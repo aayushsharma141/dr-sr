@@ -79,4 +79,12 @@
 - **Rationale:** Eliminates any risk of exposing real patient medical data in version control, logs, or public demos.
 
 ---
+
+### ADR-09: Separate Application Palette from Physical Prescription Branding
+- **Status:** Approved for UI redesign branch
+- **Context:** The earlier app shell used deep maroon across most interface surfaces because the physical prescription pad uses maroon. The supplied trust and hospital marks emphasize green, blue, and gold, and the maroon-heavy UI competed with clinical content.
+- **Decision:** Use trust green (`#155B43`) for the application identity and primary actions, clinical blue (`#234B86`) for secondary actions, restrained gold (`#C39A35`) for small highlights, a neutral canvas (`#F5F7F5`), and teal (`#0D9488`) for focus/interaction. Keep the maroon prescription header in the A4 document builder.
+- **Rationale:** Distinguishes the working desktop application from the printed form while grounding the UI palette in the actual trust/hospital branding.
+
+---
 *Decisions logged and baselined.*
