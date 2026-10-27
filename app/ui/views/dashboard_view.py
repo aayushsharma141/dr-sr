@@ -1,12 +1,16 @@
 """
 Live Hospital Dashboard for Kalyan Hospital.
-UI-only redesign: preserves all service calls, data keys, and navigation signals.
+UI-only redesign: keeps existing service calls, data keys, and navigation signals.
 """
+from pathlib import Path
+
 from PySide6.QtCore import Qt, Signal, QDateTime
+from PySide6.QtGui import QPixmap
 from PySide6.QtWidgets import (
     QFrame, QHBoxLayout, QHeaderView, QLabel, QPushButton,
     QTableWidget, QTableWidgetItem, QVBoxLayout, QWidget,
 )
+
 from app.config import (
     CLINIC_1_ADDR, CLINIC_2_ADDR, COLORS, DOCTORS, HOSPITAL_DEPT,
     HOSPITAL_NAME, HOSPITAL_NAME_HINDI, TRUST_NAME,
@@ -14,8 +18,11 @@ from app.config import (
 from app.services.dashboard_service import DashboardService
 
 
+ASSET_DIR = Path(__file__).resolve().parents[2] / "assets"
+
+
 class StatCard(QFrame):
-    """Compact metric card with a color accent and text-based icon badge."""
+    """Compact metric card with a brand-color accent and typographic icon."""
 
     def __init__(
         self,
@@ -87,37 +94,47 @@ class DashboardView(QWidget):
         self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
 
         root_layout = QVBoxLayout(self)
-        root_layout.setContentsMargins(24, 20, 24, 18)
-        root_layout.setSpacing(14)
+        root_layout.setContentsMargins(24, 18, 24, 16)
+        root_layout.setSpacing(12)
 
-        # Brand header: clinic identity and branch information, no stock imagery.
+        # Header row: supplied hospital logo, identity, and a correctly positioned
+        # physiotherapist helping a patient with a supported knee-flexion exercise.
         header_box = QFrame()
         header_box.setObjectName("CardPanel")
-        header_box.setStyleSheet(
-            "QFrame#CardPanel { background:#FFFFFF;border:1px solid #E2E8F0;border-radius:10px; }"
-        )
         header_layout = QHBoxLayout(header_box)
-        header_layout.setContentsMargins(18, 14, 18, 14)
-        header_layout.setSpacing(14)
+        header_layout.setContentsMargins(14, 12, 14, 12)
+        header_layout.setSpacing(12)
 
-        brand_mark = QLabel("KH")
-        brand_mark.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        brand_mark.setFixedSize(54, 54)
-        brand_mark.setStyleSheet(
-            f"background:{COLORS['primary_dark']};color:#FFFFFF;border-radius:10px;"
-            "font-size:18px;font-weight:800;letter-spacing:1px;"
-        )
-        header_layout.addWidget(brand_mark, alignment=Qt.AlignmentFlag.AlignTop)
+        logo_lbl = QLabel()
+        logo_lbl.setObjectName("HospitalLogo")
+        logo_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        logo_lbl.setFixedSize(68, 68)
+        logo_path = ASSET_DIR / "kalyan_hospital_logo.jpg"
+        logo_pixmap = QPixmap(str(logo_path))
+        if not logo_pixmap.isNull():
+            logo_lbl.setPixmap(logo_pixmap.scaled(
+                logo_lbl.size(),
+                Qt.AspectRatioMode.KeepAspectRatio,
+                Qt.TransformationMode.SmoothTransformation,
+            ))
+        else:
+            logo_lbl.setText("KH")
+            logo_lbl.setStyleSheet(
+                f"background:{COLORS['primary_dark']};color:#FFFFFF;"
+                "border-radius:8px;font-size:18px;font-weight:800;"
+            )
+        header_layout.addWidget(logo_lbl, alignment=Qt.AlignmentFlag.AlignTop)
 
         header_text = QVBoxLayout()
         header_text.setSpacing(3)
         title_lbl = QLabel(f"{HOSPITAL_NAME_HINDI}  |  {HOSPITAL_NAME}")
         title_lbl.setObjectName("PageHeading")
+        title_lbl.setWordWrap(True)
         header_text.addWidget(title_lbl)
 
-        sub_info = QLabel(f"{HOSPITAL_DEPT}   ·   {TRUST_NAME}")
+        sub_info = QLabel(f"{HOSPITAL_DEPT}  ·  {TRUST_NAME}")
         sub_info.setStyleSheet(
-            f"color:{COLORS['primary']};font-size:11px;font-weight:700;letter-spacing:.25px;"
+            f"color:{COLORS['primary']};font-size:10px;font-weight:800;letter-spacing:.25px;"
         )
         sub_info.setWordWrap(True)
         header_text.addWidget(sub_info)
@@ -127,27 +144,46 @@ class DashboardView(QWidget):
         doctor_info.setObjectName("PageSubheading")
         doctor_info.setWordWrap(True)
         header_text.addWidget(doctor_info)
-
-        addresses = QLabel(f"ARA: {CLINIC_1_ADDR}\nGADHANI: {CLINIC_2_ADDR}")
-        addresses.setObjectName("PageSubheading")
-        addresses.setWordWrap(True)
-        header_text.addWidget(addresses)
-
         header_layout.addLayout(header_text, stretch=1)
 
+        scene_lbl = QLabel()
+        scene_lbl.setObjectName("PhysiotherapyHeaderImage")
+        scene_lbl.setFixedSize(232, 96)
+        scene_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        scene_lbl.setToolTip("Physiotherapist assisting a patient during a knee-mobility exercise")
+        scene_path = ASSET_DIR / "physiotherapy_header.jpg"
+        scene_pixmap = QPixmap(str(scene_path))
+        if not scene_pixmap.isNull():
+            scene_lbl.setPixmap(scene_pixmap.scaled(
+                scene_lbl.size(),
+                Qt.AspectRatioMode.IgnoreAspectRatio,
+                Qt.TransformationMode.SmoothTransformation,
+            ))
+        else:
+            scene_lbl.setText("PHYSIOTHERAPY")
+            scene_lbl.setStyleSheet(
+                f"background:{COLORS['background']};color:{COLORS['primary']};"
+                "border:1px solid #E2E8F0;border-radius:8px;font-weight:800;"
+            )
+        scene_lbl.setStyleSheet(
+            scene_lbl.styleSheet() +
+            "border:1px solid #E2E8F0;border-radius:8px;background:#F8FAFC;"
+        )
+        header_layout.addWidget(scene_lbl)
+
         header_side = QVBoxLayout()
-        header_side.setSpacing(7)
+        header_side.setSpacing(6)
         offline_badge = QLabel("●  OFFLINE · LOCAL DATA")
         offline_badge.setAlignment(Qt.AlignmentFlag.AlignCenter)
         offline_badge.setStyleSheet(
             "background:#ECFDF5;color:#166534;border:1px solid #A7F3D0;"
-            "border-radius:6px;padding:7px 9px;font-size:10px;font-weight:800;"
+            "border-radius:6px;padding:7px 8px;font-size:9px;font-weight:800;"
         )
         header_side.addWidget(offline_badge)
 
-        self.clock_label = QLabel(QDateTime.currentDateTime().toString("ddd, dd MMM yyyy  ·  hh:mm AP"))
-        self.clock_label.setAlignment(Qt.AlignmentFlag.AlignRight)
-        self.clock_label.setStyleSheet(f"color:{COLORS['text_secondary']};font-size:11px;")
+        self.clock_label = QLabel(QDateTime.currentDateTime().toString("ddd, dd MMM yyyy\nhh:mm AP"))
+        self.clock_label.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+        self.clock_label.setStyleSheet(f"color:{COLORS['text_secondary']};font-size:10px;")
         header_side.addWidget(self.clock_label)
 
         refresh_btn = QPushButton("Refresh Data")
@@ -158,7 +194,27 @@ class DashboardView(QWidget):
         header_layout.addLayout(header_side)
         root_layout.addWidget(header_box)
 
-        # Live KPI cards; values continue to come from DashboardService.
+        # Branch addresses are kept visible below the brand header.
+        branch_info = QFrame()
+        branch_info.setObjectName("ClinicInfoBar")
+        branch_info.setStyleSheet(
+            f"QFrame#ClinicInfoBar {{ background:{COLORS['primary_dark']};"
+            "border-radius:6px; }"
+        )
+        branch_layout = QHBoxLayout(branch_info)
+        branch_layout.setContentsMargins(12, 7, 12, 7)
+        branch_layout.setSpacing(10)
+        branch_icon = QLabel("CLINIC LOCATIONS")
+        branch_icon.setStyleSheet("color:#FFFFFF;font-size:9px;font-weight:800;letter-spacing:.6px;")
+        branch_layout.addWidget(branch_icon, alignment=Qt.AlignmentFlag.AlignTop)
+
+        addresses = QLabel(f"ARA: {CLINIC_1_ADDR}\nGADHANI: {CLINIC_2_ADDR}")
+        addresses.setStyleSheet("color:#F8FAFC;font-size:10px;")
+        addresses.setWordWrap(True)
+        branch_layout.addWidget(addresses, stretch=1)
+        root_layout.addWidget(branch_info)
+
+        # Live KPIs remain connected to DashboardService, not mock figures.
         cards_layout = QHBoxLayout()
         cards_layout.setSpacing(12)
         self.card_total_patients = StatCard(
@@ -182,16 +238,16 @@ class DashboardView(QWidget):
             cards_layout.addWidget(card)
         root_layout.addLayout(cards_layout)
 
-        # Keyboard-friendly quick actions.
+        # Existing navigation actions; labels are text-based rather than emoji icons.
         actions_frame = QFrame()
         actions_frame.setObjectName("CardPanel")
         actions_layout = QHBoxLayout(actions_frame)
-        actions_layout.setContentsMargins(14, 11, 14, 11)
-        actions_layout.setSpacing(9)
+        actions_layout.setContentsMargins(12, 9, 12, 9)
+        actions_layout.setSpacing(8)
 
         quick_label = QLabel("QUICK ACTIONS")
         quick_label.setStyleSheet(
-            f"font-size:10px;font-weight:800;letter-spacing:.7px;color:{COLORS['text_secondary']};"
+            f"font-size:10px;font-weight:800;letter-spacing:.6px;color:{COLORS['text_secondary']};"
         )
         actions_layout.addWidget(quick_label)
 
@@ -221,7 +277,7 @@ class DashboardView(QWidget):
         actions_layout.addStretch()
         root_layout.addWidget(actions_frame)
 
-        # Recent admissions table remains connected to the same service method.
+        # Recent admissions table is populated from the same live service method.
         table_header = QHBoxLayout()
         table_title = QLabel("Recent Patient Admissions")
         table_title.setObjectName("PageHeading")
@@ -250,8 +306,8 @@ class DashboardView(QWidget):
         self.recent_table.setAlternatingRowColors(True)
         self.recent_table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
         self.recent_table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
-        self.recent_table.verticalHeader().setDefaultSectionSize(42)
-        self.recent_table.setMinimumHeight(170)
+        self.recent_table.verticalHeader().setDefaultSectionSize(40)
+        self.recent_table.setMinimumHeight(150)
         root_layout.addWidget(self.recent_table, stretch=1)
 
         footer = QLabel(
@@ -259,7 +315,7 @@ class DashboardView(QWidget):
             "Patient information is stored on this computer"
         )
         footer.setAlignment(Qt.AlignmentFlag.AlignRight)
-        footer.setStyleSheet(f"color:{COLORS['text_secondary']};font-size:10px;padding-top:2px;")
+        footer.setStyleSheet(f"color:{COLORS['text_secondary']};font-size:10px;padding-top:1px;")
         root_layout.addWidget(footer)
 
         self.refresh_data()
