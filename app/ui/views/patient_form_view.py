@@ -157,7 +157,7 @@ class PatientFormView(QWidget):
         )
         right_layout.addWidget(self.photo_preview)
 
-        browse_photo_btn = QPushButton("📷 Choose Photo...")
+        browse_photo_btn = QPushButton("Choose Photo...")
         browse_photo_btn.setObjectName("SecondaryButton")
         browse_photo_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         browse_photo_btn.clicked.connect(self._browse_photo)
@@ -190,7 +190,7 @@ class PatientFormView(QWidget):
         cancel_btn.clicked.connect(self.cancelled.emit)
         button_row.addWidget(cancel_btn)
 
-        save_btn = QPushButton("💾  Save Patient Record")
+        save_btn = QPushButton("Save Patient Record")
         save_btn.setObjectName("PrimaryButton")
         save_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         save_btn.clicked.connect(self.save_record)
@@ -309,7 +309,7 @@ class PatientFormView(QWidget):
             self.error_banner.setVisible(False)
             self.patient_saved.emit(saved)
         except ValidationError as e:
-            self.error_banner.setText(f"⚠ {str(e)}")
+            self.error_banner.setText(f"Warning: {str(e)}")
             self.error_banner.setVisible(True)
         except Exception as e:
             self.error_banner.setText(f"Database error: {str(e)}")
