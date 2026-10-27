@@ -6,7 +6,7 @@ A standalone, 100% offline Windows desktop application built with Python, PySide
 
 ## Features (Phase 1 — Stage A)
 
-- **Official Hospital Branding:** Deep maroon theme (`#6B1736`) with clinician credentials (Dr. Madan Mohan Dwivedi & Dr. Chandan Kr. Dwivedi) and both clinic branch addresses (Ara & Gadhani).
+- **Trust-Led Clinical Branding:** Forest green (`#155B43`) and clinical blue (`#234B86`) with restrained gold accents (`#C39A35`), supplied hospital logo, bilingual trust identity, clinician credentials, and both clinic branch addresses (Ara & Gadhani). The printed A4 prescription retains the physical pad's maroon header.
 - **Navigation Sidebar:** Seamless routing between Dashboard, Patients, Treatment Sessions, Billing & Payments, and Backups.
 - **Live Database-Backed Dashboard:** Real-time metrics calculated from local SQLite database (Total Patients, Today's Admissions, Active Treatment Cases, and Outstanding Balance in ₹). Zero hardcoded mock numbers.
 - **Local-First & Offline:** Zero internet dependency, no telemetry, no cloud accounts.
