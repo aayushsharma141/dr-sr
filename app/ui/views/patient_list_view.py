@@ -60,7 +60,7 @@ class PatientListView(QWidget):
         top_row.addLayout(header_text)
         top_row.addStretch()
 
-        btn_new = QPushButton("➕  Register New Patient")
+        btn_new = QPushButton("+  Register New Patient")
         btn_new.setObjectName("PrimaryButton")
         btn_new.setCursor(Qt.CursorShape.PointingHandCursor)
         btn_new.clicked.connect(self.register_clicked.emit)
@@ -75,7 +75,7 @@ class PatientListView(QWidget):
         search_layout.setContentsMargins(16, 10, 16, 10)
         search_layout.setSpacing(12)
 
-        search_icon = QLabel("🔍")
+        search_icon = QLabel("Search")
         search_icon.setStyleSheet("font-size: 16px;")
         search_layout.addWidget(search_icon)
 
@@ -87,7 +87,7 @@ class PatientListView(QWidget):
         self.search_input.textChanged.connect(self._on_search_changed)
         search_layout.addWidget(self.search_input)
 
-        refresh_btn = QPushButton("🔄 Refresh")
+        refresh_btn = QPushButton("Refresh")
         refresh_btn.setObjectName("SecondaryButton")
         refresh_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         refresh_btn.clicked.connect(self.reload_patients)
@@ -177,7 +177,7 @@ class PatientListView(QWidget):
             actions_layout.setContentsMargins(4, 2, 4, 2)
             actions_layout.setSpacing(6)
 
-            edit_btn = QPushButton("✏ Edit")
+            edit_btn = QPushButton("Edit")
             edit_btn.setObjectName("SecondaryButton")
             edit_btn.setStyleSheet("padding: 3px 8px; font-size: 11px;")
             edit_btn.setCursor(Qt.CursorShape.PointingHandCursor)
@@ -185,14 +185,14 @@ class PatientListView(QWidget):
             edit_btn.clicked.connect(lambda _, pid=patient_id: self.edit_clicked.emit(pid))
             actions_layout.addWidget(edit_btn)
 
-            trt_btn = QPushButton("🩺 Session")
+            trt_btn = QPushButton("Session")
             trt_btn.setObjectName("SecondaryButton")
             trt_btn.setStyleSheet(f"padding: 3px 8px; font-size: 11px; color: {COLORS['secondary']};")
             trt_btn.setCursor(Qt.CursorShape.PointingHandCursor)
             trt_btn.clicked.connect(lambda _, pid=patient_id: self.open_treatment_clicked.emit(pid))
             actions_layout.addWidget(trt_btn)
 
-            print_btn = QPushButton("🖨️ Print")
+            print_btn = QPushButton("Print")
             print_btn.setObjectName("SecondaryButton")
             print_btn.setStyleSheet("padding: 3px 8px; font-size: 11px;")
             print_btn.setCursor(Qt.CursorShape.PointingHandCursor)
