@@ -90,7 +90,7 @@ class PaymentView(QWidget):
 
         sel_layout.addStretch()
 
-        refresh_btn = QPushButton("🔄 Refresh")
+        refresh_btn = QPushButton("Refresh")
         refresh_btn.setStyleSheet(f"""
             QPushButton {{
                 background-color: transparent;
@@ -138,7 +138,7 @@ class PaymentView(QWidget):
         entry_layout = QVBoxLayout(entry_frame)
         entry_layout.setSpacing(12)
 
-        entry_title = QLabel("💳 Record Partial Payment / Installment")
+        entry_title = QLabel("Record Partial Payment / Installment")
         entry_title.setStyleSheet(f"font-size: 15px; font-weight: 700; color: {COLOR_PRIMARY};")
         entry_layout.addWidget(entry_title)
 
@@ -204,7 +204,7 @@ class PaymentView(QWidget):
         form_grid.addWidget(self.note_input, 1, 1, 1, 2)
 
         # Record Button
-        self.submit_payment_btn = QPushButton("💾 Save Payment")
+        self.submit_payment_btn = QPushButton("Save Payment")
         self.submit_payment_btn.setStyleSheet(f"""
             QPushButton {{
                 background-color: {COLOR_PRIMARY};
