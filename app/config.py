@@ -62,18 +62,21 @@ DOCTORS = [
 ]
 
 # Theme & Palette Tokens
+# Application palette is trust-led: forest green, clinical blue, and restrained gold.
+# The A4 prescription design intentionally retains its own maroon palette in document_builder.py.
 COLORS = {
-    "primary": "#6B1736",         # Deep Hospital Maroon (from physical slip)
-    "primary_dark": "#500F27",
-    "primary_light": "#882347",
-    "secondary": "#0D5C75",       # Clinical Deep Teal/Slate
-    "accent": "#0D9488",          # Clinical Teal
-    "background": "#F8FAFC",      # Light Work Area
-    "surface": "#FFFFFF",         # Card / Surface White
-    "border": "#E2E8F0",          # Subtle Border
-    "text_primary": "#0F172A",    # Slate Dark Text
-    "text_secondary": "#64748B",  # Slate Muted Text
-    "success": "#16A34A",
-    "warning": "#D97706",
-    "danger": "#DC2626",
+    "primary": "#155B43",         # Trust / forest green for application actions
+    "primary_dark": "#104735",    # Sidebar and dark brand surfaces
+    "primary_light": "#24785B",   # Hover and selected states
+    "secondary": "#234B86",       # Clinical blue for secondary actions and information
+    "accent": "#0D9488",          # Clinical teal for focus and interaction
+    "gold": "#C39A35",             # Restrained heritage accent
+    "background": "#F5F7F5",      # Neutral, low-glare work area
+    "surface": "#FFFFFF",         # Form and table surfaces
+    "border": "#DDE5DF",          # Soft neutral dividers
+    "text_primary": "#202B33",    # High-contrast slate text
+    "text_secondary": "#64736D",  # Quiet supporting text
+    "success": "#16734A",
+    "warning": "#A16207",
+    "danger": "#B42318",
 }

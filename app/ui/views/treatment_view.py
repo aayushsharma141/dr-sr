@@ -43,8 +43,8 @@ class NewCaseDialog(QDialog):
         """)
 
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(24, 24, 24, 24)
-        layout.setSpacing(16)
+        layout.setContentsMargins(22, 20, 22, 20)
+        layout.setSpacing(14)
 
         title_lbl = QLabel("New Physiotherapy Treatment Case")
         title_lbl.setStyleSheet(f"font-size: 17px; font-weight: 700; color: {COLOR_PRIMARY};")
@@ -267,8 +267,8 @@ class TreatmentView(QWidget):
 
     def _setup_ui(self):
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(28, 28, 28, 28)
-        layout.setSpacing(20)
+        layout.setContentsMargins(24, 20, 24, 20)
+        layout.setSpacing(14)
 
         # 1. Header Bar
         header_layout = QHBoxLayout()

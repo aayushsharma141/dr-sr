@@ -45,8 +45,8 @@ class PatientFormView(QWidget):
         self.selected_photo_path: str | None = None
 
         root_layout = QVBoxLayout(self)
-        root_layout.setContentsMargins(28, 20, 28, 20)
-        root_layout.setSpacing(16)
+        root_layout.setContentsMargins(24, 20, 24, 20)
+        root_layout.setSpacing(14)
 
         # 1. Header with title and mode indicator
         header_layout = QHBoxLayout()
@@ -69,17 +69,25 @@ class PatientFormView(QWidget):
         form_card.setObjectName("CardPanel")
         form_layout = QHBoxLayout(form_card)
         form_layout.setContentsMargins(24, 20, 24, 20)
-        form_layout.setSpacing(32)
+        form_layout.setSpacing(24)
 
         # Left Column: Inputs Form
         left_inputs = QWidget()
         left_layout = QFormLayout(left_inputs)
         left_layout.setSpacing(12)
-        left_layout.setLabelAlignment(Qt.AlignmentFlag.AlignRight)
+        left_layout.setLabelAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
+        left_layout.setFormAlignment(Qt.AlignmentFlag.AlignTop)
+        left_layout.setFieldGrowthPolicy(QFormLayout.FieldGrowthPolicy.AllNonFixedFieldsGrow)
+        left_layout.setRowWrapPolicy(QFormLayout.RowWrapPolicy.WrapLongRows)
+
+        # Personal / contact section
+        patient_section = QLabel("PATIENT DETAILS")
+        patient_section.setObjectName("FormSectionHeading")
+        left_layout.addRow(patient_section)
 
         # Field 1: Serial / URN
         self.urn_display = QLabel("Auto-generated on save")
-        self.urn_display.setStyleSheet("font-weight: 700; color: #64748B; font-size: 13px;")
+        self.urn_display.setStyleSheet(f"font-weight: 700; color: {COLORS['text_secondary']}; font-size: 13px;")
         left_layout.addRow("1. Serial / URN No.:", self.urn_display)
 
         # Field 2: Patient Name
@@ -115,6 +123,11 @@ class PatientFormView(QWidget):
         self.input_mobile.setMaxLength(14)
         left_layout.addRow("6. Mobile No. *:", self.input_mobile)
 
+        # Visit and clinical section
+        visit_section = QLabel("VISIT & CLINICAL DETAILS")
+        visit_section.setObjectName("FormSectionHeading")
+        left_layout.addRow(visit_section)
+
         # Field 7: Patient In
         self.input_in_time = QDateTimeEdit(QDateTime.currentDateTime())
         self.input_in_time.setDisplayFormat("yyyy-MM-dd HH:mm")
@@ -146,14 +159,14 @@ class PatientFormView(QWidget):
         right_layout.setSpacing(12)
 
         photo_title = QLabel("Patient Picture")
-        photo_title.setStyleSheet("font-weight: 600; color: #475569;")
+        photo_title.setStyleSheet(f"font-weight: 700; color: {COLORS['text_primary']};")
         right_layout.addWidget(photo_title)
 
         self.photo_preview = QLabel("No Photo Selected")
         self.photo_preview.setFixedSize(140, 160)
         self.photo_preview.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.photo_preview.setStyleSheet(
-            "border: 2px dashed #CBD5E1; border-radius: 8px; background-color: #F8FAFC; color: #94A3B8;"
+            f"border: 2px dashed {COLORS['border']}; border-radius: 8px; background-color: {COLORS['background']}; color: {COLORS['text_secondary']};"
         )
         right_layout.addWidget(self.photo_preview)
 
@@ -164,7 +177,7 @@ class PatientFormView(QWidget):
         right_layout.addWidget(browse_photo_btn)
 
         clear_photo_btn = QPushButton("Remove Photo")
-        clear_photo_btn.setStyleSheet("color: #EF4444; border: none; background: transparent;")
+        clear_photo_btn.setStyleSheet(f"color: {COLORS['danger']}; border: none; background: transparent;")
         clear_photo_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         clear_photo_btn.clicked.connect(self._clear_photo)
         right_layout.addWidget(clear_photo_btn)
@@ -231,7 +244,7 @@ class PatientFormView(QWidget):
         self.selected_photo_path = None
         self.title_lbl.setText("Patient Registration Form")
         self.urn_display.setText("Auto-generated on save")
-        self.urn_display.setStyleSheet("font-weight: 700; color: #64748B; font-size: 13px;")
+        self.urn_display.setStyleSheet(f"font-weight: 700; color: {COLORS['text_secondary']}; font-size: 13px;")
         self.input_name.clear()
         self.input_age.setValue(35)
         self.input_sex.setCurrentIndex(0)

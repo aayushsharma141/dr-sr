@@ -62,6 +62,16 @@ def get_application_stylesheet() -> str:
     QLabel#StatCardTitle {{ color: {c['text_secondary']}; font-size: 11px; font-weight: 700; letter-spacing: .5px; }}
     QLabel#StatCardValue {{ color: {c['text_primary']}; font-size: 27px; font-weight: 750; }}
     QLabel#StatCardSubtitle {{ color: {c['text_secondary']}; font-size: 11px; }}
+    QLabel#FormSectionHeading {{
+        color: {c['primary']};
+        background: transparent;
+        border-bottom: 1px solid {c['border']};
+        padding: 8px 0 5px 0;
+        margin-top: 5px;
+        font-size: 10px;
+        font-weight: 800;
+        letter-spacing: .7px;
+    }}
 
     QPushButton {{
         font-family: "Segoe UI", "Nirmala UI", sans-serif;

@@ -5,6 +5,8 @@ Placeholder view for staging modules before clinical workflows are linked.
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QFrame, QLabel, QVBoxLayout, QWidget
 
+from app.config import COLORS
+
 
 class PlaceholderView(QWidget):
     """Clean placeholder card with module title, description, and icon badge."""
@@ -30,7 +32,7 @@ class PlaceholderView(QWidget):
         card_layout.setSpacing(12)
 
         icon_label = QLabel(icon)
-        icon_label.setStyleSheet("font-size: 12px; font-weight: 800; letter-spacing: 1px; color: #6B1736;")
+        icon_label.setStyleSheet(f"font-size: 12px; font-weight: 800; letter-spacing: 1px; color: {COLORS['primary']};")
         icon_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         card_layout.addWidget(icon_label)
 

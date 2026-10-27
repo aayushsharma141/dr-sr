@@ -32,7 +32,7 @@ Enumerated from `app/ui/` codebase — 11 core view and container components —
 | Component | Import path | Notes |
 |-----------|-------------|-------|
 | `MainWindow` | `app.ui.main_window` | Top-level window shell with central split layout (`CentralWidget`). |
-| `SidebarWidget` | `app.ui.sidebar` | 240px persistent maroon navigation bar with authentic Hindi/English branding. |
+| `SidebarWidget` | `app.ui.sidebar` | 240px persistent trust-green navigation bar with authentic Hindi/English branding. |
 | `DashboardView` | `app.ui.views.dashboard_view` | Real-time metric cards, quick-action shortcuts, and admissions summary. |
 | `PatientModuleView`| `app.ui.views.patient_module_view` | Tabbed wrapper toggling between intake form and searchable registry. |
 | `PatientFormView` | `app.ui.views.patient_form_view` | 12-field clinical intake form with portrait photo picker & inline validation. |
@@ -68,7 +68,7 @@ Exceptions: Fixed 240px left sidebar width, 120x140px portrait photo box.
 | Role | Size | Weight | Line Height | Usage |
 |------|------|--------|-------------|-------|
 | Display | 26px | 700 (Bold) | 1.1 | Stat card numeric metrics (`#StatCardValue`) |
-| Heading 1 | 20px | 700 (Bold) | 1.2 | Module page headers (`#PageHeading`) in Maroon (`#6B1736`) |
+| Heading 1 | 20px | 700 (Bold) | 1.2 | Module page headers (`#PageHeading`) in slate (`#202B33`) |
 | Heading 2 | 16px | 700 (Bold) | 1.25 | Sidebar Hindi title (`#SidebarTitle`), Dialog titles |
 | Body Bold | 14px | 600 (Semi) | 1.4 | Form inputs (`QLineEdit`), Table headers, Primary CTA text |
 | Body Base | 13px | 400 (Regular) | 1.45 | Application base text, navigation labels, table rows |
@@ -81,22 +81,28 @@ Exceptions: Fixed 240px left sidebar width, 120x140px portrait photo box.
 
 ## Color
 
-60/30/10 Clinical Healthcare Palette:
+60/30/10 Trust-Led Clinical Palette:
 
 | Role | Value | Usage |
 |------|-------|-------|
-| Dominant Canvas (60%) | `#F8FAFC` / `#FFFFFF` | Main window work canvas (`#F8FAFC`) and card surfaces (`#FFFFFF`). |
-| Structural Contrast (30%) | `#500F27` / `#6B1736` | Sidebar background (`#500F27`), headers, and primary identity anchors. |
-| Clinical Accent (10%) | `#0D9488` | Active focus rings, hover indicators, selection highlights. |
-| Financial Liability | `#DC2626` | Outstanding balance dues, error banners, destructive confirmation. |
-| Financial Settled | `#16A34A` | Zero outstanding balance, successful backup verification, online status. |
-| Operational Warning | `#D97706` | Overpayment warnings, unverified restore snapshots. |
+| Dominant Canvas (60%) | `#F5F7F5` / `#FFFFFF` | Low-glare work canvas and crisp card surfaces. |
+| Structural Identity (30%) | `#155B43` / `#104735` | Sidebar, primary actions, selected navigation and brand anchors. |
+| Supporting Identity | `#234B86` | Secondary actions, links and informational accents. |
+| Heritage Highlight | `#C39A35` | Small brand details only; never large background fills. |
+| Clinical Interaction | `#0D9488` | Focus rings, input focus, interaction and selection highlights. |
+| Primary Text | `#202B33` | Patient and clinical data text. |
+| Borders | `#DDE5DF` | Tables, forms, separators and cards. |
+| Financial Liability | `#B42318` | Outstanding dues, errors and destructive warnings. |
+| Financial Settled | `#16734A` | Zero balance and verified backup success. |
+| Operational Warning | `#A16207` | Overpayment warnings and unverified restore snapshots. |
 
 Accent reserved for:
-- Input `:focus` border glow (`#0D9488`)
-- Active sidebar button left indicator border (`#F43F5E`)
+- Input `:focus` border (`#0D9488`)
+- Active navigation marker (soft teal `#5EEAD4`)
 - Text selection highlights (`selection-background-color: #0D9488`)
-- Interactive hover transitions on primary actions
+- Hover state on primary and secondary actions
+
+The physical A4 prescription retains maroon (`#6B1736`) to match the supplied pad; maroon is not the dominant application-shell color.
 
 ---
 
@@ -104,16 +110,16 @@ Accent reserved for:
 
 | Element | Copy |
 |---------|------|
-| Primary Patient CTA | `"💾  Save Patient Record"` |
-| Primary Session CTA | `"💾 Save Session Record"` |
-| Primary Payment CTA | `"💾 Save Payment"` |
+| Primary Patient CTA | `"Save Patient Record"` |
+| Primary Session CTA | `"Save Session Record"` |
+| Primary Payment CTA | `"Save Payment"` |
 | Quick Registration | `"+ Register New Patient"` |
 | Empty Patient Search | `"No records matching '{query}'."` |
 | Empty Patient Registry | `"Patient registry is empty. Click 'Register New Patient' to add records."` |
 | Empty Treatment Case | `"No Active Treatment Case"` |
 | Empty Photo Box | `"No Photo Selected"` |
 | Inline Form Error Banner | `"• {field_name}: {validation_error_description}"` |
-| Destructive Reset Action | `"⚡ Reset Demo Data": "Warning: This replaces current records with synthetic demo patients. Proceed?"` |
+| Destructive Reset Action | `"Reset Demo Data": "Warning: This replaces current records with synthetic demo patients. Proceed?"` |
 | Administrative Guard | `"Administrator Authorization Required": "Enter admin password to proceed with {action}."` |
 
 ---
@@ -127,7 +133,7 @@ Accent reserved for:
 | Filter State | Search Bar | ✅ covered | Character-by-character instant filter updates table within 50ms. |
 | Inline Validation| Patient Form View | ✅ covered | Highlights invalid field in red and displays multi-line error banner. |
 | Modal Protection | Database Restore & Demo Reset | ✅ covered | PBKDF2 password challenge prevents unauthorized overrides. |
-| Visual Contrast | Left Sidebar | ✅ covered | Deep maroon (`#500F27`) background with WA_StyledBackground guarantees high contrast against white text. |
+| Visual Contrast | Left Sidebar | ✅ covered | Trust green (`#104735`) background with WA_StyledBackground guarantees high contrast against white text. |
 | High-DPI Scale | All Views | ✅ covered | Qt high-DPI scaling enabled; scalable layouts with auto-expanding gutters. |
 
 ---
