@@ -41,8 +41,8 @@ class PatientListView(QWidget):
         self.service = patient_service or PatientService()
 
         root_layout = QVBoxLayout(self)
-        root_layout.setContentsMargins(28, 20, 28, 20)
-        root_layout.setSpacing(16)
+        root_layout.setContentsMargins(24, 20, 24, 20)
+        root_layout.setSpacing(14)
 
         # 1. Header & Quick Action Row
         top_row = QHBoxLayout()
@@ -72,11 +72,11 @@ class PatientListView(QWidget):
         search_panel = QFrame()
         search_panel.setObjectName("CardPanel")
         search_layout = QHBoxLayout(search_panel)
-        search_layout.setContentsMargins(16, 10, 16, 10)
+        search_layout.setContentsMargins(14, 10, 14, 10)
         search_layout.setSpacing(12)
 
-        search_icon = QLabel("Search")
-        search_icon.setStyleSheet("font-size: 16px;")
+        search_icon = QLabel("SEARCH")
+        search_icon.setStyleSheet(f"font-size: 9px; font-weight: 800; letter-spacing: .6px; color: {COLORS['text_secondary']};")
         search_layout.addWidget(search_icon)
 
         self.search_input = QLineEdit()
@@ -84,6 +84,7 @@ class PatientListView(QWidget):
             "Search by Serial / URN No. (e.g. KH-2026-0001), Patient Name, or Mobile Number..."
         )
         self.search_input.setClearButtonEnabled(True)
+        self.search_input.setMinimumHeight(36)
         self.search_input.textChanged.connect(self._on_search_changed)
         search_layout.addWidget(self.search_input)
 
@@ -123,12 +124,13 @@ class PatientListView(QWidget):
         self.table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
         self.table.cellDoubleClicked.connect(self._on_cell_double_clicked)
         self.table.verticalHeader().setDefaultSectionSize(42)
+        self.table.verticalHeader().setMinimumSectionSize(42)
 
         root_layout.addWidget(self.table)
 
         # 4. Status Bar
         self.status_lbl = QLabel("Loading patient directory...")
-        self.status_lbl.setStyleSheet("color: #64748B; font-size: 11px;")
+        self.status_lbl.setStyleSheet(f"color: {COLORS['text_secondary']}; font-size: 11px;")
         root_layout.addWidget(self.status_lbl)
 
         # Initial load
@@ -179,7 +181,7 @@ class PatientListView(QWidget):
 
             edit_btn = QPushButton("Edit")
             edit_btn.setObjectName("SecondaryButton")
-            edit_btn.setStyleSheet("padding: 3px 8px; font-size: 11px;")
+            edit_btn.setStyleSheet("padding: 4px 9px; font-size: 11px;")
             edit_btn.setCursor(Qt.CursorShape.PointingHandCursor)
             patient_id = p["id"]
             edit_btn.clicked.connect(lambda _, pid=patient_id: self.edit_clicked.emit(pid))
@@ -187,14 +189,14 @@ class PatientListView(QWidget):
 
             trt_btn = QPushButton("Session")
             trt_btn.setObjectName("SecondaryButton")
-            trt_btn.setStyleSheet(f"padding: 3px 8px; font-size: 11px; color: {COLORS['secondary']};")
+            trt_btn.setStyleSheet(f"padding: 4px 9px; font-size: 11px; color: {COLORS['secondary']};")
             trt_btn.setCursor(Qt.CursorShape.PointingHandCursor)
             trt_btn.clicked.connect(lambda _, pid=patient_id: self.open_treatment_clicked.emit(pid))
             actions_layout.addWidget(trt_btn)
 
             print_btn = QPushButton("Print")
             print_btn.setObjectName("SecondaryButton")
-            print_btn.setStyleSheet("padding: 3px 8px; font-size: 11px;")
+            print_btn.setStyleSheet("padding: 4px 9px; font-size: 11px;")
             print_btn.setCursor(Qt.CursorShape.PointingHandCursor)
             print_btn.clicked.connect(lambda _, pt=p: self._on_print_patient(pt))
             actions_layout.addWidget(print_btn)
