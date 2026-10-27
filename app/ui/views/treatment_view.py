@@ -215,7 +215,7 @@ class LogSessionDialog(QDialog):
         cancel_btn.clicked.connect(self.reject)
         btn_layout.addWidget(cancel_btn)
 
-        save_btn = QPushButton("💾 Save Session Record")
+        save_btn = QPushButton("Save Session Record")
         save_btn.setStyleSheet(f"""
             QPushButton {{
                 background-color: {COLOR_PRIMARY};
@@ -284,7 +284,7 @@ class TreatmentView(QWidget):
 
         header_layout.addStretch()
 
-        self.new_case_btn = QPushButton("➕ Open New Case")
+        self.new_case_btn = QPushButton("Open New Case")
         self.new_case_btn.setStyleSheet(f"""
             QPushButton {{
                 background-color: transparent;
@@ -299,7 +299,7 @@ class TreatmentView(QWidget):
         self.new_case_btn.clicked.connect(self._on_new_case_clicked)
         header_layout.addWidget(self.new_case_btn)
 
-        self.log_session_btn = QPushButton("📝 Log Session")
+        self.log_session_btn = QPushButton("Log Session")
         self.log_session_btn.setStyleSheet(f"""
             QPushButton {{
                 background-color: {COLOR_PRIMARY};
@@ -349,7 +349,7 @@ class TreatmentView(QWidget):
 
         sel_layout.addStretch()
 
-        self.billing_shortcut_btn = QPushButton("💳 View Financials & Ledger")
+        self.billing_shortcut_btn = QPushButton("View Financials & Ledger")
         self.billing_shortcut_btn.setStyleSheet(f"""
             QPushButton {{
                 background-color: {COLOR_SECONDARY};
