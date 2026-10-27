@@ -10,9 +10,11 @@
 ## Pre-Demo Preparation (15 Seconds Before Meeting)
 
 1. Launch the application:
-   ```bash
-   python main.py
-   ```
+   - **Option A (Easiest):** Double-click `run.bat` in the project folder.
+   - **Option B (PowerShell):**
+     ```powershell
+     .\.venv\Scripts\python.exe main.py
+     ```
 2. Open **"Local Backup & Data Safety"** in the sidebar.
 3. Click **"⚡ Reset Demo Data"** and enter the admin password: `kalyan@admin`.
    - *Result:* In < 1 second, the database is reset with 5 realistic patients, active treatment cases, and payment records.

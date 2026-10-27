@@ -39,9 +39,11 @@ pip install -r requirements.txt
 
 ### 3. Launch the Application
 
-```powershell
-python main.py
-```
+- **Option A (One-click double-click):** Double-click `run.bat` in File Explorer.
+- **Option B (PowerShell):**
+  ```powershell
+  .\.venv\Scripts\python.exe main.py
+  ```
 
 ---
 
