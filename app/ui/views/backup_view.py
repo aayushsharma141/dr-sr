@@ -55,7 +55,7 @@ class BackupView(QWidget):
 
         header_layout.addStretch()
 
-        self.reset_demo_btn = QPushButton("⚡ Reset Demo Data")
+        self.reset_demo_btn = QPushButton("Reset Demo Data")
         self.reset_demo_btn.setStyleSheet(f"""
             QPushButton {{
                 background-color: transparent;
@@ -71,7 +71,7 @@ class BackupView(QWidget):
         self.reset_demo_btn.clicked.connect(self._on_reset_demo_clicked)
         header_layout.addWidget(self.reset_demo_btn)
 
-        self.create_backup_btn = QPushButton("💾 Create Backup Now")
+        self.create_backup_btn = QPushButton("Create Backup Now")
         self.create_backup_btn.setStyleSheet(f"""
             QPushButton {{
                 background-color: {COLOR_PRIMARY};
@@ -229,13 +229,13 @@ class BackupView(QWidget):
             actions_layout.setContentsMargins(4, 2, 4, 2)
             actions_layout.setSpacing(6)
 
-            verify_btn = QPushButton("🔍 Verify")
+            verify_btn = QPushButton("Verify")
             verify_btn.setStyleSheet("padding: 4px 8px; font-size: 11px;")
             b_path = b["path"]
             verify_btn.clicked.connect(lambda _, path=b_path: self._on_verify_backup(path))
             actions_layout.addWidget(verify_btn)
 
-            restore_btn = QPushButton("🔄 Restore")
+            restore_btn = QPushButton("Restore")
             restore_btn.setStyleSheet(f"""
                 QPushButton {{
                     background-color: {COLOR_DANGER};
@@ -288,7 +288,7 @@ class BackupView(QWidget):
         else:
             QMessageBox.warning(
                 self,
-                "Integrity Check: FAILED ⚠️",
+                "Integrity Check: FAILED",
                 f"Backup file integrity validation failed:\n\n{info.get('error')}"
             )
 
@@ -302,7 +302,7 @@ class BackupView(QWidget):
             self,
             "Confirm Database Restoration",
             f"Are you sure you want to restore database from:\n\n'{filename}'?\n\n"
-            f"⚠️ WARNING: This will replace the active database with the data in this snapshot.\n"
+            f"WARNING: This will replace the active database with the data in this snapshot.\n"
             f"A safety rollback snapshot of the current state will be created automatically.",
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
             QMessageBox.StandardButton.No,
@@ -340,7 +340,7 @@ class BackupView(QWidget):
             self,
             "Confirm Demo Reset",
             "Are you sure you want to reset the database to clean demo data?\n\n"
-            "⚡ This will clear current transactional records and re-seed the 5 realistic "
+            "This will clear current transactional records and re-seed the 5 realistic "
             "fictional demo patients with treatment cases and payment histories.\n\n"
             "This action executes in < 1 second.",
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
