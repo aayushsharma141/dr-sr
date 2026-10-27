@@ -96,8 +96,8 @@ class SidebarWidget(QWidget):
             (0, "Dashboard"),
             (1, "Patient Registry"),
             (2, "Treatment Sessions"),
-            (3, "Billing & Payments"),
-            (4, "Backup & Safety"),
+            (3, "Billing && Payments"),
+            (4, "Backup && Safety"),
         ]
         self.nav_buttons: list[QPushButton] = []
         for index, label in nav_items:

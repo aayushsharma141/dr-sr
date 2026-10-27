@@ -123,8 +123,11 @@ class BackupView(QWidget):
         header.setSectionResizeMode(3, QHeaderView.ResizeToContents)
         header.setSectionResizeMode(4, QHeaderView.ResizeToContents)
         header.setSectionResizeMode(5, QHeaderView.ResizeToContents)
-        header.setSectionResizeMode(6, QHeaderView.ResizeToContents)
+        header.setSectionResizeMode(6, QHeaderView.Fixed)
+        self.table.setColumnWidth(6, 160)
         self.table.verticalHeader().setVisible(False)
+        self.table.verticalHeader().setDefaultSectionSize(40)
+        self.table.verticalHeader().setMinimumSectionSize(40)
         self.table.setAlternatingRowColors(True)
         self.table.setStyleSheet(f"""
             QTableWidget {{
@@ -230,23 +233,25 @@ class BackupView(QWidget):
             actions_layout.setSpacing(6)
 
             verify_btn = QPushButton("Verify")
-            verify_btn.setStyleSheet("padding: 4px 8px; font-size: 11px;")
+            verify_btn.setObjectName("SecondaryButton")
+            verify_btn.setStyleSheet("padding: 3px 8px; font-size: 11px;")
             b_path = b["path"]
             verify_btn.clicked.connect(lambda _, path=b_path: self._on_verify_backup(path))
             actions_layout.addWidget(verify_btn)
 
             restore_btn = QPushButton("Restore")
+            restore_btn.setObjectName("DangerButton")
             restore_btn.setStyleSheet(f"""
                 QPushButton {{
                     background-color: {COLOR_DANGER};
                     color: white;
-                    border: none;
-                    border-radius: 4px;
-                    padding: 4px 10px;
+                    border: 1px solid {COLOR_DANGER};
+                    border-radius: 5px;
+                    padding: 3px 9px;
                     font-size: 11px;
                     font-weight: 600;
                 }}
-                QPushButton:hover {{ background-color: #B91C1C; }}
+                QPushButton:hover {{ background-color: #991B1B; }}
             """)
             restore_btn.clicked.connect(lambda _, path=b_path, name=b["filename"]: self._on_restore_backup(path, name))
             actions_layout.addWidget(restore_btn)

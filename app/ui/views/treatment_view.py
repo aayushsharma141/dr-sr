@@ -349,7 +349,7 @@ class TreatmentView(QWidget):
 
         sel_layout.addStretch()
 
-        self.billing_shortcut_btn = QPushButton("View Financials & Ledger")
+        self.billing_shortcut_btn = QPushButton("View Financials && Ledger")
         self.billing_shortcut_btn.setStyleSheet(f"""
             QPushButton {{
                 background-color: {COLOR_SECONDARY};

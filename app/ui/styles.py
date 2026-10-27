@@ -59,7 +59,7 @@ def get_application_stylesheet() -> str:
     QFrame#StatCard, QFrame#CardPanel {{
         background: #FFFFFF; border: 1px solid {c['border']}; border-radius: 10px;
     }}
-    QLabel#StatCardTitle {{ color: {c['text_secondary']}; font-size: 11px; font-weight: 700; letter-spacing: .5px; }}
+    QLabel#StatCardTitle {{ color: {c['text_secondary']}; font-size: 10px; font-weight: 700; letter-spacing: .5px; }}
     QLabel#StatCardValue {{ color: {c['text_primary']}; font-size: 27px; font-weight: 750; }}
     QLabel#StatCardSubtitle {{ color: {c['text_secondary']}; font-size: 11px; }}
     QLabel#FormSectionHeading {{

@@ -276,7 +276,7 @@ class DashboardView(QWidget):
         btn_new_treatment.clicked.connect(lambda: self.navigate_to.emit(2))
         actions_layout.addWidget(btn_new_treatment)
 
-        btn_payments = QPushButton("Billing & Payments")
+        btn_payments = QPushButton("Billing && Payments")
         btn_payments.setObjectName("SecondaryButton")
         btn_payments.setCursor(Qt.CursorShape.PointingHandCursor)
         btn_payments.clicked.connect(lambda: self.navigate_to.emit(3))
@@ -343,4 +343,5 @@ class DashboardView(QWidget):
             age_sex = f"{patient.get('age', '')} / {patient.get('sex', '')}"
             self.recent_table.setItem(row, 2, QTableWidgetItem(age_sex))
             self.recent_table.setItem(row, 3, QTableWidgetItem(str(patient.get("patient_condition", ""))))
-            self.recent_table.setItem(row, 4, QTableWidgetItem(str(patient.get("registered_at", ""))[:16]))
+            reg_time = str(patient.get("created_at") or patient.get("registered_at") or patient.get("patient_in") or "")[:16]
+            self.recent_table.setItem(row, 4, QTableWidgetItem(reg_time))

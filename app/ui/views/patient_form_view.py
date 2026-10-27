@@ -132,7 +132,7 @@ class PatientFormView(QWidget):
         self.input_in_time = QDateTimeEdit(QDateTime.currentDateTime())
         self.input_in_time.setDisplayFormat("yyyy-MM-dd HH:mm")
         self.input_in_time.setCalendarPopup(True)
-        left_layout.addRow("7. Patient In (Date & Time):", self.input_in_time)
+        left_layout.addRow("7. Patient In (Date && Time):", self.input_in_time)
 
         # Field 8: Patient Out
         self.input_out_time = QDateTimeEdit(QDateTime.currentDateTime())

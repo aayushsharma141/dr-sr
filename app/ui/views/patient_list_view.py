@@ -117,7 +117,8 @@ class PatientListView(QWidget):
         header.setSectionResizeMode(3, QHeaderView.ResizeMode.ResizeToContents)
         header.setSectionResizeMode(4, QHeaderView.ResizeMode.Stretch)
         header.setSectionResizeMode(5, QHeaderView.ResizeMode.ResizeToContents)
-        header.setSectionResizeMode(6, QHeaderView.ResizeMode.ResizeToContents)
+        header.setSectionResizeMode(6, QHeaderView.ResizeMode.Fixed)
+        self.table.setColumnWidth(6, 185)
 
         self.table.setAlternatingRowColors(True)
         self.table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
@@ -170,7 +171,8 @@ class PatientListView(QWidget):
             self.table.setItem(row, 4, cond_item)
 
             # 5. Registered At
-            reg_item = QTableWidgetItem(str(p.get("registered_at", ""))[:16])
+            reg_time = str(p.get("created_at") or p.get("registered_at") or p.get("patient_in") or "")[:16]
+            reg_item = QTableWidgetItem(reg_time)
             self.table.setItem(row, 5, reg_item)
 
             # 6. Action buttons container
