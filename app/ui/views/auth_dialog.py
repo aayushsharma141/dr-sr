@@ -46,7 +46,7 @@ class AdminAuthDialog(QDialog):
         layout.setContentsMargins(24, 24, 24, 24)
         layout.setSpacing(16)
 
-        header_lbl = QLabel("🔒 Administrator Password Required")
+        header_lbl = QLabel("Administrator Authentication Required")
         header_lbl.setStyleSheet(f"font-size: 16px; font-weight: 700; color: {COLOR_PRIMARY};")
         layout.addWidget(header_lbl)
 
