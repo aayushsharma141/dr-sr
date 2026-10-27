@@ -32,6 +32,7 @@ class SidebarWidget(QWidget):
     def __init__(self, parent: QWidget | None = None):
         super().__init__(parent)
         self.setObjectName("SidebarWidget")
+        self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
         self.setFixedWidth(240)
 
         layout = QVBoxLayout(self)
@@ -39,7 +40,8 @@ class SidebarWidget(QWidget):
         layout.setSpacing(0)
 
         # 1. Header Branding Container
-        header_container = QWidget()
+        header_container = QWidget(self)
+        header_container.setStyleSheet("background: transparent;")
         header_layout = QVBoxLayout(header_container)
         header_layout.setContentsMargins(20, 24, 20, 20)
         header_layout.setSpacing(4)
@@ -101,7 +103,8 @@ class SidebarWidget(QWidget):
         layout.addStretch()
 
         # 4. Footer Status Area
-        footer_container = QWidget()
+        footer_container = QWidget(self)
+        footer_container.setStyleSheet("background: transparent;")
         footer_layout = QVBoxLayout(footer_container)
         footer_layout.setContentsMargins(20, 12, 20, 0)
         footer_layout.setSpacing(4)

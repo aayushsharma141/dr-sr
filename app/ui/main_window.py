@@ -42,6 +42,7 @@ class MainWindow(QMainWindow):
 
         # Central Layout Container
         central_widget = QWidget(self)
+        central_widget.setObjectName("CentralWidget")
         self.setCentralWidget(central_widget)
 
         root_layout = QHBoxLayout(central_widget)

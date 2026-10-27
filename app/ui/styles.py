@@ -22,17 +22,25 @@ def get_application_stylesheet() -> str:
     """Returns the unified QSS stylesheet for the application."""
     return f"""
     /* Global Application Styles */
-    QMainWindow, QWidget {{
+    QMainWindow, QWidget#CentralWidget, QStackedWidget#MainContent {{
         background-color: {COLORS['background']};
         color: {COLORS['text_primary']};
-        font-family: "Segoe UI", -apple-system, BlinkMacSystemFont, "Segoe UI Web (West European)", "Helvetica Neue", sans-serif;
+    }}
+
+    QWidget {{
+        color: {COLORS['text_primary']};
+        font-family: "Segoe UI", "Nirmala UI", -apple-system, BlinkMacSystemFont, "Segoe UI Web (West European)", "Helvetica Neue", sans-serif;
         font-size: 13px;
     }}
 
     /* Sidebar Styling */
-    QWidget#SidebarWidget {{
+    QWidget#SidebarWidget, QFrame#SidebarWidget {{
         background-color: {COLORS['primary_dark']};
         border-right: 1px solid {COLORS['primary_light']};
+    }}
+
+    #SidebarWidget QLabel {{
+        background-color: transparent;
     }}
 
     QLabel#SidebarTitle {{
@@ -175,6 +183,37 @@ def get_application_stylesheet() -> str:
     QLineEdit:focus, QComboBox:focus, QTextEdit:focus, QSpinBox:focus, QDateEdit:focus {{
         border: 1px solid {COLORS['accent']};
         outline: none;
+    }}
+
+    /* Table & Header Styling */
+    QTableWidget {{
+        background-color: {COLORS['surface']};
+        border: 1px solid {COLORS['border']};
+        border-radius: 8px;
+        gridline-color: {COLORS['border']};
+        selection-background-color: #F1F5F9;
+        selection-color: {COLORS['text_primary']};
+    }}
+
+    QTableWidget::item {{
+        padding: 8px 12px;
+        border-bottom: 1px solid {COLORS['border']};
+    }}
+
+    QTableWidget::item:hover {{
+        background-color: #F8FAFC;
+    }}
+
+    QHeaderView::section {{
+        background-color: #F8FAFC;
+        color: {COLORS['text_secondary']};
+        font-weight: 600;
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        border: none;
+        border-bottom: 2px solid {COLORS['border']};
+        padding: 8px 12px;
     }}
 
     /* Scrollbars */
