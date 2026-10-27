@@ -13,7 +13,7 @@ class PlaceholderView(QWidget):
         self,
         title: str,
         description: str,
-        icon: str = "📁",
+        icon: str = "INFO",
         parent: QWidget | None = None,
     ):
         super().__init__(parent)
@@ -30,7 +30,7 @@ class PlaceholderView(QWidget):
         card_layout.setSpacing(12)
 
         icon_label = QLabel(icon)
-        icon_label.setStyleSheet("font-size: 40px;")
+        icon_label.setStyleSheet("font-size: 12px; font-weight: 800; letter-spacing: 1px; color: #6B1736;")
         icon_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         card_layout.addWidget(icon_label)
 
