@@ -18,6 +18,13 @@ from app.config import (
 from app.services.dashboard_service import DashboardService
 
 
+def _rgba(hex_color: str, alpha: int) -> str:
+    """Convert #RRGGBB to Qt's rgba() syntax for tinted icon badges."""
+    value = hex_color.lstrip("#")
+    red, green, blue = (int(value[i:i + 2], 16) for i in (0, 2, 4))
+    return f"rgba({red}, {green}, {blue}, {alpha})"
+
+
 ASSET_DIR = Path(__file__).resolve().parents[2] / "assets"
 
 
@@ -59,7 +66,7 @@ class StatCard(QFrame):
         icon_badge.setAlignment(Qt.AlignmentFlag.AlignCenter)
         icon_badge.setFixedSize(30, 30)
         icon_badge.setStyleSheet(
-            f"background:{accent}18;color:{accent};border:1px solid {accent}55;"
+            f"background:{_rgba(accent, 22)};color:{accent};border:1px solid {_rgba(accent, 85)};"
             "border-radius:7px;font-weight:800;font-size:11px;"
         )
         header.addWidget(icon_badge)
