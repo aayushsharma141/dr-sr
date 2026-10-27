@@ -38,8 +38,8 @@ class BackupView(QWidget):
 
     def _setup_ui(self):
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(28, 28, 28, 28)
-        layout.setSpacing(20)
+        layout.setContentsMargins(24, 20, 24, 20)
+        layout.setSpacing(14)
 
         # 1. Header Bar
         header_layout = QHBoxLayout()
@@ -91,7 +91,7 @@ class BackupView(QWidget):
 
         # 2. Metric Stat Cards
         cards_layout = QHBoxLayout()
-        cards_layout.setSpacing(16)
+        cards_layout.setSpacing(12)
 
         self.db_size_card = self._create_metric_card("Active Database Size", "0.0 KB", COLOR_SECONDARY)
         cards_layout.addWidget(self.db_size_card)
