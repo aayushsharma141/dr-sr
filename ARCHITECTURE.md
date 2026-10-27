@@ -362,12 +362,13 @@ CREATE TABLE IF NOT EXISTS id_sequences (
 
 ## 5. UI Layout & Style System
 
-- **Layout Container:** `QMainWindow` featuring a fixed left navigation sidebar (220px width) and a central `QStackedWidget` for view switching.
+- **Layout Container:** `QMainWindow` featuring a fixed left navigation sidebar (240px width) and a central `QStackedWidget` for view switching.
 - **Palette & Typography:**
-  - Background: Crisp, clean clinic white (`#FFFFFF`) with light grey work areas (`#F8FAFC`).
-  - Brand Accent: Deep clinical maroon/navy (`#6B1736` / `#0D5C75`) with subtle teal highlights (`#14B8A6`).
-  - Text: High-contrast slate grey (`#1E293B`) using clean system fonts (`Segoe UI`, `Arial`).
-  - Borders & Cards: Subtle borders (`#E2E8F0`) with rounded corners (6px).
+  - Application canvas: Neutral clinic surface (`#F5F7F5`) and white cards (`#FFFFFF`).
+  - Application identity: Trust green (`#155B43`), clinical blue (`#234B86`), and restrained gold (`#C39A35`); teal (`#0D9488`) remains the focus/interaction accent.
+  - Text: High-contrast slate (`#202B33`) with `Segoe UI` and `Nirmala UI` fallbacks for Hindi.
+  - Borders & Cards: Soft neutral borders (`#DDE5DF`) and 8–10px card corners.
+  - Print identity: The A4 prescription retains the physical pad's maroon header (`#6B1736`); print branding is intentionally separate from the app-shell palette.
 - **No external fonts/CDNs:** 100% locally bundled Qt styling.
 
 ---
