@@ -206,84 +206,125 @@ class DocumentBuilder:
     ) -> str:
         """
         Generates standard ISO A4 portrait HTML document reproducing the official
-        physical prescription slip of Kalyan Hospital, Ara, Bihar with 12 clinical fields.
+        physical prescription slip and registration record of Kalyan Hospital, Ara, Bihar.
+        Matches 100% of the signed-off physical PDF layout.
         """
-        urn = patient_data.get("serial_urn_no", "KH-2026-____")
-        name = patient_data.get("patient_name", "___________________________________")
-        age = str(patient_data.get("age", "____"))
-        sex = patient_data.get("sex", "_________")
-        age_sex = f"{age} Yrs / {sex}"
-        address = patient_data.get("address", "______________________________________________________")
-        mobile = patient_data.get("mobile_no", "____________________")
-        patient_in_raw = str(patient_data.get("patient_in") or patient_data.get("created_at") or "_________________________")
+        patient_data = patient_data or {}
+        case_data = case_data or {}
+        financial_summary = financial_summary or {}
+
+        urn = patient_data.get("serial_urn_no", "")
+        name = patient_data.get("patient_name", "")
+        age = str(patient_data.get("age", "")) if patient_data.get("age") is not None else ""
+        sex = patient_data.get("sex", "")
+        age_sex = f"{age} Yrs / {sex}" if age and sex else (age or sex)
+        address = patient_data.get("address", "")
+        mobile = patient_data.get("mobile_no", "")
+        patient_in_raw = str(patient_data.get("patient_in") or patient_data.get("created_at") or "")
         patient_in = patient_in_raw
-        patient_out = str(patient_data.get("patient_out") or "_________________________")
-        referred_by = patient_data.get("referred_by") or "___________________________________"
-        condition = patient_data.get("patient_condition", "______________________________________________________")
-        date_str = patient_in_raw[:10]
-        doctor_name = patient_data.get("doctor_name") or ""
-        doctor_name = doctor_name or "___________________________________"
+        patient_out = str(patient_data.get("patient_out") or "")
+        referred_by = patient_data.get("referred_by", "")
+        condition = patient_data.get("patient_condition", "")
+        date_str = patient_in_raw[:10] if patient_in_raw else ""
+        doctor_name = patient_data.get("doctor_name", "")
+
         # Case & Session details (Field 11)
         if case_data:
-            target_sessions = str(case_data.get("no_of_sessions", "____"))
-            case_title = case_data.get("title", "")
-            sessions_display = f"{target_sessions} Sessions ({case_title})" if case_title else f"{target_sessions} Sessions"
+            target_sessions = str(case_data.get("no_of_sessions", ""))
+            case_title = str(case_data.get("title", ""))
+            if target_sessions and case_title:
+                sessions_display = f"{target_sessions} Sessions ({case_title})"
+            elif target_sessions:
+                sessions_display = f"{target_sessions} Sessions"
+            else:
+                sessions_display = case_title
         else:
-            sessions_display = "10 Sessions (Physiotherapy Protocol)"
+            sessions_display = ""
 
         # Financial details (Field 12)
         if financial_summary:
-            total_amt_str = str(financial_summary.get("total_fee_formatted", "₹ ______________"))
-            paid_amt_str = str(financial_summary.get("total_paid_formatted", "₹ ______________"))
-            balance_str = str(financial_summary.get("balance_formatted", "₹ ______________"))
+            total_amt_str = str(financial_summary.get("total_fee_formatted", ""))
+            paid_amt_str = str(financial_summary.get("total_paid_formatted", ""))
+            balance_str = str(financial_summary.get("balance_formatted", ""))
         elif case_data and "total_amount_paise" in case_data:
             paise = case_data["total_amount_paise"]
             total_amt_str = BillingService.format_inr(paise)
             paid_amt_str = "₹ 0.00"
             balance_str = total_amt_str
         else:
-            total_amt_str = "₹ ______________"
-            paid_amt_str = "₹ ______________"
-            balance_str = "₹ ______________"
+            total_amt_str = ""
+            paid_amt_str = ""
+            balance_str = ""
 
-        # Photo handling: 35mm x 45mm at 96 dpi = 132 x 170 px. Stored photos are already cropped
-        # to this ratio, so a fixed-size <img> is never stretched.
+        # Photo handling: 35mm x 45mm
         resolved_photo = photo_path or patient_data.get("photo_full_path") or patient_data.get("photo_path")
         photo_src = cls._image_to_base64_src(resolved_photo)
         if photo_src:
-            photo_html = f'<img src="{photo_src}" width="128" height="166" alt="Patient Photo" />'
+            photo_html = f'<img src="{photo_src}" width="124" height="155" style="display:block; object-fit: cover; border-radius: 2px;" alt="Patient Photo" />'
         else:
-            photo_html = (
-                '<table width="128" height="166" cellpadding="0" cellspacing="0"><tr>'
-                '<td align="center" valign="middle" bgcolor="#F8FAFC" '
-                'style="color: #64748B; font-size: 11px;">Patient Photo<br/>'
-                '<span style="font-size: 9px; color: #94A3B8;">35mm x 45mm</span></td></tr></table>'            )
+            photo_html = '''<table width="100%" height="100%" cellpadding="0" cellspacing="0">
+              <tr>
+                <td align="center" valign="middle" style="color: #94A3B8; font-family: 'Segoe UI', Arial, sans-serif; font-size: 11px; text-align: center;">
+                  Patient Photo<br/>
+                  <span style="font-size: 9px; color: #CBD5E1;">35 mm × 45 mm</span>
+                </td>
+              </tr>
+            </table>'''
 
-        # Escape every user-entered value used below (after the photo, which is trusted markup).
-        urn, name, age, sex, address, mobile, patient_in, patient_out, referred_by, condition, date_str, doctor_name = (
-            _esc(v) for v in (
-                urn, name, age, sex, address, mobile, patient_in, patient_out,
-                referred_by, condition, date_str, doctor_name,
-            )
+        # Escape user-entered text safely
+        urn_esc, name_esc, age_esc, sex_esc, address_esc, mobile_esc = (
+            _esc(v) for v in (urn, name, age, sex, address, mobile)
         )
-        age_sex = f"{age} Yrs / {sex}"
-        sessions_display = _esc(sessions_display)
-        total_amt_str, paid_amt_str, balance_str = (_esc(v) for v in (total_amt_str, paid_amt_str, balance_str))
+        patient_in_esc, patient_out_esc, referred_by_esc, condition_esc = (
+            _esc(v) for v in (patient_in, patient_out, referred_by, condition)
+        )
+        date_str_esc, doctor_name_esc = _esc(date_str), _esc(doctor_name)
+        age_sex_esc = f"{age_esc} Yrs / {sex_esc}" if age_esc and sex_esc else (age_esc or sex_esc)
+        sessions_display_esc = _esc(sessions_display)
+        total_amt_esc, paid_amt_esc, balance_esc = (_esc(v) for v in (total_amt_str, paid_amt_str, balance_str))
 
+        # Letterhead (show_serial=False so Sl No is not placed in the crimson banner)
         letterhead = cls._build_letterhead_html(
-            urn=urn,
-            name=name,
-            age_sex=age_sex,
-            date_str=date_str,
-            address=address,
-            referred_by=referred_by,
+            urn=urn_esc,
+            name=name_esc,
+            age_sex=age_sex_esc,
+            date_str=date_str_esc,
+            address=address_esc,
+            referred_by=referred_by_esc,
+            show_serial=False,
         )
+
+        # Doctor Checkboxes
+        doc_lower = doctor_name.lower()
+        is_madan = "madan" in doc_lower
+        is_chandan = "chandan" in doc_lower
+        cb_madan = "&#9745;" if is_madan else "&#9633;"
+        cb_chandan = "&#9745;" if is_chandan else "&#9633;"
+
+        # Badge
+        badge_text = f"RECORD #{urn_esc}" if urn_esc and not urn_esc.startswith("KH-2026-____") else "RECORD #KH-"
+
+        # Date for authorized signature
+        date_sig = f"<b>{date_str_esc}</b>" if date_str_esc and not date_str_esc.startswith("___") else "___/___/_____"
+
+        # Payment values
+        total_disp = total_amt_esc if (total_amt_esc and "___" not in total_amt_esc) else "₹ ____________________"
+        paid_disp = paid_amt_esc if (paid_amt_esc and "___" not in paid_amt_esc) else "₹ ____________________"
+        bal_disp = balance_esc if (balance_esc and "___" not in balance_esc) else "₹ ____________________"
+
+        def dot_cell(val: str, color: str = "#0F172A", align: str = "left"):
+            content = f'<b style="color: {color}; font-size: 11.5px;">{val}</b>' if val and not val.startswith("___") else "&nbsp;"
+            return f'<td class="dot-line" align="{align}">{content}</td>'
+
+        age_display = f"{age_esc} Yrs" if age_esc and not age_esc.startswith("_") else ""
+        sex_display = sex_esc if sex_esc and not sex_esc.startswith("_") else ""
+        urn_display = urn_esc if urn_esc and not urn_esc.startswith("KH-2026-____") else ""
 
         return f"""<!DOCTYPE html>
 <html lang="hi">
 <head>
 <meta charset="UTF-8">
-<title>Patient Registration & Treatment Record - {urn}</title>
+<title>Patient Registration & Treatment Record - {urn_esc or 'KH'}</title>
 <style>
   @page {{
     size: A4 portrait;
@@ -298,26 +339,29 @@ class DocumentBuilder:
     font-family: 'Segoe UI', 'Nirmala UI', Arial, sans-serif;
     margin: 0;
     padding: 0;
-    color: #0F172A;
+    color: #1E293B;
     background-color: #FFFFFF;
-    font-size: 12px;
-    line-height: 1.35;
+    font-size: 11px;
+    line-height: 1.25;
   }}
   .a4-container {{
     width: 100%;
     margin: 0 auto;
     background-color: #FFFFFF;
   }}
-  .field-label {{
+  .lbl {{
     font-weight: 700;
-    color: #475569;
-    font-size: 12px;
-  }}
-  .field-value {{
-    font-weight: 600;
     color: #0F172A;
-    border-bottom: 1px solid #CBD5E1;
-    padding-bottom: 2px;
+    font-size: 11.5px;
+    white-space: nowrap;
+    vertical-align: bottom;
+    padding-bottom: 1px;
+  }}
+  .dot-line {{
+    border-bottom: 1px dotted #475569;
+    vertical-align: bottom;
+    padding: 0 4px;
+    font-size: 11.5px;
   }}
 </style>
 </head>
@@ -326,106 +370,133 @@ class DocumentBuilder:
 <div class="a4-container">
   {letterhead}
 
-  <!-- 4. PATIENT REGISTRATION & CLINICAL MASTER RECORD -->
-  <div style="padding: 10px 16px; background-color: #FFFFFF;">
-    <!-- Title Bar -->
-    <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom: 4px; border-bottom: 1px solid #E2E8F0; padding-bottom: 2px;">      <tr>
-        <td>
-          <span style="font-size: 13.5px; font-weight: 800; color: #7A1B3C; ">PATIENT REGISTRATION & TREATMENT RECORD</span>
+  <!-- 4. RECORD TITLE BAR -->
+  <table width="100%" cellpadding="0" cellspacing="0" style="margin-top: 8px; margin-bottom: 6px;">
+    <tr>
+      <td align="center">
+        <span style="font-family: 'Segoe UI', Arial, sans-serif; font-size: 13.5px; font-weight: 800; color: #7A1B3C; letter-spacing: 0.5px;">PATIENT REGISTRATION &amp; TREATMENT RECORD</span>
+      </td>
+      <td width="135" align="right">
+        <span style="background-color: #7A1B3C; color: #FFFFFF; font-family: 'Segoe UI', Arial, sans-serif; font-weight: bold; font-size: 11px; padding: 2px 8px; border-radius: 3px; letter-spacing: 0.5px;">{badge_text}</span>
+      </td>
+    </tr>
+  </table>
+
+  <!-- 5. FIELDS 1 TO 6 & PHOTO FRAME -->
+  <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom: 2px;">
+    <tr>
+      <td valign="top" style="padding-right: 14px;">
+        <table width="100%" cellpadding="0" cellspacing="0">
+          <tr>
+            <td class="lbl" width="125">1. Serial / URN No.:</td>
+            {dot_cell(urn_display, color="#7A1B3C")}
+          </tr>
+          <tr>
+            <td class="lbl" style="padding-top: 5px;">2. Patient Name:</td>
+            {dot_cell(name_esc)}
+          </tr>
+          <tr>
+            <td colspan="2" style="padding-top: 5px;">
+              <table width="100%" cellpadding="0" cellspacing="0">
+                <tr>
+                  <td class="lbl" width="55">3. Age:</td>
+                  {dot_cell(age_display)}
+                  <td class="lbl" width="55" style="padding-left: 10px;">4. Sex:</td>
+                  {dot_cell(sex_display)}
+                </tr>
+              </table>
+            </td>
+          </tr>
+          <tr>
+            <td class="lbl" style="padding-top: 5px;">5. Address:</td>
+            {dot_cell(address_esc)}
+          </tr>
+          <tr>
+            <td class="lbl" style="padding-top: 5px;">6. Mobile No.:</td>
+            {dot_cell(mobile_esc)}
+          </tr>
+          <tr>
+            <td colspan="2" style="padding-top: 8px; font-size: 11.5px;">
+              <span class="lbl">Consulting Doctor:</span> &nbsp;&nbsp;
+              <span style="font-size: 13px;">{cb_madan}</span> Dr. Madan Mohan Dwivedi &nbsp;&nbsp;&nbsp;&nbsp;
+              <span style="font-size: 13px;">{cb_chandan}</span> Dr. Chandan Kr. Dwivedi
+            </td>
+          </tr>
+        </table>
+      </td>
+      <!-- Photo Frame -->
+      <td width="130" align="right" valign="top">
+        <table cellpadding="0" cellspacing="0" style="width: 124px; height: 155px; border: 1.5px solid #93C5FD; border-radius: 2px; background-color: #FFFFFF;">
+          <tr>
+            <td align="center" valign="middle">
+              {photo_html}
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+
+  <!-- 6. FIELDS 7 TO 11 -->
+  <table width="100%" cellpadding="0" cellspacing="0" style="margin-top: 4px;">
+    <tr>
+      <td class="lbl" width="175">7. Patient In (Date &amp; Time):</td>
+      {dot_cell(patient_in_esc)}
+      <td class="lbl" width="100" style="padding-left: 10px;">8. Patient Out:</td>
+      {dot_cell(patient_out_esc)}
+    </tr>
+    <tr>
+      <td class="lbl" style="padding-top: 5px;">9. Reference / Referred By:</td>
+      <td colspan="3" class="dot-line" style="padding-top: 5px;">{f'<b style="color: #0F172A; font-size: 11.5px;">{referred_by_esc}</b>' if referred_by_esc and not referred_by_esc.startswith("___") else '&nbsp;'}</td>
+    </tr>
+    <tr>
+      <td class="lbl" style="padding-top: 5px;">10. Patient Condition:</td>
+      <td colspan="3" class="dot-line" style="padding-top: 5px;">{f'<b style="color: #0F172A; font-size: 11.5px;">{condition_esc}</b>' if condition_esc and not condition_esc.startswith("___") else '&nbsp;'}</td>
+    </tr>
+    <tr>
+      <td class="lbl" style="padding-top: 5px;">11. No. of Sessions:</td>
+      <td colspan="3" class="dot-line" style="padding-top: 5px;">{f'<b style="color: #0F172A; font-size: 11.5px;">{sessions_display_esc}</b>' if sessions_display_esc and not sessions_display_esc.startswith("___") else '&nbsp;'}</td>
+    </tr>
+  </table>
+
+  <!-- 7. FIELD 12: PAYMENT DETAILS -->
+  <div style="border: 1px solid #E2E8F0; border-radius: 4px; padding: 6px 12px; margin-top: 6px; margin-bottom: 6px;">
+    <div style="font-size: 11px; font-weight: bold; color: #7A1B3C; margin-bottom: 4px;">12. Payment Details:</div>
+    <table width="100%" cellpadding="0" cellspacing="0">
+      <tr>
+        <td width="33%">
+          <div style="font-size: 9.5px; font-weight: bold; color: #475569; letter-spacing: 0.5px;">TOTAL AGREED FEE</div>
+          <div style="font-size: 13px; font-weight: bold; color: #0F172A; border-bottom: 1px solid #94A3B8; padding-bottom: 2px; margin-top: 4px; width: 85%;">{total_disp}</div>
         </td>
-        <td align="right">
-          <span style="background-color: #7A1B3C; color: #FFFFFF; font-weight: bold; font-size: 11.5px; padding: 2px 8px; border-radius: 3px;">RECORD #{urn}</span>
+        <td width="33%">
+          <div style="font-size: 9.5px; font-weight: bold; color: #475569; letter-spacing: 0.5px;">AMOUNT PAID</div>
+          <div style="font-size: 13px; font-weight: bold; color: #16A34A; border-bottom: 1px solid #94A3B8; padding-bottom: 2px; margin-top: 4px; width: 85%;">{paid_disp}</div>
+        </td>
+        <td width="34%">
+          <div style="font-size: 9.5px; font-weight: bold; color: #475569; letter-spacing: 0.5px;">REMAINING BALANCE</div>
+          <div style="font-size: 13px; font-weight: bold; color: #7A1B3C; border-bottom: 1px solid #94A3B8; padding-bottom: 2px; margin-top: 4px; width: 85%;">{bal_disp}</div>
         </td>
       </tr>
-    </table>
-
-    <!-- Top Row: Fields 1-5 recap + Photo frame -->
-    <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom: 8px;">
-      <tr>
-        <td valign="top" style="padding-right: 14px;">
-          <table width="100%" cellpadding="2" cellspacing="0">            <tr>
-              <td width="28%" class="field-label">1. Serial / URN No.:</td>
-              <td width="72%" class="field-value" style="color: #7A1B3C; font-weight: 700;">{urn}</td>
-            </tr>
-            <tr>
-              <td class="field-label">2. Patient Name:</td>
-              <td class="field-value">{name}</td>
-            </tr>
-            <tr>
-              <td class="field-label">3. Age:</td>
-              <td class="field-value">{age} Yrs &nbsp;&nbsp;&nbsp;&nbsp; <b>4. Sex:</b> {sex}</td>
-            </tr>
-            <tr>
-              <td class="field-label">5. Address:</td>
-              <td class="field-value">{address}</td>
-            </tr>
-            <tr>
-              <td class="field-label">6. Mobile No.:</td>
-              <td class="field-value">{mobile}</td>
-            </tr>
-            <tr>
-              <td class="field-label">Doctor:</td>
-              <td class="field-value">{doctor_name}</td>
-            </tr>
-          </table>
-        </td>
-        <td width="140" align="right" valign="top"><table cellpadding="3" cellspacing="0"><tr><td style="border: 1px solid #4A7AB8;">{photo_html}</td></tr></table></td>
-      </tr>
-    </table>
-
-    <!-- Fields 6-10 Grid -->
-    <table width="100%" cellpadding="2" cellspacing="0" style="margin-bottom: 4px;">      <tr>
-        <td width="26%" class="field-label">7. Patient In:</td>
-        <td width="26%" class="field-value" style="font-size: 11.5px;">{patient_in}</td>
-        <td width="16%" class="field-label" style="padding-left: 12px;">8. Patient Out:</td>
-        <td width="32%" class="field-value" style="font-size: 11.5px;">{patient_out}</td>
-      </tr>
-      <tr>
-        <td class="field-label">9. Reference / Referred By:</td>
-        <td colspan="3" class="field-value">{referred_by}</td>
-      </tr>
-      <tr>
-        <td class="field-label">10. Patient Condition:</td>
-        <td colspan="3" class="field-value" style="color: #0F172A;">{condition}</td>
-      </tr>
-      <tr>
-        <td class="field-label">11. No. of Sessions:</td>
-        <td colspan="3" class="field-value" style="color: #0D9488;">{sessions_display}</td>      </tr>
-    </table>
-
-    <!-- Field 12: Payment Box -->
-    <div style="background-color: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 6px; padding: 5px 12px; margin: 4px 0 4px 0;">
-      <div style="font-size: 12px; font-weight: bold; color: #7A1B3C; margin-bottom: 6px;">12. Payment Details:</div>      <table width="100%" cellpadding="0" cellspacing="0">
-        <tr>
-          <td width="33%">
-            <div style="font-size: 10px; font-weight: bold; color: #64748B; text-transform: uppercase;">Total Agreed Fee</div>
-            <div style="font-size: 14.5px; font-weight: bold; color: #0F172A; margin-top: 2px;">{total_amt_str}</div>
-          </td>
-          <td width="33%">
-            <div style="font-size: 10px; font-weight: bold; color: #64748B; text-transform: uppercase;">Amount Paid</div>
-            <div style="font-size: 14.5px; font-weight: bold; color: #16A34A; margin-top: 2px;">{paid_amt_str}</div>
-          </td>
-          <td width="34%">
-            <div style="font-size: 10px; font-weight: bold; color: #64748B; text-transform: uppercase;">Remaining Balance</div>
-            <div style="font-size: 14.5px; font-weight: bold; color: #7A1B3C; margin-top: 2px;">{balance_str}</div>
-          </td>
-        </tr>
-      </table>
-    </div>
-
-    <!-- Dual Signatures & Date -->
-    <table width="100%" cellpadding="0" cellspacing="0" style="margin-top: 12px;">
-      <tr>
-        <td width="8%">&nbsp;</td>
-        <td width="34%" align="center" valign="top" style="border-top: 1px solid #0F172A; padding-top: 4px; font-size: 12px; font-weight: bold; color: #334155;">Patient / Attendant Signature<br/>&nbsp;</td>
-        <td width="16%">&nbsp;</td>
-        <td width="34%" align="center" valign="top" style="border-top: 1px solid #0F172A; padding-top: 4px; font-size: 12px; font-weight: bold; color: #334155;">Authorized Signature<br/><span style="font-size: 10px; font-weight: normal; color: #64748B;">Kalyan Hospital, Ara (Bihar)  ·  Date: <b>{date_str}</b></span></td>
-        <td width="8%">&nbsp;</td>
-      </tr></table>        </td>
-      </tr>
-
     </table>
   </div>
+
+  <!-- 8. DUAL SIGNATURES -->
+  <table width="100%" cellpadding="0" cellspacing="0" style="margin-top: 22px; margin-bottom: 8px;">
+    <tr>
+      <td width="48%" align="center" valign="bottom">
+        <div style="width: 220px; border-bottom: 1px solid #0F172A; margin: 0 auto 6px auto;"></div>
+        <div style="font-family: 'Segoe UI', Arial, sans-serif; font-size: 12px; font-weight: bold; color: #1E293B;">Patient / Attendant Signature</div>
+      </td>
+      <td width="4%"></td>
+      <td width="48%" align="center" valign="bottom">
+        <div style="width: 220px; border-bottom: 1px solid #0F172A; margin: 0 auto 6px auto;"></div>
+        <div style="font-family: 'Segoe UI', Arial, sans-serif; font-size: 12px; font-weight: bold; color: #1E293B;">Authorized Signature</div>
+        <div style="font-size: 9.5px; color: #64748B; margin-top: 3px;">Kalyan Hospital, Ara (Bihar) &nbsp;·&nbsp; Date: {date_sig}</div>
+      </td>
+    </tr>
+  </table>
+
+  <!-- 9. BOTTOM CRIMSON FOOTER BANNER -->
   {cls._build_footer_html()}
 </div>
 
