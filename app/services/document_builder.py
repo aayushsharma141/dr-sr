@@ -538,3 +538,161 @@ class DocumentBuilder:
 
 </body>
 </html>"""
+
+
+    @classmethod
+    def build_thermal_receipt_html(
+        cls,
+        patient_data: Dict[str, Any],
+        case_data: Dict[str, Any],
+        payment_data: Dict[str, Any],
+        financial_summary: Optional[Dict[str, Any]] = None,
+    ) -> str:
+        """
+        Build a self-contained 80mm thermal installment receipt.
+
+        The summary balance is labelled as the current balance at print time;
+        the schema does not store a per-payment historical balance snapshot.
+        """
+        from html import escape as html_escape
+        from app.config import HOSPITAL_NAME, HOSPITAL_NAME_HINDI, HOSPITAL_DEPT, TRUST_NAME
+
+        def safe(value: Any) -> str:
+            return html_escape(str(value if value is not None else ""), quote=True)
+
+        payment_id = payment_data.get("id") or payment_data.get("payment_id") or 0
+        try:
+            receipt_number = f"RCPT-{int(payment_id):04d}"
+        except (TypeError, ValueError):
+            receipt_number = "RCPT-PENDING"
+
+        amount_paise = int(payment_data.get("amount_paid_paise") or 0)
+        amount_formatted = payment_data.get("amount_formatted")
+        if not amount_formatted:
+            amount_formatted = payment_data.get("amount_paid_formatted")
+        if not amount_formatted:
+            amount_formatted = BillingService.format_inr(amount_paise)
+
+        financial_summary = financial_summary or {}
+        total_fee = financial_summary.get("total_fee_formatted")
+        total_paid = financial_summary.get("total_paid_formatted")
+        current_balance = financial_summary.get("balance_formatted")
+        if current_balance is None:
+            current_balance = payment_data.get("balance_formatted", "Not available")
+
+        payment_timestamp = str(
+            payment_data.get("payment_timestamp")
+            or payment_data.get("created_at")
+            or payment_data.get("session_timestamp")
+            or ""
+        )
+        if payment_timestamp:
+            payment_timestamp = payment_timestamp[:16]
+        else:
+            payment_timestamp = "Date not recorded"
+
+        patient_name = safe(patient_data.get("patient_name") or "Patient")
+        urn = safe(patient_data.get("serial_urn_no") or "")
+        mobile = safe(patient_data.get("mobile_no") or "")
+        condition = safe(patient_data.get("patient_condition") or "")
+        case_title = safe(case_data.get("title") or "Physiotherapy")
+        target_sessions = safe(case_data.get("no_of_sessions") or "")
+        payment_mode = safe(payment_data.get("payment_mode") or "CASH")
+        reference_note = safe(payment_data.get("reference_note") or "")
+        recorded_by = safe(payment_data.get("recorded_by") or "Staff")
+
+        fee_row = (
+            f'<div class="summary-row"><span>Total fee</span><strong>{safe(total_fee)}</strong></div>'
+            if total_fee is not None else ""
+        )
+        paid_row = (
+            f'<div class="summary-row"><span>Total paid</span><strong>{safe(total_paid)}</strong></div>'
+            if total_paid is not None else ""
+        )
+        balance_row = (
+            f'<div class="summary-row current-balance"><span>Current balance*</span>'
+            f'<strong>{safe(current_balance)}</strong></div>'
+        )
+
+        return f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Thermal Receipt {safe(receipt_number)}</title>
+<style>
+  @page {{ size: 80mm 240mm; margin: 3mm; }}
+  * {{ box-sizing: border-box; }}
+  html, body {{ margin: 0; padding: 0; }}
+  body {{
+    width: 74mm;
+    color: #111827;
+    background: #FFFFFF;
+    font-family: "Consolas", "Courier New", monospace;
+    font-size: 10px;
+    line-height: 1.35;
+  }}
+  .receipt {{ width: 74mm; padding: 0 1mm; }}
+  .center {{ text-align: center; }}
+  .hospital-en {{ font: 800 15px "Arial", sans-serif; letter-spacing: .2px; }}
+  .hospital-hi {{ font: 700 14px "Nirmala UI", "Arial", sans-serif; margin-top: 2px; }}
+  .trust {{ font: 10px "Nirmala UI", "Arial", sans-serif; margin-top: 2px; }}
+  .dept {{ font: 800 9px "Arial", sans-serif; margin-top: 3px; }}
+  .muted {{ color: #4B5563; font-size: 9px; }}
+  .rule {{ border-top: 1px dashed #111827; margin: 7px 0; }}
+  .strong {{ font-weight: 800; }}
+  .receipt-number {{ border: 1px solid #111827; padding: 4px; font-size: 11px; font-weight: 800; }}
+  .patient-name {{ font: 800 12px "Arial", sans-serif; overflow-wrap: anywhere; }}
+  .row {{ margin: 3px 0; overflow-wrap: anywhere; }}
+  .summary-row {{ display: flex; justify-content: space-between; gap: 6px; margin: 4px 0; }}
+  .summary-row strong {{ text-align: right; }}
+  .payment-amount {{
+    border: 1px solid #111827; margin: 7px 0; padding: 7px 5px;
+    text-align: center; font-size: 12px; font-weight: 800;
+  }}
+  .payment-amount .amount {{ font: 800 17px "Arial", sans-serif; margin-top: 2px; }}
+  .current-balance {{ border-top: 1px dashed #111827; padding-top: 6px; font-weight: 800; }}
+  .footnote {{ font-size: 8px; color: #374151; margin-top: 8px; }}
+  .footer {{ text-align:center; margin-top: 12px; font-weight: 800; }}
+</style>
+</head>
+<body>
+<div class="receipt">
+  <div class="center">
+    <div class="hospital-en">{safe(HOSPITAL_NAME)}</div>
+    <div class="hospital-hi">{safe(HOSPITAL_NAME_HINDI)}</div>
+    <div class="trust">{safe(TRUST_NAME)}</div>
+    <div class="dept">{safe(HOSPITAL_DEPT)}</div>
+    <div class="muted">Ara · Gadhani · Bhojpur, Bihar</div>
+  </div>
+
+  <div class="rule"></div>
+  <div class="center receipt-number">{safe(receipt_number)}</div>
+  <div class="center muted row">{safe(payment_timestamp)}</div>
+  <div class="rule"></div>
+
+  <div class="row patient-name">{patient_name}</div>
+  <div class="row"><span class="strong">URN:</span> {urn}</div>
+  <div class="row"><span class="strong">Mobile:</span> {mobile or "—"}</div>
+  <div class="row"><span class="strong">Condition:</span> {condition or "—"}</div>
+  <div class="row"><span class="strong">Case:</span> {case_title}</div>
+  <div class="row"><span class="strong">Sessions planned:</span> {target_sessions or "—"}</div>
+
+  <div class="rule"></div>
+  <div class="payment-amount">
+    PAYMENT RECEIVED
+    <div class="amount">{safe(amount_formatted)}</div>
+  </div>
+  <div class="summary-row"><span>Payment mode</span><strong>{payment_mode}</strong></div>
+  <div class="summary-row"><span>Recorded by</span><strong>{recorded_by}</strong></div>
+  {f'<div class="row"><span class="strong">Reference:</span> {reference_note}</div>' if reference_note else ""}
+  <div class="rule"></div>
+  {fee_row}
+  {paid_row}
+  {balance_row}
+  <div class="footnote">* Current balance as of this receipt's print time. It may differ from the balance immediately after an older installment.</div>
+  <div class="rule"></div>
+  <div class="footer">Thank you</div>
+  <div class="center muted">Please retain this receipt for your records.</div>
+</div>
+</body>
+</html>"""
