@@ -18,6 +18,7 @@ class PatientModuleView(QWidget):
     """
 
     open_treatment_requested = Signal(int)
+    patient_saved = Signal(dict)
 
     def __init__(
         self,
@@ -69,6 +70,7 @@ class PatientModuleView(QWidget):
         self.stack.setCurrentIndex(0)
         self.list_view.reload_patients()
 
-    def _on_patient_saved(self, _saved_patient: dict):
-        """Callback when patient is saved successfully."""
+    def _on_patient_saved(self, saved_patient: dict):
+        """Callback after save; emit a UI event without moving persistence into the view."""
+        self.patient_saved.emit(saved_patient)
         self.show_directory_list()
