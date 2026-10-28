@@ -13,7 +13,7 @@ from PySide6.QtWidgets import (
     QFrame
 )
 from app.ui.clinical_controls import ModalityChipGroup, PainScaleWidget, PainTrendWidget
-from qfluentwidgets import TableWidget, PrimaryPushButton, PushButton, FluentIcon
+from qfluentwidgets import TableWidget, PrimaryPushButton, PushButton, FluentIcon, SplitPushButton, RoundMenu, Action
 from app.services.treatment_service import TreatmentService
 from app.services.patient_service import PatientService
 from app.services.billing_service import BillingService
@@ -259,9 +259,25 @@ class TreatmentView(QWidget):
         self.new_case_btn.clicked.connect(self._on_new_case_clicked)
         header_layout.addWidget(self.new_case_btn)
 
-        self.print_rx_btn = PushButton(FluentIcon.PRINT, "Print Rx Pad")
+        self.print_rx_btn = SplitPushButton(FluentIcon.PRINT, "Print Rx Pad")
         self.print_rx_btn.setObjectName("SecondaryButton")
-        self.print_rx_btn.clicked.connect(self._on_print_prescription_clicked)
+        self.print_rx_btn.clicked.connect(self._on_direct_print_prescription)
+
+        # Flyout menu for Print Rx Pad
+        rx_flyout = RoundMenu(parent=self)
+        act_print = Action(FluentIcon.PRINT, "Print Rx Pad (Send to Printer)", self)
+        act_print.triggered.connect(self._on_direct_print_prescription)
+        rx_flyout.addAction(act_print)
+
+        act_preview = Action(FluentIcon.VIEW, "Print Preview", self)
+        act_preview.triggered.connect(self._on_preview_prescription)
+        rx_flyout.addAction(act_preview)
+
+        act_pdf = Action(FluentIcon.SAVE, "Export as PDF...", self)
+        act_pdf.triggered.connect(self._on_export_prescription_pdf)
+        rx_flyout.addAction(act_pdf)
+
+        self.print_rx_btn.setFlyout(rx_flyout)
         header_layout.addWidget(self.print_rx_btn)
 
         self.log_session_btn = PrimaryPushButton(FluentIcon.ADD, "Log Session")
@@ -599,20 +615,72 @@ class TreatmentView(QWidget):
         else:
             QMessageBox.information(self, "No Case Selected", "Select a case to view billing details.")
 
-    def _on_print_prescription_clicked(self):
-        """Generates and previews the authentic A4 prescription pad for the selected patient and case."""
+    def _build_prescription_html(self) -> Optional[tuple[str, dict]]:
+        """Validates patient/case selection and builds the authentic prescription slip HTML."""
         if not self.current_patient_id:
             QMessageBox.warning(self, "No Patient Selected", "Please select a patient to print their prescription pad.")
-            return
+            return None
 
         patient_data = self.patient_service.get_patient(self.current_patient_id)
         if not patient_data:
             QMessageBox.warning(self, "Patient Not Found", "Unable to load patient data.")
-            return
+            return None
 
         case_data = None
         if self.current_case_id:
             case_data = self.treatment_service.get_case(self.current_case_id)
 
         html = DocumentBuilder.build_prescription_slip_html(patient_data, case_data=case_data)
-        PrintService.show_print_preview(html, parent=self)
+        return html, patient_data
+
+    def _on_direct_print_prescription(self):
+        """Directly sends the prescription pad to the Windows print dialog (actual print path)."""
+        result = self._build_prescription_html()
+        if not result:
+            return
+        html, patient_data = result
+        patient_name = patient_data.get("patient_name", "Patient")
+        success = PrintService.print_document(
+            html,
+            parent=self,
+            title=f"Prescription Slip — {patient_name}",
+        )
+        if success and hasattr(self.window(), "show_toast"):
+            self.window().show_toast(
+                "Sent to Printer",
+                f"Prescription slip for {patient_name} sent to printer successfully.",
+                "success",
+            )
+
+    def _on_preview_prescription(self):
+        """Displays interactive full-page A4 preview with embedded print/PDF action bar."""
+        result = self._build_prescription_html()
+        if not result:
+            return
+        html, patient_data = result
+        PrintService.show_print_preview(
+            html,
+            parent=self,
+            title=f"Prescription Slip — {patient_data.get('patient_name', 'Patient')}",
+        )
+
+    def _on_export_prescription_pdf(self):
+        """Prompts for a file path and exports the prescription pad as a vector PDF."""
+        result = self._build_prescription_html()
+        if not result:
+            return
+        html, patient_data = result
+        patient_name = patient_data.get("patient_name", "Patient")
+        urn = patient_data.get("serial_urn_no", "Record")
+        default_name = f"Prescription_{urn}_{patient_name.replace(' ', '_')}.pdf"
+        saved_path = PrintService.export_to_pdf_with_dialog(html, parent=self, default_name=default_name)
+        if saved_path and hasattr(self.window(), "show_toast"):
+            self.window().show_toast(
+                "PDF Exported",
+                f"Saved prescription PDF to {os.path.basename(saved_path)}.",
+                "success",
+            )
+
+    def _on_print_prescription_clicked(self):
+        """Backward-compatible handler: routes directly to the print dialog."""
+        self._on_direct_print_prescription()

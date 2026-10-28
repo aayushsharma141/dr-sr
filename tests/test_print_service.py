@@ -239,3 +239,33 @@ def test_thermal_printer_uses_custom_80mm_page(qapp, tmp_path):
     assert abs(size_mm.width() - 80.0) < 0.5
     assert abs(size_mm.height() - 240.0) < 0.5
     assert "Thermal Receipt" in page_size.name()
+
+
+def test_export_to_pdf_with_dialog_cancelled(monkeypatch):
+    """When user cancels QFileDialog, export_to_pdf_with_dialog returns None."""
+    from PySide6.QtWidgets import QFileDialog
+
+    monkeypatch.setattr(QFileDialog, "getSaveFileName", lambda *args, **kwargs: ("", ""))
+    result = PrintService.export_to_pdf_with_dialog("<html>test</html>")
+    assert result is None
+
+
+def test_export_to_pdf_with_dialog_selected_path(monkeypatch, tmp_path):
+    """When user confirms a path in QFileDialog, export_to_pdf is called with .pdf suffix."""
+    from PySide6.QtWidgets import QFileDialog
+
+    target = str(tmp_path / "custom_doc")
+    monkeypatch.setattr(QFileDialog, "getSaveFileName", lambda *args, **kwargs: (target, "PDF Files (*.pdf)"))
+    monkeypatch.setattr(PrintService, "export_to_pdf", lambda html, out_path: out_path)
+
+    result = PrintService.export_to_pdf_with_dialog("<html>test</html>")
+    assert result == target + ".pdf"
+
+
+def test_print_document_cancelled(monkeypatch):
+    """When QPrintDialog is cancelled/rejected, print_document returns False."""
+    from PySide6.QtPrintSupport import QPrintDialog
+
+    monkeypatch.setattr(QPrintDialog, "exec", lambda self: QPrintDialog.DialogCode.Rejected)
+    result = PrintService.print_document("<html>test</html>")
+    assert result is False

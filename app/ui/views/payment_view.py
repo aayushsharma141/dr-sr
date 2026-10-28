@@ -3,8 +3,10 @@ Payment View - Financial Ledger, Installment Processing & Real-Time Balance Card
 Kalyan Hospital Management System.
 """
 
+import os
 from typing import Any, Dict, List, Optional
 from PySide6.QtCore import Qt, Signal
+from PySide6.QtGui import QCursor
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit,
     QPushButton, QTableWidget, QTableWidgetItem, QHeaderView,
@@ -17,11 +19,13 @@ from app.services.patient_service import PatientService
 from app.services.document_builder import DocumentBuilder
 from app.services.print_service import PrintService
 from qfluentwidgets import (
+    Action,
     ElevatedCardWidget,
     FluentIcon,
     PillPushButton,
     PrimaryPushButton,
     PushButton,
+    RoundMenu,
     TableWidget,
 )
 from app.ui.styles import (
@@ -522,8 +526,8 @@ class PaymentView(QWidget):
         if desired >= 0.01:
             self.amt_input.setValue(desired)
 
-    def _on_print_thermal_receipt(self, payment_id: int):
-        """Print the selected installment using an 80mm receipt page, not A4."""
+    def _on_print_thermal_receipt(self, payment_id: int, action_mode: str = "preview"):
+        """Print or preview the selected installment using an 80mm receipt page, not A4."""
         if not self._current_patient_details or not self._current_case_details or not self._current_financial_summary:
             QMessageBox.warning(self, "Receipt Unavailable", "Select a patient and treatment case before printing a receipt.")
             return
@@ -540,6 +544,24 @@ class PaymentView(QWidget):
             payment_data=payment,
             financial_summary=self._current_financial_summary,
         )
+        patient_name = self._current_patient_details.get("patient_name", "Patient")
+        receipt_title = f"Receipt #{payment_id:04d} — {patient_name}"
+
+        if action_mode == "direct":
+            if PrintService.print_thermal_receipt(receipt_html, parent=self, title=receipt_title) and hasattr(self.window(), "show_toast"):
+                self.window().show_toast("Receipt Printed", f"Receipt #{payment_id:04d} sent to printer.", "success")
+            return
+        if action_mode == "pdf":
+            saved = PrintService.export_thermal_receipt_with_dialog(
+                receipt_html,
+                parent=self,
+                default_name=f"Receipt_{payment_id:04d}.pdf",
+            )
+            if saved and hasattr(self.window(), "show_toast"):
+                self.window().show_toast("PDF Exported", f"Saved receipt to {os.path.basename(saved)}", "success")
+            return
+
+        # Default action: preview with the modern footer bar offering Print Now, Save as PDF, and Close
         PrintService.show_thermal_receipt_preview(receipt_html, parent=self)
 
     def _clear_billing_view(self):

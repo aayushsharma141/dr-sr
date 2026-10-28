@@ -5,6 +5,7 @@ existing edit form and the same patient/treatment/billing services.
 """
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 from PySide6.QtCore import Qt, Signal
@@ -33,13 +34,16 @@ from app.services.patient_service import PatientService
 from app.services.print_service import PrintService
 from app.services.treatment_service import TreatmentService
 from qfluentwidgets import (
+    Action,
     ElevatedCardWidget,
     FluentIcon,
     PillPushButton,
     PrimaryPushButton,
     ProgressBar,
     PushButton,
+    RoundMenu,
     SearchLineEdit,
+    SplitPushButton,
     TableWidget,
 )
 
@@ -311,13 +315,36 @@ class PatientListView(QWidget):
         layout.addWidget(self.profile_treatment_btn)
 
         print_row = QHBoxLayout()
-        self.profile_rx_btn = PushButton(FluentIcon.PRINT, "Print Rx")
+        self.profile_rx_btn = SplitPushButton(FluentIcon.PRINT, "Print Rx")
         self.profile_rx_btn.setObjectName("SecondaryButton")
-        self.profile_rx_btn.clicked.connect(lambda: self._print_profile_patient("rx"))
+        self.profile_rx_btn.clicked.connect(lambda: self._print_profile_patient("rx", "direct"))
+        rx_menu = RoundMenu(parent=self)
+        act_rx_prn = Action(FluentIcon.PRINT, "Print Rx (Send to Printer)", self)
+        act_rx_prn.triggered.connect(lambda: self._print_profile_patient("rx", "direct"))
+        rx_menu.addAction(act_rx_prn)
+        act_rx_prev = Action(FluentIcon.VIEW, "Preview Rx", self)
+        act_rx_prev.triggered.connect(lambda: self._print_profile_patient("rx", "preview"))
+        rx_menu.addAction(act_rx_prev)
+        act_rx_pdf = Action(FluentIcon.SAVE, "Export Rx PDF...", self)
+        act_rx_pdf.triggered.connect(lambda: self._print_profile_patient("rx", "pdf"))
+        rx_menu.addAction(act_rx_pdf)
+        self.profile_rx_btn.setFlyout(rx_menu)
         print_row.addWidget(self.profile_rx_btn)
-        self.profile_record_btn = PushButton(FluentIcon.DOCUMENT, "Print Record")
+
+        self.profile_record_btn = SplitPushButton(FluentIcon.DOCUMENT, "Print Record")
         self.profile_record_btn.setObjectName("SecondaryButton")
-        self.profile_record_btn.clicked.connect(lambda: self._print_profile_patient("record"))
+        self.profile_record_btn.clicked.connect(lambda: self._print_profile_patient("record", "direct"))
+        rec_menu = RoundMenu(parent=self)
+        act_rec_prn = Action(FluentIcon.PRINT, "Print Record (Send to Printer)", self)
+        act_rec_prn.triggered.connect(lambda: self._print_profile_patient("record", "direct"))
+        rec_menu.addAction(act_rec_prn)
+        act_rec_prev = Action(FluentIcon.VIEW, "Preview Record", self)
+        act_rec_prev.triggered.connect(lambda: self._print_profile_patient("record", "preview"))
+        rec_menu.addAction(act_rec_prev)
+        act_rec_pdf = Action(FluentIcon.SAVE, "Export Record PDF...", self)
+        act_rec_pdf.triggered.connect(lambda: self._print_profile_patient("record", "pdf"))
+        rec_menu.addAction(act_rec_pdf)
+        self.profile_record_btn.setFlyout(rec_menu)
         print_row.addWidget(self.profile_record_btn)
         layout.addLayout(print_row)
 
@@ -516,16 +543,35 @@ class PatientListView(QWidget):
         if self._profile_patient:
             self.open_treatment_clicked.emit(int(self._profile_patient["id"]))
 
-    def _print_profile_patient(self, document_type: str):
+    def _print_profile_patient(self, document_type: str, action_mode: str = "direct"):
         if self._profile_patient:
-            self._on_print_patient(self._profile_patient, document_type)
+            self._on_print_patient(self._profile_patient, document_type, action_mode=action_mode)
 
-    def _on_print_patient(self, patient_dict: dict, document_type: str | None = None):
-        """Build the selected document and show its existing print preview."""
+    def _on_print_patient(
+        self,
+        patient_dict: dict,
+        document_type: str | None = None,
+        action_mode: str = "direct",
+    ):
+        """Build the selected document and print directly, preview, or export to PDF."""
+        patient_name = patient_dict.get("patient_name", "Patient")
+        urn = patient_dict.get("serial_urn_no", "Record")
+
         if document_type == "rx":
             html = DocumentBuilder.build_prescription_slip_html(patient_dict)
-            PrintService.show_print_preview(html, parent=self)
+            title = f"Prescription Slip — {patient_name}"
+            default_pdf = f"Prescription_{urn}_{patient_name.replace(' ', '_')}.pdf"
+            if action_mode == "direct":
+                if PrintService.print_document(html, parent=self, title=title) and hasattr(self.window(), "show_toast"):
+                    self.window().show_toast("Sent to Printer", f"Prescription for {patient_name} sent to printer.", "success")
+            elif action_mode == "pdf":
+                saved = PrintService.export_to_pdf_with_dialog(html, parent=self, default_name=default_pdf)
+                if saved and hasattr(self.window(), "show_toast"):
+                    self.window().show_toast("PDF Exported", f"Saved to {os.path.basename(saved)}", "success")
+            else:
+                PrintService.show_print_preview(html, parent=self, title=title)
             return
+
         if document_type == "record":
             financial_summary = None
             case_data = None
@@ -537,22 +583,50 @@ class PatientListView(QWidget):
                 case_data=case_data,
                 financial_summary=financial_summary,
             )
-            PrintService.show_print_preview(html, parent=self)
+            title = f"Registration Card — {patient_name}"
+            default_pdf = f"Registration_{urn}_{patient_name.replace(' ', '_')}.pdf"
+            if action_mode == "direct":
+                if PrintService.print_document(html, parent=self, title=title) and hasattr(self.window(), "show_toast"):
+                    self.window().show_toast("Sent to Printer", f"Registration record for {patient_name} sent to printer.", "success")
+            elif action_mode == "pdf":
+                saved = PrintService.export_to_pdf_with_dialog(html, parent=self, default_name=default_pdf)
+                if saved and hasattr(self.window(), "show_toast"):
+                    self.window().show_toast("PDF Exported", f"Saved to {os.path.basename(saved)}", "success")
+            else:
+                PrintService.show_print_preview(html, parent=self, title=title)
             return
 
-        menu = QMenu(self)
-        menu.setStyleSheet(f"""
-            QMenu {{ background-color:#FFFFFF; border:1px solid {COLORS['border']}; border-radius:6px; padding:4px; }}
-            QMenu::item {{ padding:8px 16px; border-radius:4px; font-size:12px; color:{COLORS['text_primary']}; }}
-            QMenu::item:selected {{ background-color:{COLORS['primary']}; color:#FFFFFF; }}
-        """)
-        action_rx = menu.addAction("Prescription Slip (Rx Pad)")
-        action_card = menu.addAction("Registration & Treatment Record (12 Fields)")
-        chosen = menu.exec(QCursor.pos())
-        if chosen == action_rx:
-            self._on_print_patient(patient_dict, "rx")
-        elif chosen == action_card:
-            self._on_print_patient(patient_dict, "record")
+        # When triggered from the table row Print button without preselected type, show full action menu
+        menu = RoundMenu(parent=self)
+        act_print_rx = Action(FluentIcon.PRINT, "Print Rx Pad (Send to Printer)", self)
+        act_print_rx.triggered.connect(lambda: self._on_print_patient(patient_dict, "rx", "direct"))
+        menu.addAction(act_print_rx)
+
+        act_print_rec = Action(FluentIcon.PRINT, "Print Registration Card (Send to Printer)", self)
+        act_print_rec.triggered.connect(lambda: self._on_print_patient(patient_dict, "record", "direct"))
+        menu.addAction(act_print_rec)
+
+        menu.addSeparator()
+
+        act_prev_rx = Action(FluentIcon.VIEW, "Preview Rx Pad", self)
+        act_prev_rx.triggered.connect(lambda: self._on_print_patient(patient_dict, "rx", "preview"))
+        menu.addAction(act_prev_rx)
+
+        act_prev_rec = Action(FluentIcon.VIEW, "Preview Registration Card", self)
+        act_prev_rec.triggered.connect(lambda: self._on_print_patient(patient_dict, "record", "preview"))
+        menu.addAction(act_prev_rec)
+
+        menu.addSeparator()
+
+        act_pdf_rx = Action(FluentIcon.SAVE, "Export Rx as PDF...", self)
+        act_pdf_rx.triggered.connect(lambda: self._on_print_patient(patient_dict, "rx", "pdf"))
+        menu.addAction(act_pdf_rx)
+
+        act_pdf_rec = Action(FluentIcon.SAVE, "Export Registration as PDF...", self)
+        act_pdf_rec.triggered.connect(lambda: self._on_print_patient(patient_dict, "record", "pdf"))
+        menu.addAction(act_pdf_rec)
+
+        menu.exec(QCursor.pos())
 
     def _on_cell_double_clicked(self, row: int, _col: int):
         item = self.table.item(row, 0)
