@@ -37,3 +37,21 @@ def test_sidebar_navigation_switching(qapp):
     for target_index in range(5):
         window.sidebar.page_changed.emit(target_index)
         assert window.stacked_widget.currentIndex() == target_index
+
+
+def test_global_quick_search_shortcut_is_available(qapp):
+    """Ctrl+K must stay available from the shared application shell."""
+    window = MainWindow()
+
+    assert window.quick_search_button.text().endswith("Ctrl+K")
+    assert window.quick_search_shortcut.key().toString() == "Ctrl+K"
+
+
+def test_quick_launcher_registration_action_opens_blank_form(qapp, tmp_path):
+    """The launcher registration action must open the actual form, not just the directory."""
+    window = MainWindow(db_path=str(tmp_path / "registration_shortcut.db"))
+
+    window._handle_quick_selection("register", None)
+
+    assert window.stacked_widget.currentIndex() == 1
+    assert window.patient_module.stack.currentIndex() == 1
