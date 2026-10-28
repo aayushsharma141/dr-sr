@@ -126,14 +126,20 @@ class DashboardView(QWidget):
         logo_lbl = QLabel()
         logo_lbl.setObjectName("HospitalLogo")
         logo_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        logo_lbl.setFixedSize(56, 56)
-        logo_pixmap = QPixmap(str(ASSET_DIR / "kalyan_hospital_logo.jpg"))
+        logo_lbl.setFixedSize(62, 62)
+        logo_path = ASSET_DIR / "kalyan_hospital_logo.png"
+        if not logo_path.exists():
+            logo_path = ASSET_DIR / "kalyan_hospital_logo.jpg"
+        logo_pixmap = QPixmap(str(logo_path))
         if not logo_pixmap.isNull():
-            logo_lbl.setPixmap(logo_pixmap.scaled(
-                logo_lbl.size(),
+            scaled = logo_pixmap.scaled(
+                logo_lbl.size() * logo_lbl.devicePixelRatio(),
                 Qt.AspectRatioMode.KeepAspectRatio,
                 Qt.TransformationMode.SmoothTransformation,
-            ))
+            )
+            scaled.setDevicePixelRatio(logo_lbl.devicePixelRatio())
+            logo_lbl.setPixmap(scaled)
+            logo_lbl.setStyleSheet("background: transparent; margin-right: 4px;")
         else:
             logo_lbl.setText("KH")
             logo_lbl.setStyleSheet(

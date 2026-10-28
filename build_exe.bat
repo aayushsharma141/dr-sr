@@ -16,6 +16,7 @@ echo.
 
 ".venv\Scripts\pyinstaller.exe" --noconfirm --onedir --windowed ^
     --name "KalyanHospital" ^
+    --icon "app/assets/kalyan_hospital_icon.ico" ^
     --add-data "app/db/schema.sql;app/db" ^
     --add-data "app/assets;app/assets" ^
     --collect-all qfluentwidgets ^

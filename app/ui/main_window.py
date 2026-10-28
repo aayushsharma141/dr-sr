@@ -5,7 +5,7 @@ Native PySide6 shell with keyboard-first patient search and non-blocking feedbac
 from typing import Optional
 
 from PySide6.QtCore import Qt, QDateTime
-from PySide6.QtGui import QKeySequence, QShortcut
+from PySide6.QtGui import QKeySequence, QShortcut, QIcon
 from PySide6.QtWidgets import (
     QFrame,
     QHBoxLayout,
@@ -17,7 +17,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from app.config import APP_NAME, COLORS
+from app.config import APP_NAME, COLORS, BASE_DIR
 from app.db.connection import init_db
 from app.services.dashboard_service import DashboardService
 from app.services.patient_service import PatientService
@@ -49,6 +49,9 @@ class MainWindow(QMainWindow):
         self._active_toast: ToastNotification | None = None
 
         self.setWindowTitle(APP_NAME)
+        icon_path = BASE_DIR / "app" / "assets" / "kalyan_hospital_logo.png"
+        if icon_path.exists():
+            self.setWindowIcon(QIcon(str(icon_path)))
         self.resize(1160, 780)
         self.setMinimumSize(980, 660)
         self.setStyleSheet(get_application_stylesheet())
