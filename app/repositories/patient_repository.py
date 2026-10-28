@@ -224,7 +224,6 @@ class PatientRepository:
                     SELECT 1
                     FROM treatment_cases tc
                     WHERE tc.patient_id = p.id
-                      AND tc.status = 'IN_PROGRESS'
                       AND tc.total_amount_paise > COALESCE(
                           (SELECT SUM(pay.amount_paid_paise)
                            FROM payments pay
