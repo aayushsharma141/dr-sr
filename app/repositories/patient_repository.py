@@ -180,38 +180,74 @@ class PatientRepository:
         finally:
             conn.close()
 
-    def search(self, query: str = "", limit: int = 50) -> list[dict[str, Any]]:
+    def search(
+        self,
+        query: str = "",
+        limit: int = 50,
+        filter_key: str = "all",
+    ) -> list[dict[str, Any]]:
         """
-        Searches patients by matching substring against serial_urn_no,
-        patient_name, or mobile_no. Returns all active patients if query is empty.
+        Searches active patient records by URN, name, and mobile number with optional
+        read-only registry filters. No schema or persistence behavior is changed.
         """
+        cleaned_query = query.strip()
+        safe_limit = max(1, min(int(limit), 10000))
+        clauses = ["p.status != 'ARCHIVED'"]
+        params: list[Any] = []
+
+        if cleaned_query:
+            wildcard = f"%{cleaned_query}%"
+            clauses.append(
+                "(p.serial_urn_no LIKE ? OR p.patient_name LIKE ? OR p.mobile_no LIKE ?)"
+            )
+            params.extend((wildcard, wildcard, wildcard))
+
+        normalized_filter = (filter_key or "all").strip().lower()
+        if normalized_filter == "today":
+            clauses.append(
+                "date(COALESCE(p.patient_in, p.created_at)) = date('now', 'localtime')"
+            )
+        elif normalized_filter == "active_therapy":
+            clauses.append(
+                """
+                EXISTS (
+                    SELECT 1 FROM treatment_cases tc
+                    WHERE tc.patient_id = p.id
+                      AND tc.status = 'IN_PROGRESS'
+                )
+                """
+            )
+        elif normalized_filter == "pending_balance":
+            clauses.append(
+                """
+                EXISTS (
+                    SELECT 1
+                    FROM treatment_cases tc
+                    WHERE tc.patient_id = p.id
+                      AND tc.status = 'IN_PROGRESS'
+                      AND tc.total_amount_paise > COALESCE(
+                          (SELECT SUM(pay.amount_paid_paise)
+                           FROM payments pay
+                           WHERE pay.case_id = tc.id),
+                          0
+                      )
+                )
+                """
+            )
+
+        sql = f"""
+            SELECT p.*
+            FROM patients p
+            WHERE {" AND ".join(clauses)}
+            ORDER BY p.id DESC
+            LIMIT ?
+        """
+        params.append(safe_limit)
+
         conn = get_db_connection(self.db_path)
         try:
             cursor = conn.cursor()
-            cleaned_query = query.strip()
-
-            if not cleaned_query:
-                cursor.execute(
-                    """
-                    SELECT * FROM patients
-                    WHERE status != 'ARCHIVED'
-                    ORDER BY id DESC
-                    LIMIT ?
-                    """,
-                    (limit,),
-                )
-            else:
-                wildcard = f"%{cleaned_query}%"
-                cursor.execute(
-                    """
-                    SELECT * FROM patients
-                    WHERE status != 'ARCHIVED'
-                      AND (serial_urn_no LIKE ? OR patient_name LIKE ? OR mobile_no LIKE ?)
-                    ORDER BY id DESC
-                    LIMIT ?
-                    """,
-                    (wildcard, wildcard, wildcard, limit),
-                )
+            cursor.execute(sql, params)
             return [dict(row) for row in cursor.fetchall()]
         finally:
             conn.close()
