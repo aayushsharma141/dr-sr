@@ -18,6 +18,7 @@ echo.
     --name "KalyanHospital" ^
     --add-data "app/db/schema.sql;app/db" ^
     --add-data "app/assets;app/assets" ^
+    --collect-all qfluentwidgets ^
     main.py
 
 echo.
