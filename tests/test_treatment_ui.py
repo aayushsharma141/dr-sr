@@ -9,6 +9,7 @@ from app.db.connection import init_db
 from app.services.patient_service import PatientService
 from app.services.treatment_service import TreatmentService
 from app.services.billing_service import BillingService
+from app.services.print_service import PrintService
 from app.ui.views.treatment_view import TreatmentView
 from app.ui.views.payment_view import PaymentView
 from app.ui.main_window import MainWindow
@@ -133,3 +134,46 @@ def test_main_window_treatment_billing_navigation(qapp, test_db, populated_clini
     case_id = populated_clinic["case"]["id"]
     window.treatment_view.view_billing_clicked.emit(case_id)
     assert window.stacked_widget.currentIndex() == 3
+
+
+def test_payment_presets_status_and_thermal_receipt_action(qapp, test_db, populated_clinic, monkeypatch):
+    """Payment quick amounts and receipt actions use the saved ledger summary."""
+    view = PaymentView(db_path=test_db)
+    case_id = populated_clinic["case"]["id"]
+    view.load_case_billing(case_id)
+
+    assert view.payment_status_badge.text() == "BALANCE DUE"
+    view.pay_full_button.click()
+    assert view.amt_input.value() == 4000.0
+
+    # Record one actual installment through the existing billing service.
+    view.billing_service.record_installment(
+        case_id=case_id,
+        amount_rupees=1000,
+        payment_mode="UPI",
+        reference_note="Test UPI receipt",
+    )
+    view.load_case_billing(case_id)
+
+    assert view.payment_status_badge.text() == "PARTIAL DUE"
+    assert view.payments_table.columnCount() == 7
+    assert view.payments_table.rowCount() == 1
+    assert view.payments_table.cellWidget(0, 6) is not None
+
+    view.amount_preset_buttons[500].click()
+    assert view.amt_input.value() == 500.0
+    view.pay_full_button.click()
+    assert view.amt_input.value() == 3000.0
+
+    printed = []
+    monkeypatch.setattr(
+        PrintService,
+        "show_thermal_receipt_preview",
+        lambda html, parent=None: printed.append(html),
+    )
+    view.payments_table.cellWidget(0, 6).click()
+
+    assert len(printed) == 1
+    assert "RCPT-0001" in printed[0]
+    assert "80mm 240mm" in printed[0]
+    assert "Test UPI receipt" in printed[0]
