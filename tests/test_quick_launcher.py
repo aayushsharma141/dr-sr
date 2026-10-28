@@ -54,7 +54,7 @@ def test_quick_launcher_finds_patient_by_name_and_returns_selection(qapp, tmp_pa
     patient_items = [
         dialog.results_list.item(row)
         for row in range(dialog.results_list.count())
-        if dialog.results_list.item(row).data(256) == "patient"
+        if dialog.results_list.item(row).data(Qt.ItemDataRole.UserRole) == "patient"
     ]
 
     assert len(patient_items) == 1
