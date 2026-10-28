@@ -4,6 +4,8 @@ Powered by QFluentWidgets InfoBar with graceful fallback to native Qt toast.
 """
 from __future__ import annotations
 
+from typing import Optional
+
 from PySide6.QtCore import QEasingCurve, QPropertyAnimation, QTimer, Qt, Signal
 from PySide6.QtWidgets import (
     QFrame,
