@@ -214,10 +214,48 @@ class PatientListView(QWidget):
         else:
             self.status_lbl.setText(f"Displaying {count} patient record(s). Double-click a row to edit.")
 
-    def _on_print_patient(self, patient_dict: dict):
+    def _on_print_patient(self, patient_dict: dict, document_type: str | None = None):
         """Builds A4 document and displays print preview."""
-        html = DocumentBuilder.build_patient_registration_html(patient_dict)
-        PrintService.show_print_preview(html, parent=self)
+        if document_type == "rx":
+            html = DocumentBuilder.build_prescription_slip_html(patient_dict)
+            PrintService.show_print_preview(html, parent=self)
+            return
+        elif document_type == "record":
+            html = DocumentBuilder.build_patient_registration_html(patient_dict)
+            PrintService.show_print_preview(html, parent=self)
+            return
+
+        from PySide6.QtGui import QCursor
+        from PySide6.QtWidgets import QMenu
+
+        menu = QMenu(self)
+        menu.setStyleSheet("""
+            QMenu {
+                background-color: #FFFFFF;
+                border: 1px solid #CBD5E1;
+                border-radius: 6px;
+                padding: 4px;
+            }
+            QMenu::item {
+                padding: 8px 16px;
+                border-radius: 4px;
+                font-size: 12px;
+                color: #0F172A;
+            }
+            QMenu::item:selected {
+                background-color: #155B43;
+                color: #FFFFFF;
+            }
+        """)
+        action_rx = menu.addAction("Prescription Slip (डॉक्टर पर्ची / Rx Pad)")
+        action_card = menu.addAction("Registration & Treatment Record (12 Fields)")
+        chosen = menu.exec(QCursor.pos())
+        if chosen == action_rx:
+            html = DocumentBuilder.build_prescription_slip_html(patient_dict)
+            PrintService.show_print_preview(html, parent=self)
+        elif chosen == action_card:
+            html = DocumentBuilder.build_patient_registration_html(patient_dict)
+            PrintService.show_print_preview(html, parent=self)
 
     def _on_cell_double_clicked(self, row: int, _col: int):
         item = self.table.item(row, 0)

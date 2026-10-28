@@ -138,6 +138,36 @@ def test_photo_embedding_in_html(sample_patient_dict, tmp_path):
     assert "data:image/jpeg;base64," in html
 
 
+def test_prescription_slip_generation(sample_patient_dict, sample_case_dict):
+    """Verifies that prescription slip HTML reproduces authentic pad letterhead and Rx symbol."""
+    html = DocumentBuilder.build_prescription_slip_html(
+        patient_data=sample_patient_dict,
+        case_data=sample_case_dict,
+    )
+
+    # Letterhead branding
+    assert "कल्याण हॉस्पीटल" in html
+    assert "PHYSIOTHERAPY DEPARTMENT" in html
+    assert "Sl No." in html
+    assert "KH-2026-0001" in html
+    assert "Dr. Madan Mohan Dwivedi" in html
+    assert "Dr. Chandan Kr. Dwivedi" in html
+    assert "फिजियोरत्न से सम्मानित" in html
+    assert "फिजियोथेरेपिस्ट" in html
+
+    # Patient info strip
+    assert "Name" in html
+    assert "Ramesh Kumar Sharma" in html
+    assert "Age / Sex" in html
+    assert "Add." in html
+
+    # Rx & protocol
+    assert "℞" in html
+    assert "Severe Lumbar Spondylosis" in html
+    assert "10 Sessions" in html
+    assert "Authorized Physiotherapist Signature" in html
+
+
 @pytest.mark.skip(
     reason=(
         "QPrinter on Windows requires COM/Print Spooler which crashes in headless "

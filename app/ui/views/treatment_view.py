@@ -15,6 +15,8 @@ from PySide6.QtWidgets import (
 from app.services.treatment_service import TreatmentService
 from app.services.patient_service import PatientService
 from app.services.billing_service import BillingService
+from app.services.document_builder import DocumentBuilder
+from app.services.print_service import PrintService
 from app.ui.styles import (
     COLOR_PRIMARY, COLOR_PRIMARY_HOVER, COLOR_SECONDARY,
     COLOR_TEXT_PRIMARY, COLOR_TEXT_MUTED, COLOR_CARD_BG,
@@ -298,6 +300,22 @@ class TreatmentView(QWidget):
         """)
         self.new_case_btn.clicked.connect(self._on_new_case_clicked)
         header_layout.addWidget(self.new_case_btn)
+
+        self.print_rx_btn = QPushButton("Print Rx Pad")
+        self.print_rx_btn.setObjectName("SecondaryButton")
+        self.print_rx_btn.setStyleSheet(f"""
+            QPushButton {{
+                background-color: transparent;
+                color: {COLOR_PRIMARY};
+                border: 2px solid {COLOR_PRIMARY};
+                border-radius: 8px;
+                padding: 10px 16px;
+                font-weight: 600;
+            }}
+            QPushButton:hover {{ background-color: {COLOR_PRIMARY}; color: white; }}
+        """)
+        self.print_rx_btn.clicked.connect(self._on_print_prescription_clicked)
+        header_layout.addWidget(self.print_rx_btn)
 
         self.log_session_btn = QPushButton("Log Session")
         self.log_session_btn.setStyleSheet(f"""
@@ -633,3 +651,21 @@ class TreatmentView(QWidget):
             self.view_billing_clicked.emit(self.current_case_id)
         else:
             QMessageBox.information(self, "No Case Selected", "Select a case to view billing details.")
+
+    def _on_print_prescription_clicked(self):
+        """Generates and previews the authentic A4 prescription pad for the selected patient and case."""
+        if not self.current_patient_id:
+            QMessageBox.warning(self, "No Patient Selected", "Please select a patient to print their prescription pad.")
+            return
+
+        patient_data = self.patient_service.get_patient(self.current_patient_id)
+        if not patient_data:
+            QMessageBox.warning(self, "Patient Not Found", "Unable to load patient data.")
+            return
+
+        case_data = None
+        if self.current_case_id:
+            case_data = self.treatment_service.get_case(self.current_case_id)
+
+        html = DocumentBuilder.build_prescription_slip_html(patient_data, case_data=case_data)
+        PrintService.show_print_preview(html, parent=self)
