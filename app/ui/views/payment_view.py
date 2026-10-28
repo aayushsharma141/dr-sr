@@ -400,6 +400,32 @@ class PaymentView(QWidget):
             if patient_matches:
                 self._current_patient_details = self.patient_service.get_patient(int(patient_matches[0]["id"]))
 
+        # A case opened from Treatment must also update the visible patient/case selectors.
+        # Block combo signals while synchronizing to avoid recursive billing reloads.
+        if self._current_patient_details:
+            patient_id = int(self._current_patient_details["id"])
+            self.current_patient_id = patient_id
+            patient_index = self.patient_combo.findData(patient_id)
+            if patient_index < 0:
+                patient_label = (
+                    f"{self._current_patient_details.get('serial_urn_no', '')} - "
+                    f"{self._current_patient_details.get('patient_name', '')}"
+                )
+                self.patient_combo.addItem(patient_label, patient_id)
+                patient_index = self.patient_combo.findData(patient_id)
+            self.patient_combo.blockSignals(True)
+            self.patient_combo.setCurrentIndex(patient_index)
+            self.patient_combo.blockSignals(False)
+
+            self.case_combo.blockSignals(True)
+            self.case_combo.clear()
+            for case in self.treatment_service.get_patient_cases(patient_id):
+                self.case_combo.addItem(f"Case #{case['id']}: {case['title']}", case["id"])
+            case_index = self.case_combo.findData(case_id)
+            if case_index >= 0:
+                self.case_combo.setCurrentIndex(case_index)
+            self.case_combo.blockSignals(False)
+
         # Update cards
         self._update_card_value(self.fee_card, summary["total_fee_formatted"])
         self._update_card_value(self.paid_card, summary["total_paid_formatted"])
