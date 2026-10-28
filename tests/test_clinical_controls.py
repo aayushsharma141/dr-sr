@@ -59,6 +59,10 @@ def test_pain_trend_summarizes_actual_session_scores(qapp):
     assert "No scored sessions" in trend.summary_label.text()
 
     trend.set_scores([(1, 8), (2, 6), (3, 4)])
+    trend.resize(420, 100)
+    trend.show()
+    qapp.processEvents()
+    assert not trend.grab().isNull()  # Exercise the custom QPainter sparkline offscreen.
     assert "Latest 4/10" in trend.summary_label.text()
     assert "−4" in trend.summary_label.text()
 
