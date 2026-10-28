@@ -32,6 +32,16 @@ from app.services.document_builder import DocumentBuilder
 from app.services.patient_service import PatientService
 from app.services.print_service import PrintService
 from app.services.treatment_service import TreatmentService
+from qfluentwidgets import (
+    ElevatedCardWidget,
+    FluentIcon,
+    PillPushButton,
+    PrimaryPushButton,
+    ProgressBar,
+    PushButton,
+    SearchLineEdit,
+    TableWidget,
+)
 
 
 REGISTRY_FILTERS = (
@@ -83,7 +93,7 @@ class PatientListView(QWidget):
         top_row.addLayout(header_text)
         top_row.addStretch()
 
-        btn_new = QPushButton("+  Register New Patient")
+        btn_new = PrimaryPushButton(FluentIcon.ADD, "Register New Patient")
         btn_new.setObjectName("PrimaryButton")
         btn_new.setCursor(Qt.CursorShape.PointingHandCursor)
         btn_new.clicked.connect(self.register_clicked.emit)
@@ -103,7 +113,7 @@ class PatientListView(QWidget):
         )
         search_layout.addWidget(search_label)
 
-        self.search_input = QLineEdit()
+        self.search_input = SearchLineEdit()
         self.search_input.setObjectName("PatientRegistrySearch")
         self.search_input.setPlaceholderText("Search by patient name, KH-YYYY-XXXX, or mobile number…")
         self.search_input.setClearButtonEnabled(True)
@@ -130,7 +140,7 @@ class PatientListView(QWidget):
         self.filter_group.setExclusive(True)
         self.filter_buttons: dict[str, QPushButton] = {}
         for key, label in REGISTRY_FILTERS:
-            button = QPushButton(label)
+            button = PillPushButton(label)
             button.setObjectName("FilterChip")
             button.setCheckable(True)
             button.setCursor(Qt.CursorShape.PointingHandCursor)
@@ -148,7 +158,7 @@ class PatientListView(QWidget):
         self.splitter.setChildrenCollapsible(True)
         self.splitter.setHandleWidth(5)
 
-        self.table = QTableWidget()
+        self.table = TableWidget()
         self.table.setObjectName("PatientRegistryTable")
         self.table.setColumnCount(7)
         self.table.setHorizontalHeaderLabels([
@@ -196,13 +206,10 @@ class PatientListView(QWidget):
         self.reload_patients()
 
     def _build_profile_panel(self) -> QFrame:
-        panel = QFrame()
+        panel = ElevatedCardWidget()
         panel.setObjectName("PatientProfilePanel")
-        panel.setMinimumWidth(255)
-        panel.setMaximumWidth(350)
-        panel.setStyleSheet(
-            f"QFrame#PatientProfilePanel {{ background:#FFFFFF;border:1px solid {COLORS['border']};border-radius:10px; }}"
-        )
+        panel.setMinimumWidth(265)
+        panel.setMaximumWidth(360)
 
         layout = QVBoxLayout(panel)
         layout.setContentsMargins(13, 12, 13, 12)
@@ -276,7 +283,7 @@ class PatientListView(QWidget):
         self.profile_progress_label.setStyleSheet(f"font-size:10px;color:{COLORS['text_secondary']};")
         layout.addWidget(self.profile_progress_label)
 
-        self.profile_progress = QProgressBar()
+        self.profile_progress = ProgressBar()
         self.profile_progress.setObjectName("PatientProfileProgress")
         self.profile_progress.setRange(0, 100)
         self.profile_progress.setFixedHeight(9)
@@ -293,22 +300,22 @@ class PatientListView(QWidget):
 
         layout.addStretch(1)
 
-        self.profile_edit_btn = QPushButton("Edit Patient")
+        self.profile_edit_btn = PushButton(FluentIcon.EDIT, "Edit Patient")
         self.profile_edit_btn.setObjectName("SecondaryButton")
         self.profile_edit_btn.clicked.connect(self._on_profile_edit)
         layout.addWidget(self.profile_edit_btn)
 
-        self.profile_treatment_btn = QPushButton("Open Treatment")
+        self.profile_treatment_btn = PrimaryPushButton(FluentIcon.HEART, "Open Treatment")
         self.profile_treatment_btn.setObjectName("PrimaryButton")
         self.profile_treatment_btn.clicked.connect(self._on_profile_treatment)
         layout.addWidget(self.profile_treatment_btn)
 
         print_row = QHBoxLayout()
-        self.profile_rx_btn = QPushButton("Print Rx")
+        self.profile_rx_btn = PushButton(FluentIcon.PRINT, "Print Rx")
         self.profile_rx_btn.setObjectName("SecondaryButton")
         self.profile_rx_btn.clicked.connect(lambda: self._print_profile_patient("rx"))
         print_row.addWidget(self.profile_rx_btn)
-        self.profile_record_btn = QPushButton("Print Record")
+        self.profile_record_btn = PushButton(FluentIcon.DOCUMENT, "Print Record")
         self.profile_record_btn.setObjectName("SecondaryButton")
         self.profile_record_btn.clicked.connect(lambda: self._print_profile_patient("record"))
         print_row.addWidget(self.profile_record_btn)

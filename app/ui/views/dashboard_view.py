@@ -16,6 +16,14 @@ from app.config import (
     HOSPITAL_NAME, HOSPITAL_NAME_HINDI, TRUST_NAME,
 )
 from app.services.dashboard_service import DashboardService
+from qfluentwidgets import (
+    CardWidget,
+    ElevatedCardWidget,
+    FluentIcon,
+    PrimaryPushButton,
+    PushButton,
+    TableWidget,
+)
 
 
 def _rgba(hex_color: str, alpha: int) -> str:
@@ -28,7 +36,7 @@ def _rgba(hex_color: str, alpha: int) -> str:
 ASSET_DIR = Path(__file__).resolve().parents[2] / "assets"
 
 
-class StatCard(QFrame):
+class StatCard(ElevatedCardWidget):
     """Compact metric card with a restrained brand accent."""
 
     def __init__(
@@ -243,25 +251,25 @@ class DashboardView(QWidget):
         )
         actions_layout.addWidget(quick_label)
 
-        btn_new_patient = QPushButton("+  Register Patient")
+        btn_new_patient = PrimaryPushButton(FluentIcon.ADD, "Register Patient")
         btn_new_patient.setObjectName("PrimaryButton")
         btn_new_patient.setCursor(Qt.CursorShape.PointingHandCursor)
         btn_new_patient.clicked.connect(self.register_patient_requested.emit)
         actions_layout.addWidget(btn_new_patient)
 
-        btn_view_patients = QPushButton("Patient Registry")
+        btn_view_patients = PushButton(FluentIcon.PEOPLE, "Patient Registry")
         btn_view_patients.setObjectName("SecondaryButton")
         btn_view_patients.setCursor(Qt.CursorShape.PointingHandCursor)
         btn_view_patients.clicked.connect(lambda: self.navigate_to.emit(1))
         actions_layout.addWidget(btn_view_patients)
 
-        btn_new_treatment = QPushButton("Treatment Sessions")
+        btn_new_treatment = PushButton(FluentIcon.HEART, "Treatment Sessions")
         btn_new_treatment.setObjectName("SecondaryButton")
         btn_new_treatment.setCursor(Qt.CursorShape.PointingHandCursor)
         btn_new_treatment.clicked.connect(lambda: self.navigate_to.emit(2))
         actions_layout.addWidget(btn_new_treatment)
 
-        btn_payments = QPushButton("Billing & Payments")
+        btn_payments = PushButton(FluentIcon.TAG, "Billing && Payments")
         btn_payments.setObjectName("SecondaryButton")
         btn_payments.setCursor(Qt.CursorShape.PointingHandCursor)
         btn_payments.clicked.connect(lambda: self.navigate_to.emit(3))
@@ -276,7 +284,7 @@ class DashboardView(QWidget):
         title_activity.setStyleSheet("font-size:15px;")
         table_header.addWidget(title_activity)
         table_header.addStretch()
-        refresh_btn = QPushButton("Refresh")
+        refresh_btn = PushButton(FluentIcon.SYNC, "Refresh")
         refresh_btn.setObjectName("SecondaryButton")
         refresh_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         refresh_btn.clicked.connect(self._on_manual_refresh)
@@ -300,7 +308,7 @@ class DashboardView(QWidget):
         )
         root_layout.addWidget(self.activity_empty)
 
-        self.recent_table = QTableWidget()
+        self.recent_table = TableWidget()
         self.activity_table = self.recent_table  # Keep the original public attribute for compatibility.
         self.recent_table.setObjectName("TodayActivityTable")
         self.recent_table.setColumnCount(5)

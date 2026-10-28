@@ -13,6 +13,7 @@ from PySide6.QtWidgets import (
     QFrame
 )
 from app.ui.clinical_controls import ModalityChipGroup, PainScaleWidget, PainTrendWidget
+from qfluentwidgets import TableWidget, PrimaryPushButton, PushButton, FluentIcon
 from app.services.treatment_service import TreatmentService
 from app.services.patient_service import PatientService
 from app.services.billing_service import BillingService
@@ -254,49 +255,16 @@ class TreatmentView(QWidget):
 
         header_layout.addStretch()
 
-        self.new_case_btn = QPushButton("Open New Case")
-        self.new_case_btn.setStyleSheet(f"""
-            QPushButton {{
-                background-color: transparent;
-                color: {COLOR_PRIMARY};
-                border: 2px solid {COLOR_PRIMARY};
-                border-radius: 8px;
-                padding: 10px 18px;
-                font-weight: 600;
-            }}
-            QPushButton:hover {{ background-color: {COLOR_PRIMARY}; color: white; }}
-        """)
+        self.new_case_btn = PushButton(FluentIcon.ADD, "Open New Case")
         self.new_case_btn.clicked.connect(self._on_new_case_clicked)
         header_layout.addWidget(self.new_case_btn)
 
-        self.print_rx_btn = QPushButton("Print Rx Pad")
+        self.print_rx_btn = PushButton(FluentIcon.PRINT, "Print Rx Pad")
         self.print_rx_btn.setObjectName("SecondaryButton")
-        self.print_rx_btn.setStyleSheet(f"""
-            QPushButton {{
-                background-color: transparent;
-                color: {COLOR_PRIMARY};
-                border: 2px solid {COLOR_PRIMARY};
-                border-radius: 8px;
-                padding: 10px 16px;
-                font-weight: 600;
-            }}
-            QPushButton:hover {{ background-color: {COLOR_PRIMARY}; color: white; }}
-        """)
         self.print_rx_btn.clicked.connect(self._on_print_prescription_clicked)
         header_layout.addWidget(self.print_rx_btn)
 
-        self.log_session_btn = QPushButton("Log Session")
-        self.log_session_btn.setStyleSheet(f"""
-            QPushButton {{
-                background-color: {COLOR_PRIMARY};
-                color: white;
-                border: none;
-                border-radius: 8px;
-                padding: 10px 20px;
-                font-weight: 600;
-            }}
-            QPushButton:hover {{ background-color: {COLOR_PRIMARY_HOVER}; }}
-        """)
+        self.log_session_btn = PrimaryPushButton(FluentIcon.ADD, "Log Session")
         self.log_session_btn.clicked.connect(self._on_log_session_clicked)
         header_layout.addWidget(self.log_session_btn)
 
@@ -419,7 +387,7 @@ class TreatmentView(QWidget):
         table_title.setStyleSheet(f"font-size: 16px; font-weight: 700; color: {COLOR_PRIMARY}; margin-top: 6px;")
         layout.addWidget(table_title)
 
-        self.sessions_table = QTableWidget()
+        self.sessions_table = TableWidget()
         self.sessions_table.setColumnCount(6)
         self.sessions_table.setHorizontalHeaderLabels([
             "Session #", "Date & Time", "Therapist", "Treatment Notes", "Modalities Used", "Pain (VAS)"

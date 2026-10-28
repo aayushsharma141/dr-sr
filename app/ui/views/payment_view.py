@@ -16,6 +16,14 @@ from app.services.treatment_service import TreatmentService
 from app.services.patient_service import PatientService
 from app.services.document_builder import DocumentBuilder
 from app.services.print_service import PrintService
+from qfluentwidgets import (
+    ElevatedCardWidget,
+    FluentIcon,
+    PillPushButton,
+    PrimaryPushButton,
+    PushButton,
+    TableWidget,
+)
 from app.ui.styles import (
     COLOR_PRIMARY, COLOR_PRIMARY_HOVER, COLOR_SECONDARY,
     COLOR_TEXT_PRIMARY, COLOR_TEXT_MUTED, COLOR_CARD_BG,
@@ -225,19 +233,7 @@ class PaymentView(QWidget):
         form_grid.addWidget(self.note_input, 1, 1, 1, 2)
 
         # Record Button
-        self.submit_payment_btn = QPushButton("Save Payment")
-        self.submit_payment_btn.setStyleSheet(f"""
-            QPushButton {{
-                background-color: {COLOR_PRIMARY};
-                color: white;
-                border: none;
-                border-radius: 6px;
-                padding: 10px 20px;
-                font-weight: 700;
-                font-size: 13px;
-            }}
-            QPushButton:hover {{ background-color: {COLOR_PRIMARY_HOVER}; }}
-        """)
+        self.submit_payment_btn = PrimaryPushButton(FluentIcon.SAVE, "Save Payment")
         self.submit_payment_btn.clicked.connect(self._on_submit_payment)
         form_grid.addWidget(self.submit_payment_btn, 1, 3)
 
@@ -249,14 +245,14 @@ class PaymentView(QWidget):
             f"font-size:9px;font-weight:800;letter-spacing:.5px;color:{COLOR_TEXT_MUTED};"
         )
         quick_amount_row.addWidget(quick_amount_label)
-        self.pay_full_button = QPushButton("Pay Full Balance")
+        self.pay_full_button = PillPushButton("Pay Full Balance")
         self.pay_full_button.setObjectName("PrimaryButton")
         self.pay_full_button.setCursor(Qt.CursorShape.PointingHandCursor)
         self.pay_full_button.clicked.connect(lambda: self._set_amount_preset("full"))
         quick_amount_row.addWidget(self.pay_full_button)
         self.amount_preset_buttons: dict[int, QPushButton] = {}
         for preset_amount in (500, 1000, 2000):
-            preset_button = QPushButton(f"₹{preset_amount:,}")
+            preset_button = PillPushButton(f"₹{preset_amount:,}")
             preset_button.setObjectName("SecondaryButton")
             preset_button.setCursor(Qt.CursorShape.PointingHandCursor)
             preset_button.clicked.connect(
@@ -273,7 +269,7 @@ class PaymentView(QWidget):
         table_title.setStyleSheet(f"font-size: 16px; font-weight: 700; color: {COLOR_PRIMARY}; margin-top: 4px;")
         layout.addWidget(table_title)
 
-        self.payments_table = QTableWidget()
+        self.payments_table = TableWidget()
         self.payments_table.setColumnCount(7)
         self.payments_table.setHorizontalHeaderLabels([
             "Payment Date", "Receipt #", "Amount Paid", "Mode", "Reference Note", "Recorded By", "Receipt"
@@ -307,14 +303,11 @@ class PaymentView(QWidget):
         self.refresh_patient_list()
 
     def _create_metric_card(self, title: str, initial_value: str, accent_color: str) -> QFrame:
-        card = QFrame()
+        card = ElevatedCardWidget()
         card.setStyleSheet(f"""
-            QFrame {{
-                background-color: {COLOR_CARD_BG};
-                border: 1px solid {COLOR_BORDER};
+            ElevatedCardWidget {{
                 border-left: 5px solid {accent_color};
-                border-radius: 10px;
-                padding: 16px;
+                padding: 14px;
             }}
         """)
         card_layout = QVBoxLayout(card)

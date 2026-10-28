@@ -1,7 +1,6 @@
 """
-Lightweight, non-blocking status toast for the desktop workspace.
-Implemented with native Qt widgets so the commercial app does not require a
-separately licensed third-party widget framework.
+Modern, non-blocking status notifications for Kalyan Hospital desktop workspace.
+Powered by QFluentWidgets InfoBar with graceful fallback to native Qt toast.
 """
 from __future__ import annotations
 
@@ -17,6 +16,12 @@ from PySide6.QtWidgets import (
 
 from app.config import COLORS
 
+try:
+    from qfluentwidgets import InfoBar, InfoBarPosition
+    HAS_FLUENT = True
+except ImportError:
+    HAS_FLUENT = False
+
 
 LEVEL_COLORS = {
     "success": COLORS["success"],
@@ -30,6 +35,63 @@ class ToastNotification(QFrame):
     """A temporary, non-modal notification that never blocks the clinical workflow."""
 
     dismissed = Signal()
+
+    @classmethod
+    def show_fluent(
+        cls,
+        parent: QWidget,
+        title: str,
+        message: str,
+        level: str = "success",
+        duration_ms: int = 3200,
+    ) -> Optional[object]:
+        """Show native Fluent InfoBar if available, with smooth animation and dismissal."""
+        if not HAS_FLUENT or parent is None:
+            return None
+
+        pos = InfoBarPosition.TOP_RIGHT
+        dur = max(1500, duration_ms)
+
+        if level == "success":
+            return InfoBar.success(
+                title=title,
+                content=message,
+                orient=Qt.Orientation.Horizontal,
+                isClosable=True,
+                position=pos,
+                duration=dur,
+                parent=parent,
+            )
+        elif level == "warning":
+            return InfoBar.warning(
+                title=title,
+                content=message,
+                orient=Qt.Orientation.Horizontal,
+                isClosable=True,
+                position=pos,
+                duration=dur,
+                parent=parent,
+            )
+        elif level == "error":
+            return InfoBar.error(
+                title=title,
+                content=message,
+                orient=Qt.Orientation.Horizontal,
+                isClosable=True,
+                position=pos,
+                duration=dur,
+                parent=parent,
+            )
+        else:
+            return InfoBar.info(
+                title=title,
+                content=message,
+                orient=Qt.Orientation.Horizontal,
+                isClosable=True,
+                position=pos,
+                duration=dur,
+                parent=parent,
+            )
 
     def __init__(
         self,

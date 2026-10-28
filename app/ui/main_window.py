@@ -276,6 +276,10 @@ class MainWindow(QMainWindow):
         duration_ms: int = 3200,
     ):
         """Display a temporary, non-modal toast above the workspace content."""
+        bar = ToastNotification.show_fluent(self, title, message, level, duration_ms)
+        if bar is not None:
+            return
+
         if self._active_toast is not None:
             self._active_toast.close()
             self._active_toast = None

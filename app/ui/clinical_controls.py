@@ -21,6 +21,7 @@ from PySide6.QtWidgets import (
 )
 
 from app.config import COLORS
+from qfluentwidgets import Slider, PillPushButton, ElevatedCardWidget, CardWidget
 
 
 MODALITY_OPTIONS = (
@@ -73,7 +74,7 @@ class PainScaleWidget(QFrame):
         header.addWidget(self.level_label)
         layout.addLayout(header)
 
-        self.slider = QSlider(Qt.Orientation.Horizontal)
+        self.slider = Slider(Qt.Orientation.Horizontal)
         self.slider.setObjectName("VASPainSlider")
         self.slider.setRange(0, 10)
         self.slider.setSingleStep(1)
@@ -165,7 +166,7 @@ class ModalityChipGroup(QFrame):
         grid.setVerticalSpacing(7)
 
         for index, option in enumerate(options):
-            button = QPushButton(option)
+            button = PillPushButton(option)
             button.setObjectName("ModalityChip")
             button.setCheckable(True)
             button.setCursor(Qt.CursorShape.PointingHandCursor)
@@ -260,7 +261,7 @@ class _PainTrendPlot(QWidget):
         painter.end()
 
 
-class PainTrendWidget(QFrame):
+class PainTrendWidget(ElevatedCardWidget):
     """Pain trend panel with a simple change summary and a local sparkline."""
 
     def __init__(self, parent: QWidget | None = None):
