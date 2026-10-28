@@ -170,7 +170,7 @@ class PaymentView(QWidget):
         amt_lbl = QLabel("Payment Amount (₹) *:")
         amt_lbl.setStyleSheet(f"font-weight: 600; color: {COLOR_TEXT_PRIMARY};")
         self.amt_input = QDoubleSpinBox()
-        self.amt_input.setRange(1.0, 500000.0)
+        self.amt_input.setRange(0.01, 500000.0)
         self.amt_input.setValue(500.0)
         self.amt_input.setPrefix("₹ ")
         self.amt_input.setDecimals(2)
@@ -444,7 +444,7 @@ class PaymentView(QWidget):
         )
 
         balance_rupees = float(summary.get("balance_rupees", 0.0))
-        has_balance = balance_rupees >= 1.0
+        has_balance = balance_rupees >= 0.01
         self.pay_full_button.setEnabled(has_balance)
         for preset_amount, preset_button in self.amount_preset_buttons.items():
             preset_button.setEnabled(has_balance)
@@ -497,10 +497,10 @@ class PaymentView(QWidget):
         if not summary:
             return
         balance = float(summary.get("balance_rupees", 0.0))
-        if balance < 1.0:
+        if balance < 0.01:
             return
         desired = balance if amount == "full" else min(float(amount), balance)
-        if desired >= 1.0:
+        if desired >= 0.01:
             self.amt_input.setValue(desired)
 
     def _on_print_thermal_receipt(self, payment_id: int):
@@ -524,6 +524,7 @@ class PaymentView(QWidget):
         PrintService.show_thermal_receipt_preview(receipt_html, parent=self)
 
     def _clear_billing_view(self):
+        self.current_case_id = None
         self._current_financial_summary = None
         self._current_case_details = None
         self._current_patient_details = None
