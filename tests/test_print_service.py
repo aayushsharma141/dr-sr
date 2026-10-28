@@ -223,11 +223,13 @@ def test_thermal_receipt_builder_includes_installment_and_current_balance(
     assert "GPay <REF>&" not in html
 
 
-def test_thermal_printer_uses_custom_80mm_page(qapp):
+def test_thermal_printer_uses_custom_80mm_page(qapp, tmp_path):
     """Thermal print setup uses a custom 80mm page rather than the A4 preset."""
     from PySide6.QtGui import QPageSize
 
-    printer = PrintService.create_thermal_printer()
+    pdf_spec = str(tmp_path / "spec_test_thermal.pdf")
+
+    printer = PrintService.create_thermal_printer(pdf_path=pdf_spec)
     page_size = printer.pageLayout().pageSize()
     size_mm = page_size.size(QPageSize.Unit.Millimeter)
 
