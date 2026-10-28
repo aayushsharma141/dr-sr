@@ -125,3 +125,56 @@ def test_dashboard_view_ui(qapp, tmp_path):
     assert view.card_today_registrations.value_lbl.text() == "0"
     assert view.card_active_cases.value_lbl.text() == "0"
     assert view.card_pending_balance.value_lbl.text() == "₹0.00"
+
+
+def test_dashboard_today_activity_reports_real_registrations_and_sessions(tmp_path):
+    """Today activity is a read-only union of persisted registrations and treatment sessions."""
+    db_file = tmp_path / "today_activity.db"
+    init_db(db_file)
+
+    conn = get_db_connection(db_file)
+    cursor = conn.cursor()
+    cursor.execute(
+        """
+        INSERT INTO patients (
+            serial_urn_no, patient_name, age, sex, address, mobile_no, patient_condition
+        ) VALUES (?, ?, ?, ?, ?, ?, ?)
+        """,
+        (
+            "KH-2026-0020",
+            "Meera Kumari",
+            38,
+            "Female",
+            "Ara",
+            "9876543210",
+            "Knee Pain",
+        ),
+    )
+    patient_id = cursor.lastrowid
+    cursor.execute(
+        """
+        INSERT INTO treatment_cases (patient_id, title, no_of_sessions, total_amount_paise)
+        VALUES (?, 'Knee Rehabilitation', 8, 400000)
+        """,
+        (patient_id,),
+    )
+    case_id = cursor.lastrowid
+    cursor.execute(
+        """
+        INSERT INTO treatment_sessions (
+            case_id, session_number, treatment_notes, modalities_used, pain_score
+        ) VALUES (?, 1, 'Mobility assessment', 'TENS;Therapeutic Exercises', 6)
+        """,
+        (case_id,),
+    )
+    conn.commit()
+    conn.close()
+
+    service = DashboardService(db_file)
+    activity = service.get_today_activity(limit=10)
+
+    activity_types = {item["activity_type"] for item in activity}
+    assert "Registration" in activity_types
+    assert "Treatment session logged" in activity_types
+    assert all(item["serial_urn_no"] == "KH-2026-0020" for item in activity)
+    assert len(service.get_today_activity(limit=1)) == 1

@@ -87,4 +87,19 @@
 - **Rationale:** Distinguishes the working desktop application from the printed form while grounding the UI palette in the actual trust/hospital branding.
 
 ---
+
+### ADR-10: Use Native PySide6 Components Until Fluent Widgets Are Commercially Licensed
+- **Status:** Approved for Phase 1
+- **Context:** The app is being developed for delivery as a client-facing Windows desktop application. The QFluentWidgets upstream documentation states that its Python library is licensed under GPLv3 for non-commercial projects and that commercial use requires a commercial license.
+- **Decision:** Do not add `PySide6-Fluent-Widgets` as a runtime dependency unless the project owner has obtained and confirmed the required commercial license. Build the Fluent-inspired command bar, quick launcher, toast feedback, and modern cards with the existing PySide6 dependency in the meantime.
+- **Rationale:** Keeps the deployment dependency footprint small and avoids assuming that a non-commercial license permits a proprietary client delivery.
+- **References:** [QFluentWidgets license](https://qfluentwidgets.com/pages/about/) · [QFluentWidgets FAQ](https://qfluentwidgets.com/pages/faq/)
+
+### ADR-11: Show Only Verifiable Events in the Today's Activity Panel
+- **Status:** Approved for Phase 1
+- **Context:** The current SQLite schema stores patients, treatment cases, treatment sessions, and payments; it does not contain an appointment entity or persisted waiting-room status.
+- **Decision:** The dashboard's day feed shows only registrations and treatment sessions that have actually been persisted for the current local date. Do not label a person "Waiting", "In Therapy", or "Completed" without a source field and defined workflow that supports that state.
+- **Rationale:** Prevents the operational dashboard from presenting inferred clinical or appointment states as facts. Appointment scheduling and queue state can be designed as a separate feature if the hospital requires it.
+
+---
 *Decisions logged and baselined.*

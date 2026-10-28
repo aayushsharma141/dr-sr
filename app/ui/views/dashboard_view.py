@@ -1,11 +1,11 @@
 """
-Live Hospital Dashboard for Kalyan Hospital.
-UI-only redesign: keeps existing service calls, data keys, and navigation signals.
+Operational dashboard for Kalyan Hospital.
+Displays live SQLite metrics and actual same-day clinic activity only.
 """
 from pathlib import Path
 
 from PySide6.QtCore import Qt, Signal, QDateTime
-from PySide6.QtGui import QPixmap
+from PySide6.QtGui import QColor, QPixmap
 from PySide6.QtWidgets import (
     QFrame, QHBoxLayout, QHeaderView, QLabel, QPushButton,
     QTableWidget, QTableWidgetItem, QVBoxLayout, QWidget,
@@ -19,7 +19,7 @@ from app.services.dashboard_service import DashboardService
 
 
 def _rgba(hex_color: str, alpha: int) -> str:
-    """Convert #RRGGBB to Qt's rgba() syntax for tinted icon badges."""
+    """Convert #RRGGBB into Qt stylesheet rgba() syntax."""
     value = hex_color.lstrip("#")
     red, green, blue = (int(value[i:i + 2], 16) for i in (0, 2, 4))
     return f"rgba({red}, {green}, {blue}, {alpha})"
@@ -29,7 +29,7 @@ ASSET_DIR = Path(__file__).resolve().parents[2] / "assets"
 
 
 class StatCard(QFrame):
-    """Compact metric card with a brand-color accent and typographic icon."""
+    """Compact metric card with a restrained brand accent."""
 
     def __init__(
         self,
@@ -43,12 +43,12 @@ class StatCard(QFrame):
         super().__init__(parent)
         self.setObjectName("StatCard")
         self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
-        self.setMinimumHeight(112)
+        self.setMinimumHeight(98)
 
         accent = accent_color or COLORS["accent"]
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(16, 13, 16, 13)
-        layout.setSpacing(5)
+        layout.setContentsMargins(13, 10, 13, 10)
+        layout.setSpacing(4)
 
         accent_line = QFrame()
         accent_line.setFixedHeight(3)
@@ -57,24 +57,25 @@ class StatCard(QFrame):
 
         header = QHBoxLayout()
         header.setContentsMargins(0, 0, 0, 0)
+        header.setSpacing(4)
         title_lbl = QLabel(title.upper())
         title_lbl.setObjectName("StatCardTitle")
-        header.addWidget(title_lbl)
-        header.addStretch()
+        title_lbl.setWordWrap(True)
+        header.addWidget(title_lbl, stretch=1)
 
         icon_badge = QLabel(icon)
         icon_badge.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        icon_badge.setFixedSize(30, 30)
+        icon_badge.setFixedSize(27, 27)
         icon_badge.setStyleSheet(
             f"background:{_rgba(accent, 22)};color:{accent};border:1px solid {_rgba(accent, 85)};"
-            "border-radius:7px;font-weight:800;font-size:11px;"
+            "border-radius:7px;font-weight:800;font-size:10px;"
         )
         header.addWidget(icon_badge)
         layout.addLayout(header)
 
         self.value_lbl = QLabel(initial_value)
         self.value_lbl.setObjectName("StatCardValue")
-        self.value_lbl.setStyleSheet(f"color:{accent};")
+        self.value_lbl.setStyleSheet(f"color:{accent};font-size:24px;")
         layout.addWidget(self.value_lbl)
 
         sub_lbl = QLabel(subtitle)
@@ -87,9 +88,12 @@ class StatCard(QFrame):
 
 
 class DashboardView(QWidget):
-    """Operational overview backed by the existing SQLite dashboard service."""
+    """Operational overview backed by the existing SQLite services."""
 
     navigate_to = Signal(int)
+    register_patient_requested = Signal()
+    open_patient_requested = Signal(int, str)
+    manual_refresh_completed = Signal()
 
     def __init__(
         self,
@@ -101,23 +105,21 @@ class DashboardView(QWidget):
         self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
 
         root_layout = QVBoxLayout(self)
-        root_layout.setContentsMargins(24, 18, 24, 16)
-        root_layout.setSpacing(12)
+        root_layout.setContentsMargins(18, 12, 18, 12)
+        root_layout.setSpacing(8)
 
-        # Header row: supplied hospital logo, identity, and a correctly positioned
-        # physiotherapist helping a patient with a supported knee-flexion exercise.
+        # Compact trust/hospital identity. Printed prescription branding remains separate.
         header_box = QFrame()
         header_box.setObjectName("CardPanel")
         header_layout = QHBoxLayout(header_box)
-        header_layout.setContentsMargins(14, 12, 14, 12)
-        header_layout.setSpacing(12)
+        header_layout.setContentsMargins(12, 9, 12, 9)
+        header_layout.setSpacing(10)
 
         logo_lbl = QLabel()
         logo_lbl.setObjectName("HospitalLogo")
         logo_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        logo_lbl.setFixedSize(68, 68)
-        logo_path = ASSET_DIR / "kalyan_hospital_logo.jpg"
-        logo_pixmap = QPixmap(str(logo_path))
+        logo_lbl.setFixedSize(56, 56)
+        logo_pixmap = QPixmap(str(ASSET_DIR / "kalyan_hospital_logo.jpg"))
         if not logo_pixmap.isNull():
             logo_lbl.setPixmap(logo_pixmap.scaled(
                 logo_lbl.size(),
@@ -133,20 +135,21 @@ class DashboardView(QWidget):
         header_layout.addWidget(logo_lbl, alignment=Qt.AlignmentFlag.AlignTop)
 
         header_text = QVBoxLayout()
-        header_text.setSpacing(3)
+        header_text.setSpacing(2)
         title_lbl = QLabel(f"{HOSPITAL_NAME_HINDI}  |  {HOSPITAL_NAME}")
         title_lbl.setObjectName("PageHeading")
+        title_lbl.setStyleSheet("font-size:18px;")
         title_lbl.setWordWrap(True)
         header_text.addWidget(title_lbl)
 
         sub_info = QLabel(f"{HOSPITAL_DEPT}  ·  {TRUST_NAME}")
         sub_info.setStyleSheet(
-            f"color:{COLORS['primary']};font-size:10px;font-weight:800;letter-spacing:.25px;"
+            f"color:{COLORS['primary']};font-size:9px;font-weight:800;letter-spacing:.2px;"
         )
         sub_info.setWordWrap(True)
         header_text.addWidget(sub_info)
 
-        doctor_names = "  |  ".join(d["name_en"] for d in DOCTORS)
+        doctor_names = "  |  ".join(doctor["name_en"] for doctor in DOCTORS)
         doctor_info = QLabel(doctor_names)
         doctor_info.setObjectName("PageSubheading")
         doctor_info.setWordWrap(True)
@@ -155,11 +158,10 @@ class DashboardView(QWidget):
 
         scene_lbl = QLabel()
         scene_lbl.setObjectName("PhysiotherapyHeaderImage")
-        scene_lbl.setFixedSize(232, 96)
+        scene_lbl.setFixedSize(158, 64)
         scene_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
         scene_lbl.setToolTip("Physiotherapist assisting a patient during a knee-mobility exercise")
-        scene_path = ASSET_DIR / "physiotherapy_header.jpg"
-        scene_pixmap = QPixmap(str(scene_path))
+        scene_pixmap = QPixmap(str(ASSET_DIR / "physiotherapy_header.jpg"))
         if not scene_pixmap.isNull():
             scene_lbl.setPixmap(scene_pixmap.scaled(
                 scene_lbl.size(),
@@ -168,73 +170,56 @@ class DashboardView(QWidget):
             ))
         else:
             scene_lbl.setText("PHYSIOTHERAPY")
-            scene_lbl.setStyleSheet(
-                f"background:{COLORS['background']};color:{COLORS['primary']};"
-                "border:1px solid #E2E8F0;border-radius:8px;font-weight:800;"
-            )
         scene_lbl.setStyleSheet(
-            scene_lbl.styleSheet() +
-            "border:1px solid #E2E8F0;border-radius:8px;background:#F8FAFC;"
+            "border:1px solid #DDE5DF;border-radius:7px;background:#F5F7F5;"
         )
         header_layout.addWidget(scene_lbl)
 
-        header_side = QVBoxLayout()
-        header_side.setSpacing(6)
-        offline_badge = QLabel("●  OFFLINE · LOCAL DATA")
-        offline_badge.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        offline_badge.setStyleSheet(
-            "background:#ECFDF5;color:#166534;border:1px solid #A7F3D0;"
-            "border-radius:6px;padding:7px 8px;font-size:9px;font-weight:800;"
-        )
-        header_side.addWidget(offline_badge)
-
-        self.clock_label = QLabel(QDateTime.currentDateTime().toString("ddd, dd MMM yyyy\nhh:mm AP"))
+        self.clock_label = QLabel(QDateTime.currentDateTime().toString("ddd, dd MMM yyyy  ·  hh:mm AP"))
         self.clock_label.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
         self.clock_label.setStyleSheet(f"color:{COLORS['text_secondary']};font-size:10px;")
-        header_side.addWidget(self.clock_label)
-
-        refresh_btn = QPushButton("Refresh Data")
-        refresh_btn.setObjectName("SecondaryButton")
-        refresh_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        refresh_btn.clicked.connect(self.refresh_data)
-        header_side.addWidget(refresh_btn)
-        header_layout.addLayout(header_side)
+        header_layout.addWidget(self.clock_label)
         root_layout.addWidget(header_box)
 
-        # Branch addresses are kept visible below the brand header.
+        # Branch details, compactly displayed instead of a promotional banner.
         branch_info = QFrame()
         branch_info.setObjectName("ClinicInfoBar")
         branch_info.setStyleSheet(
-            f"QFrame#ClinicInfoBar {{ background:{COLORS['primary_dark']};"
-            "border-radius:6px; }"
+            f"QFrame#ClinicInfoBar {{ background:{COLORS['primary_dark']};border-radius:6px; }}"
         )
         branch_layout = QHBoxLayout(branch_info)
-        branch_layout.setContentsMargins(12, 7, 12, 7)
+        branch_layout.setContentsMargins(10, 6, 10, 6)
         branch_layout.setSpacing(10)
-        branch_icon = QLabel("CLINIC LOCATIONS")
-        branch_icon.setStyleSheet("color:#FFFFFF;font-size:9px;font-weight:800;letter-spacing:.6px;")
-        branch_layout.addWidget(branch_icon, alignment=Qt.AlignmentFlag.AlignTop)
-
-        addresses = QLabel(f"ARA: {CLINIC_1_ADDR}\nGADHANI: {CLINIC_2_ADDR}")
-        addresses.setStyleSheet("color:#F8FAFC;font-size:10px;")
+        branch_title = QLabel("CLINIC LOCATIONS")
+        branch_title.setStyleSheet("color:#D9C27A;font-size:9px;font-weight:800;letter-spacing:.5px;")
+        branch_layout.addWidget(branch_title, alignment=Qt.AlignmentFlag.AlignTop)
+        addresses = QLabel(f"ARA  ·  {CLINIC_1_ADDR}\nGADHANI  ·  {CLINIC_2_ADDR}")
+        addresses.setStyleSheet("color:#FFFFFF;font-size:9px;")
         addresses.setWordWrap(True)
         branch_layout.addWidget(addresses, stretch=1)
+        offline_badge = QLabel("● OFFLINE · LOCAL DATA")
+        offline_badge.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        offline_badge.setStyleSheet(
+            "background:#E7F5EB;color:#155B43;border:1px solid #C5E5D0;"
+            "border-radius:5px;padding:6px 8px;font-size:9px;font-weight:800;"
+        )
+        branch_layout.addWidget(offline_badge, alignment=Qt.AlignmentFlag.AlignTop)
         root_layout.addWidget(branch_info)
 
-        # Live KPIs remain connected to DashboardService, not mock figures.
+        # Live KPI cards; figures are never hard-coded sample counts.
         cards_layout = QHBoxLayout()
-        cards_layout.setSpacing(12)
+        cards_layout.setSpacing(9)
         self.card_total_patients = StatCard(
             "Total Patients", "0", "Registered patient records", "PT", COLORS["primary"]
         )
         self.card_today_registrations = StatCard(
-            "Today's Admissions", "0", "New registrations today", "IN", COLORS["accent"]
+            "Today's Admissions", "0", "Registrations today", "TD", COLORS["accent"]
         )
         self.card_active_cases = StatCard(
-            "Active Cases", "0", "Ongoing treatment plans", "TR", COLORS["secondary"]
+            "Active Cases", "0", "Ongoing treatment plans", "TX", COLORS["secondary"]
         )
         self.card_pending_balance = StatCard(
-            "Outstanding Balance", "₹0.00", "Fees pending collection", "₹", COLORS["danger"]
+            "Outstanding Balance", "₹0.00", "Unpaid fees on active cases", "₹", COLORS["danger"]
         )
         for card in (
             self.card_total_patients,
@@ -245,26 +230,26 @@ class DashboardView(QWidget):
             cards_layout.addWidget(card)
         root_layout.addLayout(cards_layout)
 
-        # Existing navigation actions; labels are text-based rather than emoji icons.
+        # One-click work actions. Registration is a distinct action, not just directory navigation.
         actions_frame = QFrame()
         actions_frame.setObjectName("CardPanel")
         actions_layout = QHBoxLayout(actions_frame)
-        actions_layout.setContentsMargins(12, 9, 12, 9)
-        actions_layout.setSpacing(8)
+        actions_layout.setContentsMargins(10, 7, 10, 7)
+        actions_layout.setSpacing(7)
 
         quick_label = QLabel("QUICK ACTIONS")
         quick_label.setStyleSheet(
-            f"font-size:10px;font-weight:800;letter-spacing:.6px;color:{COLORS['text_secondary']};"
+            f"font-size:9px;font-weight:800;letter-spacing:.5px;color:{COLORS['text_secondary']};"
         )
         actions_layout.addWidget(quick_label)
 
         btn_new_patient = QPushButton("+  Register Patient")
         btn_new_patient.setObjectName("PrimaryButton")
         btn_new_patient.setCursor(Qt.CursorShape.PointingHandCursor)
-        btn_new_patient.clicked.connect(lambda: self.navigate_to.emit(1))
+        btn_new_patient.clicked.connect(self.register_patient_requested.emit)
         actions_layout.addWidget(btn_new_patient)
 
-        btn_view_patients = QPushButton("Search Registry")
+        btn_view_patients = QPushButton("Patient Registry")
         btn_view_patients.setObjectName("SecondaryButton")
         btn_view_patients.setCursor(Qt.CursorShape.PointingHandCursor)
         btn_view_patients.clicked.connect(lambda: self.navigate_to.emit(1))
@@ -276,7 +261,7 @@ class DashboardView(QWidget):
         btn_new_treatment.clicked.connect(lambda: self.navigate_to.emit(2))
         actions_layout.addWidget(btn_new_treatment)
 
-        btn_payments = QPushButton("Billing && Payments")
+        btn_payments = QPushButton("Billing & Payments")
         btn_payments.setObjectName("SecondaryButton")
         btn_payments.setCursor(Qt.CursorShape.PointingHandCursor)
         btn_payments.clicked.connect(lambda: self.navigate_to.emit(3))
@@ -284,37 +269,58 @@ class DashboardView(QWidget):
         actions_layout.addStretch()
         root_layout.addWidget(actions_frame)
 
-        # Recent admissions table is populated from the same live service method.
+        # Real today activity: registrations and treatment sessions saved today.
         table_header = QHBoxLayout()
-        table_title = QLabel("Recent Patient Admissions")
-        table_title.setObjectName("PageHeading")
-        table_title.setStyleSheet("font-size:16px;")
-        table_header.addWidget(table_title)
+        title_activity = QLabel("Today's Patient Activity")
+        title_activity.setObjectName("PageHeading")
+        title_activity.setStyleSheet("font-size:15px;")
+        table_header.addWidget(title_activity)
         table_header.addStretch()
-        latest_lbl = QLabel("LATEST 5 RECORDS")
-        latest_lbl.setStyleSheet(
-            f"color:{COLORS['text_secondary']};font-size:10px;font-weight:700;letter-spacing:.6px;"
+        refresh_btn = QPushButton("Refresh")
+        refresh_btn.setObjectName("SecondaryButton")
+        refresh_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        refresh_btn.clicked.connect(self._on_manual_refresh)
+        table_header.addWidget(refresh_btn)
+        activity_hint = QLabel("REAL SQLITE ACTIVITY  ·  DOUBLE-CLICK OR OPEN A PATIENT")
+        activity_hint.setStyleSheet(
+            f"color:{COLORS['text_secondary']};font-size:8px;font-weight:800;letter-spacing:.3px;"
         )
-        table_header.addWidget(latest_lbl)
+        table_header.addWidget(activity_hint)
         root_layout.addLayout(table_header)
 
+        self.activity_empty = QLabel(
+            "No registrations or treatment sessions have been recorded today."
+        )
+        self.activity_empty.setObjectName("EmptyStateLabel")
+        self.activity_empty.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.activity_empty.setMinimumHeight(64)
+        self.activity_empty.setStyleSheet(
+            f"background:#FFFFFF;color:{COLORS['text_secondary']};border:1px dashed {COLORS['border']};"
+            "border-radius:8px;padding:12px;"
+        )
+        root_layout.addWidget(self.activity_empty)
+
         self.recent_table = QTableWidget()
-        self.recent_table.setObjectName("RecentAdmissionsTable")
+        self.activity_table = self.recent_table  # Keep the original public attribute for compatibility.
+        self.recent_table.setObjectName("TodayActivityTable")
         self.recent_table.setColumnCount(5)
         self.recent_table.setHorizontalHeaderLabels([
-            "Serial / URN", "Patient Name", "Age / Sex", "Condition", "Registered At"
+            "Activity", "Patient / URN", "Condition", "Time", "Action"
         ])
         header_view = self.recent_table.horizontalHeader()
         header_view.setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
-        header_view.setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
-        header_view.setSectionResizeMode(2, QHeaderView.ResizeMode.ResizeToContents)
-        header_view.setSectionResizeMode(3, QHeaderView.ResizeMode.Stretch)
-        header_view.setSectionResizeMode(4, QHeaderView.ResizeMode.ResizeToContents)
+        header_view.setSectionResizeMode(1, QHeaderView.ResizeMode.ResizeToContents)
+        header_view.setSectionResizeMode(2, QHeaderView.ResizeMode.Stretch)
+        header_view.setSectionResizeMode(3, QHeaderView.ResizeMode.ResizeToContents)
+        header_view.setSectionResizeMode(4, QHeaderView.ResizeMode.Fixed)
+        self.recent_table.setColumnWidth(4, 72)
         self.recent_table.setAlternatingRowColors(True)
         self.recent_table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
         self.recent_table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
+        self.recent_table.setShowGrid(False)
         self.recent_table.verticalHeader().setDefaultSectionSize(40)
-        self.recent_table.setMinimumHeight(150)
+        self.recent_table.verticalHeader().setMinimumSectionSize(40)
+        self.recent_table.cellDoubleClicked.connect(self._on_activity_double_clicked)
         root_layout.addWidget(self.recent_table, stretch=1)
 
         footer = QLabel(
@@ -322,26 +328,61 @@ class DashboardView(QWidget):
             "Patient information is stored on this computer"
         )
         footer.setAlignment(Qt.AlignmentFlag.AlignRight)
-        footer.setStyleSheet(f"color:{COLORS['text_secondary']};font-size:10px;padding-top:1px;")
+        footer.setStyleSheet(f"color:{COLORS['text_secondary']};font-size:9px;padding-top:1px;")
         root_layout.addWidget(footer)
 
         self.refresh_data()
 
+    def _on_activity_double_clicked(self, row: int, _column: int) -> None:
+        item = self.recent_table.item(row, 0)
+        if item is None:
+            return
+        patient_id = item.data(Qt.ItemDataRole.UserRole)
+        urn = item.data(Qt.ItemDataRole.UserRole + 1)
+        if patient_id:
+            self.open_patient_requested.emit(int(patient_id), str(urn or ""))
+
+    def _on_open_activity_patient(self, patient_id: int, urn: str) -> None:
+        self.open_patient_requested.emit(patient_id, urn)
+
+    def _on_manual_refresh(self):
+        self.refresh_data()
+        self.manual_refresh_completed.emit()
+
     def refresh_data(self):
-        """Fetch current metrics and recent records from the existing SQLite service."""
+        """Refresh live aggregates and real same-day registrations/session events."""
         stats = self.service.get_statistics()
         self.card_total_patients.set_value(str(stats["total_patients"]))
         self.card_today_registrations.set_value(str(stats["today_registrations"]))
         self.card_active_cases.set_value(str(stats["active_cases"]))
         self.card_pending_balance.set_value(f"₹{stats['pending_balance_rupees']:,.2f}")
 
-        recent_patients = self.service.get_recent_registrations(limit=5)
-        self.recent_table.setRowCount(len(recent_patients))
-        for row, patient in enumerate(recent_patients):
-            self.recent_table.setItem(row, 0, QTableWidgetItem(str(patient.get("serial_urn_no", ""))))
-            self.recent_table.setItem(row, 1, QTableWidgetItem(str(patient.get("patient_name", ""))))
-            age_sex = f"{patient.get('age', '')} / {patient.get('sex', '')}"
-            self.recent_table.setItem(row, 2, QTableWidgetItem(age_sex))
-            self.recent_table.setItem(row, 3, QTableWidgetItem(str(patient.get("patient_condition", ""))))
-            reg_time = str(patient.get("created_at") or patient.get("registered_at") or patient.get("patient_in") or "")[:16]
-            self.recent_table.setItem(row, 4, QTableWidgetItem(reg_time))
+        activities = self.service.get_today_activity(limit=8)
+        self.recent_table.setRowCount(len(activities))
+        self.activity_empty.setVisible(not activities)
+        self.recent_table.setVisible(bool(activities))
+
+        for row, activity in enumerate(activities):
+            patient_id = int(activity.get("patient_id") or 0)
+            urn = str(activity.get("serial_urn_no") or "")
+            activity_item = QTableWidgetItem(str(activity.get("activity_type") or "Activity"))
+            activity_item.setData(Qt.ItemDataRole.UserRole, patient_id)
+            activity_item.setData(Qt.ItemDataRole.UserRole + 1, urn)
+            activity_item.setForeground(QColor(COLORS["primary"]))
+            self.recent_table.setItem(row, 0, activity_item)
+
+            patient_label = f"{activity.get('patient_name', '')}  ·  {urn}"
+            self.recent_table.setItem(row, 1, QTableWidgetItem(patient_label))
+            self.recent_table.setItem(row, 2, QTableWidgetItem(str(activity.get("patient_condition") or "")))
+            activity_at = str(activity.get("activity_at") or "")
+            self.recent_table.setItem(row, 3, QTableWidgetItem(activity_at[-8:-3] if len(activity_at) >= 16 else activity_at))
+
+            open_btn = QPushButton("Open")
+            open_btn.setObjectName("SecondaryButton")
+            open_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+            open_btn.setMinimumHeight(27)
+            open_btn.clicked.connect(
+                lambda _checked=False, pid=patient_id, patient_urn=urn:
+                    self._on_open_activity_patient(pid, patient_urn)
+            )
+            self.recent_table.setCellWidget(row, 4, open_btn)
