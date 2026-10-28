@@ -15,6 +15,9 @@ A standalone, 100% offline Windows desktop application built with Python, PySide
 - **Clinical VAS Pain Scale:** Session logging uses a color-graded 0–10 score with explicit No Pain, Mild, Moderate, and Severe labels while storing the existing integer `pain_score` field.
 - **Modality Chips:** One-click selection for TENS, IFT, UST, cervical/lumbar traction, moist heat, therapeutic exercise, and manual mobilization; selections still serialize to the existing `modalities_used` text field.
 - **Session Pain Trend:** A local sparkline summarizes recorded pain scores by session number. It only plots saved scores and does not infer a clinical outcome or change the treatment plan.
+- **Patient Registry Filters & Quick Profile:** Filter the saved registry by all patients, admissions today, active treatment cases, or any unpaid case balance. Selecting a row opens a profile panel with the patient's condition, session progress, total balance, and direct edit/treatment/print actions.
+- **Payment Status & Quick Amounts:** Ledger status is derived from saved financial summaries (`PAID IN FULL`, `PARTIAL DUE`, `BALANCE DUE`, or `OVERPAID`) and the form provides full-balance/₹500/₹1,000/₹2,000 presets. No `OVERDUE` label is used because the current schema does not store a payment due date.
+- **80mm Thermal Receipts:** Each installment row has a Print action that opens an 80mm custom-page receipt preview with patient URN, receipt number, payment mode, amount, total paid, and current balance as of print time. The A4 prescription and registration record remain separate formats.
 - **Local-First & Offline:** Zero runtime internet dependency, no telemetry, no cloud accounts.
 
 ---

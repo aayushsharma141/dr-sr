@@ -141,6 +141,7 @@ class MainWindow(QMainWindow):
         self.stacked_widget.addWidget(self.treatment_view)
 
         self.payment_view = PaymentView(db_path=self.db_path, parent=self)
+        self.payment_view.payment_saved.connect(self._on_payment_saved)
         self.stacked_widget.addWidget(self.payment_view)
 
         self.backup_view = BackupView(db_path=self.db_path, parent=self)
@@ -232,6 +233,22 @@ class MainWindow(QMainWindow):
         urn = str(patient.get("serial_urn_no") or "")
         detail = f"{name} · {urn} saved to the local database." if urn else f"{name} saved to the local database."
         self.show_toast("Patient record saved", detail, "success")
+
+    def _on_payment_saved(self, receipt: dict):
+        """Refresh live financial indicators and acknowledge a saved payment without a modal."""
+        self.dashboard_view.refresh_data()
+        amount = str(receipt.get("amount_paid_formatted") or "Payment")
+        balance = str(receipt.get("balance_formatted") or "")
+        detail = f"{amount} recorded. "
+        if receipt.get("is_overpayment"):
+            detail += f"Case is cleared with an excess of {receipt.get('overpayment_formatted', '—')}."
+            level = "warning"
+            title = "Payment recorded · overpayment"
+        else:
+            detail += f"Remaining balance: {balance}. Use the Print action in the ledger for an 80mm receipt."
+            level = "success"
+            title = "Payment recorded"
+        self.show_toast(title, detail, level)
 
     def _on_session_saved(self, session: dict):
         """Refresh the day feed and acknowledge successful session logging non-modally."""

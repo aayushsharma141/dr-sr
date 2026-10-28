@@ -190,3 +190,47 @@ def test_pdf_export_generation(qapp, sample_patient_dict, sample_case_dict, tmp_
 
     assert os.path.exists(generated_path)
     assert os.path.getsize(generated_path) > 1000  # PDF is non-empty and well-formed
+
+
+def test_thermal_receipt_builder_includes_installment_and_current_balance(
+    sample_patient_dict, sample_case_dict, sample_financial_summary
+):
+    """80mm receipt output includes the saved installment and transparently labels current balance."""
+    payment = {
+        "id": 7,
+        "amount_paid_paise": 150000,
+        "payment_mode": "UPI",
+        "payment_timestamp": "2026-10-28 10:15:00",
+        "reference_note": "GPay <REF>&",
+        "recorded_by": "Staff",
+    }
+    html = DocumentBuilder.build_thermal_receipt_html(
+        patient_data=sample_patient_dict,
+        case_data=sample_case_dict,
+        payment_data=payment,
+        financial_summary=sample_financial_summary,
+    )
+
+    assert "size: 80mm 240mm" in html
+    assert "RCPT-0007" in html
+    assert "Ramesh Kumar Sharma" in html
+    assert "KH-2026-0001" in html
+    assert "₹ 1,500.00" in html
+    assert "₹ 3,500.00" in html
+    assert "₹ 2,000.00" in html
+    assert "Current balance as of this receipt's print time" in html
+    assert "GPay &lt;REF&gt;&amp;" in html
+    assert "GPay <REF>&" not in html
+
+
+def test_thermal_printer_uses_custom_80mm_page(qapp):
+    """Thermal print setup uses a custom 80mm page rather than the A4 preset."""
+    from PySide6.QtGui import QPageSize
+
+    printer = PrintService.create_thermal_printer()
+    page_size = printer.pageLayout().pageSize()
+    size_mm = page_size.size(QPageSize.Unit.Millimeter)
+
+    assert abs(size_mm.width() - 80.0) < 0.5
+    assert abs(size_mm.height() - 240.0) < 0.5
+    assert "Thermal Receipt" in page_size.name()
