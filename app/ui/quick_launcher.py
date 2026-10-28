@@ -84,9 +84,8 @@ class QuickLauncherDialog(QDialog):
         self.search_input.textChanged.connect(self._populate_results)
         self.search_input.returnPressed.connect(self._activate_current)
         self.results_list.itemActivated.connect(self._activate_item)
-        self.results_list.itemDoubleClicked.connect(self._activate_item)
 
-        escape = QShortcut(QKeySequence(Qt.Key.Key_Escape), self)
+        escape = QShortcut(QKeySequence("Escape"), self)
         escape.activated.connect(self.reject)
 
         self._populate_results("")
