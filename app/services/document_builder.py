@@ -6,12 +6,18 @@ authentic Caduceus medical emblem, and dual clinician signatures.
 
 import base64
 import os
+from html import escape as _html_escape
 from pathlib import Path
 from typing import Any, Dict, Optional
 
 from app.services.billing_service import BillingService
 
 ASSET_DIR = Path(__file__).resolve().parents[1] / "assets"
+
+
+def _esc(value: Any) -> str:
+    """Escape user-entered text so characters like < > & can never break the printed layout."""
+    return _html_escape(str(value if value is not None else ""), quote=True)
 
 
 class DocumentBuilder:
@@ -61,6 +67,9 @@ class DocumentBuilder:
         3. Pale Yellow Patient Info Strip with Name, Age/Sex, Date, Add., and Ref.
         4. Solid Maroon Divider matching the physical pad.
         """
+        urn, name, age_sex, date_str, address, referred_by = (
+            _esc(v) for v in (urn, name, age_sex, date_str, address, referred_by)
+        )
         caduceus_src = cls._get_caduceus_b64()
         if caduceus_src:
             caduceus_img_tag = f'<img src="{caduceus_src}" width="88" height="82" alt="Caduceus" style="display:block;margin:0 auto;" />'
@@ -71,17 +80,17 @@ class DocumentBuilder:
   <!-- 1. TOP MAROON BANNER (MATCHES PHYSICAL PAD) -->
   <table width="100%" cellpadding="0" cellspacing="0" bgcolor="#6B1736" style="background-color: #6B1736; color: #FFFFFF; border-collapse: collapse;">
     <tr bgcolor="#6B1736">
-      <td bgcolor="#6B1736" align="center" style="padding-top: 10px; padding-bottom: 2px;">
+      <td bgcolor="#6B1736" align="center" style="padding-top: 6px; padding-bottom: 0;">
         <span style="font-family: 'Nirmala UI', 'Mangal', 'Arial Black', Arial, sans-serif; font-size: 32px; font-weight: 800; color: #FFFFFF; letter-spacing: 2px;">कल्याण हॉस्पीटल</span>
       </td>
     </tr>
     <tr bgcolor="#6B1736">
-      <td bgcolor="#6B1736" align="center" style="padding-bottom: 8px;">
+      <td bgcolor="#6B1736" align="center" style="padding-bottom: 5px;">
         <span style="font-family: Arial, Helvetica, sans-serif; font-size: 14.5px; font-weight: 800; color: #FFFFFF; letter-spacing: 3px;">PHYSIOTHERAPY DEPARTMENT</span>
       </td>
     </tr>
     <tr bgcolor="#6B1736">
-      <td bgcolor="#6B1736" style="padding: 0 14px 10px 14px;">
+      <td bgcolor="#6B1736" style="padding: 0 14px 6px 14px;">
         <table width="100%" cellpadding="0" cellspacing="0" bgcolor="#6B1736">
           <tr bgcolor="#6B1736">
             <!-- Sl No. Badge on Left -->
@@ -105,13 +114,13 @@ class DocumentBuilder:
   </table>
 
   <!-- 2. DOCTORS & CADUCEUS EMBLEM (3 COLUMNS) -->
-  <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #FFFFFF; padding: 10px 14px 8px 14px; border-collapse: collapse;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #FFFFFF; padding: 6px 14px 4px 14px; border-collapse: collapse;">
     <tr>
       <!-- Left: Dr. Madan Mohan Dwivedi (Left Aligned) -->
       <td width="39%" valign="top" style="text-align: left;">
         <div style="font-family: 'Nirmala UI', Arial, sans-serif; font-size: 14.5px; font-weight: bold; color: #9E1B42; line-height: 1.2;">डॉ० मदन मोहन द्विवेदी</div>
         <div style="font-family: 'Georgia', 'Times New Roman', serif; font-size: 13.5px; font-weight: bold; font-style: italic; color: #9E1B42; margin-bottom: 4px;">Dr. Madan Mohan Dwivedi</div>
-        <div style="font-size: 9.5px; color: #000000; line-height: 1.38; font-family: 'Segoe UI', Arial, sans-serif;">
+        <div style="font-size: 9.5px; color: #000000; line-height: 1.2; font-family: 'Segoe UI', Arial, sans-serif;">
           D.P.T (Pat.), O.C.T.M. (Delhi)<br/>
           O.C.S.P. (Gwaliar), M.B.S.A.P.O. (Bihar)<br/>
           Sr. Diploma Music (Allahabad)<br/>
@@ -133,7 +142,7 @@ class DocumentBuilder:
       <td width="43%" valign="top" style="text-align: left; padding-left: 10px;">
         <div style="font-family: 'Nirmala UI', Arial, sans-serif; font-size: 14.5px; font-weight: bold; color: #9E1B42; line-height: 1.2;">डॉ० चंदन कुमार द्विवेदी</div>
         <div style="font-family: 'Georgia', 'Times New Roman', serif; font-size: 13.5px; font-weight: bold; font-style: italic; color: #9E1B42; margin-bottom: 4px;">Dr. Chandan Kr. Dwivedi</div>
-        <div style="font-size: 9.5px; color: #000000; line-height: 1.38; font-family: 'Segoe UI', Arial, sans-serif;">
+        <div style="font-size: 9.5px; color: #000000; line-height: 1.2; font-family: 'Segoe UI', Arial, sans-serif;">
           B.P.T. (RGUHS) Bangalore, M.I.A.P.<br/>
           CDNT - Bangalore, CCT - Bangalore<br/>
           Ex. INT. NIMHANS - Bangalore<br/>
@@ -149,7 +158,7 @@ class DocumentBuilder:
   </table>
 
   <!-- 3. PALE YELLOW PATIENT DETAILS STRIP -->
-  <table width="100%" cellpadding="0" cellspacing="0" bgcolor="#FFFDE6" style="background-color: #FFFDE6; border-top: 1px solid #F6EDB5; padding: 7px 14px 6px 14px; font-family: 'Georgia', 'Times New Roman', serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" bgcolor="#FFFDE6" style="background-color: #FFFDE6; border-top: 1px solid #F6EDB5; padding: 4px 14px 4px 14px; font-family: 'Georgia', 'Times New Roman', serif;">
     <tr bgcolor="#FFFDE6">
       <td width="55%" style="font-size: 12.5px; color: #1E293B;">
         <i style="color: #475569;">Name</i> <span style="font-family: 'Segoe UI', Arial, sans-serif; font-weight: bold; color: #0F172A; text-decoration: underline; padding-left: 4px;">&nbsp;{name}&nbsp;</span>
@@ -203,6 +212,8 @@ class DocumentBuilder:
         referred_by = patient_data.get("referred_by") or "___________________________________"
         condition = patient_data.get("patient_condition", "______________________________________________________")
         date_str = str(patient_in)[:10]
+        doctor_name = patient_data.get("doctor_name") or ""
+        doctor_name = doctor_name or "___________________________________"
 
         # Case & Session details (Field 11)
         if case_data:
@@ -227,19 +238,30 @@ class DocumentBuilder:
             paid_amt_str = "₹ ______________"
             balance_str = "₹ ______________"
 
-        # Photo handling
-        resolved_photo = photo_path or patient_data.get("photo_path")
+        # Photo handling: 35mm x 45mm at 96 dpi = 132 x 170 px. Stored photos are already cropped
+        # to this ratio, so a fixed-size <img> is never stretched.
+        resolved_photo = photo_path or patient_data.get("photo_full_path") or patient_data.get("photo_path")
         photo_src = cls._image_to_base64_src(resolved_photo)
         if photo_src:
-            photo_html = f'<img src="{photo_src}" style="width: 100%; height: 100%; object-fit: cover; border-radius: 4px;" alt="Patient Photo" />'
+            photo_html = f'<img src="{photo_src}" width="128" height="166" alt="Patient Photo" />'
         else:
             photo_html = (
-                '<div style="width: 100%; height: 100%; display: flex; flex-direction: column; '
-                'align-items: center; justify-content: center; background-color: #F8FAFC; color: #64748B; '
-                'font-size: 11px; text-align: center; border: 1px dashed #CBD5E1; border-radius: 4px; padding: 4px;">'
-                '<span>👤</span><span style="margin-top: 4px;">Patient Picture</span>'
-                '<span style="font-size: 9px; color: #94A3B8;">(35mm × 45mm)</span></div>'
+                '<table width="128" height="166" cellpadding="0" cellspacing="0"><tr>'
+                '<td align="center" valign="middle" bgcolor="#F8FAFC" '
+                'style="color: #64748B; font-size: 11px;">Patient Photo<br/>'
+                '<span style="font-size: 9px; color: #94A3B8;">35mm x 45mm</span></td></tr></table>'
             )
+
+        # Escape every user-entered value used below (after the photo, which is trusted markup).
+        urn, name, age, sex, address, mobile, patient_in, patient_out, referred_by, condition, date_str, doctor_name = (
+            _esc(v) for v in (
+                urn, name, age, sex, address, mobile, patient_in, patient_out,
+                referred_by, condition, date_str, doctor_name,
+            )
+        )
+        age_sex = f"{age} Yrs / {sex}"
+        sessions_display = _esc(sessions_display)
+        total_amt_str, paid_amt_str, balance_str = (_esc(v) for v in (total_amt_str, paid_amt_str, balance_str))
 
         letterhead = cls._build_letterhead_html(
             urn=urn,
@@ -299,9 +321,9 @@ class DocumentBuilder:
   {letterhead}
 
   <!-- 4. PATIENT REGISTRATION & CLINICAL MASTER RECORD -->
-  <div style="padding: 14px 18px; background-color: #FFFFFF;">
+  <div style="padding: 10px 16px; background-color: #FFFFFF;">
     <!-- Title Bar -->
-    <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom: 12px; border-bottom: 1px solid #E2E8F0; padding-bottom: 6px;">
+    <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom: 4px; border-bottom: 1px solid #E2E8F0; padding-bottom: 2px;">
       <tr>
         <td>
           <span style="font-size: 13.5px; font-weight: 800; color: #6B1736; ">PATIENT REGISTRATION & TREATMENT RECORD</span>
@@ -316,7 +338,7 @@ class DocumentBuilder:
     <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom: 8px;">
       <tr>
         <td valign="top" style="padding-right: 14px;">
-          <table width="100%" cellpadding="4" cellspacing="0">
+          <table width="100%" cellpadding="2" cellspacing="0">
             <tr>
               <td width="28%" class="field-label">1. Serial / URN No.:</td>
               <td width="72%" class="field-value" style="color: #6B1736; font-weight: 700;">{urn}</td>
@@ -333,42 +355,44 @@ class DocumentBuilder:
               <td class="field-label">5. Address:</td>
               <td class="field-value">{address}</td>
             </tr>
+            <tr>
+              <td class="field-label">6. Mobile No.:</td>
+              <td class="field-value">{mobile}</td>
+            </tr>
+            <tr>
+              <td class="field-label">Doctor:</td>
+              <td class="field-value">{doctor_name}</td>
+            </tr>
           </table>
         </td>
-        <td width="115" align="right" valign="top">
-          <div style="width: 35mm; height: 45mm; border: 1px solid #CBD5E1; border-radius: 4px; padding: 2px;">
-            {photo_html}
-          </div>
-        </td>
+        <td width="140" align="right" valign="top">{photo_html}</td>
       </tr>
     </table>
 
     <!-- Fields 6-10 Grid -->
-    <table width="100%" cellpadding="4" cellspacing="0" style="margin-bottom: 10px;">
+    <table width="100%" cellpadding="2" cellspacing="0" style="margin-bottom: 4px;">
       <tr>
-        <td width="20%" class="field-label">6. Mobile No.:</td>
-        <td width="30%" class="field-value">{mobile}</td>
-        <td width="20%" class="field-label" style="padding-left: 12px;">7. Patient In:</td>
-        <td width="30%" class="field-value" style="font-size: 11.5px;">{patient_in}</td>
+        <td width="26%" class="field-label">7. Patient In:</td>
+        <td width="26%" class="field-value" style="font-size: 11.5px;">{patient_in}</td>
+        <td width="16%" class="field-label" style="padding-left: 12px;">8. Patient Out:</td>
+        <td width="32%" class="field-value" style="font-size: 11.5px;">{patient_out}</td>
       </tr>
       <tr>
-        <td class="field-label">8. Patient Out:</td>
-        <td class="field-value" style="font-size: 11.5px;">{patient_out}</td>
-        <td class="field-label" style="padding-left: 12px;">9. Reference / Referred By:</td>
-        <td class="field-value">{referred_by}</td>
+        <td class="field-label">9. Reference / Referred By:</td>
+        <td colspan="3" class="field-value">{referred_by}</td>
       </tr>
       <tr>
-        <td class="field-label" style="padding-top: 8px;">10. Patient Condition:</td>
-        <td colspan="3" class="field-value" style="padding-top: 8px; color: #0F172A;">{condition}</td>
+        <td class="field-label">10. Patient Condition:</td>
+        <td colspan="3" class="field-value" style="color: #0F172A;">{condition}</td>
       </tr>
       <tr>
-        <td class="field-label" style="padding-top: 8px;">11. No. of Sessions:</td>
-        <td colspan="3" class="field-value" style="padding-top: 8px; color: #0D9488;">{sessions_display}</td>
+        <td class="field-label">11. No. of Sessions:</td>
+        <td colspan="3" class="field-value" style="color: #0D9488;">{sessions_display}</td>
       </tr>
     </table>
 
     <!-- Field 12: Payment Box -->
-    <div style="background-color: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 6px; padding: 10px 14px; margin: 10px 0 16px 0;">
+    <div style="background-color: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 6px; padding: 5px 12px; margin: 4px 0 4px 0;">
       <div style="font-size: 12px; font-weight: bold; color: #6B1736; margin-bottom: 6px;">12. Payment Details:</div>
       <table width="100%" cellpadding="0" cellspacing="0">
         <tr>
@@ -389,23 +413,17 @@ class DocumentBuilder:
     </div>
 
     <!-- Dual Signatures & Date -->
-    <table width="100%" cellpadding="0" cellspacing="0" style="margin-top: 40px;">
+    <table width="100%" cellpadding="0" cellspacing="0" style="margin-top: 12px;">
       <tr>
-        <td width="50%" align="center" valign="bottom">
-          <div style="width: 220px; border-bottom: 1px solid #0F172A; margin: 0 auto 6px auto;"></div>
-          <div style="font-size: 12px; font-weight: bold; color: #334155;">Patient / Attendant Signature</div>
-        </td>
-        <td width="50%" align="center" valign="bottom">
-          <div style="width: 220px; border-bottom: 1px solid #0F172A; margin: 0 auto 6px auto;"></div>
-          <div style="font-size: 12px; font-weight: bold; color: #334155;">Authorized Signature</div>
-          <div style="font-size: 10px; color: #64748B;">Kalyan Hospital, Ara (Bihar)</div>
+        <td width="8%">&nbsp;</td>
+        <td width="34%" align="center" valign="top" style="border-top: 1px solid #0F172A; padding-top: 4px; font-size: 12px; font-weight: bold; color: #334155;">Patient / Attendant Signature<br/>&nbsp;</td>
+        <td width="16%">&nbsp;</td>
+        <td width="34%" align="center" valign="top" style="border-top: 1px solid #0F172A; padding-top: 4px; font-size: 12px; font-weight: bold; color: #334155;">Authorized Signature<br/><span style="font-size: 10px; font-weight: normal; color: #64748B;">Kalyan Hospital, Ara (Bihar)  ·  Date: <b>{date_str}</b></span></td>
+        <td width="8%">&nbsp;</td>
+      </tr></table>
         </td>
       </tr>
-      <tr>
-        <td colspan="2" style="padding-top: 22px; font-size: 11px; color: #64748B;">
-          Date: <b>{date_str}</b> · Kalyan Hospital Physiotherapy Management System
-        </td>
-      </tr>
+
     </table>
   </div>
 </div>
@@ -434,6 +452,7 @@ class DocumentBuilder:
         condition = patient_data.get("patient_condition", "")
         patient_in = str(patient_data.get("patient_in") or patient_data.get("created_at") or "")
         date_str = str(patient_in)[:10] if patient_in else ""
+        doctor_name = patient_data.get("doctor_name") or ""
 
         letterhead = cls._build_letterhead_html(
             urn=urn,
@@ -444,11 +463,19 @@ class DocumentBuilder:
             referred_by=referred_by,
         )
 
+        condition = _esc(condition)
+        urn_safe, date_safe = _esc(urn), _esc(date_str)
+        doctor_line = (
+            f'<div style="font-size: 11.5px; color: #475569; margin-bottom: 8px;">Consulting doctor: '
+            f'<b>{_esc(doctor_name)}</b></div>' if doctor_name else ""
+        )
         protocol_box = ""
         if case_data:
             target_sessions = str(case_data.get("no_of_sessions", ""))
             case_title = case_data.get("title", "")
-            notes = case_data.get("notes", "") or clinical_notes
+            notes = _esc(case_data.get("notes", "") or clinical_notes)
+            case_title = _esc(case_title)
+            target_sessions = _esc(target_sessions)
             protocol_box = f"""
     <div style="background-color: #F0FDF4; border: 1px solid #BBF7D0; border-radius: 6px; padding: 10px 14px; margin-bottom: 16px;">
       <div style="font-size: 11px; font-weight: bold; color: #166534; text-transform: uppercase;">Active Treatment Protocol: {case_title} ({target_sessions} Sessions)</div>
@@ -460,7 +487,7 @@ class DocumentBuilder:
 <html lang="hi">
 <head>
 <meta charset="UTF-8">
-<title>Physiotherapy Prescription - {urn}</title>
+<title>Physiotherapy Prescription - {urn_safe}</title>
 <style>
   @page {{
     size: A4 portrait;
@@ -494,9 +521,9 @@ class DocumentBuilder:
   {letterhead}
 
   <!-- PRESCRIPTION BODY -->
-  <div style="padding: 16px 20px; min-height: 580px; background-color: #FFFFFF;">
+  <div style="padding: 10px 18px; background-color: #FFFFFF;">
     <!-- Rx Symbol & Diagnosis Banner -->
-    <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom: 14px;">
+    <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom: 10px;">
       <tr>
         <td width="55" valign="top">
           <span style="font-family: 'Georgia', serif; font-size: 34px; font-weight: bold; color: #6B1736; line-height: 1;">℞</span>
@@ -510,32 +537,30 @@ class DocumentBuilder:
       </tr>
     </table>
 
+    {doctor_line}
     {protocol_box}
 
     <!-- Clinical Lined Writing Space -->
-    <div style="border-bottom: 1px dotted #CBD5E1; height: 38px;"></div>
-    <div style="border-bottom: 1px dotted #CBD5E1; height: 38px;"></div>
-    <div style="border-bottom: 1px dotted #CBD5E1; height: 38px;"></div>
-    <div style="border-bottom: 1px dotted #CBD5E1; height: 38px;"></div>
-    <div style="border-bottom: 1px dotted #CBD5E1; height: 38px;"></div>
-    <div style="border-bottom: 1px dotted #CBD5E1; height: 38px;"></div>
+    <div style="border-bottom: 1px dotted #CBD5E1; height: 32px;"></div>
+    <div style="border-bottom: 1px dotted #CBD5E1; height: 32px;"></div>
+    <div style="border-bottom: 1px dotted #CBD5E1; height: 32px;"></div>
+    <div style="border-bottom: 1px dotted #CBD5E1; height: 32px;"></div>
+    <div style="border-bottom: 1px dotted #CBD5E1; height: 32px;"></div>
 
     <!-- Signatures -->
-    <table width="100%" cellpadding="0" cellspacing="0" style="margin-top: 50px;">
+    <table width="100%" cellpadding="0" cellspacing="0" style="margin-top: 28px;">
       <tr>
-        <td width="50%" align="center" valign="bottom">
-          <div style="width: 200px; border-bottom: 1px solid #0F172A; margin: 0 auto 6px auto;"></div>
-          <div style="font-size: 11.5px; font-weight: bold; color: #334155;">Patient / Attendant Signature</div>
-        </td>
-        <td width="50%" align="center" valign="bottom">
-          <div style="width: 200px; border-bottom: 1px solid #0F172A; margin: 0 auto 6px auto;"></div>
-          <div style="font-size: 11.5px; font-weight: bold; color: #334155;">Authorized Physiotherapist Signature</div>
-          <div style="font-size: 10px; color: #64748B;">Kalyan Hospital, Ara</div>
+        <td width="8%">&nbsp;</td>
+        <td width="34%" align="center" valign="top" style="border-top: 1px solid #0F172A; padding-top: 4px; font-size: 11.5px; font-weight: bold; color: #334155;">Patient / Attendant Signature<br/>&nbsp;</td>
+        <td width="16%">&nbsp;</td>
+        <td width="34%" align="center" valign="top" style="border-top: 1px solid #0F172A; padding-top: 4px; font-size: 11.5px; font-weight: bold; color: #334155;">Authorized Physiotherapist Signature<br/><span style="font-size: 10px; font-weight: normal; color: #64748B;">Kalyan Hospital, Ara</span></td>
+        <td width="8%">&nbsp;</td>
+      </tr></table>
         </td>
       </tr>
       <tr>
-        <td colspan="2" style="padding-top: 24px; font-size: 11px; color: #64748B;">
-          Date: <b>{date_str}</b> · Kalyan Hospital Physiotherapy Management System
+        <td colspan="5" style="padding-top: 10px; font-size: 11px; color: #64748B;">
+          Date: <b>{date_safe}</b> · Kalyan Hospital Physiotherapy Management System
         </td>
       </tr>
     </table>
@@ -606,6 +631,7 @@ class DocumentBuilder:
         payment_mode = safe(payment_data.get("payment_mode") or "CASH")
         reference_note = safe(payment_data.get("reference_note") or "")
         recorded_by = safe(payment_data.get("recorded_by") or "Staff")
+        doctor_name = safe(patient_data.get("doctor_name") or "")
 
         fee_row = (
             f'<table class="summary-table" width="100%"><tr><td>Total fee</td>'
@@ -685,6 +711,7 @@ class DocumentBuilder:
   <div class="row"><span class="strong">Mobile:</span> {mobile or "—"}</div>
   <div class="row"><span class="strong">Condition:</span> {condition or "—"}</div>
   <div class="row"><span class="strong">Case:</span> {case_title}</div>
+  {f'<div class="row"><span class="strong">Doctor:</span> {doctor_name}</div>' if doctor_name else ""}
   <div class="row"><span class="strong">Sessions planned:</span> {target_sessions or "—"}</div>
 
   <div class="rule"></div>
