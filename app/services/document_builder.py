@@ -24,6 +24,13 @@ class DocumentBuilder:
     """Builds pixel-accurate, printable ISO A4 HTML documents matching the physical letterhead."""
 
     @staticmethod
+    def _escape_html(value: Any) -> str:
+        """Escape untrusted field values before placing them in printable HTML."""
+        from html import escape
+
+        return escape(str(value if value is not None else ""), quote=True)
+
+    @staticmethod
     def _image_to_base64_src(image_path: Optional[str]) -> Optional[str]:
         """Converts local image file to base64 data URI for embedded printing."""
         if not image_path or not os.path.exists(image_path):
@@ -81,9 +88,6 @@ class DocumentBuilder:
         3. Pale Yellow Patient Info Strip with prefilled data on clean dotted leaders.
         4. Solid Burgundy Divider matching the physical pad.
         """
-        urn, name, age_sex, date_str, address, referred_by = (
-            _esc(v) for v in (urn, name, age_sex, date_str, address, referred_by)
-        )
         logo_b64 = cls._get_hospital_logo_b64()
         if logo_b64:
             logo_img_tag = f'<img src="{logo_b64}" width="108" height="108" alt="Kalyan Hospital Business Logo Caduceus Emblem" style="display:block;margin:0 auto;" />'
@@ -225,14 +229,14 @@ class DocumentBuilder:
         age_sex = f"{age} Yrs / {sex}"
         address = patient_data.get("address", "______________________________________________________")
         mobile = patient_data.get("mobile_no", "____________________")
-        patient_in = str(patient_data.get("patient_in") or patient_data.get("created_at") or "_________________________")
+        patient_in_raw = str(patient_data.get("patient_in") or patient_data.get("created_at") or "_________________________")
+        patient_in = patient_in_raw
         patient_out = str(patient_data.get("patient_out") or "_________________________")
         referred_by = patient_data.get("referred_by") or "___________________________________"
         condition = patient_data.get("patient_condition", "______________________________________________________")
-        date_str = str(patient_in)[:10]
+        date_str = patient_in_raw[:10]
         doctor_name = patient_data.get("doctor_name") or ""
         doctor_name = doctor_name or "___________________________________"
-
         # Case & Session details (Field 11)
         if case_data:
             target_sessions = str(case_data.get("no_of_sessions", "____"))
@@ -243,9 +247,9 @@ class DocumentBuilder:
 
         # Financial details (Field 12)
         if financial_summary:
-            total_amt_str = financial_summary.get("total_fee_formatted", "₹ ______________")
-            paid_amt_str = financial_summary.get("total_paid_formatted", "₹ ______________")
-            balance_str = financial_summary.get("balance_formatted", "₹ ______________")
+            total_amt_str = str(financial_summary.get("total_fee_formatted", "₹ ______________"))
+            paid_amt_str = str(financial_summary.get("total_paid_formatted", "₹ ______________"))
+            balance_str = str(financial_summary.get("balance_formatted", "₹ ______________"))
         elif case_data and "total_amount_paise" in case_data:
             paise = case_data["total_amount_paise"]
             total_amt_str = BillingService.format_inr(paise)
@@ -267,8 +271,7 @@ class DocumentBuilder:
                 '<table width="128" height="166" cellpadding="0" cellspacing="0"><tr>'
                 '<td align="center" valign="middle" bgcolor="#F8FAFC" '
                 'style="color: #64748B; font-size: 11px;">Patient Photo<br/>'
-                '<span style="font-size: 9px; color: #94A3B8;">35mm x 45mm</span></td></tr></table>'
-            )
+                '<span style="font-size: 9px; color: #94A3B8;">35mm x 45mm</span></td></tr></table>'            )
 
         # Escape every user-entered value used below (after the photo, which is trusted markup).
         urn, name, age, sex, address, mobile, patient_in, patient_out, referred_by, condition, date_str, doctor_name = (
@@ -311,8 +314,8 @@ class DocumentBuilder:
     padding: 0;
     color: #0F172A;
     background-color: #FFFFFF;
-    font-size: 13px;
-    line-height: 1.45;
+    font-size: 12px;
+    line-height: 1.35;
   }}
   .a4-container {{
     width: 100%;
@@ -341,8 +344,7 @@ class DocumentBuilder:
   <!-- 4. PATIENT REGISTRATION & CLINICAL MASTER RECORD -->
   <div style="padding: 10px 16px; background-color: #FFFFFF;">
     <!-- Title Bar -->
-    <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom: 4px; border-bottom: 1px solid #E2E8F0; padding-bottom: 2px;">
-      <tr>
+    <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom: 4px; border-bottom: 1px solid #E2E8F0; padding-bottom: 2px;">      <tr>
         <td>
           <span style="font-size: 13.5px; font-weight: 800; color: #54152F; ">PATIENT REGISTRATION & TREATMENT RECORD</span>
         </td>
@@ -356,8 +358,7 @@ class DocumentBuilder:
     <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom: 8px;">
       <tr>
         <td valign="top" style="padding-right: 14px;">
-          <table width="100%" cellpadding="2" cellspacing="0">
-            <tr>
+          <table width="100%" cellpadding="2" cellspacing="0">            <tr>
               <td width="28%" class="field-label">1. Serial / URN No.:</td>
               <td width="72%" class="field-value" style="color: #54152F; font-weight: 700;">{urn}</td>
             </tr>
@@ -388,8 +389,7 @@ class DocumentBuilder:
     </table>
 
     <!-- Fields 6-10 Grid -->
-    <table width="100%" cellpadding="2" cellspacing="0" style="margin-bottom: 4px;">
-      <tr>
+    <table width="100%" cellpadding="2" cellspacing="0" style="margin-bottom: 4px;">      <tr>
         <td width="26%" class="field-label">7. Patient In:</td>
         <td width="26%" class="field-value" style="font-size: 11.5px;">{patient_in}</td>
         <td width="16%" class="field-label" style="padding-left: 12px;">8. Patient Out:</td>
@@ -405,14 +405,12 @@ class DocumentBuilder:
       </tr>
       <tr>
         <td class="field-label">11. No. of Sessions:</td>
-        <td colspan="3" class="field-value" style="color: #0D9488;">{sessions_display}</td>
-      </tr>
+        <td colspan="3" class="field-value" style="color: #0D9488;">{sessions_display}</td>      </tr>
     </table>
 
     <!-- Field 12: Payment Box -->
     <div style="background-color: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 6px; padding: 5px 12px; margin: 4px 0 4px 0;">
-      <div style="font-size: 12px; font-weight: bold; color: #54152F; margin-bottom: 6px;">12. Payment Details:</div>
-      <table width="100%" cellpadding="0" cellspacing="0">
+      <div style="font-size: 12px; font-weight: bold; color: #54152F; margin-bottom: 6px;">12. Payment Details:</div>      <table width="100%" cellpadding="0" cellspacing="0">
         <tr>
           <td width="33%">
             <div style="font-size: 10px; font-weight: bold; color: #64748B; text-transform: uppercase;">Total Agreed Fee</div>
@@ -438,8 +436,7 @@ class DocumentBuilder:
         <td width="16%">&nbsp;</td>
         <td width="34%" align="center" valign="top" style="border-top: 1px solid #0F172A; padding-top: 4px; font-size: 12px; font-weight: bold; color: #334155;">Authorized Signature<br/><span style="font-size: 10px; font-weight: normal; color: #64748B;">Kalyan Hospital, Ara (Bihar)  ·  Date: <b>{date_str}</b></span></td>
         <td width="8%">&nbsp;</td>
-      </tr></table>
-        </td>
+      </tr></table>        </td>
       </tr>
 
     </table>
@@ -472,6 +469,16 @@ class DocumentBuilder:
         date_str = str(patient_in)[:10] if patient_in else ""
         doctor_name = patient_data.get("doctor_name") or ""
 
+        urn = _esc(urn)
+        name = _esc(name)
+        age_sex = _esc(age_sex)
+        date_str = _esc(date_str)
+        address = _esc(address)
+        referred_by = _esc(referred_by)
+        condition = _esc(condition)
+        doctor_name = _esc(doctor_name)
+        urn_safe, date_safe = urn, date_str
+
         letterhead = cls._build_letterhead_html(
             urn=urn,
             name=name,
@@ -481,11 +488,9 @@ class DocumentBuilder:
             referred_by=referred_by,
         )
 
-        condition = _esc(condition)
-        urn_safe, date_safe = _esc(urn), _esc(date_str)
         doctor_line = (
             f'<div style="font-size: 11.5px; color: #475569; margin-bottom: 8px;">Consulting doctor: '
-            f'<b>{_esc(doctor_name)}</b></div>' if doctor_name else ""
+            f'<b>{doctor_name}</b></div>' if doctor_name else ""
         )
         protocol_box = ""
         if case_data:

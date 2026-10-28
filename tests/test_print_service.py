@@ -269,3 +269,77 @@ def test_print_document_cancelled(monkeypatch):
     monkeypatch.setattr(QPrintDialog, "exec", lambda self: QPrintDialog.DialogCode.Rejected)
     result = PrintService.print_document("<html>test</html>")
     assert result is False
+
+
+def test_registration_document_fits_one_a4_page(sample_patient_dict, sample_case_dict, sample_financial_summary):
+    """The complete registration record, including both signatures and footer, must fit one A4 page."""
+    import os
+    import subprocess
+    import sys
+    import textwrap
+
+    if sys.platform == "win32":
+        script = textwrap.dedent(f"""
+            import sys
+            sys.path.insert(0, {os.getcwd()!r})
+            from PySide6.QtWidgets import QApplication
+            app = QApplication([])
+            from app.services.document_builder import DocumentBuilder
+            from app.services.print_service import PrintService
+            patient = {sample_patient_dict!r}
+            case = {sample_case_dict!r}
+            fin = {sample_financial_summary!r}
+            html = DocumentBuilder.build_patient_registration_html(patient, case, fin)
+            count = PrintService.page_count(html)
+            sys.exit(0 if count == 1 else 1)
+        """)
+        env = dict(os.environ, QT_QPA_PLATFORM="windows")
+        result = subprocess.run([sys.executable, "-I", "-c", script], env=env, capture_output=True, text=True, timeout=30)
+        assert result.returncode == 0, f"Registration output paginated to > 1 pages on Windows: {result.stdout} {result.stderr}"
+    else:
+        from PySide6.QtCore import QSizeF
+        from PySide6.QtGui import QTextDocument
+
+        html = DocumentBuilder.build_patient_registration_html(
+            patient_data=sample_patient_dict,
+            case_data=sample_case_dict,
+            financial_summary=sample_financial_summary,
+        )
+        printable_width = (210.0 - 16.0) * 96.0 / 25.4
+        printable_height = (297.0 - 16.0) * 96.0 / 25.4
+        document = QTextDocument()
+        document.setPageSize(QSizeF(printable_width, printable_height))
+        document.setHtml(html)
+        assert document.pageCount() == 1
+
+
+def test_a4_print_templates_escape_patient_and_case_text(sample_patient_dict, sample_case_dict):
+    """User-entered values must remain text rather than becoming printable HTML markup."""
+    from copy import deepcopy
+
+    patient = deepcopy(sample_patient_dict)
+    patient["patient_name"] = 'Anita <b>Singh</b> & Co "Clinic"'
+    patient["address"] = '<img src=x onerror="bad"> Babu Bazar & Ara'
+    patient["patient_condition"] = "<script>unsafe()</script> Shoulder pain"
+
+    case = deepcopy(sample_case_dict)
+    case["title"] = "<script>case()</script> & rehabilitation"
+    case["notes"] = "<b>therapeutic plan</b> & review"
+
+    registration_html = DocumentBuilder.build_patient_registration_html(
+        patient_data=patient,
+        case_data=case,
+    )
+    prescription_html = DocumentBuilder.build_prescription_slip_html(
+        patient_data=patient,
+        case_data=case,
+    )
+
+    for html in (registration_html, prescription_html):
+        assert "<script>" not in html
+        assert "<img src=x" not in html
+        assert "&lt;script&gt;" in html
+        assert "&amp;" in html
+
+    assert "&lt;b&gt;Singh&lt;/b&gt;" in registration_html
+    assert "&lt;b&gt;therapeutic plan&lt;/b&gt;" in prescription_html
