@@ -213,7 +213,7 @@ class DashboardView(QWidget):
             "Total Patients", "0", "Registered patient records", "PT", COLORS["primary"]
         )
         self.card_today_registrations = StatCard(
-            "Today's Admissions", "0", "Registrations today", "TODAY", COLORS["accent"]
+            "Today's Admissions", "0", "Registrations today", "TD", COLORS["accent"]
         )
         self.card_active_cases = StatCard(
             "Active Cases", "0", "Ongoing treatment plans", "TX", COLORS["secondary"]
