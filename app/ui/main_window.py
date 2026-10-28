@@ -264,10 +264,16 @@ class MainWindow(QMainWindow):
             self._active_toast = None
         toast = ToastNotification(self, title, message, level, duration_ms)
         self._active_toast = toast
+        toast.dismissed.connect(lambda current=toast: self._on_toast_dismissed(current))
         toast.adjustSize()
         x = max(16, self.width() - toast.width() - 22)
         y = 70
         toast.show_toast(x, y)
+
+    def _on_toast_dismissed(self, toast: ToastNotification) -> None:
+        """Avoid retaining a Python wrapper for a toast widget that Qt has deleted."""
+        if self._active_toast is toast:
+            self._active_toast = None
 
     def resizeEvent(self, event):
         super().resizeEvent(event)
