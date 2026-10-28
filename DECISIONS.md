@@ -102,4 +102,18 @@
 - **Rationale:** Prevents the operational dashboard from presenting inferred clinical or appointment states as facts. Appointment scheduling and queue state can be designed as a separate feature if the hospital requires it.
 
 ---
+
+### ADR-12: Keep Payment Statuses Grounded in Stored Financial Data
+- **Status:** Approved for Phase 3
+- **Context:** The existing schema stores case fees, payments, and treatment-case status, but has no payment due-date or overdue timestamp.
+- **Decision:** Render `PAID IN FULL`, `PARTIAL DUE`, `BALANCE DUE`, or `OVERPAID` strictly from the existing `BillingService.get_financial_summary()` values. Do not display `OVERDUE` without a persisted due date and agreed rules for calculating overdue.
+- **Rationale:** Prevents a decorative payment badge from incorrectly asserting a collection deadline that the database cannot verify.
+
+### ADR-13: Mark Thermal Receipt Balance as Current-at-Print
+- **Status:** Approved for Phase 3
+- **Context:** Historical payment rows do not store a balance-after-payment snapshot. The existing ledger can calculate the current case balance but cannot reliably reconstruct the exact balance after an old installment without replaying the ledger.
+- **Decision:** The 80mm receipt displays the installment amount and labels the displayed aggregate balance as `Current balance as of this receipt's print time`. The receipt preview uses a custom 80mm page and remains separate from the A4 prescription and registration record.
+- **Rationale:** Avoids presenting today's balance as if it were a historical transaction snapshot.
+
+---
 *Decisions logged and baselined.*
