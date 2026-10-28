@@ -37,6 +37,7 @@ jobs:
           from PIL import Image
 
           for asset in (
+              Path("app/assets/caduceus_emblem.png"),
               Path("app/assets/kalyan_hospital_logo.jpg"),
               Path("app/assets/physiotherapy_header.jpg"),
           ):
