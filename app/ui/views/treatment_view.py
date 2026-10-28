@@ -10,8 +10,9 @@ from PySide6.QtWidgets import (
     QPushButton, QTableWidget, QTableWidgetItem, QHeaderView,
     QComboBox, QSpinBox, QDoubleSpinBox, QDialog, QTextEdit,
     QDateTimeEdit, QFormLayout, QProgressBar, QMessageBox,
-    QFrame, QCheckBox, QGridLayout
+    QFrame
 )
+from app.ui.clinical_controls import ModalityChipGroup, PainScaleWidget, PainTrendWidget
 from app.services.treatment_service import TreatmentService
 from app.services.patient_service import PatientService
 from app.services.billing_service import BillingService
@@ -128,31 +129,35 @@ class LogSessionDialog(QDialog):
     def __init__(self, session_number: int, parent=None):
         super().__init__(parent)
         self.setWindowTitle(f"Log Clinical Session #{session_number}")
-        self.setMinimumWidth(500)
+        self.setMinimumWidth(700)
+        self.resize(740, 600)
         self.setStyleSheet(f"""
             QDialog {{ background-color: {COLOR_CARD_BG}; }}
-            QLabel {{ color: {COLOR_TEXT_PRIMARY}; font-size: 13px; font-weight: 500; }}
+            QLabel {{ color: {COLOR_TEXT_PRIMARY}; font-size: 12px; font-weight: 500; }}
             QLineEdit, QSpinBox, QComboBox, QTextEdit, QDateTimeEdit {{
                 background-color: {COLOR_BG};
                 color: {COLOR_TEXT_PRIMARY};
                 border: 1px solid {COLOR_BORDER};
                 border-radius: 6px;
-                padding: 8px;
-                font-size: 13px;
+                padding: 7px;
+                font-size: 12px;
             }}
-            QCheckBox {{ color: {COLOR_TEXT_PRIMARY}; font-size: 12px; }}
         """)
 
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(24, 24, 24, 24)
-        layout.setSpacing(14)
+        layout.setContentsMargins(20, 18, 20, 18)
+        layout.setSpacing(9)
 
         header_lbl = QLabel(f"Record Clinical Session #{session_number}")
-        header_lbl.setStyleSheet(f"font-size: 17px; font-weight: 700; color: {COLOR_PRIMARY};")
+        header_lbl.setStyleSheet(f"font-size: 17px; font-weight: 800; color: {COLOR_PRIMARY};")
         layout.addWidget(header_lbl)
 
+        helper_lbl = QLabel("Record the patient's pain score, modalities applied, and clinical response.")
+        helper_lbl.setStyleSheet(f"font-size: 11px; color: {COLOR_TEXT_MUTED};")
+        layout.addWidget(helper_lbl)
+
         form = QFormLayout()
-        form.setSpacing(12)
+        form.setSpacing(9)
 
         self.therapist_combo = QComboBox()
         self.therapist_combo.addItems([
@@ -162,76 +167,39 @@ class LogSessionDialog(QDialog):
         ])
         form.addRow("Treating Therapist *:", self.therapist_combo)
 
-        self.pain_input = QSpinBox()
-        self.pain_input.setRange(0, 10)
-        self.pain_input.setValue(5)
-        self.pain_input.setSuffix(" / 10 (0 = No Pain, 10 = Severe)")
-        form.addRow("Pain Score (VAS):", self.pain_input)
-
+        self.pain_scale = PainScaleWidget(initial_value=5, parent=self)
+        # Keep the previous attribute name available for any UI integrations/tests.
+        self.pain_input = self.pain_scale.slider
+        form.addRow("Pain Score (VAS):", self.pain_scale)
         layout.addLayout(form)
 
-        mod_lbl = QLabel("Treatment Modalities Applied:")
-        layout.addWidget(mod_lbl)
-
-        mod_grid = QGridLayout()
-        self.mod_cbs = {}
-        modalities = [
-            "Interferential Therapy (IFT)",
-            "Ultrasound Therapy (UST)",
-            "Cervical / Lumbar Traction",
-            "Shortwave Diathermy (SWD)",
-            "Moist Heat Pack",
-            "Therapeutic Exercise",
-            "Manual Mobilization",
-            "TENS Stimulation",
-        ]
-        for idx, mod in enumerate(modalities):
-            cb = QCheckBox(mod)
-            self.mod_cbs[mod] = cb
-            mod_grid.addWidget(cb, idx // 2, idx % 2)
-        layout.addLayout(mod_grid)
+        self.modality_group = ModalityChipGroup(parent=self)
+        self.mod_cbs = self.modality_group.buttons
+        layout.addWidget(self.modality_group)
 
         notes_lbl = QLabel("Clinical Progress Notes *:")
+        notes_lbl.setStyleSheet("font-weight:700;")
         layout.addWidget(notes_lbl)
 
         self.notes_input = QTextEdit()
-        self.notes_input.setPlaceholderText("Detailed observations, patient response, range of motion, exercises performed...")
-        self.notes_input.setMinimumHeight(100)
-        layout.addWidget(self.notes_input)
+        self.notes_input.setPlaceholderText(
+            "Patient response, range of motion, exercises performed, tolerance, and next-session plan…"
+        )
+        self.notes_input.setMinimumHeight(78)
+        layout.addWidget(self.notes_input, stretch=1)
 
         btn_layout = QHBoxLayout()
         btn_layout.addStretch()
 
         cancel_btn = QPushButton("Cancel")
-        cancel_btn.setStyleSheet(f"""
-            QPushButton {{
-                background-color: transparent;
-                color: {COLOR_TEXT_MUTED};
-                border: 1px solid {COLOR_BORDER};
-                border-radius: 6px;
-                padding: 8px 16px;
-                font-weight: 600;
-            }}
-            QPushButton:hover {{ background-color: {COLOR_BORDER}; }}
-        """)
+        cancel_btn.setObjectName("SecondaryButton")
         cancel_btn.clicked.connect(self.reject)
         btn_layout.addWidget(cancel_btn)
 
         save_btn = QPushButton("Save Session Record")
-        save_btn.setStyleSheet(f"""
-            QPushButton {{
-                background-color: {COLOR_PRIMARY};
-                color: white;
-                border: none;
-                border-radius: 6px;
-                padding: 8px 20px;
-                font-weight: 600;
-            }}
-            QPushButton:hover {{ background-color: {COLOR_PRIMARY_HOVER}; }}
-        """)
+        save_btn.setObjectName("PrimaryButton")
         save_btn.clicked.connect(self.validate_and_accept)
         btn_layout.addWidget(save_btn)
-
         layout.addLayout(btn_layout)
 
     def validate_and_accept(self):
@@ -241,11 +209,10 @@ class LogSessionDialog(QDialog):
         self.accept()
 
     def get_data(self) -> Dict[str, Any]:
-        applied = [mod for mod, cb in self.mod_cbs.items() if cb.isChecked()]
         return {
             "therapist_name": self.therapist_combo.currentText().split(" (")[0],
-            "pain_score": self.pain_input.value(),
-            "modalities_used": ", ".join(applied),
+            "pain_score": self.pain_scale.value(),
+            "modalities_used": ", ".join(self.modality_group.selected_values()),
             "treatment_notes": self.notes_input.toPlainText().strip(),
         }
 
@@ -254,6 +221,7 @@ class TreatmentView(QWidget):
     """Main view for managing physiotherapy clinical treatment cases and session timelines."""
 
     view_billing_clicked = Signal(int)  # Emits case_id to open billing ledger
+    session_saved = Signal(dict)
 
     def __init__(self, db_path: Optional[str] = None, parent=None):
         super().__init__(parent)
@@ -443,6 +411,9 @@ class TreatmentView(QWidget):
 
         layout.addWidget(self.case_info_frame)
 
+        self.pain_trend = PainTrendWidget(self)
+        layout.addWidget(self.pain_trend)
+
         # 4. Sessions Timeline Table
         table_title = QLabel("Clinical Sessions Log (Chronological)")
         table_title.setStyleSheet(f"font-size: 16px; font-weight: 700; color: {COLOR_PRIMARY}; margin-top: 6px;")
@@ -546,6 +517,12 @@ class TreatmentView(QWidget):
 
         # Populate sessions table
         sessions = case_data.get("sessions", [])
+        pain_scores = [
+            (int(session.get("session_number") or 0), int(session["pain_score"]))
+            for session in sessions
+            if session.get("pain_score") is not None
+        ]
+        self.pain_trend.set_scores(pain_scores)
         self.sessions_table.setRowCount(len(sessions))
         for row, s in enumerate(sessions):
             # Session #
@@ -586,6 +563,7 @@ class TreatmentView(QWidget):
         self.progress_lbl.setText("Sessions: 0 of 0 completed")
         self.progress_bar.setValue(0)
         self.sessions_table.setRowCount(0)
+        self.pain_trend.set_scores([])
 
     def load_patient_case(self, patient_id: int, case_id: Optional[int] = None):
         """Allows external modules (e.g. PatientList) to select patient and case directly."""
@@ -635,7 +613,7 @@ class TreatmentView(QWidget):
         if dialog.exec() == QDialog.Accepted:
             data = dialog.get_data()
             try:
-                self.treatment_service.log_session(
+                saved_session = self.treatment_service.log_session(
                     case_id=self.current_case_id,
                     treatment_notes=data["treatment_notes"],
                     therapist_name=data["therapist_name"],
@@ -643,6 +621,7 @@ class TreatmentView(QWidget):
                     pain_score=data["pain_score"],
                 )
                 self.load_case(self.current_case_id)
+                self.session_saved.emit(saved_session)
             except Exception as e:
                 QMessageBox.critical(self, "Error", f"Failed to log session: {str(e)}")
 
