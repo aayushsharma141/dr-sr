@@ -190,3 +190,18 @@ class ToastNotification(QFrame):
     def _finish_dismiss(self) -> None:
         self.dismissed.emit()
         self.close()
+
+
+def notify(widget: QWidget, title: str, message: str, level: str = "warning") -> None:
+    """Non-blocking feedback from any view. Errors stay up longer so staff can read and act.
+
+    Falls back to a message box only when the view is not hosted in the main window.
+    """
+    window = widget.window() if widget is not None else None
+    if window is not None and hasattr(window, "show_toast"):
+        window.show_toast(title, message, level, 9000 if level == "error" else 4500)
+        return
+    from PySide6.QtWidgets import QMessageBox
+
+    box = {"error": QMessageBox.critical, "warning": QMessageBox.warning}.get(level, QMessageBox.information)
+    box(widget, title, message)

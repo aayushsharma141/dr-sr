@@ -190,19 +190,14 @@ class PatientRepository:
         finally:
             conn.close()
 
-    def search(
+    def _build_search_where(
         self,
-        query: str = "",
-        limit: int = 50,
-        filter_key: str = "all",
-        doctor_id: int | None = None,
-    ) -> list[dict[str, Any]]:
-        """
-        Searches active patient records by URN, name, and mobile number with optional
-        read-only registry filters. No schema or persistence behavior is changed.
-        """
+        query: str,
+        filter_key: str,
+        doctor_id: int | None,
+    ) -> tuple[str, list[Any]]:
+        """WHERE clause shared by search() and count() so the two always agree."""
         cleaned_query = query.strip()
-        safe_limit = max(1, min(int(limit), 10000))
         clauses = ["p.status != 'ARCHIVED'"]
         params: list[Any] = []
 
@@ -248,12 +243,40 @@ class PatientRepository:
                 )
                 """
             )
+        return " AND ".join(clauses), params
 
+    def count(
+        self,
+        query: str = "",
+        filter_key: str = "all",
+        doctor_id: int | None = None,
+    ) -> int:
+        """Total records matching the same search/filter, regardless of any display limit."""
+        where, params = self._build_search_where(query, filter_key, doctor_id)
+        conn = get_db_connection(self.db_path)
+        try:
+            return conn.execute(f"SELECT COUNT(*) FROM patients p WHERE {where}", params).fetchone()[0]
+        finally:
+            conn.close()
+
+    def search(
+        self,
+        query: str = "",
+        limit: int = 50,
+        filter_key: str = "all",
+        doctor_id: int | None = None,
+    ) -> list[dict[str, Any]]:
+        """
+        Searches active patient records by URN, name, and mobile number with optional
+        read-only registry filters, newest first.
+        """
+        safe_limit = max(1, min(int(limit), 10000))
+        where, params = self._build_search_where(query, filter_key, doctor_id)
         sql = f"""
             SELECT p.*, d.name_en AS doctor_name, d.department AS doctor_department
             FROM patients p
             LEFT JOIN doctors d ON d.id = p.doctor_id
-            WHERE {" AND ".join(clauses)}
+            WHERE {where}
             ORDER BY p.id DESC
             LIMIT ?
         """

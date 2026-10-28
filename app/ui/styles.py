@@ -258,6 +258,19 @@ def get_application_stylesheet() -> str:
     QPushButton#SecondaryButton:hover {{ background: #F1F7F2; border-color: #AFC9B8; }}
     QPushButton:disabled {{ color: #94A3B8; background: #F1F5F9; }}
 
+    /* Visible keyboard focus (Tab / Shift+Tab) on every custom control; padding is reduced
+       by the extra border width so controls never change size when focused. */
+    QPushButton:focus {{ border: 2px solid {c['accent']}; padding: 7px 12px; }}
+    QPushButton#PrimaryButton:focus {{ border: 2px solid {c['primary_dark']}; }}
+    QPushButton#FilterChip:focus, QPushButton#ModalityChip:focus {{
+        border: 2px solid {c['accent']}; padding: 4px 10px;
+    }}
+    QPushButton#NavButton:focus {{
+        border: 2px solid #5EEAD4; border-left: 3px solid #5EEAD4; padding: 11px 13px 11px 15px;
+    }}
+    QTableWidget:focus, QTableView:focus {{ border: 2px solid {c['accent']}; }}
+    QCheckBox:focus {{ color: {c['primary']}; font-weight: 700; }}
+
     QLineEdit, QComboBox, QTextEdit, QSpinBox, QDateEdit, QDateTimeEdit {{
         background: #FFFFFF; color: {c['text_primary']}; border: 1px solid {c['border']};
         border-radius: 6px; padding: 7px 9px; selection-background-color: {c['accent']};

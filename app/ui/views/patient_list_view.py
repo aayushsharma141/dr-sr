@@ -50,6 +50,8 @@ from qfluentwidgets import (
 )
 
 
+PAGE_SIZE = 200
+
 REGISTRY_FILTERS = (
     ("all", "All Patients"),
     ("today", "Admitted Today"),
@@ -78,6 +80,7 @@ class PatientListView(QWidget):
         self.doctor_service = DoctorService(db_path)
         self._active_filter = "all"
         self._active_doctor_id: int | None = None
+        self._limit = PAGE_SIZE
         self._profile_patient: dict | None = None
         self._profile_cases: list[dict] = []
         self._profile_selected_case: dict | None = None
@@ -204,9 +207,18 @@ class PatientListView(QWidget):
         self.splitter.setSizes([1000, 0])
         root_layout.addWidget(self.splitter, stretch=1)
 
+        status_row = QHBoxLayout()
         self.status_lbl = QLabel("Loading patient directory…")
-        self.status_lbl.setStyleSheet(f"color:{COLORS['text_secondary']};font-size:10px;")
-        root_layout.addWidget(self.status_lbl)
+        self.status_lbl.setStyleSheet(f"color:{COLORS['text_secondary']};font-size:12px;")
+        status_row.addWidget(self.status_lbl)
+        status_row.addStretch()
+        self.show_more_btn = QPushButton("Show more")
+        self.show_more_btn.setObjectName("SecondaryButton")
+        self.show_more_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.show_more_btn.clicked.connect(self._on_show_more)
+        self.show_more_btn.hide()
+        status_row.addWidget(self.show_more_btn)
+        root_layout.addLayout(status_row)
 
         self.reload_patients()
 
@@ -377,17 +389,26 @@ class PatientListView(QWidget):
         self._hide_profile()
         self.reload_patients(query=self.search_input.text())
 
-    def reload_patients(self, query: str = ""):
+    def _on_show_more(self):
+        self._limit += PAGE_SIZE
+        self.reload_patients(keep_limit=True)
+
+    def reload_patients(self, query: str = "", keep_limit: bool = False):
         """Refresh records from the existing patient-search service and selected filter."""
+        if not keep_limit:
+            self._limit = PAGE_SIZE
         self._hide_profile()
         active_query = query if query else self.search_input.text()
         patients = self.service.search_patients(
             active_query,
-            limit=500,
+            limit=self._limit,
             filter_key=self._active_filter,
             doctor_id=self._active_doctor_id,
         )
 
+        total = self.service.count_patients(
+            active_query, filter_key=self._active_filter, doctor_id=self._active_doctor_id
+        )
         self.table.blockSignals(True)
         self.table.clearSelection()
         self.table.setRowCount(len(patients))
@@ -443,8 +464,9 @@ class PatientListView(QWidget):
             else:
                 self.status_lbl.setText(f"No records found for {filter_label.lower()}.")
         else:
-            suffix = " · latest 500 records" if count == 500 else ""
-            self.status_lbl.setText(f"{count} patient record(s) · {filter_label}{suffix}. Select a row for quick view.")
+            shown = f"Showing {count} of {total}" if total > count else f"{count}"
+            self.status_lbl.setText(f"{shown} patient record(s) · {filter_label}. Select a row for quick view.")
+        self.show_more_btn.setVisible(total > count)
 
     def _on_selection_changed(self):
         item = self.table.item(self.table.currentRow(), 0) if self.table.currentRow() >= 0 else None

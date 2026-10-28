@@ -3,26 +3,26 @@ Treatment View - Clinical Cases and Chronological Session History.
 Kalyan Hospital Management System.
 """
 
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Optional
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit,
-    QPushButton, QTableWidget, QTableWidgetItem, QHeaderView,
+    QPushButton, QTableWidgetItem, QHeaderView,
     QComboBox, QSpinBox, QDoubleSpinBox, QDialog, QTextEdit,
-    QDateTimeEdit, QFormLayout, QProgressBar, QMessageBox,
-    QFrame
+    QFormLayout, QProgressBar, QFrame
 )
 from app.ui.clinical_controls import ModalityChipGroup, PainScaleWidget, PainTrendWidget
 from qfluentwidgets import TableWidget, PrimaryPushButton, PushButton, FluentIcon, SplitPushButton, RoundMenu, Action
 from app.services.treatment_service import TreatmentService
 from app.services.patient_service import PatientService
 from app.services.billing_service import BillingService
+from app.ui.toast_notification import notify
 from app.services.document_builder import DocumentBuilder
 from app.services.print_service import PrintService
 from app.ui.styles import (
     COLOR_PRIMARY, COLOR_PRIMARY_HOVER, COLOR_SECONDARY,
     COLOR_TEXT_PRIMARY, COLOR_TEXT_MUTED, COLOR_CARD_BG,
-    COLOR_BORDER, COLOR_BG, COLOR_SUCCESS, COLOR_WARNING, COLOR_DANGER
+    COLOR_BORDER, COLOR_BG, COLOR_SUCCESS
 )
 
 
@@ -201,11 +201,16 @@ class LogSessionDialog(QDialog):
         save_btn.setObjectName("PrimaryButton")
         save_btn.clicked.connect(self.validate_and_accept)
         btn_layout.addWidget(save_btn)
+        self.error_label = QLabel("Clinical treatment notes cannot be empty.")
+        self.error_label.setObjectName("ErrorBanner")
+        self.error_label.hide()
+        layout.addWidget(self.error_label)
         layout.addLayout(btn_layout)
 
     def validate_and_accept(self):
         if not self.notes_input.toPlainText().strip():
-            QMessageBox.warning(self, "Validation Error", "Clinical treatment notes cannot be empty.")
+            self.error_label.show()
+            self.notes_input.setFocus()
             return
         self.accept()
 
@@ -565,7 +570,7 @@ class TreatmentView(QWidget):
 
     def _on_new_case_clicked(self):
         if not self.current_patient_id:
-            QMessageBox.information(self, "Select Patient", "Please select or register a patient first.")
+            notify(self, "Select a patient", "Please select or register a patient first.", "info")
             return
 
         patient = self.patient_service.get_patient(self.current_patient_id)
@@ -585,11 +590,11 @@ class TreatmentView(QWidget):
                 self._on_patient_selected(self.patient_combo.currentIndex())
                 self.load_case(new_case["id"])
             except Exception as e:
-                QMessageBox.critical(self, "Error", f"Failed to create case: {str(e)}")
+                notify(self, "Could not create case", str(e), "error")
 
     def _on_log_session_clicked(self):
         if not self.current_case_id:
-            QMessageBox.information(self, "No Case Selected", "Please select an active treatment case first.")
+            notify(self, "No case selected", "Please select an active treatment case first.", "info")
             return
 
         next_seq = self.treatment_service.treatment_repo.get_next_session_number(self.current_case_id)
@@ -607,23 +612,23 @@ class TreatmentView(QWidget):
                 self.load_case(self.current_case_id)
                 self.session_saved.emit(saved_session)
             except Exception as e:
-                QMessageBox.critical(self, "Error", f"Failed to log session: {str(e)}")
+                notify(self, "Could not save session", str(e), "error")
 
     def _on_view_billing_clicked(self):
         if self.current_case_id:
             self.view_billing_clicked.emit(self.current_case_id)
         else:
-            QMessageBox.information(self, "No Case Selected", "Select a case to view billing details.")
+            notify(self, "No case selected", "Select a case to view billing details.", "info")
 
     def _build_prescription_html(self) -> Optional[tuple[str, dict]]:
         """Validates patient/case selection and builds the authentic prescription slip HTML."""
         if not self.current_patient_id:
-            QMessageBox.warning(self, "No Patient Selected", "Please select a patient to print their prescription pad.")
+            notify(self, "No patient selected", "Please select a patient to print their prescription pad.", "warning")
             return None
 
         patient_data = self.patient_service.get_patient(self.current_patient_id)
         if not patient_data:
-            QMessageBox.warning(self, "Patient Not Found", "Unable to load patient data.")
+            notify(self, "Patient not found", "Unable to load patient data.", "error")
             return None
 
         case_data = None

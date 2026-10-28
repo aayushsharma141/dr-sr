@@ -4,34 +4,30 @@ Kalyan Hospital Management System.
 """
 
 import os
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Optional
 from PySide6.QtCore import Qt, Signal
-from PySide6.QtGui import QCursor
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit,
-    QPushButton, QTableWidget, QTableWidgetItem, QHeaderView,
-    QComboBox, QDoubleSpinBox, QFormLayout, QMessageBox,
-    QFrame, QGridLayout
+    QPushButton, QTableWidgetItem, QHeaderView,
+    QComboBox, QDoubleSpinBox, QFrame, QGridLayout
 )
 from app.services.billing_service import BillingService
+from app.ui.toast_notification import notify
 from app.services.treatment_service import TreatmentService
 from app.services.patient_service import PatientService
 from app.services.document_builder import DocumentBuilder
 from app.services.print_service import PrintService
 from qfluentwidgets import (
-    Action,
     ElevatedCardWidget,
     FluentIcon,
     PillPushButton,
     PrimaryPushButton,
-    PushButton,
-    RoundMenu,
     TableWidget,
 )
 from app.ui.styles import (
-    COLOR_PRIMARY, COLOR_PRIMARY_HOVER, COLOR_SECONDARY,
+    COLOR_PRIMARY, COLOR_SECONDARY,
     COLOR_TEXT_PRIMARY, COLOR_TEXT_MUTED, COLOR_CARD_BG,
-    COLOR_BORDER, COLOR_BG, COLOR_SUCCESS, COLOR_WARNING, COLOR_DANGER
+    COLOR_BORDER, COLOR_BG, COLOR_SUCCESS
 )
 
 
@@ -521,14 +517,14 @@ class PaymentView(QWidget):
     def _on_print_thermal_receipt(self, payment_id: int, action_mode: str = "preview"):
         """Print or preview the selected installment using an 80mm receipt page, not A4."""
         if not self._current_patient_details or not self._current_case_details or not self._current_financial_summary:
-            QMessageBox.warning(self, "Receipt Unavailable", "Select a patient and treatment case before printing a receipt.")
+            notify(self, "Receipt unavailable", "Select a patient and treatment case before printing a receipt.", "warning")
             return
         payment = next(
             (item for item in self._current_financial_summary.get("payments", []) if int(item.get("id") or 0) == payment_id),
             None,
         )
         if not payment:
-            QMessageBox.warning(self, "Receipt Not Found", "The selected payment is not available in this ledger.")
+            notify(self, "Receipt not found", "The selected payment is not available in this ledger.", "warning")
             return
         receipt_html = DocumentBuilder.build_thermal_receipt_html(
             patient_data=self._current_patient_details,
@@ -576,7 +572,7 @@ class PaymentView(QWidget):
 
     def _on_submit_payment(self):
         if not self.current_case_id:
-            QMessageBox.information(self, "No Case Selected", "Please select a treatment case first.")
+            notify(self, "No case selected", "Please select a treatment case first.", "info")
             return
 
         amount = self.amt_input.value()
@@ -599,4 +595,4 @@ class PaymentView(QWidget):
             self.payment_recorded.emit(self.current_case_id)
             self.payment_saved.emit(receipt)
         except Exception as e:
-            QMessageBox.critical(self, "Payment Error", f"Failed to record payment: {str(e)}")
+            notify(self, "Payment not saved", str(e), "error")

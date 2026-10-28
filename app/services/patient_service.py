@@ -183,6 +183,15 @@ class PatientService:
                 patient["photo_full_path"] = None
         return patient
 
+    def count_patients(
+        self,
+        query: str = "",
+        filter_key: str = "all",
+        doctor_id: int | None = None,
+    ) -> int:
+        """Total matching records, so the UI can say when a list is only partly shown."""
+        return self.repository.count(query, filter_key=filter_key, doctor_id=doctor_id)
+
     def search_patients(
         self,
         query: str = "",
