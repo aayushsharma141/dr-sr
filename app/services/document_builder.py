@@ -466,7 +466,7 @@ class DocumentBuilder:
         referred_by = patient_data.get("referred_by", "")
         condition = patient_data.get("patient_condition", "")
         patient_in = str(patient_data.get("patient_in") or patient_data.get("created_at") or "")
-        date_str = str(patient_in)[:10] if patient_in else ""
+        date_str = patient_in[:10] if patient_in else ""
         doctor_name = patient_data.get("doctor_name") or ""
 
         urn = _esc(urn)
