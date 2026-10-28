@@ -11,7 +11,10 @@ A standalone, 100% offline Windows desktop application built with Python, PySide
 - **Keyboard-First Quick Launcher:** Press `Ctrl+K` from any workspace to find a patient by name, URN, or mobile number, or jump to an app section.
 - **Live Database-Backed Dashboard:** Real metrics from local SQLite for total patients, today's registrations, active treatment cases, and outstanding balance in ₹.
 - **Today's Patient Activity:** Displays registrations and treatment sessions actually recorded today; it does not fabricate appointment/waiting states that the current schema cannot represent.
-- **Non-Blocking Feedback:** Native toast notifications confirm patient saves, data refreshes, and successful restore completion without interrupting work.
+- **Non-Blocking Feedback:** Native toast notifications confirm patient saves, data refreshes, treatment sessions, and successful restore completion without interrupting work.
+- **Clinical VAS Pain Scale:** Session logging uses a color-graded 0–10 score with explicit No Pain, Mild, Moderate, and Severe labels while storing the existing integer `pain_score` field.
+- **Modality Chips:** One-click selection for TENS, IFT, UST, cervical/lumbar traction, moist heat, therapeutic exercise, and manual mobilization; selections still serialize to the existing `modalities_used` text field.
+- **Session Pain Trend:** A local sparkline summarizes recorded pain scores by session number. It only plots saved scores and does not infer a clinical outcome or change the treatment plan.
 - **Local-First & Offline:** Zero runtime internet dependency, no telemetry, no cloud accounts.
 
 ---
