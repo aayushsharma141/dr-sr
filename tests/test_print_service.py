@@ -145,6 +145,10 @@ def test_prescription_slip_generation(sample_patient_dict, sample_case_dict):
         case_data=sample_case_dict,
     )
 
+    # The local emblem is embedded in HTML so print preview does not need a remote URL.
+    assert 'alt="Caduceus"' in html
+    assert "data:image/png;base64," in html
+
     # Letterhead branding
     assert "कल्याण हॉस्पीटल" in html
     assert "PHYSIOTHERAPY DEPARTMENT" in html
