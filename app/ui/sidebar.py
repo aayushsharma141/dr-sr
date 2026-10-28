@@ -96,8 +96,8 @@ class SidebarWidget(QWidget):
             (0, "Dashboard"),
             (1, "Patient Registry"),
             (2, "Treatment Sessions"),
-            (3, "Billing && Payments"),
-            (4, "Backup && Safety"),
+            (3, "Billing & Payments"),
+            (4, "Backup & Safety"),
         ]
         self.nav_buttons: list[QPushButton] = []
         for index, label in nav_items:
@@ -132,6 +132,10 @@ class SidebarWidget(QWidget):
         footer_trust = QLabel("Physiotherapy Management")
         footer_trust.setStyleSheet("color:#CBD5E1;font-size:10px;")
         footer_layout.addWidget(footer_trust)
+
+        shortcut_hint = QLabel("QUICK SEARCH  ·  CTRL+K")
+        shortcut_hint.setStyleSheet("color:#D9C27A;font-size:9px;font-weight:800;letter-spacing:.4px;")
+        footer_layout.addWidget(shortcut_hint)
 
         version = QLabel(f"Version {APP_VERSION}")
         version.setObjectName("SidebarVersion")
