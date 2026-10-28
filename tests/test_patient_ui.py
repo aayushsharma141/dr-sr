@@ -2,7 +2,9 @@
 UI tests for PatientFormView, PatientListView, and PatientModuleView.
 """
 
-from app.db.connection import init_db
+from app.db.connection import get_db_connection, init_db
+from app.services.billing_service import BillingService
+from app.services.treatment_service import TreatmentService
 from app.services.patient_service import PatientService
 from app.ui.views.patient_form_view import PatientFormView
 from app.ui.views.patient_list_view import PatientListView
@@ -100,3 +102,109 @@ def test_patient_module_transitions(qapp, tmp_path):
     # Cancel back
     module.form_view.cancelled.emit()
     assert module.stack.currentIndex() == 0
+
+
+def test_patient_registry_filters_use_saved_today_active_case_and_balance_data(qapp, tmp_path):
+    """Registry filters are backed by persisted patient, case, and payment values."""
+    db_file = tmp_path / "registry_filters.db"
+    init_db(db_file)
+    patient_service = PatientService(db_file)
+    treatment_service = TreatmentService(db_file)
+    billing_service = BillingService(db_file)
+
+    today_patient = patient_service.register_patient({
+        "patient_name": "Anjali Current",
+        "age": 32,
+        "sex": "Female",
+        "mobile_no": "9000000001",
+        "address": "Ara",
+        "patient_condition": "Knee Pain",
+    })
+    old_patient = patient_service.register_patient({
+        "patient_name": "Ramesh Archived Date",
+        "age": 45,
+        "sex": "Male",
+        "mobile_no": "9000000002",
+        "address": "Ara",
+        "patient_condition": "Back Pain",
+    })
+
+    conn = get_db_connection(db_file)
+    conn.execute(
+        "UPDATE patients SET created_at = ?, patient_in = ? WHERE id = ?",
+        ("2020-01-01 09:00:00", "2020-01-01 09:00:00", old_patient["id"]),
+    )
+    conn.commit()
+    conn.close()
+
+    unpaid_case = treatment_service.open_treatment_case(
+        patient_id=today_patient["id"],
+        title="Active Knee Rehabilitation",
+        no_of_sessions=8,
+        total_amount_rupees=2400,
+    )
+    paid_case = treatment_service.open_treatment_case(
+        patient_id=old_patient["id"],
+        title="Completed Payment Plan",
+        no_of_sessions=4,
+        total_amount_rupees=1000,
+    )
+    billing_service.record_installment(
+        case_id=paid_case["id"],
+        amount_rupees=1000,
+        payment_mode="CASH",
+    )
+
+    today_ids = {
+        p["id"]
+        for p in patient_service.search_patients("", limit=100, filter_key="today")
+    }
+    active_ids = {
+        p["id"]
+        for p in patient_service.search_patients("", limit=100, filter_key="active_therapy")
+    }
+    pending_ids = {
+        p["id"]
+        for p in patient_service.search_patients("", limit=100, filter_key="pending_balance")
+    }
+
+    assert today_patient["id"] in today_ids
+    assert old_patient["id"] not in today_ids
+    assert today_patient["id"] in active_ids
+    assert old_patient["id"] in active_ids
+    assert today_patient["id"] in pending_ids
+    assert old_patient["id"] not in pending_ids
+
+
+def test_patient_directory_filter_chip_and_profile_panel(qapp, tmp_path):
+    """Selecting a row opens the service-backed quick profile and filters are selectable."""
+    db_file = tmp_path / "registry_profile.db"
+    init_db(db_file)
+    patient_service = PatientService(db_file)
+    patient = patient_service.register_patient({
+        "patient_name": "Sita Devi",
+        "age": 41,
+        "sex": "Female",
+        "mobile_no": "9000000011",
+        "address": "Station Road, Ara",
+        "patient_condition": "Shoulder Pain",
+    })
+    TreatmentService(db_file).open_treatment_case(
+        patient_id=patient["id"],
+        title="Shoulder Mobility",
+        no_of_sessions=6,
+        total_amount_rupees=1800,
+    )
+
+    view = PatientListView(patient_service=patient_service)
+    view.filter_buttons["active_therapy"].click()
+
+    assert view.table.rowCount() == 1
+    view.table.setCurrentCell(0, 0)
+    qapp.processEvents()
+
+    assert not view.profile_panel.isHidden()
+    assert view.profile_name.text() == "Sita Devi"
+    assert view.profile_urn.text() == patient["serial_urn_no"]
+    assert "Shoulder Mobility" in view.profile_case.text()
+    assert view.profile_progress.value() == 0
