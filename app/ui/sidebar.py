@@ -4,9 +4,11 @@ Trust-led branding, clear text navigation, and explicit offline status.
 """
 from pathlib import Path
 
-from PySide6.QtCore import Qt, Signal
+from PySide6.QtCore import QSize, Qt, Signal
 from PySide6.QtGui import QPixmap
 from PySide6.QtWidgets import QButtonGroup, QFrame, QLabel, QPushButton, QVBoxLayout, QWidget
+
+from qfluentwidgets import FluentIcon, Theme
 
 from app.config import APP_VERSION, HOSPITAL_DEPT, HOSPITAL_NAME, HOSPITAL_NAME_HINDI, TRUST_NAME
 
@@ -98,15 +100,17 @@ class SidebarWidget(QWidget):
         self.button_group = QButtonGroup(self)
         self.button_group.setExclusive(True)
         nav_items = [
-            (0, "Dashboard"),
-            (1, "Patient Registry"),
-            (2, "Treatment Sessions"),
-            (3, "Billing & Payments"),
-            (4, "Backup & Safety"),
+            (0, "Dashboard", FluentIcon.HOME),
+            (1, "Patient Registry", FluentIcon.PEOPLE),
+            (2, "Treatment Sessions", FluentIcon.HEART),
+            (3, "Billing && Payments", FluentIcon.TAG),
+            (4, "Backup && Safety", FluentIcon.SAVE),
         ]
         self.nav_buttons: list[QPushButton] = []
-        for index, label in nav_items:
+        for index, label, icon in nav_items:
             btn = QPushButton(label)
+            btn.setIcon(icon.icon(Theme.DARK))
+            btn.setIconSize(QSize(17, 17))
             btn.setObjectName("NavButton")
             btn.setCheckable(True)
             btn.setCursor(Qt.CursorShape.PointingHandCursor)

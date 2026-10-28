@@ -17,6 +17,8 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from qfluentwidgets import setThemeColor
+
 from app.config import APP_NAME, COLORS, BASE_DIR
 from app.db.connection import init_db
 from app.services.dashboard_service import DashboardService
@@ -54,6 +56,7 @@ class MainWindow(QMainWindow):
             self.setWindowIcon(QIcon(str(icon_path)))
         self.resize(1160, 780)
         self.setMinimumSize(980, 660)
+        setThemeColor(COLORS["primary"])
         self.setStyleSheet(get_application_stylesheet())
 
         central_widget = QWidget(self)

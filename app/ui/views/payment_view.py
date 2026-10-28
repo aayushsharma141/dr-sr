@@ -77,12 +77,12 @@ class PaymentView(QWidget):
 
         # 2. Patient & Case Selection Ribbon
         sel_frame = QFrame()
+        sel_frame.setObjectName("CardPanel")
         sel_frame.setStyleSheet(f"""
-            QFrame {{
+            QFrame#CardPanel {{
                 background-color: {COLOR_CARD_BG};
                 border: 1px solid {COLOR_BORDER};
                 border-radius: 10px;
-                padding: 12px;
             }}
         """)
         sel_layout = QHBoxLayout(sel_frame)
@@ -160,12 +160,12 @@ class PaymentView(QWidget):
 
         # 4. Record Payment Input Group
         entry_frame = QFrame()
+        entry_frame.setObjectName("CardPanel")
         entry_frame.setStyleSheet(f"""
-            QFrame {{
+            QFrame#CardPanel {{
                 background-color: {COLOR_CARD_BG};
                 border: 1px solid {COLOR_BORDER};
                 border-radius: 10px;
-                padding: 16px;
             }}
         """)
         entry_layout = QVBoxLayout(entry_frame)
@@ -431,23 +431,15 @@ class PaymentView(QWidget):
         if summary["is_cleared"]:
             self._update_card_value(self.balance_card, f"{bal_formatted} (CLEARED ✓)", COLOR_SUCCESS)
             self.balance_card.setStyleSheet(f"""
-                QFrame {{
-                    background-color: {COLOR_CARD_BG};
-                    border: 1px solid {COLOR_BORDER};
+                ElevatedCardWidget {{
                     border-left: 5px solid {COLOR_SUCCESS};
-                    border-radius: 10px;
-                    padding: 16px;
                 }}
             """)
         else:
             self._update_card_value(self.balance_card, bal_formatted, COLOR_PRIMARY)
             self.balance_card.setStyleSheet(f"""
-                QFrame {{
-                    background-color: {COLOR_CARD_BG};
-                    border: 1px solid {COLOR_BORDER};
+                ElevatedCardWidget {{
                     border-left: 5px solid {COLOR_PRIMARY};
-                    border-radius: 10px;
-                    padding: 16px;
                 }}
             """)
 

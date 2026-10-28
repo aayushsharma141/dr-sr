@@ -153,13 +153,13 @@ class BackupView(QWidget):
 
     def _create_metric_card(self, title: str, initial_value: str, accent_color: str) -> QFrame:
         card = QFrame()
+        card.setObjectName("CardPanel")
         card.setStyleSheet(f"""
-            QFrame {{
+            QFrame#CardPanel {{
                 background-color: {COLOR_CARD_BG};
                 border: 1px solid {COLOR_BORDER};
                 border-left: 5px solid {accent_color};
                 border-radius: 10px;
-                padding: 16px;
             }}
         """)
         card_layout = QVBoxLayout(card)

@@ -47,7 +47,7 @@ def get_application_stylesheet() -> str:
     QPushButton#NavButton {{
         background: transparent; color: #E2E8F0; border: 0;
         border-left: 3px solid transparent; border-radius: 7px;
-        text-align: left; padding: 12px 14px; margin: 2px 10px;
+        text-align: left; padding: 12px 14px 12px 16px; margin: 2px 10px;
         font-size: 13px; font-weight: 500;
     }}
     QPushButton#NavButton:hover {{ background: rgba(255,255,255,0.09); color: #FFFFFF; }}

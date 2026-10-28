@@ -288,12 +288,12 @@ class TreatmentView(QWidget):
 
         # 2. Patient & Case Selection Ribbon
         sel_frame = QFrame()
+        sel_frame.setObjectName("CardPanel")
         sel_frame.setStyleSheet(f"""
-            QFrame {{
+            QFrame#CardPanel {{
                 background-color: {COLOR_CARD_BG};
                 border: 1px solid {COLOR_BORDER};
                 border-radius: 10px;
-                padding: 12px;
             }}
         """)
         sel_layout = QHBoxLayout(sel_frame)
@@ -338,12 +338,12 @@ class TreatmentView(QWidget):
 
         # 3. Active Case Information Card
         self.case_info_frame = QFrame()
+        self.case_info_frame.setObjectName("CardPanel")
         self.case_info_frame.setStyleSheet(f"""
-            QFrame {{
+            QFrame#CardPanel {{
                 background-color: {COLOR_CARD_BG};
                 border: 1px solid {COLOR_BORDER};
                 border-radius: 10px;
-                padding: 16px;
             }}
         """)
         case_info_layout = QVBoxLayout(self.case_info_frame)
