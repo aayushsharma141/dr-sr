@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QCursor, QPixmap
 from PySide6.QtWidgets import (
     QButtonGroup,
@@ -45,9 +45,9 @@ REGISTRY_FILTERS = (
 class PatientListView(QWidget):
     """Patient directory with fast filtering, quick profile, and direct clinical actions."""
 
-    register_clicked = __import__("PySide6.QtCore", fromlist=["Signal"]).Signal()
-    edit_clicked = __import__("PySide6.QtCore", fromlist=["Signal"]).Signal(int)
-    open_treatment_clicked = __import__("PySide6.QtCore", fromlist=["Signal"]).Signal(int)
+    register_clicked = Signal()
+    edit_clicked = Signal(int)
+    open_treatment_clicked = Signal(int)
 
     def __init__(
         self,
@@ -62,7 +62,7 @@ class PatientListView(QWidget):
         self._active_filter = "all"
         self._profile_patient: dict | None = None
         self._profile_cases: list[dict] = []
-        self._profile_summary: dict | None = None
+        self._profile_selected_case: dict | None = None
 
         root_layout = QVBoxLayout(self)
         root_layout.setContentsMargins(20, 14, 20, 12)
@@ -335,6 +335,7 @@ class PatientListView(QWidget):
 
     def reload_patients(self, query: str = ""):
         """Refresh records from the existing patient-search service and selected filter."""
+        self._hide_profile()
         active_query = query if query else self.search_input.text()
         patients = self.service.search_patients(
             active_query,
@@ -416,7 +417,6 @@ class PatientListView(QWidget):
 
         self._profile_patient = patient
         self._profile_cases = self.treatment_service.get_patient_cases(patient_id)
-        self._profile_summary = None
 
         name = str(patient.get("patient_name") or "Patient")
         self.profile_name.setText(name)
@@ -447,6 +447,7 @@ class PatientListView(QWidget):
             reverse=True,
         )
         selected_case = sorted_cases[0] if sorted_cases else None
+        self._profile_selected_case = selected_case
         if selected_case:
             history = self.treatment_service.get_case_with_history(int(selected_case["id"]))
             self.profile_case.setText(
@@ -464,18 +465,19 @@ class PatientListView(QWidget):
 
         # Total due is aggregated from existing billing summaries rather than a UI-side formula.
         total_balance_paise = 0
+        has_partial_due = False
         for case in self._profile_cases:
             try:
                 summary = self.billing_service.get_financial_summary(int(case["id"]))
-                total_balance_paise += int(summary.get("balance_paise", 0))
+                case_balance = int(summary.get("balance_paise", 0))
+                total_balance_paise += case_balance
+                if case_balance > 0 and int(summary.get("total_paid_paise", 0)) > 0:
+                    has_partial_due = True
             except Exception:
                 continue
         balance_text = self.billing_service.format_inr(total_balance_paise)
         if total_balance_paise > 0:
-            status = "PARTIAL DUE" if any(
-                self.billing_service.get_financial_summary(int(case["id"])).get("total_paid_paise", 0) > 0
-                for case in self._profile_cases
-            ) else "BALANCE DUE"
+            status = "PARTIAL DUE" if has_partial_due else "BALANCE DUE"
             self.profile_balance.setText(f"{status} · Outstanding balance: {balance_text}")
             self.profile_balance.setStyleSheet(
                 "background:#FFF7E6;color:#8A4B08;border:1px solid #F2D49B;"
@@ -520,8 +522,8 @@ class PatientListView(QWidget):
         if document_type == "record":
             financial_summary = None
             case_data = None
-            if self._profile_cases:
-                case_data = self.treatment_service.get_case_with_history(int(self._profile_cases[0]["id"]))
+            if self._profile_selected_case:
+                case_data = self.treatment_service.get_case_with_history(int(self._profile_selected_case["id"]))
                 financial_summary = self.billing_service.get_financial_summary(int(case_data["id"]))
             html = DocumentBuilder.build_patient_registration_html(
                 patient_dict,
