@@ -304,7 +304,7 @@ class DocumentBuilder:
     <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom: 12px; border-bottom: 1px solid #E2E8F0; padding-bottom: 6px;">
       <tr>
         <td>
-          <span style="font-size: 13.5px; font-weight: 800; color: #6B1736; letter-spacing: 0.5px;">PATIENT REGISTRATION & TREATMENT RECORD</span>
+          <span style="font-size: 13.5px; font-weight: 800; color: #6B1736; ">PATIENT REGISTRATION & TREATMENT RECORD</span>
         </td>
         <td align="right">
           <span style="background-color: #6B1736; color: #FFFFFF; font-weight: bold; font-size: 11.5px; padding: 2px 8px; border-radius: 3px;">RECORD #{urn}</span>
