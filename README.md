@@ -47,6 +47,14 @@ pip install -r requirements.txt
 
 ---
 
+## Build Standalone Windows Executable
+
+After installing the development dependencies, run `build_exe.bat` from the repository root on Windows. The build includes the SQLite schema and `app/assets/` (hospital logo, physiotherapy banner, and Caduceus emblem) in the `dist/KalyanHospital/` folder.
+
+Before distributing the build, launch `dist/KalyanHospital/KalyanHospital.exe` on a clean Windows workstation and verify the sidebar logo, dashboard therapy image, prescription letterhead emblem, print preview, and a test print. The headless test suite does not replace Windows printer validation.
+
+---
+
 ## Running Automated Tests
 
 Run the automated test suite in headless mode:
