@@ -1,5 +1,7 @@
 """Tests for the native Ctrl+K workspace and patient launcher."""
 
+from PySide6.QtCore import Qt
+
 from app.db.connection import get_db_connection, init_db
 from app.services.patient_service import PatientService
 from app.ui.quick_launcher import QuickLauncherDialog
