@@ -44,23 +44,26 @@ def sample_financial_summary():
 
 
 def test_document_builder_contains_official_branding(sample_patient_dict):
-    """Verifies that generated HTML includes official clinic branding and clinicians."""
+    """Verifies that generated HTML includes official clinic branding and clinicians matching the physical pad."""
     html = DocumentBuilder.build_patient_registration_html(sample_patient_dict)
 
-    # Trust & Hospital Name
-    assert "श्री वशिष्ठ कल्याण ट्रस्ट द्वारा संचालित" in html
-    assert "KALYAN HOSPITAL" in html
+    # Hospital Name & Department
+    assert "कल्याण हॉस्पीटल" in html
+    assert "PHYSIOTHERAPY DEPARTMENT" in html
     assert "#6B1736" in html  # Deep Maroon Header
 
     # Clinicians
     assert "Dr. Madan Mohan Dwivedi" in html
-    assert "Senior Physiotherapist (Ex Sadar Hospital, Arrah)" in html
+    assert "Ex Sadar Hospital, Arrah (Bhojpur)" in html
     assert "Dr. Chandan Kr. Dwivedi" in html
-    assert "Physiotherapist (NIMHANS, Apollo Bangalore)" in html
+    assert "Ex. INT. NIMHANS - Bangalore" in html
+    assert "Ex. INT. APOLLO - Bangalore" in html
+    assert "फिजियोरत्न से सम्मानित" in html
+    assert "फिजियोथेरेपिस्ट" in html
 
     # Branches
-    assert "स्टेशन रोड, नवादा थाना के सामने वाली गली, आरा" in html
-    assert "श्रीरामपुर रोड, गड़हनी, भोजपुर" in html
+    assert "नवादा थाना के सामने वाली गली, आरा, जिला- भोजपुर" in html
+    assert "श्रीरामपुर रोड, गड़हनी, प्रखण्ड- उदवन्तनगर" in html
 
 
 def test_document_builder_all_12_fields(sample_patient_dict, sample_case_dict, sample_financial_summary):
