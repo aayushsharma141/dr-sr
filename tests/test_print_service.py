@@ -48,9 +48,9 @@ def test_document_builder_contains_official_branding(sample_patient_dict):
     html = DocumentBuilder.build_patient_registration_html(sample_patient_dict)
 
     # Hospital Name & Department
-    assert "कल्याण हॉस्पीटल" in html
+    assert "KALYAN HOSPITAL" in html
     assert "PHYSIOTHERAPY DEPARTMENT" in html
-    assert "#54152F" in html  # Deep Burgundy Header
+    assert "#9E1B42" in html  # Approved crimson header and footer bar
 
     # Clinicians
     assert "Dr. Madan Mohan Dwivedi" in html
@@ -153,7 +153,7 @@ def test_prescription_slip_generation(sample_patient_dict, sample_case_dict):
     assert "data:image/png;base64," in html
 
     # Letterhead branding
-    assert "कल्याण हॉस्पीटल" in html
+    assert "KALYAN HOSPITAL" in html
     assert "PHYSIOTHERAPY DEPARTMENT" in html
     assert "Sl No." in html
     assert "KH-2026-0001" in html
