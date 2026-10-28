@@ -14,6 +14,8 @@ from PySide6.QtWidgets import (
 from app.services.billing_service import BillingService
 from app.services.treatment_service import TreatmentService
 from app.services.patient_service import PatientService
+from app.services.document_builder import DocumentBuilder
+from app.services.print_service import PrintService
 from app.ui.styles import (
     COLOR_PRIMARY, COLOR_PRIMARY_HOVER, COLOR_SECONDARY,
     COLOR_TEXT_PRIMARY, COLOR_TEXT_MUTED, COLOR_CARD_BG,
@@ -25,6 +27,7 @@ class PaymentView(QWidget):
     """Manages medical billing, partial installments, and dynamic balance tracking."""
 
     payment_recorded = Signal(int)  # Emits case_id after payment saved
+    payment_saved = Signal(dict)  # Emits the saved receipt payload for non-blocking UI feedback
 
     def __init__(self, db_path: Optional[str] = None, parent=None):
         super().__init__(parent)
@@ -35,6 +38,9 @@ class PaymentView(QWidget):
 
         self.current_patient_id: Optional[int] = None
         self.current_case_id: Optional[int] = None
+        self._current_financial_summary: Optional[Dict[str, Any]] = None
+        self._current_case_details: Optional[Dict[str, Any]] = None
+        self._current_patient_details: Optional[Dict[str, Any]] = None
 
         self._setup_ui()
 
@@ -124,6 +130,21 @@ class PaymentView(QWidget):
         cards_layout.addWidget(self.balance_card)
 
         layout.addLayout(cards_layout)
+
+        # Payment state is derived from saved ledger values, not a manually editable status.
+        status_row = QHBoxLayout()
+        status_label = QLabel("PAYMENT STATUS")
+        status_label.setStyleSheet(f"font-size:9px;font-weight:800;letter-spacing:.6px;color:{COLOR_TEXT_MUTED};")
+        status_row.addWidget(status_label)
+        self.payment_status_badge = QLabel("NO CASE SELECTED")
+        self.payment_status_badge.setObjectName("PaymentStatusBadge")
+        self.payment_status_badge.setStyleSheet(
+            "background:#F1F5F9;color:#475569;border:1px solid #D7DEE8;"
+            "border-radius:12px;padding:5px 10px;font-size:10px;font-weight:800;"
+        )
+        status_row.addWidget(self.payment_status_badge)
+        status_row.addStretch()
+        layout.addLayout(status_row)
 
         # 4. Record Payment Input Group
         entry_frame = QFrame()
@@ -221,6 +242,30 @@ class PaymentView(QWidget):
         form_grid.addWidget(self.submit_payment_btn, 1, 3)
 
         entry_layout.addLayout(form_grid)
+
+        quick_amount_row = QHBoxLayout()
+        quick_amount_label = QLabel("QUICK AMOUNTS")
+        quick_amount_label.setStyleSheet(
+            f"font-size:9px;font-weight:800;letter-spacing:.5px;color:{COLOR_TEXT_MUTED};"
+        )
+        quick_amount_row.addWidget(quick_amount_label)
+        self.pay_full_button = QPushButton("Pay Full Balance")
+        self.pay_full_button.setObjectName("PrimaryButton")
+        self.pay_full_button.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.pay_full_button.clicked.connect(lambda: self._set_amount_preset("full"))
+        quick_amount_row.addWidget(self.pay_full_button)
+        self.amount_preset_buttons: dict[int, QPushButton] = {}
+        for preset_amount in (500, 1000, 2000):
+            preset_button = QPushButton(f"₹{preset_amount:,}")
+            preset_button.setObjectName("SecondaryButton")
+            preset_button.setCursor(Qt.CursorShape.PointingHandCursor)
+            preset_button.clicked.connect(
+                lambda _checked=False, amount=preset_amount: self._set_amount_preset(amount)
+            )
+            self.amount_preset_buttons[preset_amount] = preset_button
+            quick_amount_row.addWidget(preset_button)
+        quick_amount_row.addStretch()
+        entry_layout.addLayout(quick_amount_row)
         layout.addWidget(entry_frame)
 
         # 5. Payment Installments Ledger Table
@@ -229,12 +274,14 @@ class PaymentView(QWidget):
         layout.addWidget(table_title)
 
         self.payments_table = QTableWidget()
-        self.payments_table.setColumnCount(6)
+        self.payments_table.setColumnCount(7)
         self.payments_table.setHorizontalHeaderLabels([
-            "Payment Date", "Receipt #", "Amount Paid", "Mode", "Reference Note", "Recorded By"
+            "Payment Date", "Receipt #", "Amount Paid", "Mode", "Reference Note", "Recorded By", "Receipt"
         ])
         self.payments_table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeToContents)
         self.payments_table.horizontalHeader().setSectionResizeMode(4, QHeaderView.Stretch)
+        self.payments_table.horizontalHeader().setSectionResizeMode(6, QHeaderView.Fixed)
+        self.payments_table.setColumnWidth(6, 82) 
         self.payments_table.verticalHeader().setVisible(False)
         self.payments_table.setAlternatingRowColors(True)
         self.payments_table.setStyleSheet(f"""
@@ -341,6 +388,18 @@ class PaymentView(QWidget):
         except Exception:
             return
 
+        self._current_financial_summary = summary
+        try:
+            self._current_case_details = self.treatment_service.get_case_with_history(case_id)
+        except Exception:
+            self._current_case_details = None
+        self._current_patient_details = None
+        serial_urn = str(summary.get("serial_urn_no") or "")
+        if serial_urn:
+            patient_matches = self.patient_service.search_patients(serial_urn, limit=1)
+            if patient_matches:
+                self._current_patient_details = self.patient_service.get_patient(int(patient_matches[0]["id"]))
+
         # Update cards
         self._update_card_value(self.fee_card, summary["total_fee_formatted"])
         self._update_card_value(self.paid_card, summary["total_paid_formatted"])
@@ -368,6 +427,29 @@ class PaymentView(QWidget):
                     padding: 16px;
                 }}
             """)
+
+        if summary.get("is_cleared"):
+            status_text = "OVERPAID" if summary.get("is_overpayment") else "PAID IN FULL"
+            status_color, status_bg, status_border = COLOR_SUCCESS, "#E7F5EB", "#C5E5D0"
+        elif int(summary.get("total_paid_paise", 0)) > 0:
+            status_text = "PARTIAL DUE"
+            status_color, status_bg, status_border = "#8A4B08", "#FFF7E6", "#F2D49B"
+        else:
+            status_text = "BALANCE DUE"
+            status_color, status_bg, status_border = "#8A4B08", "#FFF7E6", "#F2D49B"
+        self.payment_status_badge.setText(status_text)
+        self.payment_status_badge.setStyleSheet(
+            f"background:{status_bg};color:{status_color};border:1px solid {status_border};"
+            "border-radius:12px;padding:5px 10px;font-size:10px;font-weight:800;"
+        )
+
+        balance_rupees = float(summary.get("balance_rupees", 0.0))
+        has_balance = balance_rupees >= 1.0
+        self.pay_full_button.setEnabled(has_balance)
+        for preset_amount, preset_button in self.amount_preset_buttons.items():
+            preset_button.setEnabled(has_balance)
+        if has_balance:
+            self.amt_input.setValue(min(500.0, balance_rupees))
 
         # Populate payments table
         payments = summary.get("payments", [])
@@ -399,11 +481,64 @@ class PaymentView(QWidget):
             # Recorded By
             self.payments_table.setItem(row, 5, QTableWidgetItem(p.get("recorded_by", "Staff")))
 
+            print_btn = QPushButton("Print")
+            print_btn.setObjectName("SecondaryButton")
+            print_btn.setStyleSheet("padding:4px 7px;font-size:10px;")
+            print_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+            payment_id = int(p.get("id") or 0)
+            print_btn.clicked.connect(
+                lambda _checked=False, pid=payment_id: self._on_print_thermal_receipt(pid)
+            )
+            self.payments_table.setCellWidget(row, 6, print_btn)
+
+    def _set_amount_preset(self, amount: int | str):
+        """Set a quick amount without allowing a preset to exceed the current balance."""
+        summary = self._current_financial_summary
+        if not summary:
+            return
+        balance = float(summary.get("balance_rupees", 0.0))
+        if balance < 1.0:
+            return
+        desired = balance if amount == "full" else min(float(amount), balance)
+        if desired >= 1.0:
+            self.amt_input.setValue(desired)
+
+    def _on_print_thermal_receipt(self, payment_id: int):
+        """Print the selected installment using an 80mm receipt page, not A4."""
+        if not self._current_patient_details or not self._current_case_details or not self._current_financial_summary:
+            QMessageBox.warning(self, "Receipt Unavailable", "Select a patient and treatment case before printing a receipt.")
+            return
+        payment = next(
+            (item for item in self._current_financial_summary.get("payments", []) if int(item.get("id") or 0) == payment_id),
+            None,
+        )
+        if not payment:
+            QMessageBox.warning(self, "Receipt Not Found", "The selected payment is not available in this ledger.")
+            return
+        receipt_html = DocumentBuilder.build_thermal_receipt_html(
+            patient_data=self._current_patient_details,
+            case_data=self._current_case_details,
+            payment_data=payment,
+            financial_summary=self._current_financial_summary,
+        )
+        PrintService.show_thermal_receipt_preview(receipt_html, parent=self)
+
     def _clear_billing_view(self):
+        self._current_financial_summary = None
+        self._current_case_details = None
+        self._current_patient_details = None
         self._update_card_value(self.fee_card, "₹ 0.00")
         self._update_card_value(self.paid_card, "₹ 0.00")
         self._update_card_value(self.balance_card, "₹ 0.00")
         self.payments_table.setRowCount(0)
+        self.payment_status_badge.setText("NO CASE SELECTED")
+        self.payment_status_badge.setStyleSheet(
+            "background:#F1F5F9;color:#475569;border:1px solid #D7DEE8;"
+            "border-radius:12px;padding:5px 10px;font-size:10px;font-weight:800;"
+        )
+        self.pay_full_button.setEnabled(False)
+        for preset_button in self.amount_preset_buttons.values():
+            preset_button.setEnabled(False)
 
     def _on_submit_payment(self):
         if not self.current_case_id:
@@ -428,21 +563,6 @@ class PaymentView(QWidget):
             # Refresh view
             self.load_case_billing(self.current_case_id)
             self.payment_recorded.emit(self.current_case_id)
-
-            if receipt.get("is_overpayment"):
-                over_str = receipt.get("overpayment_formatted", "")
-                QMessageBox.information(
-                    self,
-                    "Payment Saved (Overpayment)",
-                    f"Payment of {receipt['amount_paid_formatted']} recorded successfully.\n"
-                    f"Note: This case is now fully cleared, with an excess payment of {over_str}."
-                )
-            else:
-                QMessageBox.information(
-                    self,
-                    "Payment Recorded",
-                    f"Payment of {receipt['amount_paid_formatted']} successfully recorded.\n"
-                    f"Remaining Balance: {receipt['balance_formatted']}"
-                )
+            self.payment_saved.emit(receipt)
         except Exception as e:
             QMessageBox.critical(self, "Payment Error", f"Failed to record payment: {str(e)}")
