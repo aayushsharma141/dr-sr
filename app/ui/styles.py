@@ -111,6 +111,60 @@ def get_application_stylesheet() -> str:
         font-weight: 800;
     }}
 
+    /* Patient registry filters and compact profile panel */
+    QPushButton#FilterChip {{
+        background:#FFFFFF;
+        color:{c['text_secondary']};
+        border:1px solid {c['border']};
+        border-radius:15px;
+        padding:5px 11px;
+        min-height:16px;
+        font-size:10px;
+        font-weight:700;
+    }}
+    QPushButton#FilterChip:hover {{
+        background:#F1F7F2;
+        border-color:#AFC9B8;
+        color:{c['primary']};
+    }}
+    QPushButton#FilterChip:checked {{
+        background:{c['primary']};
+        color:#FFFFFF;
+        border:1px solid {c['primary']};
+    }}
+    QLineEdit#PatientRegistrySearch {{
+        background:#FFFFFF;
+        border:1px solid {c['border']};
+        border-radius:7px;
+        padding:8px 10px;
+        font-size:12px;
+    }}
+    QLineEdit#PatientRegistrySearch:focus {{
+        border:1px solid {c['accent']};
+    }}
+    QFrame#PatientProfilePanel {{
+        background:#FFFFFF;
+        border:1px solid {c['border']};
+        border-radius:10px;
+    }}
+    QLabel#PatientProfilePhoto {{
+        background:#E7F5EB;
+        color:{c['primary']};
+        border:1px solid {c['border']};
+        border-radius:8px;
+        font-size:18px;
+        font-weight:800;
+    }}
+    QProgressBar#PatientProfileProgress {{
+        background:#F1F5F1;
+        border:1px solid {c['border']};
+        border-radius:4px;
+    }}
+    QProgressBar#PatientProfileProgress::chunk {{
+        background:{c['primary']};
+        border-radius:3px;
+    }}
+
     /* Clinical session input controls */
     QFrame#PainScaleWidget {{
         background: #F8FAF8;
