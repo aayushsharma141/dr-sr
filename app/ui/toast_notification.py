@@ -5,7 +5,7 @@ separately licensed third-party widget framework.
 """
 from __future__ import annotations
 
-from PySide6.QtCore import QEasingCurve, QPropertyAnimation, QTimer, Qt
+from PySide6.QtCore import QEasingCurve, QPropertyAnimation, QTimer, Qt, Signal
 from PySide6.QtWidgets import (
     QFrame,
     QGraphicsOpacityEffect,
@@ -28,6 +28,8 @@ LEVEL_COLORS = {
 
 class ToastNotification(QFrame):
     """A temporary, non-modal notification that never blocks the clinical workflow."""
+
+    dismissed = Signal()
 
     def __init__(
         self,
@@ -109,6 +111,7 @@ class ToastNotification(QFrame):
 
     def dismiss(self) -> None:
         if not self.isVisible():
+            self.dismissed.emit()
             self.close()
             return
         self._timer.stop()
@@ -117,5 +120,9 @@ class ToastNotification(QFrame):
         self._fade_out.setStartValue(self._opacity.opacity())
         self._fade_out.setEndValue(0.0)
         self._fade_out.setEasingCurve(QEasingCurve.Type.InCubic)
-        self._fade_out.finished.connect(self.close)
+        self._fade_out.finished.connect(self._finish_dismiss)
         self._fade_out.start()
+
+    def _finish_dismiss(self) -> None:
+        self.dismissed.emit()
+        self.close()

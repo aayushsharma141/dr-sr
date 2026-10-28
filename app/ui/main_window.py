@@ -137,6 +137,7 @@ class MainWindow(QMainWindow):
 
         self.treatment_view = TreatmentView(db_path=self.db_path, parent=self)
         self.treatment_view.view_billing_clicked.connect(self._on_view_billing)
+        self.treatment_view.session_saved.connect(self._on_session_saved)
         self.stacked_widget.addWidget(self.treatment_view)
 
         self.payment_view = PaymentView(db_path=self.db_path, parent=self)
@@ -232,6 +233,16 @@ class MainWindow(QMainWindow):
         detail = f"{name} · {urn} saved to the local database." if urn else f"{name} saved to the local database."
         self.show_toast("Patient record saved", detail, "success")
 
+    def _on_session_saved(self, session: dict):
+        """Refresh the day feed and acknowledge successful session logging non-modally."""
+        self.dashboard_view.refresh_data()
+        session_number = session.get("session_number", "")
+        pain_score = session.get("pain_score")
+        detail = f"Session {session_number} saved to the local case history."
+        if pain_score is not None:
+            detail += f" Recorded pain score: {pain_score}/10."
+        self.show_toast("Treatment session saved", detail, "success")
+
     def _on_database_restored(self):
         """Refresh all loaded views after database restore and notify without blocking."""
         self.dashboard_view.refresh_data()
@@ -253,10 +264,16 @@ class MainWindow(QMainWindow):
             self._active_toast = None
         toast = ToastNotification(self, title, message, level, duration_ms)
         self._active_toast = toast
+        toast.dismissed.connect(lambda current=toast: self._on_toast_dismissed(current))
         toast.adjustSize()
         x = max(16, self.width() - toast.width() - 22)
         y = 70
         toast.show_toast(x, y)
+
+    def _on_toast_dismissed(self, toast: ToastNotification) -> None:
+        """Avoid retaining a Python wrapper for a toast widget that Qt has deleted."""
+        if self._active_toast is toast:
+            self._active_toast = None
 
     def resizeEvent(self, event):
         super().resizeEvent(event)

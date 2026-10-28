@@ -111,6 +111,40 @@ def get_application_stylesheet() -> str:
         font-weight: 800;
     }}
 
+    /* Clinical session input controls */
+    QFrame#PainScaleWidget {{
+        background: #F8FAF8;
+        border: 1px solid {c['border']};
+        border-radius: 8px;
+    }}
+    QLabel#VASScoreValue {{ font-size: 17px; font-weight: 800; }}
+    QLabel#VASLevelBadge {{ border-radius: 10px; padding: 4px 9px; font-size: 9px; font-weight: 800; }}
+    QPushButton#ModalityChip {{
+        background: #FFFFFF;
+        color: {c['text_primary']};
+        border: 1px solid {c['border']};
+        border-radius: 16px;
+        padding: 6px 9px;
+        min-height: 16px;
+        font-size: 10px;
+        font-weight: 600;
+    }}
+    QPushButton#ModalityChip:hover {{
+        background: #F1F7F2;
+        border-color: #AFC9B8;
+    }}
+    QPushButton#ModalityChip:checked {{
+        background: #E7F5EB;
+        color: {c['primary_dark']};
+        border: 1px solid {c['primary']};
+        font-weight: 800;
+    }}
+    QFrame#PainTrendWidget {{
+        background: #FFFFFF;
+        border: 1px solid {c['border']};
+        border-radius: 8px;
+    }}
+
     /* Native quick launcher */
     QDialog#QuickLauncherDialog {{
         background: {c['background']};
