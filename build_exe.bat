@@ -17,6 +17,7 @@ echo.
 ".venv\Scripts\pyinstaller.exe" --noconfirm --onedir --windowed ^
     --name "KalyanHospital" ^
     --add-data "app/db/schema.sql;app/db" ^
+    --add-data "app/assets;app/assets" ^
     main.py
 
 echo.
