@@ -18,6 +18,13 @@ class DocumentBuilder:
     """Builds pixel-accurate, printable ISO A4 HTML documents matching the physical letterhead."""
 
     @staticmethod
+    def _escape_html(value: Any) -> str:
+        """Escape untrusted field values before placing them in printable HTML."""
+        from html import escape
+
+        return escape(str(value if value is not None else ""), quote=True)
+
+    @staticmethod
     def _image_to_base64_src(image_path: Optional[str]) -> Optional[str]:
         """Converts local image file to base64 data URI for embedded printing."""
         if not image_path or not os.path.exists(image_path):
@@ -191,35 +198,36 @@ class DocumentBuilder:
         Generates standard ISO A4 portrait HTML document reproducing the official
         physical prescription slip of Kalyan Hospital, Ara, Bihar with 12 clinical fields.
         """
-        urn = patient_data.get("serial_urn_no", "KH-2026-____")
-        name = patient_data.get("patient_name", "___________________________________")
-        age = str(patient_data.get("age", "____"))
-        sex = patient_data.get("sex", "_________")
+        urn = cls._escape_html(patient_data.get("serial_urn_no", "KH-2026-____"))
+        name = cls._escape_html(patient_data.get("patient_name", "___________________________________"))
+        age = cls._escape_html(patient_data.get("age", "____"))
+        sex = cls._escape_html(patient_data.get("sex", "_________"))
         age_sex = f"{age} Yrs / {sex}"
-        address = patient_data.get("address", "______________________________________________________")
-        mobile = patient_data.get("mobile_no", "____________________")
-        patient_in = str(patient_data.get("patient_in") or patient_data.get("created_at") or "_________________________")
-        patient_out = str(patient_data.get("patient_out") or "_________________________")
-        referred_by = patient_data.get("referred_by") or "___________________________________"
-        condition = patient_data.get("patient_condition", "______________________________________________________")
-        date_str = str(patient_in)[:10]
+        address = cls._escape_html(patient_data.get("address", "______________________________________________________"))
+        mobile = cls._escape_html(patient_data.get("mobile_no", "____________________"))
+        patient_in_raw = str(patient_data.get("patient_in") or patient_data.get("created_at") or "_________________________")
+        patient_in = cls._escape_html(patient_in_raw)
+        patient_out = cls._escape_html(patient_data.get("patient_out") or "_________________________")
+        referred_by = cls._escape_html(patient_data.get("referred_by") or "___________________________________")
+        condition = cls._escape_html(patient_data.get("patient_condition", "______________________________________________________"))
+        date_str = cls._escape_html(patient_in_raw[:10])
 
         # Case & Session details (Field 11)
         if case_data:
-            target_sessions = str(case_data.get("no_of_sessions", "____"))
-            case_title = case_data.get("title", "")
+            target_sessions = cls._escape_html(case_data.get("no_of_sessions", "____"))
+            case_title = cls._escape_html(case_data.get("title", ""))
             sessions_display = f"{target_sessions} Sessions ({case_title})" if case_title else f"{target_sessions} Sessions"
         else:
             sessions_display = "10 Sessions (Physiotherapy Protocol)"
 
         # Financial details (Field 12)
         if financial_summary:
-            total_amt_str = financial_summary.get("total_fee_formatted", "₹ ______________")
-            paid_amt_str = financial_summary.get("total_paid_formatted", "₹ ______________")
-            balance_str = financial_summary.get("balance_formatted", "₹ ______________")
+            total_amt_str = cls._escape_html(financial_summary.get("total_fee_formatted", "₹ ______________"))
+            paid_amt_str = cls._escape_html(financial_summary.get("total_paid_formatted", "₹ ______________"))
+            balance_str = cls._escape_html(financial_summary.get("balance_formatted", "₹ ______________"))
         elif case_data and "total_amount_paise" in case_data:
             paise = case_data["total_amount_paise"]
-            total_amt_str = BillingService.format_inr(paise)
+            total_amt_str = cls._escape_html(BillingService.format_inr(paise))
             paid_amt_str = "₹ 0.00"
             balance_str = total_amt_str
         else:
@@ -237,7 +245,7 @@ class DocumentBuilder:
                 '<div style="width: 100%; height: 100%; display: flex; flex-direction: column; '
                 'align-items: center; justify-content: center; background-color: #F8FAFC; color: #64748B; '
                 'font-size: 11px; text-align: center; border: 1px dashed #CBD5E1; border-radius: 4px; padding: 4px;">'
-                '<span>👤</span><span style="margin-top: 4px;">Patient Picture</span>'
+                '<span style="font-size: 10px; font-weight: 700; letter-spacing: .4px;">PATIENT PHOTO</span>'
                 '<span style="font-size: 9px; color: #94A3B8;">(35mm × 45mm)</span></div>'
             )
 
@@ -271,8 +279,8 @@ class DocumentBuilder:
     padding: 0;
     color: #0F172A;
     background-color: #FFFFFF;
-    font-size: 13px;
-    line-height: 1.45;
+    font-size: 12px;
+    line-height: 1.35;
   }}
   .a4-container {{
     width: 100%;
@@ -299,9 +307,9 @@ class DocumentBuilder:
   {letterhead}
 
   <!-- 4. PATIENT REGISTRATION & CLINICAL MASTER RECORD -->
-  <div style="padding: 14px 18px; background-color: #FFFFFF;">
+  <div style="padding: 8px 16px; background-color: #FFFFFF;">
     <!-- Title Bar -->
-    <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom: 12px; border-bottom: 1px solid #E2E8F0; padding-bottom: 6px;">
+    <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom: 8px; border-bottom: 1px solid #E2E8F0; padding-bottom: 4px;">
       <tr>
         <td>
           <span style="font-size: 13.5px; font-weight: 800; color: #6B1736; ">PATIENT REGISTRATION & TREATMENT RECORD</span>
@@ -316,7 +324,7 @@ class DocumentBuilder:
     <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom: 8px;">
       <tr>
         <td valign="top" style="padding-right: 14px;">
-          <table width="100%" cellpadding="4" cellspacing="0">
+          <table width="100%" cellpadding="3" cellspacing="0">
             <tr>
               <td width="28%" class="field-label">1. Serial / URN No.:</td>
               <td width="72%" class="field-value" style="color: #6B1736; font-weight: 700;">{urn}</td>
@@ -344,7 +352,7 @@ class DocumentBuilder:
     </table>
 
     <!-- Fields 6-10 Grid -->
-    <table width="100%" cellpadding="4" cellspacing="0" style="margin-bottom: 10px;">
+    <table width="100%" cellpadding="3" cellspacing="0" style="margin-bottom: 6px;">
       <tr>
         <td width="20%" class="field-label">6. Mobile No.:</td>
         <td width="30%" class="field-value">{mobile}</td>
@@ -358,17 +366,17 @@ class DocumentBuilder:
         <td class="field-value">{referred_by}</td>
       </tr>
       <tr>
-        <td class="field-label" style="padding-top: 8px;">10. Patient Condition:</td>
-        <td colspan="3" class="field-value" style="padding-top: 8px; color: #0F172A;">{condition}</td>
+        <td class="field-label" style="padding-top: 5px;">10. Patient Condition:</td>
+        <td colspan="3" class="field-value" style="padding-top: 5px; color: #0F172A;">{condition}</td>
       </tr>
       <tr>
         <td class="field-label" style="padding-top: 8px;">11. No. of Sessions:</td>
-        <td colspan="3" class="field-value" style="padding-top: 8px; color: #0D9488;">{sessions_display}</td>
+        <td colspan="3" class="field-value" style="padding-top: 5px; color: #0D9488;">{sessions_display}</td>
       </tr>
     </table>
 
     <!-- Field 12: Payment Box -->
-    <div style="background-color: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 6px; padding: 10px 14px; margin: 10px 0 16px 0;">
+    <div style="background-color: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 6px; padding: 8px 12px; margin: 6px 0 8px 0;">
       <div style="font-size: 12px; font-weight: bold; color: #6B1736; margin-bottom: 6px;">12. Payment Details:</div>
       <table width="100%" cellpadding="0" cellspacing="0">
         <tr>
@@ -389,7 +397,7 @@ class DocumentBuilder:
     </div>
 
     <!-- Dual Signatures & Date -->
-    <table width="100%" cellpadding="0" cellspacing="0" style="margin-top: 40px;">
+    <table width="100%" cellpadding="0" cellspacing="0" style="margin-top: 22px;">
       <tr>
         <td width="50%" align="center" valign="bottom">
           <div style="width: 220px; border-bottom: 1px solid #0F172A; margin: 0 auto 6px auto;"></div>
@@ -402,7 +410,7 @@ class DocumentBuilder:
         </td>
       </tr>
       <tr>
-        <td colspan="2" style="padding-top: 22px; font-size: 11px; color: #64748B;">
+        <td colspan="2" style="padding-top: 8px; font-size: 10px; color: #64748B;">
           Date: <b>{date_str}</b> · Kalyan Hospital Physiotherapy Management System
         </td>
       </tr>
@@ -424,16 +432,17 @@ class DocumentBuilder:
         Generates standard ISO A4 portrait HTML document reproducing the official
         consultation prescription slip (Rx pad) with the 99.9% identical letterhead.
         """
-        urn = patient_data.get("serial_urn_no", "KH-2026-____")
-        name = patient_data.get("patient_name", "")
-        age = str(patient_data.get("age", ""))
-        sex = patient_data.get("sex", "")
+        urn = cls._escape_html(patient_data.get("serial_urn_no", "KH-2026-____"))
+        name = cls._escape_html(patient_data.get("patient_name", ""))
+        age = cls._escape_html(patient_data.get("age", ""))
+        sex = cls._escape_html(patient_data.get("sex", ""))
         age_sex = f"{age} Yrs / {sex}" if age and sex else (age or sex)
-        address = patient_data.get("address", "")
-        referred_by = patient_data.get("referred_by", "")
-        condition = patient_data.get("patient_condition", "")
-        patient_in = str(patient_data.get("patient_in") or patient_data.get("created_at") or "")
-        date_str = str(patient_in)[:10] if patient_in else ""
+        address = cls._escape_html(patient_data.get("address", ""))
+        referred_by = cls._escape_html(patient_data.get("referred_by", ""))
+        condition = cls._escape_html(patient_data.get("patient_condition", ""))
+        patient_in_raw = str(patient_data.get("patient_in") or patient_data.get("created_at") or "")
+        patient_in = cls._escape_html(patient_in_raw)
+        date_str = cls._escape_html(patient_in_raw[:10]) if patient_in_raw else ""
 
         letterhead = cls._build_letterhead_html(
             urn=urn,
@@ -446,9 +455,9 @@ class DocumentBuilder:
 
         protocol_box = ""
         if case_data:
-            target_sessions = str(case_data.get("no_of_sessions", ""))
-            case_title = case_data.get("title", "")
-            notes = case_data.get("notes", "") or clinical_notes
+            target_sessions = cls._escape_html(case_data.get("no_of_sessions", ""))
+            case_title = cls._escape_html(case_data.get("title", ""))
+            notes = cls._escape_html(case_data.get("notes", "") or clinical_notes)
             protocol_box = f"""
     <div style="background-color: #F0FDF4; border: 1px solid #BBF7D0; border-radius: 6px; padding: 10px 14px; margin-bottom: 16px;">
       <div style="font-size: 11px; font-weight: bold; color: #166534; text-transform: uppercase;">Active Treatment Protocol: {case_title} ({target_sessions} Sessions)</div>
