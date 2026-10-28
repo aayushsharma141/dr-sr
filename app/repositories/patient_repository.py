@@ -205,7 +205,7 @@ class PatientRepository:
         normalized_filter = (filter_key or "all").strip().lower()
         if normalized_filter == "today":
             clauses.append(
-                "date(COALESCE(p.patient_in, p.created_at)) = date('now', 'localtime')"
+                "date(COALESCE(NULLIF(p.patient_in, ''), p.created_at)) = date('now', 'localtime')"
             )
         elif normalized_filter == "active_therapy":
             clauses.append(
