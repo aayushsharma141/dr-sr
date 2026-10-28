@@ -72,7 +72,17 @@ class PatientService:
             raise ValidationError("Patient Condition / Diagnosis is required.")
         cleaned["patient_condition"] = condition
 
-        # 6. Optional Address & Referral
+        # 6. Assigned doctor (optional for legacy records, validated when supplied)
+        doctor_id = cleaned.get("doctor_id")
+        if doctor_id in ("", None):
+            cleaned["doctor_id"] = None
+        else:
+            try:
+                cleaned["doctor_id"] = int(doctor_id)
+            except (TypeError, ValueError):
+                raise ValidationError("Assigned doctor is invalid.")
+
+        # 7. Optional Address & Referral
         cleaned["address"] = str(cleaned.get("address", "")).strip()
         cleaned["referred_by"] = str(cleaned.get("referred_by", "")).strip()
 
@@ -178,9 +188,10 @@ class PatientService:
         query: str = "",
         limit: int = 50,
         filter_key: str = "all",
+        doctor_id: int | None = None,
     ) -> list[dict[str, Any]]:
-        """Search patient records, optionally applying a read-only registry filter."""
-        patients = self.repository.search(query, limit, filter_key=filter_key)
+        """Search patient records, optionally by registry filter and assigned doctor."""
+        patients = self.repository.search(query, limit, filter_key=filter_key, doctor_id=doctor_id)
         for p in patients:
             photo_filename = p.get("photo_filename")
             if photo_filename:

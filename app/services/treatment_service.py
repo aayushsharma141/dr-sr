@@ -67,6 +67,7 @@ class TreatmentService:
             "total_amount_paise": total_amount_paise,
             "notes": notes.strip() if notes else "",
             "start_date": start_date,
+            "doctor_id": patient.get("doctor_id"),  # case follows the patient's doctor
         }
 
         case_id = self.treatment_repo.create_case(case_data)

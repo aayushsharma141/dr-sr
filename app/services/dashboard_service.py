@@ -81,6 +81,29 @@ class DashboardService:
         finally:
             conn.close()
 
+    def get_doctor_overview(self) -> list[dict[str, Any]]:
+        """Per-doctor counts: patients registered today, patients on file, and active cases."""
+        conn = get_db_connection(self.db_path)
+        try:
+            rows = conn.execute(
+                """
+                SELECT d.id AS doctor_id, d.name_en, d.department,
+                    (SELECT COUNT(*) FROM patients p
+                      WHERE p.doctor_id = d.id AND p.status != 'ARCHIVED'
+                        AND date(p.created_at) = date('now', 'localtime')) AS today_registrations,
+                    (SELECT COUNT(*) FROM patients p
+                      WHERE p.doctor_id = d.id AND p.status != 'ARCHIVED') AS total_patients,
+                    (SELECT COUNT(*) FROM treatment_cases tc
+                      WHERE tc.doctor_id = d.id AND tc.status = 'IN_PROGRESS') AS active_cases
+                FROM doctors d
+                WHERE d.is_active = 1
+                ORDER BY d.id
+                """
+            ).fetchall()
+            return [dict(row) for row in rows]
+        finally:
+            conn.close()
+
     def get_recent_registrations(self, limit: int = 5) -> list[dict[str, Any]]:
         """Returns the most recent registered patients for dashboard quick view."""
         conn = get_db_connection(self.db_path)
@@ -115,7 +138,7 @@ class DashboardService:
             cursor = conn.cursor()
             cursor.execute(
                 """
-                SELECT *
+                SELECT a.*, d.name_en AS doctor_name
                 FROM (
                     SELECT
                         p.id AS patient_id,
@@ -124,6 +147,7 @@ class DashboardService:
                         p.age,
                         p.sex,
                         p.patient_condition,
+                        p.doctor_id,
                         p.created_at AS activity_at,
                         'Registration' AS activity_type
                     FROM patients p
@@ -139,6 +163,7 @@ class DashboardService:
                         p.age,
                         p.sex,
                         p.patient_condition,
+                        p.doctor_id,
                         ts.session_timestamp AS activity_at,
                         'Treatment session logged' AS activity_type
                     FROM treatment_sessions ts
@@ -146,7 +171,8 @@ class DashboardService:
                     INNER JOIN patients p ON p.id = tc.patient_id
                     WHERE date(ts.session_timestamp) = date('now', 'localtime')
                       AND p.status != 'ARCHIVED'
-                )
+                ) a
+                LEFT JOIN doctors d ON d.id = a.doctor_id
                 ORDER BY activity_at DESC, patient_name COLLATE NOCASE ASC
                 LIMIT ?
                 """,

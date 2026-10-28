@@ -13,6 +13,11 @@ from app.db.connection import get_db_connection
 class PatientRepository:
     """Data Access Object for Patient records and ID sequences."""
 
+    _SELECT_WITH_DOCTOR = """
+        SELECT p.*, d.name_en AS doctor_name, d.department AS doctor_department
+        FROM patients p LEFT JOIN doctors d ON d.id = p.doctor_id
+    """
+
     def __init__(self, db_path: Path | str | None = None):
         self.db_path = db_path
 
@@ -68,8 +73,8 @@ class PatientRepository:
                 INSERT INTO patients (
                     serial_urn_no, patient_name, age, sex, address,
                     mobile_no, patient_in, patient_out, referred_by,
-                    patient_condition, photo_filename, status
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    patient_condition, photo_filename, status, doctor_id
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     data["serial_urn_no"],
@@ -84,6 +89,7 @@ class PatientRepository:
                     data["patient_condition"],
                     data.get("photo_filename", ""),
                     data.get("status", "ACTIVE"),
+                    data.get("doctor_id"),
                 ),
             )
             conn.commit()
@@ -96,7 +102,9 @@ class PatientRepository:
         conn = get_db_connection(self.db_path)
         try:
             cursor = conn.cursor()
-            cursor.execute("SELECT * FROM patients WHERE id = ?", (patient_id,))
+            cursor.execute(
+                f"{self._SELECT_WITH_DOCTOR} WHERE p.id = ?", (patient_id,)
+            )
             row = cursor.fetchone()
             return dict(row) if row else None
         finally:
@@ -108,7 +116,7 @@ class PatientRepository:
         try:
             cursor = conn.cursor()
             cursor.execute(
-                "SELECT * FROM patients WHERE serial_urn_no = ?",
+                f"{self._SELECT_WITH_DOCTOR} WHERE p.serial_urn_no = ?",
                 (serial_urn_no,),
             )
             row = cursor.fetchone()
@@ -136,6 +144,7 @@ class PatientRepository:
                     referred_by = ?,
                     patient_condition = ?,
                     photo_filename = ?,
+                    doctor_id = ?,
                     updated_at = datetime('now', 'localtime')
                 WHERE id = ?
                 """,
@@ -150,6 +159,7 @@ class PatientRepository:
                     data.get("referred_by", ""),
                     data["patient_condition"],
                     data.get("photo_filename", ""),
+                    data.get("doctor_id"),
                     patient_id,
                 ),
             )
@@ -185,6 +195,7 @@ class PatientRepository:
         query: str = "",
         limit: int = 50,
         filter_key: str = "all",
+        doctor_id: int | None = None,
     ) -> list[dict[str, Any]]:
         """
         Searches active patient records by URN, name, and mobile number with optional
@@ -201,6 +212,10 @@ class PatientRepository:
                 "(p.serial_urn_no LIKE ? OR p.patient_name LIKE ? OR p.mobile_no LIKE ?)"
             )
             params.extend((wildcard, wildcard, wildcard))
+
+        if doctor_id is not None:
+            clauses.append("p.doctor_id = ?")
+            params.append(int(doctor_id))
 
         normalized_filter = (filter_key or "all").strip().lower()
         if normalized_filter == "today":
@@ -235,8 +250,9 @@ class PatientRepository:
             )
 
         sql = f"""
-            SELECT p.*
+            SELECT p.*, d.name_en AS doctor_name, d.department AS doctor_department
             FROM patients p
+            LEFT JOIN doctors d ON d.id = p.doctor_id
             WHERE {" AND ".join(clauses)}
             ORDER BY p.id DESC
             LIMIT ?

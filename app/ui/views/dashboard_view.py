@@ -7,6 +7,7 @@ from pathlib import Path
 from PySide6.QtCore import QDateTime, Qt, Signal
 from PySide6.QtGui import QColor
 from PySide6.QtWidgets import (
+    QFrame,
     QHBoxLayout,
     QHeaderView,
     QLabel,
@@ -174,6 +175,11 @@ class DashboardView(QWidget):
             cards_layout.addWidget(card)
         root_layout.addLayout(cards_layout)
 
+        # One line per doctor: shared registration and billing, separate caseloads.
+        self.doctor_row = QHBoxLayout()
+        self.doctor_row.setSpacing(14)
+        root_layout.addLayout(self.doctor_row)
+
         # Today's activity
         table_header = QHBoxLayout()
         title_box = QVBoxLayout()
@@ -209,17 +215,18 @@ class DashboardView(QWidget):
         self.recent_table = TableWidget()
         self.activity_table = self.recent_table  # Keep the original public attribute for compatibility.
         self.recent_table.setObjectName("TodayActivityTable")
-        self.recent_table.setColumnCount(5)
+        self.recent_table.setColumnCount(6)
         self.recent_table.setHorizontalHeaderLabels([
-            "ACTIVITY", "PATIENT / URN", "CONDITION", "TIME", ""
+            "ACTIVITY", "PATIENT / URN", "DOCTOR", "CONDITION", "TIME", ""
         ])
         header_view = self.recent_table.horizontalHeader()
         header_view.setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
         header_view.setSectionResizeMode(1, QHeaderView.ResizeMode.ResizeToContents)
-        header_view.setSectionResizeMode(2, QHeaderView.ResizeMode.Stretch)
-        header_view.setSectionResizeMode(3, QHeaderView.ResizeMode.ResizeToContents)
-        header_view.setSectionResizeMode(4, QHeaderView.ResizeMode.Fixed)
-        self.recent_table.setColumnWidth(4, 84)
+        header_view.setSectionResizeMode(2, QHeaderView.ResizeMode.ResizeToContents)
+        header_view.setSectionResizeMode(3, QHeaderView.ResizeMode.Stretch)
+        header_view.setSectionResizeMode(4, QHeaderView.ResizeMode.ResizeToContents)
+        header_view.setSectionResizeMode(5, QHeaderView.ResizeMode.Fixed)
+        self.recent_table.setColumnWidth(5, 84)
         self.recent_table.verticalHeader().hide()
         self.recent_table.setAlternatingRowColors(False)
         self.recent_table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
@@ -231,6 +238,31 @@ class DashboardView(QWidget):
         root_layout.addWidget(self.recent_table, stretch=1)
 
         self.refresh_data()
+
+    def _render_doctor_overview(self) -> None:
+        while self.doctor_row.count():
+            item = self.doctor_row.takeAt(0)
+            if item.widget() is not None:
+                item.widget().deleteLater()
+        for doctor in self.service.get_doctor_overview():
+            panel = QFrame()
+            panel.setObjectName("CardPanel")
+            layout = QVBoxLayout(panel)
+            layout.setContentsMargins(16, 12, 16, 12)
+            layout.setSpacing(3)
+            name = QLabel(doctor["name_en"])
+            name.setStyleSheet("font-size:14px;font-weight:700;")
+            layout.addWidget(name)
+            dept = QLabel(doctor.get("department") or "")
+            dept.setObjectName("PageSubheading")
+            layout.addWidget(dept)
+            counts = QLabel(
+                f"{doctor['today_registrations']} registered today   ·   "
+                f"{doctor['total_patients']} patients   ·   {doctor['active_cases']} active cases"
+            )
+            counts.setStyleSheet(f"color:{COLORS['primary']};font-size:12px;font-weight:600;")
+            layout.addWidget(counts)
+            self.doctor_row.addWidget(panel, stretch=1)
 
     def _on_activity_double_clicked(self, row: int, _column: int) -> None:
         item = self.recent_table.item(row, 0)
@@ -256,6 +288,8 @@ class DashboardView(QWidget):
         self.card_active_cases.set_value(str(stats["active_cases"]))
         self.card_pending_balance.set_value(f"₹{stats['pending_balance_rupees']:,.2f}")
 
+        self._render_doctor_overview()
+
         activities = self.service.get_today_activity(limit=8)
         self.recent_table.setRowCount(len(activities))
         self.activity_empty.setVisible(not activities)
@@ -272,9 +306,10 @@ class DashboardView(QWidget):
 
             patient_label = f"{activity.get('patient_name', '')}  ·  {urn}"
             self.recent_table.setItem(row, 1, QTableWidgetItem(patient_label))
-            self.recent_table.setItem(row, 2, QTableWidgetItem(str(activity.get("patient_condition") or "")))
+            self.recent_table.setItem(row, 2, QTableWidgetItem(str(activity.get("doctor_name") or "—")))
+            self.recent_table.setItem(row, 3, QTableWidgetItem(str(activity.get("patient_condition") or "")))
             activity_at = str(activity.get("activity_at") or "")
-            self.recent_table.setItem(row, 3, QTableWidgetItem(activity_at[-8:-3] if len(activity_at) >= 16 else activity_at))
+            self.recent_table.setItem(row, 4, QTableWidgetItem(activity_at[-8:-3] if len(activity_at) >= 16 else activity_at))
 
             open_btn = QPushButton("Open")
             open_btn.setObjectName("SecondaryButton")
@@ -288,4 +323,4 @@ class DashboardView(QWidget):
             cell_layout = QHBoxLayout(cell)
             cell_layout.setContentsMargins(6, 8, 10, 8)
             cell_layout.addWidget(open_btn)
-            self.recent_table.setCellWidget(row, 4, cell)
+            self.recent_table.setCellWidget(row, 5, cell)

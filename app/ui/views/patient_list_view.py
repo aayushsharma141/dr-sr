@@ -12,6 +12,7 @@ from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QCursor, QPixmap
 from PySide6.QtWidgets import (
     QButtonGroup,
+    QComboBox,
     QFrame,
     QHBoxLayout,
     QHeaderView,
@@ -29,6 +30,7 @@ from PySide6.QtWidgets import (
 
 from app.config import COLORS
 from app.services.billing_service import BillingService
+from app.services.doctor_service import DoctorService
 from app.services.document_builder import DocumentBuilder
 from app.services.patient_service import PatientService
 from app.services.print_service import PrintService
@@ -73,7 +75,9 @@ class PatientListView(QWidget):
         db_path = self.service.db_path
         self.treatment_service = TreatmentService(db_path)
         self.billing_service = BillingService(db_path)
+        self.doctor_service = DoctorService(db_path)
         self._active_filter = "all"
+        self._active_doctor_id: int | None = None
         self._profile_patient: dict | None = None
         self._profile_cases: list[dict] = []
         self._profile_selected_case: dict | None = None
@@ -111,12 +115,6 @@ class PatientListView(QWidget):
         search_layout.setContentsMargins(12, 8, 12, 8)
         search_layout.setSpacing(10)
 
-        search_label = QLabel("SEARCH")
-        search_label.setStyleSheet(
-            f"font-size:9px;font-weight:800;letter-spacing:.6px;color:{COLORS['text_secondary']};"
-        )
-        search_layout.addWidget(search_label)
-
         self.search_input = SearchLineEdit()
         self.search_input.setObjectName("PatientRegistrySearch")
         self.search_input.setPlaceholderText("Search by patient name, KH-YYYY-XXXX, or mobile number…")
@@ -125,21 +123,24 @@ class PatientListView(QWidget):
         self.search_input.textChanged.connect(self._on_search_changed)
         search_layout.addWidget(self.search_input, stretch=1)
 
+        self.doctor_filter = QComboBox()
+        self.doctor_filter.setObjectName("DoctorFilter")
+        self.doctor_filter.setMinimumWidth(230)
+        self.doctor_filter.addItem("All doctors", None)
+        for doctor in self.doctor_service.list_doctors():
+            self.doctor_filter.addItem(doctor["name_en"], doctor["id"])
+        self.doctor_filter.currentIndexChanged.connect(self._on_doctor_changed)
+        search_layout.addWidget(self.doctor_filter)
+
         refresh_btn = QPushButton("Refresh")
         refresh_btn.setObjectName("SecondaryButton")
-        refresh_btn.clicked.connect(self.reload_patients)
+        refresh_btn.clicked.connect(lambda: self.reload_patients())
         search_layout.addWidget(refresh_btn)
         root_layout.addWidget(search_panel)
 
         # Filter chips map to parameterized read-only SQL in PatientRepository.
         filter_row = QHBoxLayout()
         filter_row.setSpacing(7)
-        filter_title = QLabel("FILTER")
-        filter_title.setStyleSheet(
-            f"font-size:9px;font-weight:800;letter-spacing:.5px;color:{COLORS['text_secondary']};"
-        )
-        filter_row.addWidget(filter_title)
-
         self.filter_group = QButtonGroup(self)
         self.filter_group.setExclusive(True)
         self.filter_buttons: dict[str, QPushButton] = {}
@@ -170,20 +171,20 @@ class PatientListView(QWidget):
             "Patient Name",
             "Age / Sex",
             "Mobile No.",
-            "Condition / Diagnosis",
-            "Registered At",
-            "Actions",
+            "Condition",
+            "Doctor",
+            "",
         ])
         header = self.table.horizontalHeader()
         header.setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
-        header.setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
+        header.setSectionResizeMode(1, QHeaderView.ResizeMode.ResizeToContents)
         header.setSectionResizeMode(2, QHeaderView.ResizeMode.ResizeToContents)
         header.setSectionResizeMode(3, QHeaderView.ResizeMode.ResizeToContents)
         header.setSectionResizeMode(4, QHeaderView.ResizeMode.Stretch)
         header.setSectionResizeMode(5, QHeaderView.ResizeMode.ResizeToContents)
         header.setSectionResizeMode(6, QHeaderView.ResizeMode.Fixed)
         self.table.setColumnWidth(6, 178)
-        self.table.setAlternatingRowColors(True)
+        self.table.setAlternatingRowColors(False)
         self.table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
         self.table.setSelectionMode(QTableWidget.SelectionMode.SingleSelection)
         self.table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
@@ -254,6 +255,10 @@ class PatientListView(QWidget):
         self.profile_urn.setWordWrap(True)
         self.profile_urn.setStyleSheet(f"font-size:10px;color:{COLORS['primary']};font-weight:800;")
         name_box.addWidget(self.profile_urn)
+        self.profile_doctor = QLabel("")
+        self.profile_doctor.setWordWrap(True)
+        self.profile_doctor.setStyleSheet(f"font-size:11px;font-weight:700;color:{COLORS['primary']};")
+        name_box.addWidget(self.profile_doctor)
         self.profile_demographics = QLabel("")
         self.profile_demographics.setWordWrap(True)
         self.profile_demographics.setStyleSheet(f"font-size:10px;color:{COLORS['text_secondary']};")
@@ -362,6 +367,11 @@ class PatientListView(QWidget):
     def _on_search_changed(self, text: str):
         self.reload_patients(query=text)
 
+    def _on_doctor_changed(self, _index: int):
+        self._active_doctor_id = self.doctor_filter.currentData()
+        self._hide_profile()
+        self.reload_patients(query=self.search_input.text())
+
     def _on_filter_changed(self, filter_key: str):
         self._active_filter = filter_key
         self._hide_profile()
@@ -375,6 +385,7 @@ class PatientListView(QWidget):
             active_query,
             limit=500,
             filter_key=self._active_filter,
+            doctor_id=self._active_doctor_id,
         )
 
         self.table.blockSignals(True)
@@ -391,8 +402,7 @@ class PatientListView(QWidget):
             self.table.setItem(row, 3, QTableWidgetItem(str(patient.get("mobile_no", ""))))
             self.table.setItem(row, 4, QTableWidgetItem(str(patient.get("patient_condition", ""))))
 
-            registered = str(patient.get("created_at") or patient.get("registered_at") or patient.get("patient_in") or "")
-            self.table.setItem(row, 5, QTableWidgetItem(registered[:16]))
+            self.table.setItem(row, 5, QTableWidgetItem(str(patient.get("doctor_name") or "Unassigned")))
 
             actions_widget = QWidget()
             actions_layout = QHBoxLayout(actions_widget)
@@ -425,6 +435,8 @@ class PatientListView(QWidget):
         self.table.blockSignals(False)
         count = len(patients)
         filter_label = dict(REGISTRY_FILTERS).get(self._active_filter, "All Patients")
+        if self._active_doctor_id is not None:
+            filter_label = f"{filter_label} · {self.doctor_filter.currentText()}"
         if count == 0:
             if active_query:
                 self.status_lbl.setText(f"No records matching '{active_query}' in {filter_label}.")
@@ -455,6 +467,10 @@ class PatientListView(QWidget):
         name = str(patient.get("patient_name") or "Patient")
         self.profile_name.setText(name)
         self.profile_urn.setText(str(patient.get("serial_urn_no") or ""))
+        doctor_text = patient.get("doctor_name") or "No doctor assigned"
+        if patient.get("doctor_department"):
+            doctor_text += f" · {patient['doctor_department']}"
+        self.profile_doctor.setText(doctor_text)
         self.profile_demographics.setText(f"{patient.get('age', '')} years · {patient.get('sex', '')}")
         self.profile_condition.setText(str(patient.get("patient_condition") or "Condition not recorded"))
         self.profile_contact.setText(f"Mobile: {patient.get('mobile_no') or '—'}")

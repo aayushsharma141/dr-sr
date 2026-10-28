@@ -30,8 +30,8 @@ class TreatmentRepository:
         sql = """
             INSERT INTO treatment_cases (
                 patient_id, title, no_of_sessions, total_amount_paise,
-                start_date, notes, status
-            ) VALUES (?, ?, ?, ?, COALESCE(?, date('now', 'localtime')), ?, 'IN_PROGRESS')
+                start_date, notes, status, doctor_id
+            ) VALUES (?, ?, ?, ?, COALESCE(?, date('now', 'localtime')), ?, 'IN_PROGRESS', ?)
         """
         params = (
             case_data["patient_id"],
@@ -40,6 +40,7 @@ class TreatmentRepository:
             int(case_data.get("total_amount_paise", 0)),
             case_data.get("start_date"),
             case_data.get("notes", "").strip() if case_data.get("notes") else "",
+            case_data.get("doctor_id"),
         )
         with self._get_connection() as conn:
             cursor = conn.execute(sql, params)

@@ -76,6 +76,14 @@ def get_application_stylesheet() -> str:
         letter-spacing: .7px;
     }}
 
+    QLabel#FieldLabel, QCheckBox#FieldLabel {{
+        color: {c['text_secondary']}; font-size: 12px; font-weight: 600;
+    }}
+    QLabel#ErrorBanner {{
+        color: {c['danger']}; background: #FEF3F2; border: 1px solid #FDA29B;
+        border-radius: 8px; padding: 9px 12px; font-weight: 600;
+    }}
+
     /* Persistent workspace command bar */
     QFrame#AppCommandBar {{
         background: #FFFFFF;

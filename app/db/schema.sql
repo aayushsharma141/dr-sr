@@ -1,6 +1,16 @@
 -- Kalyan Hospital Management System - Canonical SQLite Schema
 PRAGMA foreign_keys = ON;
 
+-- 0. Doctors / Departments (two clinicians share one patient identity and one payment ledger)
+CREATE TABLE IF NOT EXISTS doctors (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name_en TEXT NOT NULL UNIQUE,
+    name_hindi TEXT DEFAULT '',
+    department TEXT NOT NULL DEFAULT '',
+    designation TEXT DEFAULT '',
+    is_active INTEGER NOT NULL DEFAULT 1 CHECK (is_active IN (0, 1))
+);
+
 -- 1. Patients Master Table (Fields 1-10 + Picture)
 CREATE TABLE IF NOT EXISTS patients (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -15,6 +25,7 @@ CREATE TABLE IF NOT EXISTS patients (
     referred_by TEXT DEFAULT '',                 -- 9. Reference / Referred By
     patient_condition TEXT NOT NULL,             -- 10. Patient Condition
     photo_filename TEXT DEFAULT '',              -- Patient Picture filename
+    doctor_id INTEGER REFERENCES doctors(id),    -- Assigned doctor / department (NULL for legacy records)
     status TEXT NOT NULL DEFAULT 'ACTIVE' CHECK (status IN ('ACTIVE', 'DISCHARGED', 'ARCHIVED')),
     created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
     updated_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
@@ -35,6 +46,7 @@ CREATE TABLE IF NOT EXISTS treatment_cases (
     end_date TEXT,
     status TEXT NOT NULL DEFAULT 'IN_PROGRESS' CHECK (status IN ('IN_PROGRESS', 'COMPLETED', 'SUSPENDED')),
     notes TEXT DEFAULT '',
+    doctor_id INTEGER REFERENCES doctors(id),
     created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
     FOREIGN KEY (patient_id) REFERENCES patients(id) ON DELETE RESTRICT
 );

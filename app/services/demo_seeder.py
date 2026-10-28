@@ -9,6 +9,7 @@ from app.db.connection import get_db_connection
 from app.services.patient_service import PatientService
 from app.services.treatment_service import TreatmentService
 from app.services.billing_service import BillingService
+from app.services.doctor_service import DoctorService
 
 
 class DemoSeeder:
@@ -247,10 +248,14 @@ class DemoSeeder:
         t_service = TreatmentService(db_path)
         b_service = BillingService(db_path)
 
+        doctors = DoctorService(db_path).list_doctors()
         seeded = []
-        for item in cls.DEMO_PATIENTS:
-            # 1. Register Patient
-            pat = p_service.register_patient(item["patient"])
+        for index, item in enumerate(cls.DEMO_PATIENTS):
+            # 1. Register Patient (demo patients alternate between the two doctors)
+            patient_data = dict(item["patient"])
+            if doctors:
+                patient_data["doctor_id"] = doctors[index % len(doctors)]["id"]
+            pat = p_service.register_patient(patient_data)
 
             # 2. Open Treatment Case
             c_info = item["case"]

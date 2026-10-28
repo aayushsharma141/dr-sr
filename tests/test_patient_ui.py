@@ -29,6 +29,8 @@ def test_patient_form_validation_and_save(qapp, tmp_path):
     # 2. Fill valid values
     form.input_name.setText("Anjali Kumari")
     form.input_age.setValue(26)
+    form.input_sex.setCurrentIndex(2)
+    form.input_doctor.setCurrentIndex(1)
     form.input_mobile.setText("9876543210")
     form.input_condition.setText("Lumbar Disc Herniation")
 
