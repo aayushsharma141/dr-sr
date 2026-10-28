@@ -602,16 +602,19 @@ class DocumentBuilder:
         recorded_by = safe(payment_data.get("recorded_by") or "Staff")
 
         fee_row = (
-            f'<div class="summary-row"><span>Total fee</span><strong>{safe(total_fee)}</strong></div>'
+            f'<table class="summary-table" width="100%"><tr><td>Total fee</td>'
+            f'<td align="right"><strong>{safe(total_fee)}</strong></td></tr></table>'
             if total_fee is not None else ""
         )
         paid_row = (
-            f'<div class="summary-row"><span>Total paid</span><strong>{safe(total_paid)}</strong></div>'
+            f'<table class="summary-table" width="100%"><tr><td>Total paid</td>'
+            f'<td align="right"><strong>{safe(total_paid)}</strong></td></tr></table>'
             if total_paid is not None else ""
         )
         balance_row = (
-            f'<div class="summary-row current-balance"><span>Current balance*</span>'
-            f'<strong>{safe(current_balance)}</strong></div>'
+            f'<table class="summary-table current-balance" width="100%"><tr>'
+            f'<td>Current balance*</td><td align="right"><strong>{safe(current_balance)}</strong></td>'
+            f'</tr></table>'
         )
 
         return f"""<!DOCTYPE html>
@@ -643,14 +646,15 @@ class DocumentBuilder:
   .receipt-number {{ border: 1px solid #111827; padding: 4px; font-size: 11px; font-weight: 800; }}
   .patient-name {{ font: 800 12px "Arial", sans-serif; overflow-wrap: anywhere; }}
   .row {{ margin: 3px 0; overflow-wrap: anywhere; }}
-  .summary-row {{ display: flex; justify-content: space-between; gap: 6px; margin: 4px 0; }}
-  .summary-row strong {{ text-align: right; }}
+  .summary-table {{ width:100%; border-collapse:collapse; }}
+  .summary-table td {{ padding:3px 0; vertical-align:top; }}
+  .summary-table td:last-child {{ text-align:right; }}
   .payment-amount {{
     border: 1px solid #111827; margin: 7px 0; padding: 7px 5px;
     text-align: center; font-size: 12px; font-weight: 800;
   }}
   .payment-amount .amount {{ font: 800 17px "Arial", sans-serif; margin-top: 2px; }}
-  .current-balance {{ border-top: 1px dashed #111827; padding-top: 6px; font-weight: 800; }}
+  .current-balance td {{ border-top:1px dashed #111827; padding-top:6px; font-weight:800; }}
   .footnote {{ font-size: 8px; color: #374151; margin-top: 8px; }}
   .footer {{ text-align:center; margin-top: 12px; font-weight: 800; }}
 </style>
@@ -682,8 +686,10 @@ class DocumentBuilder:
     PAYMENT RECEIVED
     <div class="amount">{safe(amount_formatted)}</div>
   </div>
-  <div class="summary-row"><span>Payment mode</span><strong>{payment_mode}</strong></div>
-  <div class="summary-row"><span>Recorded by</span><strong>{recorded_by}</strong></div>
+  <table class="summary-table" width="100%">
+    <tr><td>Payment mode</td><td align="right"><strong>{payment_mode}</strong></td></tr>
+    <tr><td>Recorded by</td><td align="right"><strong>{recorded_by}</strong></td></tr>
+  </table>
   {f'<div class="row"><span class="strong">Reference:</span> {reference_note}</div>' if reference_note else ""}
   <div class="rule"></div>
   {fee_row}
