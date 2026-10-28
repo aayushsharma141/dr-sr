@@ -115,36 +115,38 @@ class DashboardService:
             cursor = conn.cursor()
             cursor.execute(
                 """
-                SELECT
-                    p.id AS patient_id,
-                    p.serial_urn_no,
-                    p.patient_name,
-                    p.age,
-                    p.sex,
-                    p.patient_condition,
-                    p.created_at AS activity_at,
-                    'Registration' AS activity_type
-                FROM patients p
-                WHERE date(p.created_at) = date('now', 'localtime')
-                  AND p.status != 'ARCHIVED'
+                SELECT *
+                FROM (
+                    SELECT
+                        p.id AS patient_id,
+                        p.serial_urn_no,
+                        p.patient_name,
+                        p.age,
+                        p.sex,
+                        p.patient_condition,
+                        p.created_at AS activity_at,
+                        'Registration' AS activity_type
+                    FROM patients p
+                    WHERE date(p.created_at) = date('now', 'localtime')
+                      AND p.status != 'ARCHIVED'
 
-                UNION ALL
+                    UNION ALL
 
-                SELECT
-                    p.id AS patient_id,
-                    p.serial_urn_no,
-                    p.patient_name,
-                    p.age,
-                    p.sex,
-                    p.patient_condition,
-                    ts.session_timestamp AS activity_at,
-                    'Treatment session logged' AS activity_type
-                FROM treatment_sessions ts
-                INNER JOIN treatment_cases tc ON tc.id = ts.case_id
-                INNER JOIN patients p ON p.id = tc.patient_id
-                WHERE date(ts.session_timestamp) = date('now', 'localtime')
-                  AND p.status != 'ARCHIVED'
-
+                    SELECT
+                        p.id AS patient_id,
+                        p.serial_urn_no,
+                        p.patient_name,
+                        p.age,
+                        p.sex,
+                        p.patient_condition,
+                        ts.session_timestamp AS activity_at,
+                        'Treatment session logged' AS activity_type
+                    FROM treatment_sessions ts
+                    INNER JOIN treatment_cases tc ON tc.id = ts.case_id
+                    INNER JOIN patients p ON p.id = tc.patient_id
+                    WHERE date(ts.session_timestamp) = date('now', 'localtime')
+                      AND p.status != 'ARCHIVED'
+                )
                 ORDER BY activity_at DESC, patient_name COLLATE NOCASE ASC
                 LIMIT ?
                 """,
