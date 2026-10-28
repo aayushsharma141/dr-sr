@@ -59,6 +59,9 @@ def get_application_stylesheet() -> str:
     QFrame#StatCard, QFrame#CardPanel {{
         background: #FFFFFF; border: 1px solid {c['border']}; border-radius: 10px;
     }}
+    QFrame#StatCard:hover, QFrame#CardPanel:hover {{
+        border-color: #C6D5CB;
+    }}
     QLabel#StatCardTitle {{ color: {c['text_secondary']}; font-size: 10px; font-weight: 700; letter-spacing: .5px; }}
     QLabel#StatCardValue {{ color: {c['text_primary']}; font-size: 27px; font-weight: 750; }}
     QLabel#StatCardSubtitle {{ color: {c['text_secondary']}; font-size: 11px; }}
@@ -73,6 +76,77 @@ def get_application_stylesheet() -> str:
         letter-spacing: .7px;
     }}
 
+    /* Persistent workspace command bar */
+    QFrame#AppCommandBar {{
+        background: #FFFFFF;
+        border-bottom: 1px solid {c['border']};
+    }}
+    QLabel#WorkspaceContext {{
+        color: {c['text_primary']};
+        font-size: 10px;
+        font-weight: 800;
+        letter-spacing: .7px;
+    }}
+    QPushButton#SearchLauncherButton {{
+        background: #F5F7F5;
+        color: {c['text_primary']};
+        border: 1px solid {c['border']};
+        border-radius: 7px;
+        min-height: 17px;
+        padding: 7px 12px;
+        text-align: left;
+        font-weight: 500;
+    }}
+    QPushButton#SearchLauncherButton:hover {{
+        background: #FFFFFF;
+        border: 1px solid {c['primary']};
+    }}
+    QLabel#OfflineStatus {{
+        background: #E7F5EB;
+        color: {c['primary']};
+        border: 1px solid #C5E5D0;
+        border-radius: 5px;
+        padding: 6px 9px;
+        font-size: 9px;
+        font-weight: 800;
+    }}
+
+    /* Native quick launcher */
+    QDialog#QuickLauncherDialog {{
+        background: {c['background']};
+    }}
+    QLineEdit#QuickLauncherSearch {{
+        background: #FFFFFF;
+        border: 1px solid {c['border']};
+        border-radius: 8px;
+        padding: 9px 12px;
+        font-size: 14px;
+    }}
+    QLineEdit#QuickLauncherSearch:focus {{
+        border: 1px solid {c['accent']};
+    }}
+    QListWidget#QuickLauncherResults {{
+        background: #FFFFFF;
+        border: 1px solid {c['border']};
+        border-radius: 8px;
+        padding: 5px;
+        outline: 0;
+    }}
+    QListWidget#QuickLauncherResults::item {{
+        color: {c['text_primary']};
+        border-radius: 6px;
+        padding: 10px 11px;
+        margin: 1px;
+    }}
+    QListWidget#QuickLauncherResults::item:selected {{
+        background: #E7F5EB;
+        color: {c['primary_dark']};
+        border-left: 3px solid {c['primary']};
+    }}
+    QListWidget#QuickLauncherResults::item:hover {{
+        background: #F5F7F5;
+    }}
+
     QPushButton {{
         font-family: "Segoe UI", "Nirmala UI", sans-serif;
         border-radius: 6px; padding: 8px 13px; min-height: 18px; font-weight: 600;
@@ -85,7 +159,7 @@ def get_application_stylesheet() -> str:
     QPushButton#SecondaryButton {{
         background: #FFFFFF; color: {c['text_primary']}; border: 1px solid {c['border']};
     }}
-    QPushButton#SecondaryButton:hover {{ background: #F1F5F9; border-color: #94A3B8; }}
+    QPushButton#SecondaryButton:hover {{ background: #F1F7F2; border-color: #AFC9B8; }}
     QPushButton:disabled {{ color: #94A3B8; background: #F1F5F9; }}
 
     QLineEdit, QComboBox, QTextEdit, QSpinBox, QDateEdit, QDateTimeEdit {{
@@ -103,14 +177,14 @@ def get_application_stylesheet() -> str:
     }}
 
     QTableWidget, QTableView {{
-        background: #FFFFFF; alternate-background-color: #F8FAFC; color: {c['text_primary']};
+        background: #FFFFFF; alternate-background-color: #F8FAF8; color: {c['text_primary']};
         border: 1px solid {c['border']}; border-radius: 8px; gridline-color: #EEF2F7;
-        selection-background-color: #CCFBF1; selection-color: {c['text_primary']}; outline: 0;
+        selection-background-color: #E7F5EB; selection-color: {c['text_primary']}; outline: 0;
     }}
     QTableWidget::item, QTableView::item {{ padding: 8px 10px; border-bottom: 1px solid #F1F5F9; }}
     QTableWidget::item:hover, QTableView::item:hover {{ background: #F0FDFA; }}
     QHeaderView::section {{
-        background: #F1F5F9; color: {c['text_secondary']}; font-weight: 700; font-size: 10px;
+        background: #F3F6F3; color: {c['text_secondary']}; font-weight: 700; font-size: 10px;
         border: none; border-bottom: 1px solid {c['border']}; padding: 10px 12px;
     }}
     QTableCornerButton::section {{ background: #F1F5F9; border: none; }}
