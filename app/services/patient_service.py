@@ -173,9 +173,14 @@ class PatientService:
                 patient["photo_full_path"] = None
         return patient
 
-    def search_patients(self, query: str = "", limit: int = 50) -> list[dict[str, Any]]:
-        """Searches patients by ID, Name, or Mobile number."""
-        patients = self.repository.search(query, limit)
+    def search_patients(
+        self,
+        query: str = "",
+        limit: int = 50,
+        filter_key: str = "all",
+    ) -> list[dict[str, Any]]:
+        """Search patient records, optionally applying a read-only registry filter."""
+        patients = self.repository.search(query, limit, filter_key=filter_key)
         for p in patients:
             photo_filename = p.get("photo_filename")
             if photo_filename:
