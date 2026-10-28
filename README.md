@@ -7,9 +7,12 @@ A standalone, 100% offline Windows desktop application built with Python, PySide
 ## Features (Phase 1 — Stage A)
 
 - **Trust-Led Clinical Branding:** Forest green (`#155B43`) and clinical blue (`#234B86`) with restrained gold accents (`#C39A35`), supplied hospital logo, bilingual trust identity, clinician credentials, and both clinic branch addresses (Ara & Gadhani). The printed A4 prescription retains the physical pad's maroon header.
-- **Navigation Sidebar:** Seamless routing between Dashboard, Patients, Treatment Sessions, Billing & Payments, and Backups.
-- **Live Database-Backed Dashboard:** Real-time metrics calculated from local SQLite database (Total Patients, Today's Admissions, Active Treatment Cases, and Outstanding Balance in ₹). Zero hardcoded mock numbers.
-- **Local-First & Offline:** Zero internet dependency, no telemetry, no cloud accounts.
+- **Navigation Sidebar:** Clear routing between Dashboard, Patients, Treatment Sessions, Billing & Payments, and Backups.
+- **Keyboard-First Quick Launcher:** Press `Ctrl+K` from any workspace to find a patient by name, URN, or mobile number, or jump to an app section.
+- **Live Database-Backed Dashboard:** Real metrics from local SQLite for total patients, today's registrations, active treatment cases, and outstanding balance in ₹.
+- **Today's Patient Activity:** Displays registrations and treatment sessions actually recorded today; it does not fabricate appointment/waiting states that the current schema cannot represent.
+- **Non-Blocking Feedback:** Native toast notifications confirm patient saves, data refreshes, and successful restore completion without interrupting work.
+- **Local-First & Offline:** Zero runtime internet dependency, no telemetry, no cloud accounts.
 
 ---
 
