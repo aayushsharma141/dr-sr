@@ -5,7 +5,7 @@ Displays live SQLite metrics and actual same-day clinic activity only.
 from pathlib import Path
 
 from PySide6.QtCore import Qt, Signal, QDateTime
-from PySide6.QtGui import QPixmap
+from PySide6.QtGui import QColor, QPixmap
 from PySide6.QtWidgets import (
     QFrame, QHBoxLayout, QHeaderView, QLabel, QPushButton,
     QTableWidget, QTableWidgetItem, QVBoxLayout, QWidget,
@@ -276,6 +276,11 @@ class DashboardView(QWidget):
         title_activity.setStyleSheet("font-size:15px;")
         table_header.addWidget(title_activity)
         table_header.addStretch()
+        refresh_btn = QPushButton("Refresh")
+        refresh_btn.setObjectName("SecondaryButton")
+        refresh_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        refresh_btn.clicked.connect(self._on_manual_refresh)
+        table_header.addWidget(refresh_btn)
         activity_hint = QLabel("REAL SQLITE ACTIVITY  ·  DOUBLE-CLICK OR OPEN A PATIENT")
         activity_hint.setStyleSheet(
             f"color:{COLORS['text_secondary']};font-size:8px;font-weight:800;letter-spacing:.3px;"
@@ -326,8 +331,6 @@ class DashboardView(QWidget):
         footer.setStyleSheet(f"color:{COLORS['text_secondary']};font-size:9px;padding-top:1px;")
         root_layout.addWidget(footer)
 
-        self.refresh_btn = QPushButton("Refresh Data")
-        # Existing callers can still trigger a refresh through the connected button.
         self.refresh_data()
 
     def _on_activity_double_clicked(self, row: int, _column: int) -> None:
@@ -341,6 +344,10 @@ class DashboardView(QWidget):
 
     def _on_open_activity_patient(self, patient_id: int, urn: str) -> None:
         self.open_patient_requested.emit(patient_id, urn)
+
+    def _on_manual_refresh(self):
+        self.refresh_data()
+        self.manual_refresh_completed.emit()
 
     def refresh_data(self):
         """Refresh live aggregates and real same-day registrations/session events."""
@@ -361,7 +368,7 @@ class DashboardView(QWidget):
             activity_item = QTableWidgetItem(str(activity.get("activity_type") or "Activity"))
             activity_item.setData(Qt.ItemDataRole.UserRole, patient_id)
             activity_item.setData(Qt.ItemDataRole.UserRole + 1, urn)
-            activity_item.setForeground(Qt.GlobalColor.darkGreen)
+            activity_item.setForeground(QColor(COLORS["primary"]))
             self.recent_table.setItem(row, 0, activity_item)
 
             patient_label = f"{activity.get('patient_name', '')}  ·  {urn}"
