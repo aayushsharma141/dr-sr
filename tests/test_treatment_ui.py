@@ -71,6 +71,8 @@ def test_treatment_view_loads_and_displays_sessions(qapp, test_db, populated_cli
     assert view.sessions_table.rowCount() == 1
     assert view.sessions_table.item(0, 0).text() == "Session 1"
     assert "Initial traction" in view.sessions_table.item(0, 3).text()
+    # The real persisted score is summarized in the pain trend panel.
+    assert "Latest 7/10" in view.pain_trend.summary_label.text()
 
 
 def test_payment_view_balance_updates(qapp, test_db, populated_clinic):
