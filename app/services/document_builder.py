@@ -39,6 +39,20 @@ class DocumentBuilder:
             return None
 
     @classmethod
+    def _get_hospital_logo_b64(cls) -> str:
+        """Returns base64 data URI of the official Kalyan Hospital circular business logo."""
+        logo_path = ASSET_DIR / "kalyan_hospital_logo.png"
+        if not logo_path.exists():
+            logo_path = ASSET_DIR / "kalyan_hospital_logo.jpg"
+        if logo_path.exists():
+            try:
+                b64 = base64.b64encode(logo_path.read_bytes()).decode("utf-8")
+                return f"data:image/png;base64,{b64}"
+            except Exception:
+                pass
+        return ""
+
+    @classmethod
     def _get_caduceus_b64(cls) -> str:
         """Returns base64 data URI of the authentic blue-winged Caduceus emblem."""
         caduceus_path = ASSET_DIR / "caduceus_emblem.png"
@@ -61,49 +75,53 @@ class DocumentBuilder:
         referred_by: str,
     ) -> str:
         """
-        Renders the 99.9% identical letterhead matching the physical Kalyan Hospital letter pad:
-        1. Deep Maroon Banner with centered Hindi and English Hospital Titles, Sl No. box, and Clinic Branches.
-        2. Doctors & Central Caduceus Emblem (Dr. Madan Mohan Dwivedi & Dr. Chandan Kr. Dwivedi).
-        3. Pale Yellow Patient Info Strip with Name, Age/Sex, Date, Add., and Ref.
-        4. Solid Maroon Divider matching the physical pad.
+        Renders the authentic letterhead matching the physical Kalyan Hospital letter pad:
+        1. Deep Burgundy Banner with centered Hindi and English Hospital Titles, Sl No. box, and Clinic Branches.
+        2. Doctors & Official Business Logo (Dr. Madan Mohan Dwivedi, Official Seal, Dr. Chandan Kr. Dwivedi).
+        3. Pale Yellow Patient Info Strip with prefilled data on clean dotted leaders.
+        4. Solid Burgundy Divider matching the physical pad.
         """
         urn, name, age_sex, date_str, address, referred_by = (
             _esc(v) for v in (urn, name, age_sex, date_str, address, referred_by)
         )
-        caduceus_src = cls._get_caduceus_b64()
-        if caduceus_src:
-            caduceus_img_tag = f'<img src="{caduceus_src}" width="88" height="82" alt="Caduceus" style="display:block;margin:0 auto;" />'
+        logo_b64 = cls._get_hospital_logo_b64()
+        if logo_b64:
+            logo_img_tag = f'<img src="{logo_b64}" width="108" height="108" alt="Kalyan Hospital Business Logo Caduceus Emblem" style="display:block;margin:0 auto;" />'
         else:
-            caduceus_img_tag = '<span style="font-size:38px;color:#2563EB;">&#9764;</span>'
+            caduceus_src = cls._get_caduceus_b64()
+            if caduceus_src:
+                logo_img_tag = f'<img src="{caduceus_src}" width="88" height="82" alt="Caduceus" style="display:block;margin:0 auto;" />'
+            else:
+                logo_img_tag = '<span style="font-size:38px;color:#2563EB;">&#9764;</span>'
 
         return f"""
-  <!-- 1. TOP MAROON BANNER (MATCHES PHYSICAL PAD) -->
-  <table width="100%" cellpadding="0" cellspacing="0" bgcolor="#6B1736" style="background-color: #6B1736; color: #FFFFFF; border-collapse: collapse;">
-    <tr bgcolor="#6B1736">
-      <td bgcolor="#6B1736" align="center" style="padding-top: 6px; padding-bottom: 0;">
-        <span style="font-family: 'Nirmala UI', 'Mangal', 'Arial Black', Arial, sans-serif; font-size: 32px; font-weight: 800; color: #FFFFFF; letter-spacing: 2px;">कल्याण हॉस्पीटल</span>
+  <!-- 1. TOP BURGUNDY BANNER (MATCHES PHYSICAL PAD COLOR & ALIGNMENT) -->
+  <table width="100%" cellpadding="0" cellspacing="0" bgcolor="#54152F" style="background-color: #54152F; color: #FFFFFF; border-collapse: collapse;">
+    <tr bgcolor="#54152F">
+      <td bgcolor="#54152F" align="center" style="padding-top: 8px; padding-bottom: 2px;">
+        <span style="font-family: 'Nirmala UI', 'Mangal', 'Segoe UI', Arial, sans-serif; font-size: 33px; font-weight: 800; color: #FFFFFF; letter-spacing: 2px;">कल्याण हॉस्पीटल</span>
       </td>
     </tr>
-    <tr bgcolor="#6B1736">
-      <td bgcolor="#6B1736" align="center" style="padding-bottom: 5px;">
-        <span style="font-family: Arial, Helvetica, sans-serif; font-size: 14.5px; font-weight: 800; color: #FFFFFF; letter-spacing: 3px;">PHYSIOTHERAPY DEPARTMENT</span>
+    <tr bgcolor="#54152F">
+      <td bgcolor="#54152F" align="center" style="padding-bottom: 6px;">
+        <span style="font-family: Arial, Helvetica, sans-serif; font-size: 14.5px; font-weight: 800; color: #FFFFFF; letter-spacing: 3.5px;">PHYSIOTHERAPY DEPARTMENT</span>
       </td>
     </tr>
-    <tr bgcolor="#6B1736">
-      <td bgcolor="#6B1736" style="padding: 0 14px 6px 14px;">
-        <table width="100%" cellpadding="0" cellspacing="0" bgcolor="#6B1736">
-          <tr bgcolor="#6B1736">
+    <tr bgcolor="#54152F">
+      <td bgcolor="#54152F" style="padding: 0 14px 8px 14px;">
+        <table width="100%" cellpadding="0" cellspacing="0" bgcolor="#54152F">
+          <tr bgcolor="#54152F">
             <!-- Sl No. Badge on Left -->
-            <td width="155" valign="middle" bgcolor="#6B1736">
+            <td width="165" valign="middle" bgcolor="#54152F">
               <table cellpadding="0" cellspacing="0" bgcolor="#FFFFFF" style="background-color: #FFFFFF; border: 1.5px solid #1E293B; border-radius: 3px;">
                 <tr>
-                  <td style="padding: 3px 6px; font-family: 'Segoe UI', Arial, sans-serif; font-size: 11px; font-weight: bold; color: #1E293B; white-space: nowrap;">Sl No.</td>
-                  <td style="padding: 3px 10px; font-family: 'Segoe UI', Arial, sans-serif; font-size: 11.5px; font-weight: bold; color: #6B1736; border-left: 1.5px solid #1E293B; white-space: nowrap;">{urn}</td>
+                  <td style="padding: 3px 7px; font-family: 'Segoe UI', Arial, sans-serif; font-size: 11px; font-weight: bold; color: #1E293B; white-space: nowrap;">Sl No.</td>
+                  <td style="padding: 3px 10px; font-family: 'Segoe UI', Arial, sans-serif; font-size: 12px; font-weight: bold; color: #54152F; border-left: 1.5px solid #1E293B; white-space: nowrap;">{urn}</td>
                 </tr>
               </table>
             </td>
             <!-- Clinic Addresses on Right -->
-            <td align="right" valign="middle" bgcolor="#6B1736" style="font-family: 'Nirmala UI', Arial, sans-serif; font-size: 9.4px; color: #FFFFFF; line-height: 1.45;">
+            <td align="right" valign="middle" bgcolor="#54152F" style="font-family: 'Nirmala UI', 'Segoe UI', Arial, sans-serif; font-size: 9.5px; color: #FFFFFF; line-height: 1.45;">
               क्लिनिक :- 1. नवादा थाना के सामने वाली गली, आरा, जिला- भोजपुर (बिहार) - 802301<br/>
               क्लिनिक :- 2. श्रीरामपुर रोड, गड़हनी, प्रखण्ड- उदवन्तनगर, जिला - भोजपुर (बिहार) - 802206
             </td>
@@ -113,14 +131,14 @@ class DocumentBuilder:
     </tr>
   </table>
 
-  <!-- 2. DOCTORS & CADUCEUS EMBLEM (3 COLUMNS) -->
-  <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #FFFFFF; padding: 6px 14px 4px 14px; border-collapse: collapse;">
+  <!-- 2. DOCTORS & OFFICIAL BUSINESS LOGO (3 BALANCED COLUMNS) -->
+  <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #FFFFFF; padding: 8px 14px 6px 14px; border-collapse: collapse;">
     <tr>
-      <!-- Left: Dr. Madan Mohan Dwivedi (Left Aligned) -->
-      <td width="39%" valign="top" style="text-align: left;">
-        <div style="font-family: 'Nirmala UI', Arial, sans-serif; font-size: 14.5px; font-weight: bold; color: #9E1B42; line-height: 1.2;">डॉ० मदन मोहन द्विवेदी</div>
-        <div style="font-family: 'Georgia', 'Times New Roman', serif; font-size: 13.5px; font-weight: bold; font-style: italic; color: #9E1B42; margin-bottom: 4px;">Dr. Madan Mohan Dwivedi</div>
-        <div style="font-size: 9.5px; color: #000000; line-height: 1.2; font-family: 'Segoe UI', Arial, sans-serif;">
+      <!-- Left: Dr. Madan Mohan Dwivedi -->
+      <td width="38%" valign="top" style="text-align: left; padding: 0;">
+        <div style="font-family: 'Nirmala UI', 'Segoe UI', Arial, sans-serif; font-size: 14.5px; font-weight: bold; color: #8B1D24; line-height: 1.2;">डॉ० मदन मोहन द्विवेदी</div>
+        <div style="font-family: 'Georgia', 'Times New Roman', serif; font-size: 13.5px; font-weight: bold; font-style: italic; color: #8B1D24; margin-bottom: 4px;">Dr. Madan Mohan Dwivedi</div>
+        <div style="font-size: 9.5px; color: #000000; line-height: 1.25; font-family: 'Segoe UI', Arial, sans-serif;">
           D.P.T (Pat.), O.C.T.M. (Delhi)<br/>
           O.C.S.P. (Gwaliar), M.B.S.A.P.O. (Bihar)<br/>
           Sr. Diploma Music (Allahabad)<br/>
@@ -128,21 +146,21 @@ class DocumentBuilder:
           <b>SPORTS PHYSIOTHERAPIST</b><br/>
           Ex Sadar Hospital, Arrah (Bhojpur)
         </div>
-        <div style="font-family: 'Nirmala UI', Arial, sans-serif; font-size: 12px; font-weight: bold; color: #15803D; margin-top: 3px;">
+        <div style="font-family: 'Nirmala UI', 'Segoe UI', Arial, sans-serif; font-size: 12px; font-weight: bold; color: #0F8A43; margin-top: 4px;">
           फिजियोरत्न से सम्मानित
         </div>
       </td>
 
-      <!-- Center: Blue-Winged Caduceus Emblem -->
-      <td width="18%" align="center" valign="middle">
-        {caduceus_img_tag}
+      <!-- Center: Official Business Logo -->
+      <td width="24%" align="center" valign="middle" style="text-align: center; padding: 0 4px;">
+        {logo_img_tag}
       </td>
 
-      <!-- Right: Dr. Chandan Kr. Dwivedi (Left Aligned within right column) -->
-      <td width="43%" valign="top" style="text-align: left; padding-left: 10px;">
-        <div style="font-family: 'Nirmala UI', Arial, sans-serif; font-size: 14.5px; font-weight: bold; color: #9E1B42; line-height: 1.2;">डॉ० चंदन कुमार द्विवेदी</div>
-        <div style="font-family: 'Georgia', 'Times New Roman', serif; font-size: 13.5px; font-weight: bold; font-style: italic; color: #9E1B42; margin-bottom: 4px;">Dr. Chandan Kr. Dwivedi</div>
-        <div style="font-size: 9.5px; color: #000000; line-height: 1.2; font-family: 'Segoe UI', Arial, sans-serif;">
+      <!-- Right: Dr. Chandan Kr. Dwivedi -->
+      <td width="38%" valign="top" style="text-align: left; padding-left: 8px;">
+        <div style="font-family: 'Nirmala UI', 'Segoe UI', Arial, sans-serif; font-size: 14.5px; font-weight: bold; color: #8B1D24; line-height: 1.2;">डॉ० चंदन कुमार द्विवेदी</div>
+        <div style="font-family: 'Georgia', 'Times New Roman', serif; font-size: 13.5px; font-weight: bold; font-style: italic; color: #8B1D24; margin-bottom: 4px;">Dr. Chandan Kr. Dwivedi</div>
+        <div style="font-size: 9.5px; color: #000000; line-height: 1.25; font-family: 'Segoe UI', Arial, sans-serif;">
           B.P.T. (RGUHS) Bangalore, M.I.A.P.<br/>
           CDNT - Bangalore, CCT - Bangalore<br/>
           Ex. INT. NIMHANS - Bangalore<br/>
@@ -150,40 +168,40 @@ class DocumentBuilder:
           Ex. INT. RMH - Bangalore<br/>
           FMATS - Varanasi, UP
         </div>
-        <div style="font-family: 'Nirmala UI', Arial, sans-serif; font-size: 12px; font-weight: bold; color: #15803D; margin-top: 3px;">
+        <div style="font-family: 'Nirmala UI', 'Segoe UI', Arial, sans-serif; font-size: 12px; font-weight: bold; color: #0F8A43; margin-top: 4px;">
           फिजियोथेरेपिस्ट
         </div>
       </td>
     </tr>
   </table>
 
-  <!-- 3. PALE YELLOW PATIENT DETAILS STRIP -->
-  <table width="100%" cellpadding="0" cellspacing="0" bgcolor="#FFFDE6" style="background-color: #FFFDE6; border-top: 1px solid #F6EDB5; padding: 4px 14px 4px 14px; font-family: 'Georgia', 'Times New Roman', serif;">
+  <!-- 3. PALE YELLOW PATIENT DETAILS STRIP WITH LEADERS -->
+  <table width="100%" cellpadding="0" cellspacing="0" bgcolor="#FFFDE6" style="background-color: #FFFDE6; border-top: 1px solid #F3EBB2; padding: 5px 14px 5px 14px; font-family: 'Georgia', 'Times New Roman', serif;">
     <tr bgcolor="#FFFDE6">
       <td width="55%" style="font-size: 12.5px; color: #1E293B;">
-        <i style="color: #475569;">Name</i> <span style="font-family: 'Segoe UI', Arial, sans-serif; font-weight: bold; color: #0F172A; text-decoration: underline; padding-left: 4px;">&nbsp;{name}&nbsp;</span>
+        <i style="color: #475569;">Name</i> <span style="font-family: 'Segoe UI', Arial, sans-serif; font-weight: bold; color: #0F172A; border-bottom: 1px dotted #64748B; padding: 0 8px;">{name}</span>
       </td>
       <td width="23%" style="font-size: 12.5px; color: #1E293B;">
-        <i style="color: #475569;">Age / Sex</i> <span style="font-family: 'Segoe UI', Arial, sans-serif; font-weight: bold; color: #0F172A; text-decoration: underline; padding-left: 4px;">&nbsp;{age_sex}&nbsp;</span>
+        <i style="color: #475569;">Age / Sex</i> <span style="font-family: 'Segoe UI', Arial, sans-serif; font-weight: bold; color: #0F172A; border-bottom: 1px dotted #64748B; padding: 0 6px;">{age_sex}</span>
       </td>
       <td width="22%" align="right" style="font-size: 12.5px; color: #1E293B;">
-        <i style="color: #475569;">Date</i> <span style="font-family: 'Segoe UI', Arial, sans-serif; font-weight: bold; color: #0F172A; text-decoration: underline; padding-left: 4px;">&nbsp;{date_str}&nbsp;</span>
+        <i style="color: #475569;">Date</i> <span style="font-family: 'Segoe UI', Arial, sans-serif; font-weight: bold; color: #0F172A; border-bottom: 1px dotted #64748B; padding: 0 6px;">{date_str}</span>
       </td>
     </tr>
     <tr bgcolor="#FFFDE6">
       <td style="font-size: 12.5px; color: #1E293B; padding-top: 6px;">
-        <i style="color: #475569;">Add.</i> <span style="font-family: 'Segoe UI', Arial, sans-serif; font-weight: 500; color: #0F172A; text-decoration: underline; padding-left: 4px;">&nbsp;{address}&nbsp;</span>
+        <i style="color: #475569;">Add.</i> <span style="font-family: 'Segoe UI', Arial, sans-serif; font-weight: 500; color: #0F172A; border-bottom: 1px dotted #64748B; padding: 0 8px;">{address}</span>
       </td>
       <td colspan="2" style="font-size: 12.5px; color: #1E293B; padding-top: 6px; padding-left: 12px;">
-        <i style="color: #475569;">Ref.</i> <span style="font-family: 'Segoe UI', Arial, sans-serif; font-weight: 500; color: #0F172A; text-decoration: underline; padding-left: 4px;">&nbsp;{referred_by}&nbsp;</span>
+        <i style="color: #475569;">Ref.</i> <span style="font-family: 'Segoe UI', Arial, sans-serif; font-weight: 500; color: #0F172A; border-bottom: 1px dotted #64748B; padding: 0 8px;">{referred_by}</span>
       </td>
     </tr>
   </table>
 
-  <!-- 4. SOLID MAROON DIVIDER UNDER PATIENT STRIP (MATCHES PHYSICAL PAD) -->
-  <table width="100%" cellpadding="0" cellspacing="0" bgcolor="#6B1736" style="background-color: #6B1736; border-collapse: collapse;">
-    <tr bgcolor="#6B1736">
-      <td height="3" bgcolor="#6B1736" style="background-color: #6B1736; font-size: 1px; line-height: 3px;">&nbsp;</td>
+  <!-- 4. SOLID BURGUNDY DIVIDER -->
+  <table width="100%" cellpadding="0" cellspacing="0" bgcolor="#54152F" style="background-color: #54152F; border-collapse: collapse;">
+    <tr bgcolor="#54152F">
+      <td height="3" bgcolor="#54152F" style="background-color: #54152F; font-size: 1px; line-height: 3px;">&nbsp;</td>
     </tr>
   </table>
 """
@@ -299,7 +317,7 @@ class DocumentBuilder:
   .a4-container {{
     width: 100%;
     margin: 0 auto;
-    border: 1.5px solid #6B1736;
+    border: 1.5px solid #54152F;
     background-color: #FFFFFF;
   }}
   .field-label {{
@@ -326,10 +344,10 @@ class DocumentBuilder:
     <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom: 4px; border-bottom: 1px solid #E2E8F0; padding-bottom: 2px;">
       <tr>
         <td>
-          <span style="font-size: 13.5px; font-weight: 800; color: #6B1736; ">PATIENT REGISTRATION & TREATMENT RECORD</span>
+          <span style="font-size: 13.5px; font-weight: 800; color: #54152F; ">PATIENT REGISTRATION & TREATMENT RECORD</span>
         </td>
         <td align="right">
-          <span style="background-color: #6B1736; color: #FFFFFF; font-weight: bold; font-size: 11.5px; padding: 2px 8px; border-radius: 3px;">RECORD #{urn}</span>
+          <span style="background-color: #54152F; color: #FFFFFF; font-weight: bold; font-size: 11.5px; padding: 2px 8px; border-radius: 3px;">RECORD #{urn}</span>
         </td>
       </tr>
     </table>
@@ -341,7 +359,7 @@ class DocumentBuilder:
           <table width="100%" cellpadding="2" cellspacing="0">
             <tr>
               <td width="28%" class="field-label">1. Serial / URN No.:</td>
-              <td width="72%" class="field-value" style="color: #6B1736; font-weight: 700;">{urn}</td>
+              <td width="72%" class="field-value" style="color: #54152F; font-weight: 700;">{urn}</td>
             </tr>
             <tr>
               <td class="field-label">2. Patient Name:</td>
@@ -393,7 +411,7 @@ class DocumentBuilder:
 
     <!-- Field 12: Payment Box -->
     <div style="background-color: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 6px; padding: 5px 12px; margin: 4px 0 4px 0;">
-      <div style="font-size: 12px; font-weight: bold; color: #6B1736; margin-bottom: 6px;">12. Payment Details:</div>
+      <div style="font-size: 12px; font-weight: bold; color: #54152F; margin-bottom: 6px;">12. Payment Details:</div>
       <table width="100%" cellpadding="0" cellspacing="0">
         <tr>
           <td width="33%">
@@ -406,7 +424,7 @@ class DocumentBuilder:
           </td>
           <td width="34%">
             <div style="font-size: 10px; font-weight: bold; color: #64748B; text-transform: uppercase;">Remaining Balance</div>
-            <div style="font-size: 14.5px; font-weight: bold; color: #6B1736; margin-top: 2px;">{balance_str}</div>
+            <div style="font-size: 14.5px; font-weight: bold; color: #54152F; margin-top: 2px;">{balance_str}</div>
           </td>
         </tr>
       </table>
@@ -510,7 +528,7 @@ class DocumentBuilder:
   .a4-container {{
     width: 100%;
     margin: 0 auto;
-    border: 1.5px solid #6B1736;
+    border: 1.5px solid #54152F;
     background-color: #FFFFFF;
   }}
 </style>
@@ -526,7 +544,7 @@ class DocumentBuilder:
     <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom: 10px;">
       <tr>
         <td width="55" valign="top">
-          <span style="font-family: 'Georgia', serif; font-size: 34px; font-weight: bold; color: #6B1736; line-height: 1;">℞</span>
+          <span style="font-family: 'Georgia', serif; font-size: 34px; font-weight: bold; color: #54152F; line-height: 1;">℞</span>
         </td>
         <td valign="top" style="padding-top: 4px;">
           <div style="background-color: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 4px; padding: 6px 12px;">

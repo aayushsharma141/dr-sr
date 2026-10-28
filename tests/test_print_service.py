@@ -50,7 +50,7 @@ def test_document_builder_contains_official_branding(sample_patient_dict):
     # Hospital Name & Department
     assert "कल्याण हॉस्पीटल" in html
     assert "PHYSIOTHERAPY DEPARTMENT" in html
-    assert "#6B1736" in html  # Deep Maroon Header
+    assert "#54152F" in html  # Deep Burgundy Header
 
     # Clinicians
     assert "Dr. Madan Mohan Dwivedi" in html
@@ -149,7 +149,7 @@ def test_prescription_slip_generation(sample_patient_dict, sample_case_dict):
     )
 
     # The local emblem is embedded in HTML so print preview does not need a remote URL.
-    assert 'alt="Caduceus"' in html
+    assert "Kalyan Hospital Business Logo" in html or 'alt="Caduceus"' in html
     assert "data:image/png;base64," in html
 
     # Letterhead branding
