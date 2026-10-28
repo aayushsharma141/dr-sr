@@ -137,6 +137,7 @@ class MainWindow(QMainWindow):
 
         self.treatment_view = TreatmentView(db_path=self.db_path, parent=self)
         self.treatment_view.view_billing_clicked.connect(self._on_view_billing)
+        self.treatment_view.session_saved.connect(self._on_session_saved)
         self.stacked_widget.addWidget(self.treatment_view)
 
         self.payment_view = PaymentView(db_path=self.db_path, parent=self)
@@ -231,6 +232,16 @@ class MainWindow(QMainWindow):
         urn = str(patient.get("serial_urn_no") or "")
         detail = f"{name} · {urn} saved to the local database." if urn else f"{name} saved to the local database."
         self.show_toast("Patient record saved", detail, "success")
+
+    def _on_session_saved(self, session: dict):
+        """Refresh the day feed and acknowledge successful session logging non-modally."""
+        self.dashboard_view.refresh_data()
+        session_number = session.get("session_number", "")
+        pain_score = session.get("pain_score")
+        detail = f"Session {session_number} saved to the local case history."
+        if pain_score is not None:
+            detail += f" Recorded pain score: {pain_score}/10."
+        self.show_toast("Treatment session saved", detail, "success")
 
     def _on_database_restored(self):
         """Refresh all loaded views after database restore and notify without blocking."""
