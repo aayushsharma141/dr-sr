@@ -104,10 +104,49 @@ Deferred; tracked but not in the current roadmap.
 
 ## Traceability
 
-Populated during roadmap creation.
-
 | Requirement | Phase | Status |
 |-------------|-------|--------|
+| SEC-01 | Phase 11 | Pending |
+| SEC-02 | Phase 11 | Pending |
+| SEC-03 | Phase 11 | Pending |
+| SEC-04 | Phase 11 | Pending |
+| SEC-05 | Phase 11 | Pending |
+| SEC-06 | Phase 11 | Pending |
+| AUD-01 | Phase 11 | Pending |
+| SET-01 | Phase 12 | Pending |
+| SET-02 | Phase 12 | Pending |
+| SET-03 | Phase 12 | Pending |
+| PAT-01 | Phase 12 | Pending |
+| PAT-02 | Phase 12 | Pending |
+| PAT-03 | Phase 12 | Pending |
+| PAT-04 | Phase 12 | Pending |
+| PAT-05 | Phase 12 | Pending |
+| APT-01 | Phase 13 | Pending |
+| APT-02 | Phase 13 | Pending |
+| CLN-01 | Phase 13 | Pending |
+| CLN-02 | Phase 13 | Pending |
+| RX-01 | Phase 14 | Pending |
+| TRT-01 | Phase 14 | Pending |
+| TRT-02 | Phase 14 | Pending |
+| BIL-01 | Phase 15 | Pending |
+| BIL-02 | Phase 15 | Pending |
+| BIL-03 | Phase 15 | Pending |
+| BIL-04 | Phase 15 | Pending |
+| BIL-05 | Phase 15 | Pending |
+| CLN-03 | Phase 15 | Pending |
+| AUD-02 | Phase 16 | Pending |
+| BAK-01 | Phase 16 | Pending |
+| BAK-02 | Phase 16 | Pending |
+| BAK-03 | Phase 16 | Pending |
+| DEP-01 | Phase 17 | Pending |
+| DEP-02 | Phase 17 | Pending |
+| DEP-03 | Phase 17 | Pending |
+| PRN-01 | Phase 17 | Pending |
+
+**Coverage:**
+- v1 requirements: 36 total
+- Mapped to phases: 36
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-10-30*

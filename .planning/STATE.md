@@ -5,7 +5,7 @@ milestone_name: 'Centralized LAN Web Platform'
 status: planning
 current_phase: null
 progress:
-  total_phases: 0
+  total_phases: 7
   completed_phases: 0
   active_phase: null
   percent: 0
@@ -26,6 +26,20 @@ Phase: Not started (defining requirements)
 Plan: —
 Status: Defining requirements
 Last activity: 2026-10-30 — Milestone v3.0 started
+
+## Phase Overview
+
+Phases 11-17 (continuing from v2.0, which ended at Phase 10). See `.planning/ROADMAP.md`.
+
+| Phase | Name | Status |
+|-------|------|--------|
+| 11 | Decisions Gate, Foundation & Auth | Not started |
+| 12 | Clinic Settings & Patient Registration | Not started |
+| 13 | Appointments & Clinical Encounters | Not started |
+| 14 | Prescriptions, Treatment Plans & Sessions | Not started |
+| 15 | Billing, Receipts & Reversals | Not started |
+| 16 | Audit Viewer, Backup/Restore & Integrity | Not started |
+| 17 | LAN Deployment, Printer & Acceptance | Not started |
 
 ## Accumulated Context
 

@@ -1,131 +1,144 @@
-# Roadmap: Kalyan Hospital Management System
+# Roadmap: Kalyan Hospital v3.0 Centralized LAN Web Platform
 
 ## Overview
 
-A structured 5-phase delivery plan to build a reliable, fully offline Windows desktop application for Kalyan Hospital, Ara, Bihar. Starting from a clean application shell, each phase delivers a testable, runnable milestone ending with complete offline verification and demo readiness.
+A 7-phase delivery plan (Phases 11-17, continuing from v2.0 which ended at Phase 10) to replace the single-PC desktop app with one central LAN server: FastAPI + PostgreSQL backend and one React + TypeScript frontend with `/admin`, `/reception` and `/doctor` dashboards. Budget is Rs 22,000 over 4-6 weeks, so phases are ordered by the user's delivery priorities: (1) database, authentication and permissions; (2) clinic settings, doctors and reception registration; (3) appointments and clinical workflows; (4) billing, receipts and reversals; (5) audit, backup/restore and integrity checks; (6) LAN deployment, real-printer testing and acceptance testing. Feature freeze is at the end of Phase 16; Phase 17 is reserved for operations and handover (about 20% of effort).
+
+Ordering notes:
+- **AUD-01 (audit event writing) is in Phase 11**, not with the audit viewer, because every later module (patients, clinical, billing, backup) writes audit rows in the same transaction as its business write. Retrofitting audit calls later would mean touching every service. The audit viewer (AUD-02) stays in Phase 16.
+- **PRN-01 is owned by Phase 17** (sign-off on the real hospital printer). A registration-card print spike (mm-based A4 `@page`, bundled Devanagari font, signature layout) starts in Phase 12 alongside registration, without owning the requirement, so print drift is found early.
+- **CLN-03 (unified timeline) is owned by Phase 15**, because the timeline includes payments and can only be complete once billing exists; encounter and session feeds are built in Phases 13-14.
+- **BAK-02 is owned by Phase 16** (restore tooling and rehearsal); Phase 17 repeats the clean-machine restore as part of DEP-03 acceptance.
 
 ## Phases
 
-- [x] **Phase 1: App Shell & Dashboard Foundation** - Runnable PySide6 window with hospital branding, sidebar navigation, and live DB-backed metric cards.
-- [x] **Phase 2: Patient Registration & Search** - SQLite schema initialization, atomic patient ID generation, registration form, photo storage, and instant search.
-- [x] **Phase 3: Treatment Cases & Payment Tracking** - Multi-case tracking, chronological session logging, integer paise billing calculations, and balance ledger.
-- [x] **Phase 4: A4 Print Preview, PDF Export & Local Backup** - Hospital-branded A4 registration card generator, PDF export, hot SQLite backup, and verified restore pipeline.
-- [x] **Phase 5: Demo Hardening & Security Controls** - Role-based authentication, offline resilience verification, synthetic demo data seeder, and walkthrough readiness.
-- [x] **Phase 6: Baseline Audit & P0 Safety/Audit Core** - Persistent audit log table & service, first-run administrator credential setup, and WAL-safe database restore snapshots.
-- [x] **Phase 7: Dependable Registration & Print Layout Alignment** - 12 canonical fields, atomic URN generation, mobile validation, local photos, and dual-signature physical pad alignment.
-- [x] **Phase 8: Clinical Records & Financial Integrity** - Dated therapy sessions, clinician assignment, modalities, VAS pain scores, immutable session history, and integer-paise dynamic billing.
-- [x] **Phase 9: Local Security & Verified Disaster Recovery** - Clinical doctor role, service-layer permission enforcement, unified backup bundling (photos + DB), and strict schema verification.
-- [ ] **Phase 10: Real Windows Handover & Offline Verification** - PyInstaller standalone executable, offline rehearsal on target Windows PC, printer output test, and client sign-off under ₹22,000 ceiling.
+- [ ] **Phase 11: Decisions Gate, Foundation & Auth** - Open decisions closed, repo/PostgreSQL/Alembic scaffold, individual accounts, role-routed login, server-enforced permissions, optimistic concurrency, and the audit-event writer.
+- [ ] **Phase 12: Clinic Settings & Patient Registration** - Clinic details, doctor profiles, fee list, patient registration with atomic URN, search, edit, duplicate warning and photos (print spike starts).
+- [ ] **Phase 13: Appointments & Clinical Encounters** - Per-doctor daily appointments with tokens and status, doctor queue, encounters, finalised notes with addenda.
+- [ ] **Phase 14: Prescriptions, Treatment Plans & Sessions** - Bilingual prescriptions, treatment plans/packages, immutable physiotherapy session log with VAS.
+- [ ] **Phase 15: Billing, Receipts & Reversals** - Integer-paise payments, computed balances, dues list, gap-free receipts with DUPLICATE reprints, admin reversals, unified patient timeline.
+- [ ] **Phase 16: Audit Viewer, Backup/Restore & Integrity** - Audit log viewer, scheduled checksummed backups on a second drive, verified restore, integrity report.
+- [ ] **Phase 17: LAN Deployment, Printer & Acceptance** - One-time server install, auto-recovery after power cut, LAN multi-PC offline operation, real-printer sign-off, full acceptance suite.
 
 ## Phase Details
 
-### Phase 1: App Shell & Dashboard Foundation
-**Goal**: Deliver a runnable PySide6 application window with hospital branding, responsive sidebar navigation, and live dashboard stat cards backed by the database layer.  
-**Depends on**: Nothing (Initial Phase)  
-**Requirements**: DASH-01, DASH-02, DASH-03  
+### Phase 11: Decisions Gate, Foundation & Auth
+**Goal**: Close the open client decisions, stand up the PostgreSQL + FastAPI + React scaffold with migrations, and deliver individual login with server-enforced permissions, safe concurrent updates and an audit-event writer that all later modules use.
+**Depends on**: Nothing (first v3.0 phase; v2.0 desktop app is reference only)
+**Requirements**: SEC-01, SEC-02, SEC-03, SEC-04, SEC-05, SEC-06, AUD-01
+**Entry gate (must be recorded before build work starts)**: server hardware, UPS and fixed IP (and whether client PCs may trust a local certificate); role/permission matrix for Admin, Reception, Doctor; whether doctors may read other doctors' patients (recommended: read yes, write only own); receipt numbering year (calendar vs April-March) and who may authorise a reversal. Unresolved items are logged with a default assumption and an owner.
 **Success Criteria**:
-  1. Main window launches cleanly in Windows without console errors.
-  2. Sidebar accurately displays "KALYAN HOSPITAL" and "श्री वशिष्ठ कल्याण ट्रस्ट".
-  3. Dashboard cards query the local database layer and display accurate zero counts on fresh launch.
-  4. Sidebar buttons switch smoothly between placeholder views without application crash.
-**Plans**: 2 plans
+  1. The four entry-gate decisions are written down (with client confirmation or an explicit default) before any schema or API work is committed.
+  2. A staff member signs in with an individual account and is routed to `/admin`, `/reception` or `/doctor` according to role; a user cannot open another role's dashboard data by typing the URL or calling the API directly.
+  3. An automated test enumerates every API route and fails if any route lacks a permission check; a role x endpoint test matrix passes with default-deny behaviour.
+  4. Idle sessions expire, repeated failed logins lock the account, and admin can create, deactivate (not delete) and reset users; first login forces a password change and no default credentials exist in the repo or installer.
+  5. Two simultaneous edits to the same record result in a 409 conflict for the stale update rather than overwriting, and sign-in, failed-login and user-admin events appear as append-only audit rows.
+**Plans**: TBD
 
 Plans:
-- [x] 01-01: Environment setup, theme styling tokens, and QMainWindow shell with navigation sidebar.
-- [x] 01-02: Live database connection initialization and dashboard view with metric query cards.
+- [ ] TBD (created by plan-phase)
 
-### Phase 2: Patient Registration & Search
-**Goal**: Implement complete patient intake workflow backed by SQLite with persistent unique IDs and instant multi-field search.  
-**Depends on**: Phase 1  
-**Requirements**: PAT-01, PAT-02, PAT-03, PAT-04, PAT-05  
+### Phase 12: Clinic Settings & Patient Registration
+**Goal**: Admin configures the clinic, doctors and fees; reception registers, finds and edits patients with unique URNs and photos, with the registration-card print spike started.
+**Depends on**: Phase 11
+**Requirements**: SET-01, SET-02, SET-03, PAT-01, PAT-02, PAT-03, PAT-04, PAT-05
 **Success Criteria**:
-  1. System generates a unique `KH-YYYY-XXXX` ID on patient creation.
-  2. Patient form saves valid demographic records and persists data after app restart.
-  3. Optional patient photo is safely stored in local application directory without corruption.
-  4. Searching by patient ID, name, or mobile filters records in < 50ms.
-**Plans**: 2 plans
+  1. Admin saves English and Hindi clinic names, both clinic addresses, phone and print header/footer, plus doctor profiles and the consultation fee list; values appear on later screens and print templates.
+  2. Reception registers a patient with the 12 canonical fields; 20 parallel registrations produce unique, gap-free `KH-YYYY-XXXX` URNs.
+  3. Searching by URN, name (including Devanagari) or mobile returns the right patient, and a same-name-and-mobile registration shows a duplicate warning.
+  4. Editing a patient records an audit row with before and after values; a stale concurrent edit is rejected.
+  5. A patient photo is uploaded, stored on the server, and is only served to authenticated, authorised users (direct file URL access without a session is refused).
+**Plans**: TBD
 
 Plans:
-- [x] 02-01: SQLite schema DDL, atomic sequence generator, patient repository, and validation service.
-- [x] 02-02: Patient registration form UI, photo manager, and searchable patient list table view.
+- [ ] TBD (created by plan-phase)
 
-### Phase 3: Treatment Cases & Payment Tracking
-**Goal**: Manage physiotherapy clinical case histories and implement a currency-safe ledger for agreed fees, installments, and outstanding balances.  
-**Depends on**: Phase 2  
-**Requirements**: TRT-01, TRT-02, TRT-03, BIL-01, BIL-02, BIL-03, BIL-04  
+### Phase 13: Appointments & Clinical Encounters
+**Goal**: Reception books and tracks per-doctor daily appointments, and doctors work their day's queue and record finalised encounter notes with addenda.
+**Depends on**: Phase 12
+**Requirements**: APT-01, APT-02, CLN-01, CLN-02
 **Success Criteria**:
-  1. Physiotherapy treatment cases can be opened and linked to any patient.
-  2. Adding new treatment sessions preserves all past clinical notes chronologically.
-  3. All monetary values are handled in integer paise, preventing floating-point discrepancies.
-  4. Outstanding balance ($\text{Agreed Fee} - \sum\text{Payments}$) updates immediately and rejects negative payments.
-**Plans**: 2 plans
+  1. Reception books an appointment for a patient with a chosen doctor and receives a token number unique per doctor per day.
+  2. Appointment status moves through Booked, Arrived, In consultation, Done, Cancelled and No-show, and a doctor sees only their own day's queue in order.
+  3. A doctor records an encounter with clinical notes for a patient; reception cannot read clinical note content.
+  4. Once a note is finalised it can no longer be edited (rejected at the API); changes appear as dated addenda attached to the original.
+**Plans**: TBD
 
 Plans:
-- [x] 03-01: Relational treatment repository, session logger, and currency-safe billing service.
-- [x] 03-02: Treatment history UI, session logging dialog, payment ledger view, and dynamic balance card.
+- [ ] TBD (created by plan-phase)
 
-### Phase 4: A4 Print Preview, PDF Export & Local Backup
-**Goal**: Implement official hospital-branded A4 patient registration printout and a fail-safe hot database backup and verified restore system.  
-**Depends on**: Phase 3  
-**Requirements**: PRN-01, PRN-02, PRN-03, BAK-01, BAK-02  
+### Phase 14: Prescriptions, Treatment Plans & Sessions
+**Goal**: Doctors issue printable prescriptions, create treatment plans/packages and log immutable physiotherapy sessions with VAS pain scores.
+**Depends on**: Phase 13
+**Requirements**: RX-01, TRT-01, TRT-02
 **Success Criteria**:
-  1. Registration form renders on standard ISO A4 paper preview with exact hospital branding.
-  2. Form includes dual bottom signatures (Patient / Attendant Signature and Authorized Signature) along with Date per authentic slip.
-  3. User can export the document directly to a clean PDF file.
-  4. Local backup creates an uncorrupted SQLite snapshot via Online Backup API.
-  5. Restore pipeline tests database integrity in scratch DB before replacing active live data.
-**Plans**: 2 plans
+  1. A doctor writes a prescription (medicines, dosage, advice) linked to an encounter and prints it with English text and static Hindi labels using the bundled Devanagari font.
+  2. A doctor creates a treatment plan/package for a patient (sessions, price) that billing can reference later.
+  3. Sessions are logged with VAS pain score in chronological order; an attempt to edit or delete a session fails at the API and the database, and corrections are recorded only as addenda.
+  4. Two simultaneous session entries for the same plan receive distinct, ordered session numbers.
+**Plans**: TBD
 
 Plans:
-- [x] 04-01: A4 HTML/QTextDocument builder, QPrintPreviewDialog, and PDF export manager.
-- [x] 04-02: Hot SQLite backup service, backup manager UI, and isolated restore verification test pipeline.
+- [ ] TBD (created by plan-phase)
 
-### Phase 5: Demo Hardening & Security Controls
-**Goal**: Protect administrative actions, verify complete offline operation, and prepare a 5-minute repeatable demonstration dataset for the client.  
-**Depends on**: Phase 4  
-**Requirements**: SEC-01, SEC-02  
+### Phase 15: Billing, Receipts & Reversals
+**Goal**: Reception records fees and instalments in integer paise with safe concurrency, receipts are sequential and reprintable as duplicates, admin reverses with a reason, and staff see one patient timeline.
+**Depends on**: Phase 14 (treatment plans/packages) and Phase 11 (permissions, audit)
+**Requirements**: BIL-01, BIL-02, BIL-03, BIL-04, BIL-05, CLN-03
 **Success Criteria**:
-  1. PBKDF2-hashed administrator credentials protect database restore and financial overrides.
-  2. Full suite of automated and manual tests passes with all network adapters disabled.
-  3. Demo reset utility seeds 5 realistic fictional patients with full treatment histories in < 1s.
-  4. 5-minute client demo script rehearsal executes without glitches or pending operations.
-**Plans**: 2 plans
+  1. Reception records consultation fees and instalment payments by cash, UPI or card; amounts are stored and returned as integer paise end to end.
+  2. Overpayments and negative amounts are rejected, including when two PCs submit payments for the same patient at the same moment (concurrency test passes, retries are idempotent).
+  3. Outstanding balance is always computed from the ledger (no editable balance field) and a pending-dues list shows patients with unpaid amounts.
+  4. Receipts carry gap-free sequential numbers per the agreed year rule, print correctly, and every reprint is marked `DUPLICATE`.
+  5. Only Admin can authorise a reversal and must give a reason; the original payment stays visible, the reversal is a new ledger entry, and any delete/edit of payments is blocked.
+  6. Doctor and reception see one chronological patient timeline of encounters, sessions and payments, with each role seeing only the content its permissions allow.
+**Plans**: TBD
 
 Plans:
-- [x] 05-01: PBKDF2 authentication service, permission guard dialogs, and offline regression test suite.
-- [x] 05-02: Synthetic demo dataset generator, reset utility, and client walkthrough script.
+- [ ] TBD (created by plan-phase)
 
-### Phase 6: Baseline Audit & P0 Safety/Audit Core
-**Goal**: Resolve P0 audit gaps: implement persistent `audit_logs` table & `AuditService`, remove hardcoded default credentials in favor of first-run setup, and replace raw `shutil.copy2` with atomic WAL-safe SQLite snapshots in backup restore.  
-**Depends on**: Phase 5  
-**Requirements**: AUD-01, SEC-01, BAK-01, BAK-02  
+### Phase 16: Audit Viewer, Backup/Restore & Integrity
+**Goal**: Admin can inspect the audit log, produce scheduled verified backups on a second drive, restore them safely, and run an integrity report.
+**Depends on**: Phase 15 (all data modules exist to back up and check)
+**Requirements**: AUD-02, BAK-01, BAK-02, BAK-03
 **Success Criteria**:
-  1. `audit_logs` table exists in SQLite schema and `AuditService` records security, patient, session, payment, and backup events.
-  2. `AuthService` removes hardcoded `kalyan@admin` default password; system enforces first-run administrator password setup before any clinic record entry.
-  3. Pre-restore rollback snapshot in `BackupService` uses `conn.backup()` and explicit WAL checkpointing instead of `shutil.copy2()`.
-  4. All unit and integration tests pass with 100% green status.
-**Plans**: 1 plan
+  1. Admin filters the audit log by user, action, entity and date, and sees before/after values for patient edits; non-admins cannot access it.
+  2. Admin creates a backup bundle (database dump plus photos plus manifest with checksums) manually and by a schedule, written to a second physical drive; a corrupted bundle is detected by checksum verification.
+  3. A backup is verified and restored into a scratch environment, and the restored system opens with the expected patients, payments and photos; a pre-restore snapshot is taken before any live restore.
+  4. The integrity report flags balance-vs-ledger mismatches, URN gaps or duplicates, orphan files and session-count discrepancies, and reports clean on good data.
+**Plans**: TBD
 
 Plans:
-- [ ] 06-01: Persistent audit logging, first-run admin credential initialization, and WAL-safe restore snapshots.
+- [ ] TBD (created by plan-phase)
+
+### Phase 17: LAN Deployment, Printer & Acceptance
+**Goal**: Install once on the server PC, prove 3-5 browser PCs work over the LAN offline and survive power cuts, sign off the registration card on the real printer, and pass client acceptance.
+**Depends on**: Phase 16 (feature freeze)
+**Requirements**: DEP-01, DEP-02, DEP-03, PRN-01
+**Success Criteria**:
+  1. The system is installed once on the central server PC from an offline installer (wheelhouse, built frontend assets, no Node on the server), and 3 to 5 PCs use it through a browser over the LAN with internet disconnected.
+  2. After a pull-the-plug power cut, PostgreSQL and the API service start automatically and the system serves requests without manual steps.
+  3. The A4 registration card with the approved dual-signature layout is printed on the actual hospital printer and signed off physically against the paper pad.
+  4. The acceptance suite passes for offline operation, role permission matrix, data integrity (URN, balances, receipts), real-printer output and a clean-machine backup/restore rehearsal, with client sign-off recorded.
+**Plans**: TBD
+
+Plans:
+- [ ] TBD (created by plan-phase)
 
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 → 9 → 10
+Phases execute in numeric order: 11 → 12 → 13 → 14 → 15 → 16 → 17
 
 | Phase | Plans Complete | Status | Completed |
 |---|---|---|---|
-| 1. App Shell & Dashboard | 2/2 | Complete | 2026-10-28 |
-| 2. Patient Registration & Search | 2/2 | Complete | 2026-10-28 |
-| 3. Treatment Cases & Payments | 2/2 | Complete | 2026-10-28 |
-| 4. A4 Printing & Local Backup | 2/2 | Complete | 2026-10-28 |
-| 5. Demo Hardening & Security | 2/2 | Complete | 2026-10-28 |
-| 6. Baseline Audit & P0 Safety/Audit Core | 1/1 | Complete | 2026-10-30 |
-| 7. Dependable Registration & Print Alignment | 1/1 | Complete | 2026-10-30 |
-| 8. Clinical Records & Financial Integrity | 1/1 | Complete | 2026-10-30 |
-| 9. Local Security & Verified Disaster Recovery | 1/1 | Complete | 2026-10-30 |
-| 10. Real Windows Handover & Offline Verification | 1/1 | Complete | 2026-10-30 |
+| 11. Decisions Gate, Foundation & Auth | 0/TBD | Not started | - |
+| 12. Clinic Settings & Patient Registration | 0/TBD | Not started | - |
+| 13. Appointments & Clinical Encounters | 0/TBD | Not started | - |
+| 14. Prescriptions, Treatment Plans & Sessions | 0/TBD | Not started | - |
+| 15. Billing, Receipts & Reversals | 0/TBD | Not started | - |
+| 16. Audit Viewer, Backup/Restore & Integrity | 0/TBD | Not started | - |
+| 17. LAN Deployment, Printer & Acceptance | 0/TBD | Not started | - |
 
 ---
-*Roadmap created: 2026-10-28*
+*Roadmap created: 2026-10-30*
