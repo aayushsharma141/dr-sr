@@ -1,111 +1,114 @@
-# Requirements: Kalyan Hospital Patient & Physiotherapy Management
+# Requirements: Kalyan Hospital v3.0 Centralized LAN Web Platform
 
-**Defined:** 2026-10-28  
-**Core Value:** Reliable, zero-cloud offline patient registration, physiotherapy clinical history, and payment tracking on a single clinic computer with 100% data persistence and verifiable local backup.
+**Defined:** 2026-10-30
+**Core Value:** Reliable, internet-free shared patient records for reception and doctors across the hospital LAN, enforced by server-side permissions, with auditable changes and a backup proven to restore.
+**Scope source:** User's "Kalyan Hospital Software v3.0 — Final Plan" (2026-10-30). Proposed scope; fit within the budget and timeline is not guaranteed and acceptance criteria must be confirmed with the client.
 
 ## v1 Requirements
 
-Requirements for initial MVP release. Each maps directly to roadmap phases.
+### Foundation and Security
 
-### Dashboard & Navigation (DASH)
+- [ ] **SEC-01**: Staff member signs in with an individual account and lands on the dashboard for their role (`/admin`, `/reception` or `/doctor`) of one React + TypeScript app.
+- [ ] **SEC-02**: Every API endpoint enforces permissions on the server independently of the UI, and an automated test fails if any route lacks a permission check.
+- [ ] **SEC-03**: Three roles (Admin, Reception, Doctor) with a fixed permission catalogue.
+- [ ] **SEC-04**: Session expires after an idle timeout, and an account is locked after repeated failed logins.
+- [ ] **SEC-05**: Admin creates, deactivates (never deletes) and resets passwords for users; first login forces a password change; no default credentials ship.
+- [ ] **SEC-06**: Concurrent edits are safe: stale updates are rejected with a conflict response rather than overwriting.
 
-- [x] **DASH-01**: User sees real-time patient count, today's registrations, active cases, and pending fee balance calculated directly from SQLite.
-- [x] **DASH-02**: User can navigate between Patients, Treatments, Billing, and Backup via left sidebar.
-- [x] **DASH-03**: Application displays authentic hospital branding (KALYAN HOSPITAL / श्री वशिष्ठ कल्याण ट्रस्ट).
+### Clinic Setup
 
-### Patient Registration & Search (PAT)
+- [ ] **SET-01**: Admin configures clinic details (English and Hindi names, both clinic addresses, phone, print header/footer).
+- [ ] **SET-02**: Admin maintains doctor profiles (names, qualification, registration number).
+- [ ] **SET-03**: Admin maintains the consultation fee list.
 
-- [x] **PAT-01**: System automatically generates a unique, human-readable patient ID (`KH-YYYY-XXXX`).
-- [x] **PAT-02**: User can register a patient with Name, Age, Sex, Mobile, Address, Referral Source, Condition, and Registration Timestamp.
-- [x] **PAT-03**: User can attach a patient photograph stored in local application data directory.
-- [x] **PAT-04**: User can search patients in real time by ID, Name, or Mobile number.
-- [x] **PAT-05**: User can reopen and edit an existing patient record without data loss.
+### Reception: Patients and Appointments
 
-### Treatment Cases & Sessions (TRT)
+- [ ] **PAT-01**: Reception registers a patient with the 12 canonical fields and receives a unique URN `KH-YYYY-XXXX`, with no duplicates or gaps under concurrent registration.
+- [ ] **PAT-02**: Reception searches patients by URN, name or mobile (Devanagari names included).
+- [ ] **PAT-03**: Reception edits a patient record; each change is audited with before and after values.
+- [ ] **PAT-04**: Reception sees a duplicate-patient warning (same name and mobile) at registration.
+- [ ] **PAT-05**: Reception uploads a patient photo, stored on the server and served only to authorised users.
+- [ ] **APT-01**: Reception books a per-doctor daily appointment with a token number and assigns the doctor.
+- [ ] **APT-02**: Appointment status (Booked, Arrived, In consultation, Done, Cancelled, No-show) is tracked, and the doctor sees their day's queue.
+- [ ] **PRN-01**: Reception prints an A4 registration card with the approved dual-signature layout, verified on the actual hospital printer.
 
-- [x] **TRT-01**: User can open or create a physiotherapy treatment case for a patient.
-- [x] **TRT-02**: User can log a dated treatment session with notes, therapist name, treatment modalities, and pain score.
-- [x] **TRT-03**: User can view complete chronological history of past treatment sessions without modification of earlier records.
+### Doctor and Clinical
 
-### Billing & Payments (BIL)
+- [ ] **CLN-01**: Doctor records an encounter with clinical notes for a patient.
+- [ ] **CLN-02**: Doctor finalises a note, after which it is locked; later changes are recorded as dated addenda.
+- [ ] **RX-01**: Doctor writes a prescription (medicines, dosage, advice) and prints it with English text and static Hindi labels.
+- [ ] **TRT-01**: Doctor creates a treatment plan or package for a patient.
+- [ ] **TRT-02**: Doctor logs physiotherapy sessions with VAS pain score; sessions are chronological and immutable, with corrections by addendum.
+- [ ] **CLN-03**: Doctor and reception view one chronological patient timeline of encounters, sessions and payments.
 
-- [x] **BIL-01**: User can record the total agreed treatment fee for a case.
-- [x] **BIL-02**: User can record partial payment installments with timestamp and payment mode (Cash, UPI).
-- [x] **BIL-03**: System calculates outstanding balance automatically using integer paise arithmetic.
-- [x] **BIL-04**: System prevents negative payment amounts and flags overpayment attempts.
+### Billing (owned by Reception)
 
-### Printing & PDF Export (PRN)
+- [ ] **BIL-01**: Reception records consultation fees and instalment payments by cash, UPI or card.
+- [ ] **BIL-02**: Money is stored and transmitted as integer paise, and overpayments and negative amounts are rejected, including under concurrent entry from two PCs.
+- [ ] **BIL-03**: Outstanding balances are computed (never stored as editable) and a pending-dues list is available.
+- [ ] **BIL-04**: Receipts have gap-free sequential numbers, can be printed, and reprints are marked `DUPLICATE`.
+- [ ] **BIL-05**: Admin authorises a reversal with a mandatory reason; financial records are never silently deleted or edited.
 
-- [x] **PRN-01**: User can preview and print an A4 patient registration card reproducing official clinic branding, maroon header, and doctor credentials.
-- [x] **PRN-02**: Registration printout faithfully structures all 12 canonical fields, Patient Picture box, and dual signature lines (Patient/Attendant Signature & Authorized Signature) + Date.
-- [x] **PRN-03**: User can export the registration document directly as a local PDF file.
+### Admin and Data Protection
 
-### Data Safety & Backups (BAK)
+- [ ] **AUD-01**: Security, patient, clinical, billing and backup events are written to an append-only audit log.
+- [ ] **AUD-02**: Admin views the audit log with filters (user, action, entity, date).
+- [ ] **BAK-01**: Admin creates backup bundles (database and files) with checksums, manually and on a schedule, stored on a second drive.
+- [ ] **BAK-02**: A backup is verified and restored on a clean machine, rehearsed as a handover gate.
+- [ ] **BAK-03**: Admin runs an integrity report (balances vs ledger, URN gaps/duplicates, orphan files, session counts).
 
-- [x] **BAK-01**: User can create a local timestamped database backup using SQLite hot backup API.
-- [x] **BAK-02**: System validates backup integrity and record counts before allowing database restoration.
+### Deployment and Acceptance
 
-### Security & Access Control (SEC)
-
-- [x] **SEC-01**: System provides password-protected administrator access for sensitive clinic actions.
-- [x] **SEC-02**: System operates 100% offline with zero external network dependencies.
+- [ ] **DEP-01**: System is installed once on the central server PC; 3 to 5 PCs use it through a browser over the LAN with no internet access.
+- [ ] **DEP-02**: Server services start automatically after a power cut and recover without manual steps.
+- [ ] **DEP-03**: Acceptance tests pass for offline operation, permissions, data integrity, real-printer output and backup/restore.
 
 ## v2 Requirements
 
-Deferred to subsequent release / commercial expansion.
+Deferred; tracked but not in the current roadmap.
 
-### Multi-PC & Networking
-- **NET-01**: LAN-based multi-terminal synchronization for front desk and doctor consulting rooms.
-- **NET-02**: Concurrent database locking and conflict resolution.
+### Reporting and Convenience (v3.x)
 
-### Invoicing & Communications
-- **COM-01**: Offline SMS / WhatsApp receipt dispatch via local GSM dongle or optional internet bridge.
-- **COM-02**: Detailed itemized pharmacy and consumables billing ledger.
+- **RPT-01**: VAS pain trend chart per treatment plan.
+- **RPT-02**: Daily collection report and printable dues follow-up list.
+- **RPT-03**: Missed-session list and treatment-plan templates.
+- **RPT-04**: Canned Hindi advice library and printable patient summary.
+- **RPT-05**: Backup-health banner on the admin dashboard.
+
+### Later (v4+)
+
+- **FUT-01**: LAN HTTPS with in-browser webcam capture.
+- **FUT-02**: Document and scan attachments.
+- **FUT-03**: SQLite-to-PostgreSQL import of v2.0 data, only if real data exists.
 
 ## Out of Scope
 
 | Feature | Reason |
 |---------|--------|
-| Cloud Database (Firebase / AWS) | High ongoing recurring subscription cost; conflicts with zero-internet requirement. |
-| Multi-PC Real-Time LAN Networking | Exceeds v1 single-workstation scope; requires separate networking/concurrency agreement. |
-| Inpatient Bed & Ward Management | Project scope is strictly outpatient and physiotherapy clinical cases. |
-| Full Accounting / Tax Filing ERP | Exceeds ₹22,000 budget and 4–6 week timeline; clinic uses separate accounting. |
-| Biometric Fingerprint Hardware | Requires specialized USB SDKs and driver maintenance; keyboard search is sufficient. |
+| Inpatient/IPD, pharmacy inventory, lab and other advanced modules | Excluded unless separately agreed |
+| Aadhaar number or ID-card storage | Legal exposure and not needed for outpatient physiotherapy |
+| SMS / WhatsApp, cloud backup, patient portal | Needs internet; system is offline and LAN-only |
+| ICD/FHIR/ABDM, insurance, GST invoicing | Large separate scope; confirm trust GST/80G status first |
+| Editing or deleting past sessions, notes or payments | Would break audit trail and balance integrity |
+| Per-user custom permission trees | Three fixed roles are sufficient |
+| Drag-drop calendar, websockets | Disproportionate effort for 3 to 5 users |
+| Separate frontend per role, per-PC installs | One codebase, one central server |
+
+## Open Decisions (confirm with client)
+
+- Server hardware, UPS and fixed IP; whether client PCs may trust a local certificate (HTTPS).
+- Whether doctors can see other doctors' patients (recommended: read yes, write only own).
+- Who may authorise a reversal (plan says Admin).
+- Receipt numbering year: calendar vs April to March financial year.
+- Whether real v2.0 data exists to migrate.
 
 ## Traceability
 
-Which phases cover which requirements.
+Populated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| DASH-01 | Phase 1: App Shell & Dashboard | Complete ✓ |
-| DASH-02 | Phase 1: App Shell & Dashboard | Complete ✓ |
-| DASH-03 | Phase 1: App Shell & Dashboard | Complete ✓ |
-| PAT-01 | Phase 2: Patient Registration & Search | Complete ✓ |
-| PAT-02 | Phase 2: Patient Registration & Search | Complete ✓ |
-| PAT-03 | Phase 2: Patient Registration & Search | Complete ✓ |
-| PAT-04 | Phase 2: Patient Registration & Search | Complete ✓ |
-| PAT-05 | Phase 2: Patient Registration & Search | Complete ✓ |
-| TRT-01 | Phase 3: Treatment & Payment Tracking | Complete ✓ |
-| TRT-02 | Phase 3: Treatment & Payment Tracking | Complete ✓ |
-| TRT-03 | Phase 3: Treatment & Payment Tracking | Complete ✓ |
-| BIL-01 | Phase 3: Treatment & Payment Tracking | Complete ✓ |
-| BIL-02 | Phase 3: Treatment & Payment Tracking | Complete ✓ |
-| BIL-03 | Phase 3: Treatment & Payment Tracking | Complete ✓ |
-| BIL-04 | Phase 3: Treatment & Payment Tracking | Complete ✓ |
-| PRN-01 | Phase 4: A4 Printing & Local Backup | Complete ✓ |
-| PRN-02 | Phase 4: A4 Printing & Local Backup | Complete ✓ |
-| PRN-03 | Phase 4: A4 Printing & Local Backup | Complete ✓ |
-| BAK-01 | Phase 4: A4 Printing & Local Backup | Complete ✓ |
-| BAK-02 | Phase 4: A4 Printing & Local Backup | Complete ✓ |
-| SEC-01 | Phase 5: Demo Hardening & Security | Complete ✓ |
-| SEC-02 | Phase 5: Demo Hardening & Security | Complete ✓ |
-
-**Coverage:**
-- v1 requirements: 22 total
-- Mapped to phases: 22
-- Unmapped: 0 ✓
 
 ---
-*Requirements defined: 2026-10-28*
-*Last updated: 2026-10-28 after initial definition*
+*Requirements defined: 2026-10-30*
+*Last updated: 2026-10-30 after scoping from the user's Final Plan*
