@@ -205,6 +205,80 @@ class AuthService:
                     return True
         return False
 
+    VALID_ROLES = ("ADMIN", "RECEPTIONIST", "DOCTOR")
+
+    def create_user(
+        self,
+        username: str,
+        password: str,
+        role: str = "RECEPTIONIST",
+        actor_name: str = "Admin",
+    ) -> Dict[str, Any]:
+        """
+        Creates a new user account with a specified role ('ADMIN', 'RECEPTIONIST', 'DOCTOR').
+        """
+        username_clean = username.strip()
+        role_clean = role.strip().upper()
+
+        if not username_clean:
+            raise ValueError("Username cannot be blank.")
+        if role_clean not in self.VALID_ROLES:
+            raise ValueError(f"Invalid role '{role}'. Must be one of {self.VALID_ROLES}.")
+        if len(password) < 6:
+            raise ValueError("Password must be at least 6 characters long.")
+
+        with self._get_connection() as conn:
+            # Check for existing username
+            cursor = conn.execute("SELECT id FROM users WHERE username = ?", (username_clean,))
+            if cursor.fetchone():
+                raise ValueError(f"User '{username_clean}' already exists.")
+
+            pwd_hash, salt = self.hash_password(password)
+            ins_cursor = conn.execute(
+                """
+                INSERT INTO users (username, password_hash, salt, role, is_active)
+                VALUES (?, ?, ?, ?, 1)
+                """,
+                (username_clean, pwd_hash, salt, role_clean),
+            )
+            user_id = int(ins_cursor.lastrowid or 0)
+            conn.commit()
+
+        self._audit.log_event(
+            action="USER_CREATED",
+            entity_type="USER",
+            entity_id=user_id,
+            actor_name=actor_name,
+            details=f"Created user '{username_clean}' with role '{role_clean}'.",
+            user_id=user_id,
+        )
+
+        return {
+            "id": user_id,
+            "username": username_clean,
+            "role": role_clean,
+        }
+
+    @staticmethod
+    def can_manage_backups(role: str) -> bool:
+        """Only ADMIN can execute backup and restore operations."""
+        return role.upper() == "ADMIN"
+
+    @staticmethod
+    def can_manage_users(role: str) -> bool:
+        """Only ADMIN can create or modify user accounts."""
+        return role.upper() == "ADMIN"
+
+    @staticmethod
+    def can_record_clinical_sessions(role: str) -> bool:
+        """Doctors and Admins can log clinical physiotherapy treatment notes."""
+        return role.upper() in ("DOCTOR", "ADMIN")
+
+    @staticmethod
+    def can_register_patients(role: str) -> bool:
+        """Receptionists, Doctors, and Admins can register new patients."""
+        return role.upper() in ("RECEPTIONIST", "DOCTOR", "ADMIN")
+
     def change_password(self, user_id: int, old_password: str, new_password: str) -> bool:
         """
         Updates a user's password after verifying the existing password.

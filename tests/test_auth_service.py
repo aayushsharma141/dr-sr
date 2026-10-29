@@ -123,3 +123,32 @@ def test_offline_zero_network_operation(test_db, monkeypatch):
     billing_service = BillingService(test_db)
     receipt = billing_service.record_installment(case_id=case["id"], amount_rupees=1000)
     assert receipt["balance_paise"] == 100000
+
+
+def test_named_user_roles_and_permissions(test_db):
+    """Verifies user creation with DOCTOR, RECEPTIONIST, and ADMIN roles and permissions."""
+    auth_service = AuthService(db_path=test_db)
+
+    # 1. Create a Doctor user
+    doctor_user = auth_service.create_user(
+        username="dr_chandan",
+        password="DoctorSecret@2026",
+        role="DOCTOR",
+        actor_name="Administrator",
+    )
+    assert doctor_user["role"] == "DOCTOR"
+    assert auth_service.authenticate("dr_chandan", "DoctorSecret@2026") is not None
+
+    # 2. Permission checks
+    assert auth_service.can_record_clinical_sessions("DOCTOR") is True
+    assert auth_service.can_record_clinical_sessions("ADMIN") is True
+    assert auth_service.can_record_clinical_sessions("RECEPTIONIST") is False
+
+    assert auth_service.can_manage_backups("ADMIN") is True
+    assert auth_service.can_manage_backups("DOCTOR") is False
+    assert auth_service.can_manage_backups("RECEPTIONIST") is False
+
+    # 3. Invalid role rejected
+    with pytest.raises(ValueError, match="Invalid role"):
+        auth_service.create_user("bad_user", "ValidPass@123", role="ASTRONAUT")
+

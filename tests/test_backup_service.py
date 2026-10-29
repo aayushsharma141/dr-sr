@@ -154,3 +154,46 @@ def test_restore_corrupt_file_does_not_destroy_live_db(populated_env, tmp_path):
     # Live database should be 100% intact
     with get_db_connection(populated_env["db_path"]) as conn:
         assert conn.execute("SELECT COUNT(*) FROM patients").fetchone()[0] == 2
+
+
+def test_backup_bundles_and_restores_patient_photos(tmp_path):
+    """Verifies that create_backup bundles patient photos and restore recovers them."""
+    db_file = tmp_path / "photo_live.db"
+    backup_folder = tmp_path / "photo_backups"
+    photos_folder = tmp_path / "patient_photos"
+    init_db(str(db_file))
+
+    # Create dummy photo in photos folder
+    photos_folder.mkdir(parents=True, exist_ok=True)
+    photo1 = photos_folder / "KH-2026-0001.jpg"
+    photo1.write_bytes(b"\xFF\xD8\xFF\xE0FakePhotoBytes1")
+
+    # Initialize BackupService with custom photos directory
+    service = BackupService(
+        db_path=str(db_file),
+        backup_dir=str(backup_folder),
+        photos_dir=str(photos_folder),
+    )
+
+    # 1. Create unified backup archive
+    backup_archive = service.create_backup(bundle_photos=True)
+    assert backup_archive.suffix == ".kalyan_bak"
+
+    # 2. Verify integrity
+    info = service.verify_backup_integrity(str(backup_archive))
+    assert info["valid"] is True
+    assert info["is_bundle"] is True
+    assert info["photo_count"] == 1
+
+    # 3. Simulate photo loss
+    photo1.unlink()
+    assert not photo1.exists()
+
+    # 4. Restore from unified archive
+    res = service.restore_from_backup(str(backup_archive))
+    assert res["success"] is True
+
+    # 5. Verify photo was restored
+    assert photo1.exists()
+    assert photo1.read_bytes() == b"\xFF\xD8\xFF\xE0FakePhotoBytes1"
+
