@@ -1,42 +1,34 @@
 ---
 gsd_state_version: '1.0'
-milestone: 'v2.0-restart'
-status: milestone_complete
-current_phase: 10
+milestone: 'v3.0'
+milestone_name: 'Centralized LAN Web Platform'
+status: planning
+current_phase: null
 progress:
-  total_phases: 10
-  completed_phases: 10
+  total_phases: 0
+  completed_phases: 0
   active_phase: null
-  percent: 100
+  percent: 0
 ---
 
-# Project State: Kalyan Hospital Offline Patient Management
+# Project State: Kalyan Hospital Patient & Physiotherapy Management
 
 ## Project Reference
 
-See: `.planning/PROJECT.md` and `.planning/ROADMAP.md`
+See: `.planning/PROJECT.md` (updated 2026-10-30)
 
-**Core value:** Reliable, zero-cloud offline patient registration, physiotherapy clinical history, and payment tracking on a single clinic computer with 100% data persistence, audit logging, and verifiable local backup.  
-**Current focus:** Handover Ready.  
-**Last completed:** Phase 10 — Real Windows Handover & Offline Verification (Plan 10-01 completed).  
+**Core value:** Reliable, internet-free shared patient records for reception and doctors across the hospital LAN, enforced by server-side permissions, with auditable changes and a backup proven to restore.
+**Current focus:** Milestone v3.0 — defining requirements.
 
 ## Current Position
 
-Phase: Phase 10 (Real Windows Handover & Offline Verification)  
-Status: Complete  
-Completed Phases: 10 of 10  
-Active Roadmap: Handover & Verification Complete  
-Progress: [██████████] 100%
+Phase: Not started (defining requirements)
+Plan: —
+Status: Defining requirements
+Last activity: 2026-10-30 — Milestone v3.0 started
 
-## Phase Overview
+## Accumulated Context
 
-- [x] Phase 1: App Shell & Dashboard Foundation (2/2 plans) — Complete
-- [x] Phase 2: Patient Registration & Search (2/2 plans) — Complete
-- [x] Phase 3: Treatment Cases & Payment Tracking (2/2 plans) — Complete
-- [x] Phase 4: A4 Print Preview, PDF Export & Local Backup (2/2 plans) — Complete
-- [x] Phase 5: Demo Hardening & Security Controls (2/2 plans) — Complete
-- [x] Phase 6: Baseline Audit & P0 Safety/Audit Core (1/1 plans) — Complete
-- [x] Phase 7: Dependable Registration & Print Layout Alignment (1/1 plans) — Complete
-- [x] Phase 8: Clinical Records & Financial Integrity (1/1 plans) — Complete
-- [x] Phase 9: Local Security & Verified Disaster Recovery (1/1 plans) — Complete
-- [x] Phase 10: Real Windows Handover & Offline Verification (1/1 plans) — Complete
+- v2.0 PySide6 + SQLite desktop app (phases 1–10) is complete and archived at `.planning/milestones/v2.0-restart-phases/`. It is the reference for domain rules only.
+- Open items: confirm server hardware and LAN; plan SQLite to PostgreSQL data migration; client approval of the full feature list.
+- Tooling note: Node.js is not installed on the dev machine, so `gsd-tools.cjs` cannot run; GSD artifacts are being maintained by hand. Node is also required to build the React frontend.

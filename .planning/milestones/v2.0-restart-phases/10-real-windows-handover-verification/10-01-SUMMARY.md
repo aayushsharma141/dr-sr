@@ -47,3 +47,4 @@
 - `KalyanHospital.exe` size: ~7.27 MB.
 - Pytest suite: 100% passing.
 - Rehearsal execution: 100% offline pass with full disaster recovery cycle.
+

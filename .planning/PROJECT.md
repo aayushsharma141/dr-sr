@@ -1,79 +1,97 @@
-# Kalyan Hospital — Offline Patient & Physiotherapy Management System
+# Kalyan Hospital — Patient & Physiotherapy Management System
 
 ## What This Is
 
-A lightweight, 100% offline Windows desktop application built with Python, PySide6 (Qt 6), and SQLite 3 for Kalyan Hospital (operated by श्री वशिष्ठ कल्याण ट्रस्ट) in Ara, Bhojpur, Bihar. It streamlines patient registration, manages physiotherapy treatment cases and chronological clinical session notes, tracks package fees and payments with currency-safe arithmetic, generates hospital-branded A4 registration printouts, and provides verified local database backup and restore.
+A fully offline, centralized web application for Kalyan Hospital (operated by श्री वशिष्ठ कल्याण ट्रस्ट), Ara, Bhojpur, Bihar. One central server PC on the hospital LAN hosts a FastAPI backend and a PostgreSQL database; reception, doctor and admin staff use a browser on any LAN PC and sign in with individual accounts. It covers patient registration, appointments, clinical encounters, physiotherapy sessions, billing and data protection.
+
+The earlier v2.0 PySide6 + SQLite single-PC desktop app is retained in-repo only as the reference implementation of domain rules. It is not part of the new architecture and the two must not be mixed.
 
 ## Core Value
 
-Reliable, zero-cloud offline patient registration, physiotherapy clinical history, and payment tracking on a single clinic computer with 100% data persistence and verifiable local backup.
+Reliable, internet-free shared patient records for reception and doctors across the hospital LAN, enforced by server-side permissions, with auditable changes and a backup that has been proven to restore.
 
 ## Business Context
 
 - **Customer:** Kalyan Hospital / श्री वशिष्ठ कल्याण ट्रस्ट (Station Road, Ara, Bhojpur, Bihar).
-- **Revenue model:** Fixed-price custom desktop software contract (₹22,000 total commercial ceiling).
-- **Success metric:** 100% offline operation, reliable patient records retrieval, accurate balance calculation, client-accepted A4 registration printouts, and zero data corruption across restarts.
-- **Strategy notes:** 6-week phased delivery with early working prototype demos after Stage B (Patient Registration) and Stage D (Printing & Backups).
+- **Revenue model:** Fixed-price custom software contract (₹22,000 total commercial ceiling).
+- **Success metric:** Reception and doctor PCs read/write the same records over LAN with no internet; permissions hold at the API; backup restores cleanly on a clean machine.
+- **Strategy notes:** Source of truth for the approved direction is `docs/plans/initial plan.pdf` plus the single-frontend decision recorded below.
+
+## Current Milestone: v3.0 Centralized LAN Web Platform
+
+**Goal:** Replace the single-PC desktop app with one central-server web platform: FastAPI + PostgreSQL backend and one React + TypeScript frontend serving role-based dashboards.
+
+**Target features:**
+- One React + TypeScript codebase with role-routed dashboards at `/admin`, `/reception`, `/doctor`; individual login, UI chosen by role.
+- FastAPI enforces permissions on every endpoint independently of what the UI shows.
+- PostgreSQL schema, migrations and authorization model; local filesystem storage for patient photos and documents.
+- Reception: patient registration (KH-YYYY-XXXX URN), search, profile editing, photos, appointments, doctor assignment.
+- Doctor: clinical encounters, consultation notes, prescriptions, treatment plans, physiotherapy session history.
+- Billing: consultation charges, payments, outstanding balances, receipts, session packages (integer paise).
+- Admin: users and permissions, hospital settings, doctor profiles, audit events, backup and tested restore, integrity checks.
+- Printing and reports (registration card with dual-signature pad layout).
+- One-time install on the server PC; offline, LAN, integrity and recovery testing before handover.
 
 ## Requirements
 
 ### Validated
 
-(None yet — ship to validate)
+Domain behaviour proven in the v2.0 desktop reference implementation (rules to carry over, not code to reuse):
+
+- ✓ Sequential human-readable patient ID `KH-YYYY-XXXX` — v2.0
+- ✓ 12-field canonical registration form with dual-signature A4 print — v2.0 (client approved)
+- ✓ Integer-paise billing, rejects negative payments and overpayments — v2.0
+- ✓ Chronological, immutable physiotherapy session history with VAS pain score — v2.0
+- ✓ Persistent audit log and role-checked sensitive actions — v2.0
+- ✓ Verified backup bundle (data + photos) with integrity-checked restore — v2.0
 
 ### Active
 
-- [ ] **DASH-01**: Dashboard view showing real-time counts for total patients, today's registrations, active cases, and pending balances from SQLite.
-- [ ] **PAT-01**: Sequential, human-readable unique patient ID generation (`KH-YYYY-XXXX`).
-- [ ] **PAT-02**: Patient registration capturing name, age, sex, mobile, address, referral source, condition, and registration timestamp.
-- [ ] **PAT-03**: Optional patient photo selection stored in local application data directory.
-- [ ] **PAT-04**: Fast patient search by ID, name, or mobile number with immediate record reopening.
-- [ ] **TRT-01**: Multi-case physiotherapy tracking linked to patient records.
-- [ ] **TRT-02**: Chronological treatment sessions logging session timestamp, therapist name, notes, modalities, and pain scores.
-- [ ] **TRT-03**: Preservation of historical treatment session notes when adding new sessions.
-- [ ] **BIL-01**: Treatment fee package and payment tracking stored in integer paise.
-- [ ] **BIL-02**: Dynamic outstanding balance calculation rejecting negative payments and overpayments.
-- [ ] **PRN-01**: Hospital-branded A4 patient registration card print preview and PDF export reproducing official maroon header and clinician credentials.
-- [ ] **PRN-02**: Reproduction of canonical 12 form fields + Patient Picture box + dual signatures (Patient/Attendant & Authorized Signature) + Date.
-- [ ] **BAK-01**: Safe hot SQLite backup creation to designated local directory.
-- [ ] **BAK-02**: Verified database restore pipeline with integrity check before active database replacement.
-- [ ] **SEC-01**: Salted PBKDF2 password-hashed administrator login for sensitive clinic operations.
+Defined in `.planning/REQUIREMENTS.md` for v3.0.
 
 ### Out of Scope
 
-- **Cloud Hosting / Web Portal** — Excluded to guarantee 100% offline resilience and eliminate recurring cloud costs within ₹22,000 budget.
-- **Multi-PC LAN Real-Time Networking** — Out of scope for v1 single-workstation contract; requires separate networking/concurrency agreement.
-- **SMS / WhatsApp Gateway Automation** — Excluded to eliminate third-party telecom API costs and internet dependencies.
-- **Full Hospital ERP & Inpatient Bed Allocation** — Focus is strictly outpatient registration and physiotherapy case management.
-- **Hardware Biometric Scanners** — Standard Windows keyboard and mouse entry only.
+- **Cloud hosting / internet-facing access** — system must operate with no internet; server is reachable on the LAN only.
+- **Separate frontend projects per role** — one codebase with role routes keeps maintenance inside the ₹22,000 budget.
+- **Independent copies of the app on each PC** — all PCs share the one central database.
+- **SMS / WhatsApp gateway automation** — third-party telecom cost and internet dependency.
+- **Full hospital ERP and inpatient bed allocation** — outpatient registration and physiotherapy focus only.
+- **Hardware biometric scanners** — keyboard and mouse entry only.
+- **PySide6 + SQLite** — remains valid only if a single-computer deployment is later confirmed; never mixed with this architecture.
 
 ## Context
 
-- **Environment:** Single offline Windows 10/11 workstation at clinic reception in Ara, Bihar.
+- **Environment:** One central Windows server PC plus reception, doctor and admin PCs on the hospital LAN; no internet required for normal operation. Actual server hardware and LAN topology are not yet confirmed.
 - **Hospital Identity:** KALYAN HOSPITAL — PHYSIOTHERAPY DEPARTMENT (श्री वशिष्ठ कल्याण ट्रस्ट द्वारा संचालित).
 - **Clinics:**
   - Clinic 1: नवादा थाना के सामने वाली गली, आरा, भोजपुर (802301)
-  - Clinic 2: श्रीरामपुर रोड, गड़हनी, उदवन्तनगर, भोजपुर (802206)
+  - Clinic 2: श्रीरामपुर रोड, गड़हनी, उदवन्तनगर, भोजपुर (802206)
 - **Consultants:** Dr. Madan Mohan Dwivedi & Dr. Chandan Kr. Dwivedi.
-- **Data Policy:** 100% synthetic fictional patient records used during development and client demonstrations.
+- **Reference implementation:** `app/` (PySide6 + SQLite, v2.0, phases 1–10 archived under `.planning/milestones/v2.0-restart-phases/`).
+- **Open-source references to study (not audited, verify licence and offline behaviour before reuse):** Open Hospital, ICTHospital, OpenEMR, GNU Health, VITALIt OS.
+- **Data Policy:** 100% synthetic fictional patient records during development and demos.
 
 ## Constraints
 
 - **Budget:** ₹22,000 maximum fixed ceiling.
 - **Timeline:** 4–6 weeks total delivery window.
-- **Stack:** Python 3.10+, PySide6, SQLite 3.
-- **Architecture:** Layered Service-Repository architecture separating UI, services, data repositories, and SQL.
-- **Deployment:** Completely offline, self-contained local installation.
+- **Stack:** React + TypeScript (single app), Python + FastAPI, PostgreSQL, local file storage.
+- **Security:** Individual accounts; backend-enforced permissions on every endpoint; audit events for sensitive actions.
+- **Deployment:** Installed once on the central server PC; other PCs use a browser over LAN; no internet dependency.
+- **Build tooling:** Node.js is required only on the build machine to produce static frontend assets; the server PC serves the built assets and does not need Node. (Node is not currently installed on the dev machine.)
 
 ## Key Decisions
 
 | Decision | Rationale | Outcome |
 |----------|-----------|---------|
-| Python + PySide6 + SQLite | Zero recurring licensing, native desktop speed, rich Qt printing and PDF output | — Pending verification |
-| Single-PC Offline Boundary | Matches clinic setup and preserves budget/timeline constraints | — Pending client demo |
-| Integer Paise Billing | Prevents binary floating-point rounding errors in clinic accounts | — Pending implementation |
-| 12-Field Form with Dual Signatures | Exact replication of official Kalyan Hospital physical pad and workflow | ✓ Approved by client |
-| Hot SQLite Backup + Verified Restore | Prevents data loss during power outages and validates backup usability | — Pending implementation |
+| Centralized LAN server instead of per-PC installs | Shared records across reception and doctor PCs is the intended use case | — Pending hardware/LAN confirmation |
+| React + TypeScript, ONE codebase with `/admin` `/reception` `/doctor` routes | Avoids maintaining three frontends within ₹22,000 | ✓ Approved by user 2026-10-30 |
+| Python + FastAPI backend | Reuses existing Python domain logic; independent permission enforcement | ✓ Approved by user 2026-10-30 |
+| PostgreSQL | Concurrent multi-PC writes, proper transactions | ✓ Approved by user 2026-10-30 |
+| Backend enforces permissions; hiding screens is not security | Role UI is convenience only | ✓ Approved by user 2026-10-30 |
+| Integer paise billing | Prevents floating-point rounding in accounts | ✓ Carried from v2.0 |
+| 12-field form with dual signatures | Replicates the physical pad | ✓ Approved by client (v2.0) |
+| PySide6 + SQLite desktop app | Superseded for v3.0; kept as reference only | ⚠️ Superseded |
 
 ## Evolution
 
@@ -93,4 +111,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-10-28 after initialization*
+*Last updated: 2026-10-30 after starting milestone v3.0 (Centralized LAN Web Platform)*
