@@ -1,41 +1,42 @@
 ---
 gsd_state_version: '1.0'
-status: milestone_complete
+milestone: 'v2.0-restart'
+status: in_progress
+current_phase: 7
 progress:
-  total_phases: 5
-  completed_phases: 5
-  total_plans: 10
-  completed_plans: 10
-  percent: 100
+  total_phases: 10
+  completed_phases: 6
+  active_phase: '07-dependable-registration-print-alignment'
+  percent: 60
 ---
 
 # Project State: Kalyan Hospital Offline Patient Management
 
 ## Project Reference
 
-See: `.planning/PROJECT.md` (updated 2026-10-28)
+See: `.planning/PROJECT.md` and `.planning/ROADMAP.md`
 
-**Core value:** Reliable, zero-cloud offline patient registration, physiotherapy clinical history, and payment tracking on a single clinic computer with 100% data persistence and verifiable local backup.  
-**Current focus:** Project Milestone Complete! Ready for Client Walkthrough & Deployment.  
-**Last completed:** Phase 5 — Demo Hardening & Security Controls (2/2 plans complete)  
-**Phase 5 Plans:**
-- [x] [05-01-PLAN.md](file:///d:/dr-sr/.planning/phases/05-demo-hardening-security/05-01-PLAN.md): PBKDF2 authentication service, permission guard dialogs, and offline regression test suite.
-- [x] [05-02-PLAN.md](file:///d:/dr-sr/.planning/phases/05-demo-hardening-security/05-02-PLAN.md): Synthetic demo dataset generator, reset utility, and client walkthrough script.
-
-**Next step:** Conduct the 5-minute client demonstration using [DEMO_SCRIPT.md](file:///d:/dr-sr/DEMO_SCRIPT.md).
+**Core value:** Reliable, zero-cloud offline patient registration, physiotherapy clinical history, and payment tracking on a single clinic computer with 100% data persistence, audit logging, and verifiable local backup.  
+**Current focus:** Phase 07 — Dependable Patient Registration & Form-Pad Alignment.  
+**Last completed:** Phase 06 — Baseline Audit & P0 Safety/Audit Core (Plan 06-01 completed).  
 
 ## Current Position
 
-Phase: All 5 Phases Complete (Milestone Delivered)  
-Status: 100% Complete (10 of 10 plans finished, 22 of 22 requirements verified)  
-Last activity: Verified and completed Phase 5 execution.
-
-Progress: [██████████] 100%
+Phase: Phase 07 (Dependable Registration & Print Layout Alignment)  
+Status: Planned / Next  
+Completed Phases: 6 of 10  
+Active Roadmap: Phases 7 to 10  
+Progress: [██████░░░░] 60%
 
 ## Phase Overview
 
-1. [x] Phase 1: App Shell & Dashboard Foundation (2/2 plans) — Complete (2026-10-28)
-2. [x] Phase 2: Patient Registration & Search (2/2 plans) — Complete (2026-10-28)
-3. [x] Phase 3: Treatment Cases & Payment Tracking (2/2 plans) — Complete (2026-10-28)
-4. [x] Phase 4: A4 Print Preview, PDF Export & Local Backup (2/2 plans) — Complete (2026-10-28)
-5. [x] Phase 5: Demo Hardening & Security Controls (2/2 plans) — Complete (2026-10-28)
+- [x] Phase 1: App Shell & Dashboard Foundation (2/2 plans) — Complete
+- [x] Phase 2: Patient Registration & Search (2/2 plans) — Complete
+- [x] Phase 3: Treatment Cases & Payment Tracking (2/2 plans) — Complete
+- [x] Phase 4: A4 Print Preview, PDF Export & Local Backup (2/2 plans) — Complete
+- [x] Phase 5: Demo Hardening & Security Controls (2/2 plans) — Complete
+- [x] Phase 6: Baseline Audit & P0 Safety/Audit Core (1/1 plans) — Complete
+- [ ] Phase 7: Dependable Registration & Print Layout Alignment
+- [ ] Phase 8: Clinical Records & Financial Integrity
+- [ ] Phase 9: Local Security & Verified Disaster Recovery
+- [ ] Phase 10: Real Windows Handover & Offline Verification

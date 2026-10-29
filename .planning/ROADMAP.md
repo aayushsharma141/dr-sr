@@ -11,6 +11,11 @@ A structured 5-phase delivery plan to build a reliable, fully offline Windows de
 - [x] **Phase 3: Treatment Cases & Payment Tracking** - Multi-case tracking, chronological session logging, integer paise billing calculations, and balance ledger.
 - [x] **Phase 4: A4 Print Preview, PDF Export & Local Backup** - Hospital-branded A4 registration card generator, PDF export, hot SQLite backup, and verified restore pipeline.
 - [x] **Phase 5: Demo Hardening & Security Controls** - Role-based authentication, offline resilience verification, synthetic demo data seeder, and walkthrough readiness.
+- [x] **Phase 6: Baseline Audit & P0 Safety/Audit Core** - Persistent audit log table & service, first-run administrator credential setup, and WAL-safe database restore snapshots.
+- [ ] **Phase 7: Dependable Registration & Print Layout Alignment** - 12 canonical fields, atomic URN generation, mobile validation, local photos, and dual-signature physical pad alignment.
+- [ ] **Phase 8: Clinical Records & Financial Integrity** - Dated therapy sessions, clinician assignment, modalities, VAS pain scores, immutable session history, and integer-paise dynamic billing.
+- [ ] **Phase 9: Local Security & Verified Disaster Recovery** - Clinical doctor role, service-layer permission enforcement, unified backup bundling (photos + DB), and strict schema verification.
+- [ ] **Phase 10: Real Windows Handover & Offline Verification** - PyInstaller standalone executable, offline rehearsal on target Windows PC, printer output test, and client sign-off under ₹22,000 ceiling.
 
 ## Phase Details
 
@@ -90,18 +95,37 @@ Plans:
 - [x] 05-01: PBKDF2 authentication service, permission guard dialogs, and offline regression test suite.
 - [x] 05-02: Synthetic demo dataset generator, reset utility, and client walkthrough script.
 
+### Phase 6: Baseline Audit & P0 Safety/Audit Core
+**Goal**: Resolve P0 audit gaps: implement persistent `audit_logs` table & `AuditService`, remove hardcoded default credentials in favor of first-run setup, and replace raw `shutil.copy2` with atomic WAL-safe SQLite snapshots in backup restore.  
+**Depends on**: Phase 5  
+**Requirements**: AUD-01, SEC-01, BAK-01, BAK-02  
+**Success Criteria**:
+  1. `audit_logs` table exists in SQLite schema and `AuditService` records security, patient, session, payment, and backup events.
+  2. `AuthService` removes hardcoded `kalyan@admin` default password; system enforces first-run administrator password setup before any clinic record entry.
+  3. Pre-restore rollback snapshot in `BackupService` uses `conn.backup()` and explicit WAL checkpointing instead of `shutil.copy2()`.
+  4. All unit and integration tests pass with 100% green status.
+**Plans**: 1 plan
+
+Plans:
+- [ ] 06-01: Persistent audit logging, first-run admin credential initialization, and WAL-safe restore snapshots.
+
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
+Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 → 9 → 10
 
 | Phase | Plans Complete | Status | Completed |
-|-------|----------------|--------|-----------|
+|---|---|---|---|
 | 1. App Shell & Dashboard | 2/2 | Complete | 2026-10-28 |
 | 2. Patient Registration & Search | 2/2 | Complete | 2026-10-28 |
 | 3. Treatment Cases & Payments | 2/2 | Complete | 2026-10-28 |
 | 4. A4 Printing & Local Backup | 2/2 | Complete | 2026-10-28 |
 | 5. Demo Hardening & Security | 2/2 | Complete | 2026-10-28 |
+| 6. Baseline Audit & P0 Safety/Audit Core | 1/1 | Complete | 2026-10-30 |
+| 7. Dependable Registration & Print Alignment | 0/1 | Planned | — |
+| 8. Clinical Records & Financial Integrity | 0/1 | Planned | — |
+| 9. Local Security & Verified Disaster Recovery | 0/1 | Planned | — |
+| 10. Real Windows Handover & Offline Verification | 0/1 | Planned | — |
 
 ---
 *Roadmap created: 2026-10-28*

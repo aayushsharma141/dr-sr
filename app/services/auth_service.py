@@ -6,8 +6,10 @@ Kalyan Hospital Management System.
 import hashlib
 import hmac
 import secrets
+from pathlib import Path
 from typing import Any, Dict, Optional, Tuple
 from app.db.connection import get_db_connection
+from app.services.audit_service import AuditService
 
 
 class AuthService:
@@ -15,9 +17,12 @@ class AuthService:
 
     ITERATIONS = 100000
 
-    def __init__(self, db_path: Optional[str] = None):
-        self.db_path = db_path
-        self.ensure_default_admin()
+    def __init__(self, db_path: Optional[str | Path] = None, auto_seed_demo: bool = True):
+        self.db_path = str(db_path) if db_path else None
+        self._audit = AuditService(self.db_path)
+        if auto_seed_demo:
+            # Seed demo admin if no admin exists (for development & existing automated test harnesses)
+            self.ensure_default_admin()
 
     def _get_connection(self):
         return get_db_connection(self.db_path)
@@ -51,6 +56,57 @@ class AuthService:
         calculated_hash, _ = cls.hash_password(password, salt=salt)
         return hmac.compare_digest(calculated_hash, stored_hash)
 
+    def has_admin_user(self) -> bool:
+        """Checks if at least one active administrator account exists in the database."""
+        with self._get_connection() as conn:
+            cursor = conn.execute("SELECT id FROM users WHERE role = 'ADMIN' AND is_active = 1 LIMIT 1")
+            return cursor.fetchone() is not None
+
+    def setup_initial_admin(
+        self,
+        username: str,
+        password: str,
+    ) -> Dict[str, Any]:
+        """
+        Initializes the first administrator account during clinic onboarding.
+        Enforces a minimum password length of 8 characters.
+        """
+        if self.has_admin_user():
+            raise ValueError("An active administrator already exists in the system.")
+
+        username_clean = username.strip()
+        if not username_clean:
+            raise ValueError("Administrator username cannot be blank.")
+        if len(password) < 8:
+            raise ValueError("Administrator password must be at least 8 characters long.")
+
+        pwd_hash, salt = self.hash_password(password)
+        with self._get_connection() as conn:
+            ins_cursor = conn.execute(
+                """
+                INSERT INTO users (username, password_hash, salt, role, is_active)
+                VALUES (?, ?, ?, 'ADMIN', 1)
+                """,
+                (username_clean, pwd_hash, salt),
+            )
+            user_id = int(ins_cursor.lastrowid or 0)
+            conn.commit()
+
+        self._audit.log_event(
+            action="ADMIN_INITIALIZED",
+            entity_type="USER",
+            entity_id=user_id,
+            actor_name=username_clean,
+            details=f"First-run administrator '{username_clean}' configured.",
+            user_id=user_id,
+        )
+
+        return {
+            "id": user_id,
+            "username": username_clean,
+            "role": "ADMIN",
+        }
+
     def ensure_default_admin(
         self,
         default_username: str = "admin",
@@ -58,15 +114,13 @@ class AuthService:
     ) -> Optional[Dict[str, Any]]:
         """
         Seeds a default administrator account if the users table has no admin user.
+        Maintained for local test suites and offline demo execution.
         """
-        with self._get_connection() as conn:
-            cursor = conn.execute("SELECT id FROM users WHERE role = 'ADMIN' AND is_active = 1 LIMIT 1")
-            row = cursor.fetchone()
-            if row:
-                return None  # Admin already exists
+        if self.has_admin_user():
+            return None
 
-            # Create default admin
-            pwd_hash, salt = self.hash_password(default_password)
+        pwd_hash, salt = self.hash_password(default_password)
+        with self._get_connection() as conn:
             ins_cursor = conn.execute(
                 """
                 INSERT INTO users (username, password_hash, salt, role, is_active)
@@ -74,14 +128,23 @@ class AuthService:
                 """,
                 (default_username, pwd_hash, salt),
             )
-            user_id = ins_cursor.lastrowid
+            user_id = int(ins_cursor.lastrowid or 0)
             conn.commit()
 
-            return {
-                "id": user_id,
-                "username": default_username,
-                "role": "ADMIN",
-            }
+        self._audit.log_event(
+            action="ADMIN_SEEDED",
+            entity_type="USER",
+            entity_id=user_id,
+            actor_name="System",
+            details="Default demo admin seeded.",
+            user_id=user_id,
+        )
+
+        return {
+            "id": user_id,
+            "username": default_username,
+            "role": "ADMIN",
+        }
 
     def authenticate(self, username: str, password: str) -> Optional[Dict[str, Any]]:
         """
@@ -93,16 +156,39 @@ class AuthService:
             cursor = conn.execute(sql, (username_clean,))
             user = cursor.fetchone()
             if not user:
+                self._audit.log_event(
+                    action="AUTH_FAILED",
+                    entity_type="USER",
+                    actor_name=username_clean,
+                    details=f"Authentication attempt failed: user '{username_clean}' not found.",
+                )
                 return None
 
             user_dict = dict(user)
             if self.verify_password(password, user_dict["password_hash"], user_dict["salt"]):
+                self._audit.log_event(
+                    action="AUTH_SUCCESS",
+                    entity_type="USER",
+                    entity_id=user_dict["id"],
+                    actor_name=username_clean,
+                    details=f"User '{username_clean}' logged in successfully.",
+                    user_id=user_dict["id"],
+                )
                 return {
                     "id": user_dict["id"],
                     "username": user_dict["username"],
                     "role": user_dict["role"],
                     "created_at": user_dict["created_at"],
                 }
+
+            self._audit.log_event(
+                action="AUTH_FAILED",
+                entity_type="USER",
+                entity_id=user_dict["id"],
+                actor_name=username_clean,
+                details=f"Authentication attempt failed: incorrect password for '{username_clean}'.",
+                user_id=user_dict["id"],
+            )
             return None
 
     def verify_admin_credentials(self, password: str) -> bool:
@@ -127,7 +213,7 @@ class AuthService:
             raise ValueError("New password must be at least 6 characters long.")
 
         with self._get_connection() as conn:
-            cursor = conn.execute("SELECT password_hash, salt FROM users WHERE id = ?", (user_id,))
+            cursor = conn.execute("SELECT id, username, password_hash, salt FROM users WHERE id = ?", (user_id,))
             user = cursor.fetchone()
             if not user:
                 return False
@@ -141,4 +227,13 @@ class AuthService:
                 (new_hash, new_salt, user_id),
             )
             conn.commit()
-            return True
+
+        self._audit.log_event(
+            action="PASSWORD_CHANGED",
+            entity_type="USER",
+            entity_id=user_id,
+            actor_name=user["username"],
+            details=f"Password updated for user '{user['username']}'.",
+            user_id=user_id,
+        )
+        return True

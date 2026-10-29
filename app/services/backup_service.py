@@ -3,14 +3,23 @@ Backup Service - Hot SQLite Online Backups and Verified Restore Pipeline.
 Kalyan Hospital Management System.
 """
 
-import os
-import shutil
 import sqlite3
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 from app.config import BACKUP_DIR, DB_PATH
 from app.db.connection import get_db_connection
+from app.services.audit_service import AuditService
+
+REQUIRED_TABLES = (
+    "patients",
+    "treatment_cases",
+    "treatment_sessions",
+    "payments",
+    "users",
+    "id_sequences",
+    "doctors",
+)
 
 
 class BackupService:
@@ -20,6 +29,7 @@ class BackupService:
         self.db_path = Path(db_path) if db_path else Path(DB_PATH)
         self.backup_dir = Path(backup_dir) if backup_dir else Path(BACKUP_DIR)
         self.backup_dir.mkdir(parents=True, exist_ok=True)
+        self._audit = AuditService(str(self.db_path))
 
     def create_backup(self, target_dir: Optional[str] = None) -> Path:
         """
@@ -40,11 +50,25 @@ class BackupService:
 
         # Execute atomic SQLite hot backup
         with get_db_connection(str(self.db_path)) as src_conn:
+            # Checkpoint WAL so active changes are cleanly consolidated
+            if str(self.db_path) != ":memory:":
+                try:
+                    src_conn.execute("PRAGMA wal_checkpoint(TRUNCATE);")
+                except sqlite3.OperationalError:
+                    pass
             dest_conn = sqlite3.connect(str(dest_path))
             try:
                 src_conn.backup(dest_conn)
             finally:
                 dest_conn.close()
+
+        self._audit.log_event(
+            action="BACKUP_CREATED",
+            entity_type="DATABASE",
+            entity_id=backup_filename,
+            actor_name="System",
+            details=f"Local backup created at {dest_path.name}",
+        )
 
         return dest_path.resolve()
 
@@ -91,14 +115,23 @@ class BackupService:
                     "file_size_bytes": file_size,
                 }
 
-            # 2. Inspect table row counts
+            # 2. Verify all required canonical tables exist
+            cursor.execute("SELECT name FROM sqlite_master WHERE type='table';")
+            existing_tables = {row[0] for row in cursor.fetchall()}
+            missing_tables = [t for t in REQUIRED_TABLES if t not in existing_tables]
+            if missing_tables:
+                conn.close()
+                return {
+                    "valid": False,
+                    "error": f"Backup is structurally incomplete. Missing required table(s): {', '.join(missing_tables)}",
+                    "file_size_bytes": file_size,
+                }
+
+            # 3. Inspect table row counts
             def _get_count(table_name: str) -> int:
-                try:
-                    cursor.execute(f"SELECT COUNT(*) AS c FROM {table_name}")
-                    r = cursor.fetchone()
-                    return r["c"] if r else 0
-                except sqlite3.OperationalError:
-                    return 0
+                cursor.execute(f"SELECT COUNT(*) AS c FROM {table_name}")
+                r = cursor.fetchone()
+                return r["c"] if r else 0
 
             patients_cnt = _get_count("patients")
             cases_cnt = _get_count("treatment_cases")
@@ -155,9 +188,9 @@ class BackupService:
         a verified, fail-safe 4-step pipeline:
         
         Step 1: Pre-restore verification in an isolated connection.
-        Step 2: Create a safety rollback snapshot of current live database.
-        Step 3: Copy backup into active database path using SQLite backup API.
-        Step 4: Verify restored database health; if unhealthy, automatically rollback.
+        Step 2: Create a safety rollback snapshot of current live database via SQLite Online Backup API.
+        Step 3: Copy backup into active database path using SQLite Online Backup API.
+        Step 4: Verify restored database health; if unhealthy, automatically rollback using safety snapshot.
         
         Returns:
             Dict containing success status and restored record counts.
@@ -167,16 +200,26 @@ class BackupService:
         if not verification.get("valid"):
             raise ValueError(f"Cannot restore from corrupt backup: {verification.get('error')}")
 
-        # Step 2: Create safety snapshot of live database
+        # Step 2: Create safety snapshot of live database using SQLite backup API (WAL-safe)
         timestamp_str = datetime.now().strftime("%Y%m%d_%H%M%S")
         safety_snapshot_path = self.backup_dir / f"safety_pre_restore_{timestamp_str}.bak"
         if self.db_path.exists():
             try:
-                shutil.copy2(str(self.db_path), str(safety_snapshot_path))
+                with get_db_connection(str(self.db_path)) as live_conn:
+                    if str(self.db_path) != ":memory:":
+                        try:
+                            live_conn.execute("PRAGMA wal_checkpoint(TRUNCATE);")
+                        except sqlite3.OperationalError:
+                            pass
+                    safety_conn = sqlite3.connect(str(safety_snapshot_path))
+                    try:
+                        live_conn.backup(safety_conn)
+                    finally:
+                        safety_conn.close()
             except Exception as e:
                 raise RuntimeError(f"Failed to create pre-restore safety snapshot: {str(e)}")
 
-        # Step 3: Copy backup to active database
+        # Step 3: Copy backup to active database using atomic backup API
         backup_src = sqlite3.connect(backup_path)
         active_dest = sqlite3.connect(str(self.db_path))
         try:
@@ -186,7 +229,9 @@ class BackupService:
             active_dest.close()
             backup_src.close()
             if safety_snapshot_path.exists():
-                shutil.copy2(str(safety_snapshot_path), str(self.db_path))
+                with sqlite3.connect(str(safety_snapshot_path)) as s_conn:
+                    with sqlite3.connect(str(self.db_path)) as r_conn:
+                        s_conn.backup(r_conn)
             raise RuntimeError(f"Database restoration failed during stream copy: {str(e)}")
         finally:
             active_dest.close()
@@ -197,8 +242,18 @@ class BackupService:
         if not post_verify.get("valid"):
             # Automatic rollback
             if safety_snapshot_path.exists():
-                shutil.copy2(str(safety_snapshot_path), str(self.db_path))
+                with sqlite3.connect(str(safety_snapshot_path)) as s_conn:
+                    with sqlite3.connect(str(self.db_path)) as r_conn:
+                        s_conn.backup(r_conn)
             raise RuntimeError(f"Restored database failed post-restore verification: {post_verify.get('error')}. Rolled back.")
+
+        self._audit.log_event(
+            action="BACKUP_RESTORED",
+            entity_type="DATABASE",
+            entity_id=Path(backup_path).name,
+            actor_name="Administrator",
+            details=f"Database restored from {Path(backup_path).name}",
+        )
 
         return {
             "success": True,

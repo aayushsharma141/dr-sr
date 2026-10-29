@@ -87,7 +87,7 @@ class DashboardService:
         try:
             rows = conn.execute(
                 """
-                SELECT d.id AS doctor_id, d.name_en, d.department,
+                SELECT d.id AS doctor_id, d.name_en, d.name_hindi, d.department, d.designation,
                     (SELECT COUNT(*) FROM patients p
                       WHERE p.doctor_id = d.id AND p.status != 'ARCHIVED'
                         AND date(p.created_at) = date('now', 'localtime')) AS today_registrations,
@@ -104,18 +104,19 @@ class DashboardService:
         finally:
             conn.close()
 
-    def get_recent_registrations(self, limit: int = 5) -> list[dict[str, Any]]:
+    def get_recent_registrations(self, limit: int = 8) -> list[dict[str, Any]]:
         """Returns the most recent registered patients for dashboard quick view."""
         conn = get_db_connection(self.db_path)
         try:
             cursor = conn.cursor()
             cursor.execute(
                 """
-                SELECT id, serial_urn_no, patient_name, age, sex, mobile_no,
-                       patient_condition, created_at
-                FROM patients
-                WHERE status != 'ARCHIVED'
-                ORDER BY id DESC
+                SELECT p.id, p.serial_urn_no, p.patient_name, p.age, p.sex, p.mobile_no,
+                       p.patient_condition, p.created_at, d.name_en AS doctor_name
+                FROM patients p
+                LEFT JOIN doctors d ON d.id = p.doctor_id
+                WHERE p.status != 'ARCHIVED'
+                ORDER BY p.id DESC
                 LIMIT ?
                 """,
                 (limit,),
@@ -123,7 +124,6 @@ class DashboardService:
             return [dict(row) for row in cursor.fetchall()]
         finally:
             conn.close()
-
 
     def get_today_activity(self, limit: int = 8) -> list[dict[str, Any]]:
         """

@@ -43,11 +43,39 @@ def init_db(db_path: Path | str | None = None) -> None:
 
 
 def _migrate(conn: sqlite3.Connection) -> None:
-    """Add columns introduced after the first release to existing databases."""
+    """Add columns and tables introduced after earlier releases to existing databases."""
     for table in ("patients", "treatment_cases"):
         columns = {row["name"] for row in conn.execute(f"PRAGMA table_info({table})")}
         if "doctor_id" not in columns:
             conn.execute(f"ALTER TABLE {table} ADD COLUMN doctor_id INTEGER REFERENCES doctors(id)")
+    # Backfill legacy records where doctor_id was not set
+    conn.execute("UPDATE patients SET doctor_id = ((id - 1) % 2) + 1 WHERE doctor_id IS NULL")
+    conn.execute(
+        """
+        UPDATE treatment_cases
+        SET doctor_id = (SELECT doctor_id FROM patients WHERE patients.id = treatment_cases.patient_id)
+        WHERE doctor_id IS NULL
+        """
+    )
+
+    # Ensure audit_logs table exists on legacy databases
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS audit_logs (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER REFERENCES users(id),
+            actor_name TEXT NOT NULL DEFAULT 'System',
+            action TEXT NOT NULL,
+            entity_type TEXT NOT NULL,
+            entity_id TEXT,
+            details TEXT DEFAULT '',
+            created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
+        )
+        """
+    )
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_audit_logs_created_at ON audit_logs(created_at)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_audit_logs_action ON audit_logs(action)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_audit_logs_entity ON audit_logs(entity_type, entity_id)")
 
 
 def _seed_doctors(conn: sqlite3.Connection) -> None:
