@@ -27,7 +27,7 @@ Phase 11 delivers the authoritative entry gate resolution, repo scaffolding for 
 
 ### 4. Session Lifecycle & Concurrency Controls
 - **D-07:** Inactivity session expiration is set to 30 minutes. Account lockout triggers after 5 consecutive failed login attempts, applying a 15-minute cooldown period unless unlocked sooner by an Administrator (`SEC-04`).
-- **D-08:** Concurrency conflict resolution (`SEC-05`): Every mutable entity carries a `version_id`. Stale updates return HTTP 409 Conflict. The client interface displays a clear warning: *"Record was modified by another user"* and provides a 1-click reload to re-fetch the latest state without silent data overwrites.
+- **D-08:** Concurrency conflict resolution (`SEC-06`): Every mutable entity carries a `version_id`. Stale updates return HTTP 409 Conflict. The client interface displays a clear warning: *"Record was modified by another user"* and provides a 1-click reload to re-fetch the latest state without silent data overwrites.
 
 ### Claude's Discretion
 - Scaffolding folder structure for FastAPI (`backend/app/...`) and Alembic migrations.
@@ -66,7 +66,7 @@ Phase 11 delivers the authoritative entry gate resolution, repo scaffolding for 
 <specifics>
 ## Specific Ideas
 - The admin dashboard must expose the sequence format toggle (Financial Year vs Calendar Year) under clinic settings.
-- First boot of the web platform prompts the first-run admin initialization wizard (`SEC-04`) with zero hardcoded default credentials in the repository.
+- First boot of the web platform prompts the first-run admin initialization wizard (`SEC-05`) with zero hardcoded default credentials in the repository.
 
 </specifics>
 
@@ -80,3 +80,4 @@ Phase 11 delivers the authoritative entry gate resolution, repo scaffolding for 
 ---
 
 *Phase: 11-Decisions Gate, Foundation & Auth*
+
