@@ -28,3 +28,4 @@ Establish complete safety compliance for Kalyan Hospital v2.0 by resolving three
 3. `AuthService.ensure_default_admin()` no longer sets a known insecure password in production; `has_admin_user()` returns false if no admin exists, allowing the UI/system to trigger first-run setup.
 4. `BackupService.restore_from_backup()` creates pre-restore safety snapshots via SQLite online backup API without depending on `shutil.copy2()`, safely handling WAL mode without journal corruption.
 5. All automated tests in `tests/` pass cleanly.
+

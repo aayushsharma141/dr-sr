@@ -203,3 +203,46 @@ def test_non_destructive_update(test_db):
     assert updated["serial_urn_no"] == original_urn
     assert updated["address"] == "New Address, Nawada, Ara"
     assert updated["patient_condition"] == "Post-stroke Rehab (Progressing)"
+
+
+def test_patient_audit_logging_and_archive(test_db):
+    """Verify that registering, updating, and archiving patients dispatches audit trail events."""
+    from app.services.audit_service import AuditService
+
+    service = PatientService(test_db)
+    audit = AuditService(test_db)
+
+    # 1. Register patient
+    patient = service.register_patient({
+        "patient_name": "Manoj Tiwari",
+        "age": 38,
+        "sex": "Male",
+        "mobile_no": "9876501234",
+        "patient_condition": "Frozen Shoulder",
+    })
+    urn = patient["serial_urn_no"]
+    pid = patient["id"]
+
+    reg_logs = audit.get_recent_logs(action="PATIENT_REGISTERED")
+    assert len(reg_logs) >= 1
+    assert reg_logs[0]["entity_id"] == urn
+
+    # 2. Update patient
+    service.update_patient(pid, {
+        "patient_name": "Manoj Tiwari",
+        "age": 39,
+        "sex": "Male",
+        "mobile_no": "9876501234",
+        "patient_condition": "Frozen Shoulder (Stage 2)",
+    })
+    update_logs = audit.get_recent_logs(action="PATIENT_UPDATED")
+    assert len(update_logs) >= 1
+    assert update_logs[0]["entity_id"] == urn
+
+    # 3. Archive patient
+    success = service.archive_patient(pid, reason="Course Completed")
+    assert success is True
+    archive_logs = audit.get_recent_logs(action="PATIENT_ARCHIVED")
+    assert len(archive_logs) >= 1
+    assert archive_logs[0]["entity_id"] == urn
+

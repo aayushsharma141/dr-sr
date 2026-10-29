@@ -1,15 +1,16 @@
 """
 Patient Service implementing demographic validation, atomic registration,
-and local photo storage management.
+local photo storage management, and tamper-evident audit logging.
 """
 
 from pathlib import Path
 import re
 import shutil
-from typing import Any
+from typing import Any, Optional
 
 from app.config import PHOTOS_DIR
 from app.repositories.patient_repository import PatientRepository
+from app.services.audit_service import AuditService
 
 
 class ValidationError(Exception):
@@ -18,11 +19,12 @@ class ValidationError(Exception):
 
 
 class PatientService:
-    """Coordinates patient validation, ID generation, and file storage."""
+    """Coordinates patient validation, ID generation, file storage, and audit logging."""
 
     def __init__(self, db_path: Path | str | None = None):
         self.db_path = db_path
         self.repository = PatientRepository(db_path)
+        self.audit_service = AuditService(db_path)
 
     def validate_patient_data(self, data: dict[str, Any]) -> dict[str, Any]:
         """
@@ -86,16 +88,23 @@ class PatientService:
         cleaned["address"] = str(cleaned.get("address", "")).strip()
         cleaned["referred_by"] = str(cleaned.get("referred_by", "")).strip()
 
+        # 8. Patient In / Patient Out timestamps
+        if "patient_in" in cleaned and cleaned["patient_in"]:
+            cleaned["patient_in"] = str(cleaned["patient_in"]).strip()
+        if "patient_out" in cleaned and cleaned["patient_out"]:
+            cleaned["patient_out"] = str(cleaned["patient_out"]).strip()
+
         return cleaned
 
     def register_patient(
         self,
         data: dict[str, Any],
         photo_source_path: str | Path | None = None,
+        actor_name: str = "Receptionist",
     ) -> dict[str, Any]:
         """
         Validates input, generates a unique URN, copies photo to local storage,
-        and saves the patient into SQLite.
+        saves the patient into SQLite, and logs an audit event.
         """
         cleaned = self.validate_patient_data(data)
 
@@ -118,6 +127,16 @@ class PatientService:
                 cleaned["photo_filename"] = dest_filename
 
         patient_id = self.repository.create(cleaned)
+
+        # Log audit trail event
+        self.audit_service.log_event(
+            action="PATIENT_REGISTERED",
+            entity_type="PATIENT",
+            entity_id=cleaned.get("serial_urn_no"),
+            actor_name=actor_name,
+            details=f"Registered patient '{cleaned['patient_name']}' with URN {cleaned['serial_urn_no']}.",
+        )
+
         return self.get_patient(patient_id)  # type: ignore
 
     def update_patient(
@@ -125,9 +144,11 @@ class PatientService:
         patient_id: int,
         data: dict[str, Any],
         new_photo_path: str | Path | None = None,
+        actor_name: str = "Receptionist",
     ) -> dict[str, Any]:
         """
-        Updates an existing patient record after validating modified fields.
+        Updates an existing patient record after validating modified fields
+        and logs an audit event.
         """
         existing = self.repository.get_by_id(patient_id)
         if not existing:
@@ -151,7 +172,42 @@ class PatientService:
             cleaned["photo_filename"] = existing.get("photo_filename", "")
 
         self.repository.update(patient_id, cleaned)
+
+        # Log audit trail event
+        self.audit_service.log_event(
+            action="PATIENT_UPDATED",
+            entity_type="PATIENT",
+            entity_id=existing.get("serial_urn_no"),
+            actor_name=actor_name,
+            details=f"Updated profile for patient '{cleaned['patient_name']}' ({existing.get('serial_urn_no')}).",
+        )
+
         return self.get_patient(patient_id)  # type: ignore
+
+    def archive_patient(
+        self,
+        patient_id: int,
+        reason: str = "",
+        actor_name: str = "Staff",
+    ) -> bool:
+        """
+        Soft-deletes/archives patient record without physically removing clinical data
+        and logs an audit trail event.
+        """
+        existing = self.repository.get_by_id(patient_id)
+        if not existing:
+            raise ValidationError(f"Patient with ID {patient_id} does not exist.")
+
+        success = self.repository.soft_delete(patient_id)
+        if success:
+            self.audit_service.log_event(
+                action="PATIENT_ARCHIVED",
+                entity_type="PATIENT",
+                entity_id=existing.get("serial_urn_no"),
+                actor_name=actor_name,
+                details=f"Archived patient {existing.get('serial_urn_no')}. Reason: {reason or 'Not specified'}",
+            )
+        return success
 
     def get_patient(self, patient_id: int) -> dict[str, Any] | None:
         """

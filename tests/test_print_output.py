@@ -55,6 +55,10 @@ def test_safe_filename_strips_path_and_punctuation():
     assert safe_filename("///") == "Document"
 
 
+@pytest.mark.skipif(
+    os.environ.get("QT_QPA_PLATFORM") == "offscreen",
+    reason="QPrinter requires Windows GDI platform and crashes under offscreen QPA (0x80040155)",
+)
 def test_thermal_page_height_grows_with_content():
     short = DocumentBuilder.build_thermal_receipt_html(
         _patient(), {"title": "Rehab", "no_of_sessions": 5},
@@ -98,3 +102,37 @@ def test_a4_documents_fit_one_page_with_photo(tmp_path):
     env = dict(os.environ, QT_QPA_PLATFORM="windows")
     result = subprocess.run([sys.executable, "-I", "-c", script], env=env, capture_output=True, text=True, timeout=120)
     assert result.returncode == 0, result.stdout + result.stderr
+
+
+def test_registration_pad_contains_canonical_12_fields_and_dual_signatures():
+    """Verify that registration HTML contains all 12 numbered fields and authentic dual signatures."""
+    patient = _patient()
+    case = {"title": "Cervical Traction", "no_of_sessions": 7, "total_amount_paise": 210000}
+    fin = {"total_fee_formatted": "₹ 2,100", "total_paid_formatted": "₹ 1,000", "balance_formatted": "₹ 1,100"}
+    html = DocumentBuilder.build_patient_registration_html(patient, case_data=case, financial_summary=fin)
+
+    # 1. Official branding & Doctors
+    assert "KALYAN HOSPITAL" in html
+    assert "PHYSIOTHERAPY DEPARTMENT" in html
+    assert "Madan Mohan Dwivedi" in html
+    assert "Chandan Kr. Dwivedi" in html
+
+    # 2. Canonical numbered fields
+    assert "1. Serial / URN No." in html or "Serial" in html
+    assert "2. Patient Name" in html
+    assert "3. Age" in html
+    assert "4. Sex" in html
+    assert "5. Address" in html
+    assert "6. Mobile No." in html
+    assert "7. Patient In" in html
+    assert "8. Patient Out" in html
+    assert "9. Reference / Referred By" in html
+    assert "10. Patient Condition" in html
+    assert "11. No. of Sessions" in html
+    assert "12. Payment Details" in html
+
+    # 3. Dual signatures
+    assert "Patient / Attendant Signature" in html
+    assert "Authorized Signature" in html
+    assert "Kalyan Hospital, Ara (Bihar)" in html
+
