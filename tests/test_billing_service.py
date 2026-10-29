@@ -154,3 +154,25 @@ def test_overpayment_flagging(test_db, sample_case):
     assert r["overpayment_paise"] == 50000
     assert r["balance_paise"] == 0
     assert r["is_cleared"] is True
+
+
+def test_billing_audit_trail_logging(test_db, sample_case):
+    """Verifies that recording payment installments logs an audit event."""
+    from app.services.audit_service import AuditService
+
+    billing_service = BillingService(test_db)
+    audit = AuditService(test_db)
+
+    receipt = billing_service.record_installment(
+        case_id=sample_case["id"],
+        amount_rupees=1200,
+        payment_mode="UPI",
+        reference_note="UPI Ref #998877",
+        recorded_by="FrontDesk",
+    )
+    logs = audit.get_recent_logs(action="PAYMENT_RECORDED")
+    assert len(logs) >= 1
+    assert logs[0]["entity_id"] == str(receipt["payment_id"])
+    assert logs[0]["actor_name"] == "FrontDesk"
+    assert "₹ 1,200.00" in logs[0]["details"]
+

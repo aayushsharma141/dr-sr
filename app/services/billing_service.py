@@ -7,6 +7,7 @@ from decimal import Decimal, InvalidOperation
 from typing import Any, Dict, List, Optional
 from app.repositories.payment_repository import PaymentRepository
 from app.repositories.treatment_repository import TreatmentRepository
+from app.services.audit_service import AuditService
 
 
 class BillingService:
@@ -23,6 +24,7 @@ class BillingService:
         self.db_path = db_path
         self.payment_repo = PaymentRepository(db_path)
         self.treatment_repo = TreatmentRepository(db_path)
+        self.audit_service = AuditService(db_path)
 
     @staticmethod
     def rupees_to_paise(rupees: Any) -> int:
@@ -130,6 +132,14 @@ class BillingService:
         payment_id = self.payment_repo.record_payment(payment_data)
         balance_paise = max(0, total_fee_paise - new_total_paid_paise)
         is_cleared = (new_total_paid_paise >= total_fee_paise)
+
+        self.audit_service.log_event(
+            action="PAYMENT_RECORDED",
+            entity_type="PAYMENT",
+            entity_id=payment_id,
+            actor_name=payment_data["recorded_by"],
+            details=f"Received {self.format_inr(amount_paise)} via {mode_clean} for Case #{case_id}. Balance: {self.format_inr(balance_paise)}",
+        )
 
         return {
             "payment_id": payment_id,

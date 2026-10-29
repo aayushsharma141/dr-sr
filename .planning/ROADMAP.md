@@ -13,7 +13,7 @@ A structured 5-phase delivery plan to build a reliable, fully offline Windows de
 - [x] **Phase 5: Demo Hardening & Security Controls** - Role-based authentication, offline resilience verification, synthetic demo data seeder, and walkthrough readiness.
 - [x] **Phase 6: Baseline Audit & P0 Safety/Audit Core** - Persistent audit log table & service, first-run administrator credential setup, and WAL-safe database restore snapshots.
 - [x] **Phase 7: Dependable Registration & Print Layout Alignment** - 12 canonical fields, atomic URN generation, mobile validation, local photos, and dual-signature physical pad alignment.
-- [ ] **Phase 8: Clinical Records & Financial Integrity** - Dated therapy sessions, clinician assignment, modalities, VAS pain scores, immutable session history, and integer-paise dynamic billing.
+- [x] **Phase 8: Clinical Records & Financial Integrity** - Dated therapy sessions, clinician assignment, modalities, VAS pain scores, immutable session history, and integer-paise dynamic billing.
 - [ ] **Phase 9: Local Security & Verified Disaster Recovery** - Clinical doctor role, service-layer permission enforcement, unified backup bundling (photos + DB), and strict schema verification.
 - [ ] **Phase 10: Real Windows Handover & Offline Verification** - PyInstaller standalone executable, offline rehearsal on target Windows PC, printer output test, and client sign-off under ₹22,000 ceiling.
 
@@ -123,7 +123,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 →
 | 5. Demo Hardening & Security | 2/2 | Complete | 2026-10-28 |
 | 6. Baseline Audit & P0 Safety/Audit Core | 1/1 | Complete | 2026-10-30 |
 | 7. Dependable Registration & Print Alignment | 1/1 | Complete | 2026-10-30 |
-| 8. Clinical Records & Financial Integrity | 0/1 | Planned | — |
+| 8. Clinical Records & Financial Integrity | 1/1 | Complete | 2026-10-30 |
 | 9. Local Security & Verified Disaster Recovery | 0/1 | Planned | — |
 | 10. Real Windows Handover & Offline Verification | 0/1 | Planned | — |
 

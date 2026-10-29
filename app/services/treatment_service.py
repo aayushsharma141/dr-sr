@@ -7,15 +7,17 @@ from decimal import Decimal, InvalidOperation
 from typing import Any, Dict, List, Optional
 from app.repositories.treatment_repository import TreatmentRepository
 from app.repositories.patient_repository import PatientRepository
+from app.services.audit_service import AuditService
 
 
 class TreatmentService:
-    """Coordinates case management, session recording, and clinical progress tracking."""
+    """Coordinates case management, session recording, clinical progress, and audit tracking."""
 
     def __init__(self, db_path: Optional[str] = None):
         self.db_path = db_path
         self.treatment_repo = TreatmentRepository(db_path)
         self.patient_repo = PatientRepository(db_path)
+        self.audit_service = AuditService(db_path)
 
     @staticmethod
     def rupees_to_paise(rupees: Any) -> int:
@@ -36,6 +38,7 @@ class TreatmentService:
         total_amount_rupees: Any = 0,
         notes: str = "",
         start_date: Optional[str] = None,
+        actor_name: str = "Staff",
     ) -> Dict[str, Any]:
         """
         Opens a new physiotherapy treatment case for an existing patient.
@@ -74,6 +77,15 @@ class TreatmentService:
         saved = self.treatment_repo.get_case(case_id)
         if not saved:
             raise RuntimeError("Failed to retrieve treatment case after creation.")
+
+        self.audit_service.log_event(
+            action="CASE_OPENED",
+            entity_type="TREATMENT_CASE",
+            entity_id=case_id,
+            actor_name=actor_name,
+            details=f"Opened case '{title}' ({sessions} sessions) for patient ID {patient_id}.",
+        )
+
         return saved
 
     def log_session(
@@ -84,9 +96,11 @@ class TreatmentService:
         modalities_used: str = "",
         pain_score: Optional[int] = None,
         session_timestamp: Optional[str] = None,
+        actor_name: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
         Logs a dated treatment session with clinical notes, therapist name, and pain score.
+        Clinical sessions are strictly append-only to preserve patient medical history.
         """
         case = self.treatment_repo.get_case(case_id)
         if not case:
@@ -106,11 +120,12 @@ class TreatmentService:
                 raise ValueError("Pain score must be an integer between 0 and 10.") from exc
 
         next_session_num = self.treatment_repo.get_next_session_number(case_id)
+        attending_clinician = therapist_name.strip() if therapist_name else "Physiotherapist"
 
         session_data = {
             "case_id": case_id,
             "session_timestamp": session_timestamp,
-            "therapist_name": therapist_name.strip() if therapist_name else "Physiotherapist",
+            "therapist_name": attending_clinician,
             "session_number": next_session_num,
             "treatment_notes": notes,
             "modalities_used": modalities_used.strip() if modalities_used else "",
@@ -118,6 +133,15 @@ class TreatmentService:
         }
 
         session_id = self.treatment_repo.add_session(session_data)
+
+        self.audit_service.log_event(
+            action="SESSION_LOGGED",
+            entity_type="TREATMENT_SESSION",
+            entity_id=session_id,
+            actor_name=actor_name or attending_clinician,
+            details=f"Logged Session #{next_session_num} for Case #{case_id} by {attending_clinician}. VAS: {pain_score}",
+        )
+
         return {
             "id": session_id,
             **session_data,
@@ -150,10 +174,19 @@ class TreatmentService:
         """
         return self.treatment_repo.get_cases_for_patient(patient_id)
 
-    def update_case_status(self, case_id: int, new_status: str) -> bool:
+    def update_case_status(self, case_id: int, new_status: str, actor_name: str = "Staff") -> bool:
         """
         Updates the case status ('IN_PROGRESS', 'COMPLETED', 'SUSPENDED').
         """
         if new_status not in ("IN_PROGRESS", "COMPLETED", "SUSPENDED"):
             raise ValueError(f"Invalid case status: {new_status}")
-        return self.treatment_repo.update_case(case_id, {"status": new_status})
+        success = self.treatment_repo.update_case(case_id, {"status": new_status})
+        if success:
+            self.audit_service.log_event(
+                action="CASE_STATUS_UPDATED",
+                entity_type="TREATMENT_CASE",
+                entity_id=case_id,
+                actor_name=actor_name,
+                details=f"Status changed to {new_status} for Case #{case_id}.",
+            )
+        return success

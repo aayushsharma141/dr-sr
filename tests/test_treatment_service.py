@@ -177,3 +177,33 @@ def test_multiple_cases_per_patient(test_db, sample_patient):
 
     assert c1_hist["completed_sessions"] == 1
     assert c2_hist["completed_sessions"] == 2
+
+
+def test_treatment_audit_trail_logging(test_db, sample_patient):
+    """Verifies that case opening, session logging, and status changes record audit events."""
+    from app.services.audit_service import AuditService
+
+    treatment_service = TreatmentService(test_db)
+    audit = AuditService(test_db)
+
+    case = treatment_service.open_treatment_case(
+        patient_id=sample_patient["id"],
+        title="Spinal Decompression",
+        no_of_sessions=6,
+        total_amount_rupees=1800,
+        actor_name="Dr. Chandan",
+    )
+    case_logs = audit.get_recent_logs(action="CASE_OPENED")
+    assert len(case_logs) >= 1
+    assert case_logs[0]["actor_name"] == "Dr. Chandan"
+
+    session = treatment_service.log_session(
+        case_id=case["id"],
+        treatment_notes="Spinal traction applied at 15kg for 20 mins",
+        therapist_name="Dr. Chandan",
+        pain_score=4,
+    )
+    session_logs = audit.get_recent_logs(action="SESSION_LOGGED")
+    assert len(session_logs) >= 1
+    assert session_logs[0]["entity_id"] == str(session["id"])
+
