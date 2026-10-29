@@ -36,3 +36,4 @@ Ensure clinical records and financial transactions are rigorously validated, str
 3. Attempting to record negative or non-numeric payments raises `ValueError`.
 4. Balance calculations match exact arithmetic in paise without rounding errors.
 5. All automated unit and integration tests pass cleanly.
+

@@ -4,8 +4,8 @@ Native PySide6 shell with keyboard-first patient search and non-blocking feedbac
 """
 from typing import Optional
 
-from PySide6.QtCore import Qt, QDateTime
-from PySide6.QtGui import QKeySequence, QShortcut, QIcon
+from PySide6.QtCore import Qt, QDateTime, QSize
+from PySide6.QtGui import QColor, QKeySequence, QShortcut, QIcon
 from PySide6.QtWidgets import (
     QFrame,
     QHBoxLayout,
@@ -17,7 +17,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from qfluentwidgets import setThemeColor
+from qfluentwidgets import FluentIcon, Theme, setTheme, setThemeColor
 
 from app.config import APP_NAME, COLORS, BASE_DIR
 from app.db.connection import init_db
@@ -54,8 +54,9 @@ class MainWindow(QMainWindow):
         icon_path = BASE_DIR / "app" / "assets" / "kalyan_hospital_logo.png"
         if icon_path.exists():
             self.setWindowIcon(QIcon(str(icon_path)))
-        self.resize(1160, 780)
+        self.resize(1180, 800)
         self.setMinimumSize(980, 660)
+        setTheme(Theme.LIGHT)
         setThemeColor(COLORS["primary"])
         self.setStyleSheet(get_application_stylesheet())
 
@@ -86,7 +87,7 @@ class MainWindow(QMainWindow):
         command_layout.setContentsMargins(18, 8, 16, 8)
         command_layout.setSpacing(12)
 
-        self.workspace_context = QLabel("DASHBOARD")
+        self.workspace_context = QLabel("🏥  KALYAN HOSPITAL   ›   DASHBOARD")
         self.workspace_context.setObjectName("WorkspaceContext")
         command_layout.addWidget(self.workspace_context)
 
@@ -94,16 +95,18 @@ class MainWindow(QMainWindow):
 
         self.quick_search_button = QPushButton("Find patient, URN or mobile     Ctrl+K")
         self.quick_search_button.setObjectName("SearchLauncherButton")
+        self.quick_search_button.setIcon(FluentIcon.SEARCH.icon(color=QColor(COLORS["primary"])))
+        self.quick_search_button.setIconSize(QSize(15, 15))
         self.quick_search_button.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.quick_search_button.setMinimumWidth(275)
+        self.quick_search_button.setMinimumWidth(285)
         self.quick_search_button.clicked.connect(self.open_quick_launcher)
         command_layout.addWidget(self.quick_search_button)
 
         self.clock_label = QLabel(QDateTime.currentDateTime().toString("ddd, dd MMM  ·  hh:mm AP"))
-        self.clock_label.setStyleSheet(f"color:{COLORS['text_secondary']};font-size:10px;")
+        self.clock_label.setStyleSheet(f"color:{COLORS['text_secondary']};font-size:10px;font-weight:600;")
         command_layout.addWidget(self.clock_label)
 
-        self.offline_status = QLabel("OFFLINE · LOCAL DB")
+        self.offline_status = QLabel("●  OFFLINE · LOCAL DB")
         self.offline_status.setObjectName("OfflineStatus")
         command_layout.addWidget(self.offline_status)
 
@@ -130,6 +133,7 @@ class MainWindow(QMainWindow):
         self.dashboard_view.navigate_to.connect(self._on_dashboard_navigate)
         self.dashboard_view.register_patient_requested.connect(self._register_patient)
         self.dashboard_view.open_patient_requested.connect(self._open_patient_from_search)
+        self.dashboard_view.filter_doctor_requested.connect(self._on_filter_doctor)
         self.dashboard_view.manual_refresh_completed.connect(
             lambda: self.show_toast("Dashboard refreshed", "Clinic metrics and today's activity are up to date.", "info")
         )
@@ -186,17 +190,22 @@ class MainWindow(QMainWindow):
     def _register_patient(self):
         """Navigate to the directory and open a clean registration form."""
         self.patient_module.list_view.search_input.clear()
-        self.patient_module.stack.setCurrentIndex(0)
         self.sidebar.set_active_page(1)
         self.patient_module.show_registration_form()
 
     def _open_patient_from_search(self, patient_id: int, urn: str):
-        """Show a single matching record in the existing directory without auto-editing it."""
-        del patient_id  # The directory uses the repository-backed URN search as its visible context.
-        self.patient_module.stack.setCurrentIndex(0)
-        self.patient_module.list_view.search_input.setText(urn)
+        """Open a patient's detail view from any global search result or activity item."""
         self.sidebar.set_active_page(1)
-        self.show_toast("Patient found", f"Showing {urn} in the patient registry.", "info")
+        self.patient_module.stack.setCurrentIndex(0)
+        self.patient_module.list_view.open_patient_by_id(patient_id, urn)
+
+    def _on_filter_doctor(self, doctor_id: int):
+        """Filter patient registry by the selected clinician."""
+        self.sidebar.set_active_page(1)
+        self.patient_module.stack.setCurrentIndex(0)
+        idx = self.patient_module.list_view.doctor_filter.findData(doctor_id)
+        if idx >= 0:
+            self.patient_module.list_view.doctor_filter.setCurrentIndex(idx)
 
     def _on_dashboard_navigate(self, index: int):
         """Route dashboard shortcuts through the existing sidebar signal."""
@@ -220,7 +229,7 @@ class MainWindow(QMainWindow):
         if not 0 <= index < self.stacked_widget.count():
             return
         self.stacked_widget.setCurrentIndex(index)
-        self.workspace_context.setText(self.PAGE_LABELS[index])
+        self.workspace_context.setText(f"🏥  KALYAN HOSPITAL   ›   {self.PAGE_LABELS[index]}")
 
         if index == 0:
             self.dashboard_view.refresh_data()

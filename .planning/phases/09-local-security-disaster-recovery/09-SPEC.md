@@ -37,3 +37,4 @@ Harden user access control with named roles (`ADMIN`, `RECEPTIONIST`, `DOCTOR`) 
 3. `BackupService.restore_from_backup()` successfully restores both the SQLite database and patient photos.
 4. If a backup is corrupt or incomplete, restore aborts without modifying active data.
 5. All automated unit and integration tests pass cleanly.
+

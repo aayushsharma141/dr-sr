@@ -125,7 +125,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 →
 | 7. Dependable Registration & Print Alignment | 1/1 | Complete | 2026-10-30 |
 | 8. Clinical Records & Financial Integrity | 1/1 | Complete | 2026-10-30 |
 | 9. Local Security & Verified Disaster Recovery | 1/1 | Complete | 2026-10-30 |
-| 10. Real Windows Handover & Offline Verification | 0/1 | Planned | — |
+| 10. Real Windows Handover & Offline Verification | 1/1 | Complete | 2026-10-30 |
 
 ---
 *Roadmap created: 2026-10-28*

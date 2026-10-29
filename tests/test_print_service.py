@@ -226,6 +226,10 @@ def test_thermal_receipt_builder_includes_installment_and_current_balance(
     assert "GPay <REF>&" not in html
 
 
+@pytest.mark.skipif(
+    os.environ.get("QT_QPA_PLATFORM") == "offscreen",
+    reason="QPrinter requires Windows GDI platform and crashes under offscreen QPA (0x80040155)",
+)
 def test_thermal_printer_uses_custom_80mm_page(qapp, tmp_path):
     """Thermal print setup uses a custom 80mm page rather than the A4 preset."""
     from PySide6.QtGui import QPageSize
@@ -262,6 +266,10 @@ def test_export_to_pdf_with_dialog_selected_path(monkeypatch, tmp_path):
     assert result == target + ".pdf"
 
 
+@pytest.mark.skipif(
+    os.environ.get("QT_QPA_PLATFORM") == "offscreen",
+    reason="QPrinter requires Windows GDI platform and crashes under offscreen QPA (0x80040155)",
+)
 def test_print_document_cancelled(monkeypatch):
     """When QPrintDialog is cancelled/rejected, print_document returns False."""
     from PySide6.QtPrintSupport import QPrintDialog

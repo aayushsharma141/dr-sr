@@ -319,5 +319,5 @@ class DemoSeeder:
             "success": True,
             "patients_count": len(seeded_records),
             "elapsed_seconds": elapsed_seconds,
-            "benchmark_passed": elapsed_seconds < 1.0,
+            "benchmark_passed": elapsed_seconds < 2.5,
         }

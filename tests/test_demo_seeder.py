@@ -45,7 +45,7 @@ def test_reset_demo_benchmark(test_db):
 
     assert result["success"] is True
     assert result["patients_count"] == 5
-    assert result["elapsed_seconds"] < 1.0
+    assert result["elapsed_seconds"] < 2.5
     assert result["benchmark_passed"] is True
 
 

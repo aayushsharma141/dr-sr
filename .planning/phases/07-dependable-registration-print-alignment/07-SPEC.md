@@ -46,3 +46,4 @@ Harden the patient intake and registration subsystem to ensure 100% dependable d
 3. Invalid mobile numbers or negative/excessive ages are rejected with clear user-friendly error messages.
 4. Generated registration HTML includes all 12 numbered fields, doctor credentials, and both signature blocks.
 5. All automated tests pass cleanly.
+

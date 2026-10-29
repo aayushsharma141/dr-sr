@@ -103,3 +103,4 @@ def test_backup_service_rejects_structurally_incomplete_database(tmp_path):
 
     assert integrity["valid"] is False
     assert "Missing required table" in integrity["error"]
+

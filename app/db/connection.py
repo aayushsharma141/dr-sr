@@ -19,9 +19,10 @@ def get_db_connection(db_path: Path | str | None = None) -> sqlite3.Connection:
 
     conn = sqlite3.connect(target_path)
     conn.execute("PRAGMA foreign_keys = ON;")
-    # WAL mode is applicable to file-based databases
+    # WAL mode and NORMAL synchronicity for fast, robust offline operations
     if target_path != ":memory:":
         conn.execute("PRAGMA journal_mode = WAL;")
+        conn.execute("PRAGMA synchronous = NORMAL;")
     conn.row_factory = sqlite3.Row
     return conn
 

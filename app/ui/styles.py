@@ -30,7 +30,7 @@ def get_application_stylesheet() -> str:
         font-size: 13px;
     }}
     QLabel {{ background: transparent; }}
-    QLabel#PageHeading {{ color: {c['text_primary']}; font-size: 22px; font-weight: 700; }}
+    QLabel#PageHeading {{ color: {c['text_primary']}; font-size: 20px; font-weight: 700; }}
     QLabel#PageSubheading {{ color: {c['text_secondary']}; font-size: 12px; }}
 
     QWidget#SidebarWidget {{
@@ -56,15 +56,126 @@ def get_application_stylesheet() -> str:
         border-left: 3px solid #5EEAD4; font-weight: 700;
     }}
 
-    QFrame#StatCard, QFrame#CardPanel {{
-        background: #FFFFFF; border: 1px solid {c['border']}; border-radius: 10px;
+    /* Dashboard Scroll & Content */
+    QWidget#DashboardView, QWidget#DashboardContent, QScrollArea#DashboardScroll, QScrollArea#DashboardScroll > QWidget > QWidget {{
+        background: {c['background']};
     }}
-    QFrame#StatCard:hover, QFrame#CardPanel:hover {{
-        border-color: #C6D5CB;
+
+    /* Dashboard Hero & Header Card */
+    QFrame#DashboardHeroCard {{
+        background: #FFFFFF;
+        border: 1px solid {c['border']};
+        border-left: 5px solid {c['primary']};
+        border-radius: 12px;
     }}
-    QLabel#StatCardTitle {{ color: {c['text_secondary']}; font-size: 10px; font-weight: 700; letter-spacing: .5px; }}
-    QLabel#StatCardValue {{ color: {c['text_primary']}; font-size: 27px; font-weight: 750; }}
-    QLabel#StatCardSubtitle {{ color: {c['text_secondary']}; font-size: 11px; }}
+
+    /* KPI / Stat Cards */
+    QFrame#StatCard {{
+        background: #FFFFFF;
+        border: 1px solid {c['border']};
+        border-radius: 12px;
+    }}
+    QFrame#StatCard:hover {{
+        border-color: #B2D2C2;
+        background: #FCFDFC;
+    }}
+    QLabel#StatCardTitle {{
+        color: #556B61;
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: .6px;
+    }}
+    QLabel#StatCardValue {{
+        color: {c['text_primary']};
+        font-size: 28px;
+        font-weight: 800;
+    }}
+    QLabel#StatCardSubtitle {{
+        color: {c['text_secondary']};
+        font-size: 11px;
+        font-weight: 500;
+    }}
+
+    /* Clinician Profile Cards */
+    QFrame#DoctorProfileCard {{
+        background: #FFFFFF;
+        border: 1px solid {c['border']};
+        border-radius: 12px;
+    }}
+    QFrame#DoctorProfileCard:hover {{
+        border-color: #B2D2C2;
+        background: #FCFDFC;
+    }}
+    QLabel#DoctorCardName {{
+        color: {c['text_primary']};
+        font-size: 15px;
+        font-weight: 700;
+    }}
+    QLabel#DoctorCardHindi {{
+        color: #475569;
+        font-size: 12px;
+        font-weight: 600;
+    }}
+    QLabel#DoctorCardDept {{
+        color: {c['primary']};
+        font-size: 11px;
+        font-weight: 600;
+    }}
+    QFrame#DoctorStatBox {{
+        background: #F4F8F5;
+        border: 1px solid #E1EBE4;
+        border-radius: 8px;
+    }}
+    QLabel#DoctorStatVal {{
+        color: {c['primary']};
+        font-size: 17px;
+        font-weight: 800;
+    }}
+    QLabel#DoctorStatLbl {{
+        color: {c['text_secondary']};
+        font-size: 10px;
+        font-weight: 700;
+        letter-spacing: .4px;
+    }}
+
+    /* Table Container Card */
+    QFrame#TableContainerCard {{
+        background: #FFFFFF;
+        border: 1px solid {c['border']};
+        border-radius: 12px;
+    }}
+
+    /* Segmented Tab Switcher */
+    QPushButton#SegmentTabBtn {{
+        background-color: #FFFFFF;
+        color: {c['text_secondary']};
+        border: 1px solid {c['border']};
+        border-radius: 7px;
+        padding: 6px 14px;
+        font-size: 12px;
+        font-weight: 600;
+    }}
+    QPushButton#SegmentTabBtn:hover {{
+        background-color: #F4F8F5;
+        color: {c['primary']};
+        border-color: #B2D2C2;
+    }}
+    QPushButton#SegmentTabBtn:checked {{
+        background-color: {c['primary']};
+        color: #FFFFFF;
+        border: 1px solid {c['primary']};
+        font-weight: 700;
+    }}
+
+    /* Modern Empty State Container */
+    QFrame#EmptyStateContainer {{
+        background: #FFFFFF;
+        border: 1px dashed #CBD5E1;
+        border-radius: 12px;
+        padding: 24px;
+    }}
+
+    /* Form Section & General Headings */
     QLabel#FormSectionHeading {{
         color: {c['primary']};
         background: transparent;
@@ -90,17 +201,17 @@ def get_application_stylesheet() -> str:
         border-bottom: 1px solid {c['border']};
     }}
     QLabel#WorkspaceContext {{
-        color: {c['text_primary']};
-        font-size: 10px;
+        color: {c['primary']};
+        font-size: 12px;
         font-weight: 800;
-        letter-spacing: .7px;
+        letter-spacing: .5px;
     }}
     QPushButton#SearchLauncherButton {{
         background: #F5F7F5;
         color: {c['text_primary']};
         border: 1px solid {c['border']};
         border-radius: 7px;
-        min-height: 17px;
+        min-height: 18px;
         padding: 7px 12px;
         text-align: left;
         font-weight: 500;
@@ -113,9 +224,9 @@ def get_application_stylesheet() -> str:
         background: #E7F5EB;
         color: {c['primary']};
         border: 1px solid #C5E5D0;
-        border-radius: 5px;
-        padding: 6px 9px;
-        font-size: 9px;
+        border-radius: 6px;
+        padding: 6px 10px;
+        font-size: 10px;
         font-weight: 800;
     }}
 
@@ -258,12 +369,11 @@ def get_application_stylesheet() -> str:
     QPushButton#SecondaryButton:hover {{ background: #F1F7F2; border-color: #AFC9B8; }}
     QPushButton:disabled {{ color: #94A3B8; background: #F1F5F9; }}
 
-    /* Visible keyboard focus (Tab / Shift+Tab) on every custom control; padding is reduced
-       by the extra border width so controls never change size when focused. */
+    /* Visible keyboard focus (Tab / Shift+Tab) */
     QPushButton:focus {{ border: 2px solid {c['accent']}; padding: 7px 12px; }}
     QPushButton#PrimaryButton:focus {{ border: 2px solid {c['primary_dark']}; }}
-    QPushButton#FilterChip:focus, QPushButton#ModalityChip:focus {{
-        border: 2px solid {c['accent']}; padding: 4px 10px;
+    QPushButton#FilterChip:focus, QPushButton#ModalityChip:focus, QPushButton#SegmentTabBtn:focus {{
+        border: 2px solid {c['accent']};
     }}
     QPushButton#NavButton:focus {{
         border: 2px solid #5EEAD4; border-left: 3px solid #5EEAD4; padding: 11px 13px 11px 15px;

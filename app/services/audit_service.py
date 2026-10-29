@@ -90,3 +90,4 @@ class AuditService:
                 (entity_type.strip().upper(), str(entity_id).strip()),
             )
             return [dict(row) for row in cursor.fetchall()]
+

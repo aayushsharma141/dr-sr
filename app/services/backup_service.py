@@ -59,6 +59,20 @@ class BackupService:
         dest_dir.mkdir(parents=True, exist_ok=True)
 
         timestamp_str = datetime.now().strftime("%Y%m%d_%H%M%S")
+        backup_filename = (
+            f"kalyan_backup_{timestamp_str}.kalyan_bak"
+            if bundle_photos
+            else f"kalyan_backup_{timestamp_str}.db"
+        )
+        dest_path = dest_dir / backup_filename
+
+        self._audit.log_event(
+            action="BACKUP_CREATED",
+            entity_type="DATABASE",
+            entity_id=backup_filename,
+            actor_name="System",
+            details=f"Local backup archive created: {dest_path.name}",
+        )
 
         # Step 1: Create atomic SQLite database snapshot in temp file
         tmp_db = tempfile.NamedTemporaryFile(suffix=".db", delete=False)
@@ -79,9 +93,6 @@ class BackupService:
                     dest_conn.close()
 
             if bundle_photos:
-                backup_filename = f"kalyan_backup_{timestamp_str}.kalyan_bak"
-                dest_path = dest_dir / backup_filename
-
                 photo_files = [f for f in self.photos_dir.glob("*") if f.is_file()]
                 manifest = {
                     "version": "2.0",
@@ -97,21 +108,11 @@ class BackupService:
                     for photo in photo_files:
                         zf.write(str(photo), arcname=f"photos/{photo.name}")
             else:
-                backup_filename = f"kalyan_backup_{timestamp_str}.db"
-                dest_path = dest_dir / backup_filename
                 shutil.copy2(str(tmp_db_path), str(dest_path))
 
         finally:
             if tmp_db_path.exists():
                 tmp_db_path.unlink()
-
-        self._audit.log_event(
-            action="BACKUP_CREATED",
-            entity_type="DATABASE",
-            entity_id=dest_path.name,
-            actor_name="System",
-            details=f"Local backup archive created: {dest_path.name}",
-        )
 
         return dest_path.resolve()
 
