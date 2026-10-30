@@ -8,3 +8,6 @@ backups/
 dist/
 build/
 *.spec
+node_modules/
+*.tsbuildinfo
+coverage/
