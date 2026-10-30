@@ -256,6 +256,7 @@ winget show --id OpenJS.NodeJS.LTS --versions --source winget
                               runtime role kalyan_app (DML; audit_logs INSERT/SELECT only) · owner role kalyan_owner (Alembic only)
                               users · doctors(stub) · sessions · login_throttle · audit_logs(+3 triggers) · alembic_version
    Server-side CLI (no HTTP): create-admin · reset-admin-password · migrate (owner role) · check-db · export-openapi
+   [Superseded by EG-17 (user decision 2026-10-30): first-run web wizard with setup-mode-only availability and a one-time server-console setup code; `create-admin` dropped, `reset-admin-password` kept. See 11-11-PLAN.md.]
 ```
 
 ### Recommended Project Structure (answers question 1)
@@ -281,6 +282,7 @@ D:\dr-sr\
 │   │   ├── routers\           health.py · auth.py · users.py · areas.py
 │   │   ├── schemas\           pydantic request/response models (extra="forbid" on requests)
 │   │   ├── cli.py             argparse: create-admin · reset-admin-password · migrate · check-db · export-openapi
+   [Superseded by EG-17 (user decision 2026-10-30): first-run web wizard with setup-mode-only availability and a one-time server-console setup code; `create-admin` dropped, `reset-admin-password` kept. See 11-11-PLAN.md.]
 │   │   └── migrations\        env.py · script.py.mako · versions\0001_baseline.py     (INSIDE the package so a wheel ships them)
 │   └── tests\                 conftest.py · test_*.py · support\
 ├── frontend\                  package.json · package-lock.json · .nvmrc · .npmrc · index.html · vite.config.ts · tsconfig*.json · src\
@@ -379,6 +381,9 @@ Tests that make the catalogue enforceable: (1) `test_role_permission_matrix_snap
 - **Forced change:** `users.must_change_password BOOLEAN NOT NULL DEFAULT true`. While true, `current_principal` raises 403 `password_change_required` for everything except `GET /auth/me`, `POST /auth/logout`, `POST /auth/change-password` (the three `authenticated_only` routes). Change requires the current password, applies the policy, sets `must_change_password=false`, `password_changed_at`, rotates the session and revokes the user's other sessions.
 - **Admin operations:** create (server-generated temporary password returned once with `Cache-Control: no-store`, `must_change_password=true`), update name/role (needs `version_id`), deactivate/reactivate (sets `is_active`, revokes sessions; never delete - the runtime role is never granted `DELETE` on `users`), reset password (new temporary password, `must_change_password=true`, sessions revoked), unlock. Guards: an admin cannot deactivate/demote themselves; the last active admin cannot be deactivated or demoted (`409 last_admin`); request models use `extra="forbid"` so `password_hash`, `failed_login_count`, etc. cannot be mass-assigned (tested).
 - **First-run admin (SEC-05):** `python -m kalyan_api.cli create-admin --username NAME --full-name "..."` reads the password with `getpass` (twice, never from argv; `--password-stdin` for automation/tests), applies the policy, refuses when an active admin already exists, writes an `ADMIN_BOOTSTRAPPED` audit row with actor `cli:<windows-user>`; `--generate-password` prints a random password once and sets `must_change_password=true`. `reset-admin-password --username NAME` is the offline recovery path for a lost admin (needs OS access + `.env`). **No unauthenticated web setup endpoint**: CONTEXT's "first-run admin initialization wizard" is satisfied by `GET /api/health` returning `setup_required: true` so the login page can show "No administrator exists - run create-admin on the server"; a public create-admin endpoint would let whoever reaches the LAN port first become Admin. No seed users in any migration (test: fresh `alembic upgrade head` -> `SELECT count(*) FROM users` = 0); the legacy defaults must not reappear [VERIFIED: D:\dr-sr\app\services\auth_service.py:112-113 `default_username: str = "admin"`, `default_password: str = "kalyan@admin"`; v2.0 also used `ITERATIONS = 100000` PBKDF2 at line 18].
+
+**[Superseded by EG-17 (user decision 2026-10-30): first-run web wizard with setup-mode-only availability and a one-time server-console setup code; `create-admin` dropped, `reset-admin-password` kept. See 11-11-PLAN.md.]**
+
 
 ### Pattern 5: Reusable row-scope helpers for D-03 / D-04 (question 3)
 
@@ -562,6 +567,9 @@ Select-String -Path ".planning/phases/11-decisions-gate-foundation-auth/11-ENTRY
 | 11-03 | 2 | Auth core: Argon2, tokens, `sessions`, `current_principal`, login/logout/me/change-password, CSRF/Origin, lockout + throttle, forced change, audit writer + auth events, tests (clock seam) | SEC-01, SEC-04, AUD-01, SEC-05 (forced change) | - |
 | 11-04 | 3 | `Permission`/`Role`/`ROLE_PERMISSIONS`, policy markers, `require`, route-walk + negative control + matrix + completeness tests, `row_scope`/`get_scoped_or_404` + TEMPORARY-table tests, `GET /api/<area>/overview` | SEC-02, SEC-03 | - |
 | 11-05 | 3 | Users admin API (create/update/role/deactivate/reactivate/reset/unlock), `version_id` + 409, `create-admin` / `reset-admin-password` CLI, audit events, race tests, `last_admin`/self guards | SEC-05, SEC-06, AUD-01 | - |
+
+**[Superseded by EG-17 (user decision 2026-10-30): first-run web wizard with setup-mode-only availability and a one-time server-console setup code; `create-admin` dropped, `reset-admin-password` kept. See 11-11-PLAN.md.]**
+
 | 11-06 | 4 | `frontend/` scaffold (Vite/React/TS/Tailwind/Vitest/oxlint), API client, guards, Login / ChangePassword / Users admin / shells, ConflictBanner, `app.frontend` serving + `test_spa_serving.py`, `npm run build` | SEC-01, SEC-06 (UX) | W0-12 (`npm install`) |
 | 11-07 | 5 | Phase gate: full suite + coverage, ruff/oxlint/tsc/build, legacy-untouched check, `requirements.lock.txt`, manual UAT (second LAN device, 409 banner, psql audit check), update PROJECT.md/STATE | all | Browser/LAN UAT |
 
@@ -877,6 +885,7 @@ ALTER DATABASE kalyan_test SET timezone TO 'Asia/Kolkata';
 Syntax checked against the PG 18 `CREATE DATABASE` page (`LOCALE_PROVIDER`, `BUILTIN_LOCALE` values `C`, `C.UTF-8`, `PG_UNICODE_FAST`; `TEMPLATE template0` required when encoding/locale differ; "On Windows, however, UTF-8 encoding can be used with any locale") [CITED: postgresql.org/docs/18/sql-createdatabase.html]; behaviour of the EDB build and `\password` inside `-f` scripts are unverified [ASSUMED].
 ```python
 # cli.py (sketch) - python -m kalyan_api.cli create-admin --username kalyan.admin --full-name "..."
+# [Superseded by EG-17 (user decision 2026-10-30): first-run web wizard with setup-mode-only availability and a one-time server-console setup code; `create-admin` dropped, `reset-admin-password` kept. See 11-11-PLAN.md.]
 def cmd_create_admin(args):
     password = sys.stdin.readline().rstrip("\r\n") if args.password_stdin else (
         generate_password() if args.generate_password else getpass.getpass("New admin password: "))
@@ -1075,7 +1084,7 @@ All questions below were resolved by the plan-phase orchestrator on 2026-10-30 a
 | 1 | RESOLVED: adopt `backend/src/kalyan_api` | EG-14 |
 | 2 | RESOLVED: stub `doctors` table in `0001_baseline`, created with the DOCTOR user | EG-15 |
 | 3 | RESOLVED (DEFAULT): ADMIN least privilege, no clinical permissions, `/admin` only; confirm by Phase 13 | EG-16 |
-| 4 | RESOLVED (DEVIATION awaiting user confirmation): CLI `create-admin` + login-page notice, no unauthenticated web wizard | EG-17 |
+| 4 | RESOLVED (DECIDED-BY-USER 2026-10-30): first-run web wizard protected by setup-mode-only availability and a one-time server-console setup code; create-admin dropped; reset-admin-password kept for recovery | EG-17 |
 | 5 | RESOLVED (DEFAULT): only ADMIN reassigns between consultants; decided properly in Phase 13 | EG-18 |
 | 6 | RESOLVED (DEFAULT): 12 h absolute session limit and research password-policy numbers, held as settings | EG-19 |
 | 7 | RESOLVED (DEFAULT): client facts EG-1..EG-5 recorded with owner; D-01/D-02 locked | EG-1..EG-5 |
@@ -1090,6 +1099,9 @@ All questions below were resolved by the plan-phase orchestrator on 2026-10-30 a
    - Recommendation: stub `doctors` table in `0001` and create the row with the DOCTOR user (A5); alternative: create only ADMIN/RECEPTION users in Phase 11 and test the silo with a test-only table. Planner/discuss decides.
 3. **Admin's access to clinical data and to the reception/doctor dashboards** (A2) - client confirmation by Phase 13; the golden matrix test records whatever is decided.
 4. **First-run "wizard" wording in CONTEXT `<specifics>`** vs the CLI mechanism - research recommends CLI + a login-page notice and no unauthenticated setup endpoint. Confirm that this satisfies the intent.
+
+**[Superseded by EG-17 (user decision 2026-10-30): first-run web wizard with setup-mode-only availability and a one-time server-console setup code; `create-admin` dropped, `reset-admin-password` kept. See 11-11-PLAN.md.]**
+
 5. **Strict silo vs two consultants who "share one patient identity and one payment ledger"** (v2.0 schema comment) - who reassigns, and can a doctor cover for the other? (A6) Needs the clinicians' answer before Phase 13.
 6. **Absolute session limit and password policy numbers** (A3, A4) - confirm with the trust administrator; they are settings, not code.
 7. **UPS / server / IP / network facts** (EG-1..EG-5) - still unconfirmed; they drive RISK-01 and Phase 17.
@@ -1144,6 +1156,9 @@ All commands run from `D:\dr-sr` in PowerShell 5.1 (they work as-is; `pytest bac
 | SEC-04 | 5 failures lock 15 min incl. correct password during lock; counters persist despite 401; lock expiry; admin unlock; per-IP 429 + `Retry-After`; identical message for unknown/locked | integration | `backend/tests/test_lockout_throttle.py -q` | row not locked after 5 failures (rollback bug) | Wave 0 |
 | SEC-05 | Create returns one-time temp password + forces change; blocked endpoints until changed; deactivate keeps row (DELETE privilege revoked); reset revokes sessions; last-admin/self guards; mass assignment rejected | integration | `backend/tests/test_users_admin.py backend/tests/test_password_change.py -q` | any non-409/403 where a guard is expected | Wave 0 |
 | SEC-05 | CLI `create-admin`: prompts/stdin, refuses second bootstrap, policy applied, audit actor `cli:`; fresh migrated DB has 0 users; repo scan finds no default credentials | integration | `backend/tests/test_cli_admin.py backend/tests/test_no_default_credentials.py -q` | users count > 0; legacy string found | Wave 0 |
+
+**[Superseded by EG-17 (user decision 2026-10-30): first-run web wizard with setup-mode-only availability and a one-time server-console setup code; `create-admin` dropped, `reset-admin-password` kept. See 11-11-PLAN.md.]**
+
 | SEC-06 | Stale `version_id` -> 409 and row/audit unchanged; response carries incremented version; missing version -> 422; deterministic two-session race raises `StaleDataError`; 20x concurrent PATCH -> `[200, 409]`; no code assigns `.version_id =` | integration (+ `concurrency`) | `backend/tests/test_optimistic_locking.py -q` (full run includes `-m concurrency`) | two 200s; version not incremented | Wave 0 |
 | SEC-06 | 409 UX: banner text "Record was modified by another user", Reload refetches and resets form | frontend unit | `npm --prefix frontend run test -- conflict-banner` | banner missing / no refetch | Wave 0 |
 | AUD-01 | Audit row commits with the business write and both vanish when the audit insert fails (non-2xx); events for login ok/fail/lock/logout, user create/update/role/deactivate/reactivate/reset/unlock/password change; payloads redacted (writer raises on secrets) | integration | `backend/tests/test_audit_writer.py -q` | missing row/action; secret key accepted | Wave 0 |

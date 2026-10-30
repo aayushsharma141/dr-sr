@@ -23,9 +23,9 @@ See: `.planning/PROJECT.md` (updated 2026-10-30)
 ## Current Position
 
 Phase: 11 (Decisions Gate, Foundation & Auth)
-Plan: 0 of 15 complete
+Plan: 0 of 16 complete
 Status: Planned, ready to execute
-Last activity: 2026-10-30 — Phase 11 planned (15 plans, checker passed after 2 revisions)
+Last activity: 2026-10-30 — Phase 11 planned (16 plans; user chose first-run web wizard, EG-17)
 
 ## Phase Overview
 
