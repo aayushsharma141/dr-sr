@@ -1,0 +1,62 @@
+[build-system]
+requires = ["setuptools>=68.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "kalyan-api"
+version = "0.1.0"
+description = "Kalyan Hospital Centralized LAN Management API"
+readme = "README.md"
+requires-python = ">=3.12,<3.14"
+dependencies = [
+    "fastapi==0.162.0",
+    "starlette==1.10.0",
+    "pydantic==2.14.2",
+    "pydantic-settings==2.16.2",
+    "uvicorn==0.54.0",
+    "SQLAlchemy==2.0.55",
+    "alembic==1.20.1",
+    "psycopg==3.3.6",
+    "psycopg-binary==3.3.6",
+    "argon2-cffi==25.1.0",
+    "tzdata==2026.6",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest==9.2.0",
+    "pytest-timeout==2.4.0",
+    "pytest-cov==7.1.0",
+    "httpx==0.28.1",
+    "ruff==0.17.3",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+namespaces = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra -q --import-mode=importlib --strict-markers"
+timeout = 60
+pythonpath = ["tests"]
+markers = [
+    "concurrency: Concurrency stress and race condition tests",
+    "db_owner: Tests requiring PostgreSQL owner role privileges",
+    "slow: Tests with extended execution time",
+    "needs_build: Tests requiring frontend dist static assets",
+]
+filterwarnings = [
+    "ignore::DeprecationWarning:httpx.*",
+]
+
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "S", "DTZ"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["S101", "S105", "S106", "S311"]
+

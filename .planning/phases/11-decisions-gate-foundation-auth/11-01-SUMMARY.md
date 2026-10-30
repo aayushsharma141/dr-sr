@@ -61,3 +61,4 @@
 - Node & npm: `v26.13.0` / `11.20.0`
 - PostgreSQL service: `postgresql-x64-18 Running` (`psql 18.6`)
 - `backend/.env`: Exists, is git-ignored, and active connection to `kalyan_dev` succeeded.
+
