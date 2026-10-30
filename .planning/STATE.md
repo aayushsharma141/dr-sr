@@ -23,8 +23,8 @@ See: `.planning/PROJECT.md` (updated 2026-10-30)
 ## Current Position
 
 Phase: 11 (Decisions Gate, Foundation & Auth)
-Plan: 0 of 16 complete
-Status: Planned, ready to execute
+Plan: 1 of 16 complete
+Status: In progress
 Last activity: 2026-10-30 — Phase 11 planned (16 plans; user chose first-run web wizard, EG-17)
 
 ## Phase Overview
@@ -33,7 +33,7 @@ Phases 11-17 (continuing from v2.0, which ended at Phase 10). See `.planning/ROA
 
 | Phase | Name | Status |
 |-------|------|--------|
-| 11 | Decisions Gate, Foundation & Auth | Not started |
+| 11 | Decisions Gate, Foundation & Auth | In progress (1/16 plans) |
 | 12 | Clinic Settings & Patient Registration | Not started |
 | 13 | Appointments & Clinical Encounters | Not started |
 | 14 | Prescriptions, Treatment Plans & Sessions | Not started |
