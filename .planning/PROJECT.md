@@ -92,6 +92,15 @@ Defined in `.planning/REQUIREMENTS.md` for v3.0.
 | Integer paise billing | Prevents floating-point rounding in accounts | ✓ Carried from v2.0 |
 | 12-field form with dual signatures | Replicates the physical pad | ✓ Approved by client (v2.0) |
 | PySide6 + SQLite desktop app | Superseded for v3.0; kept as reference only | ⚠️ Superseded |
+| Plain HTTP transport on isolated LAN (D-01) | Eliminates root CA install on staff PCs; zero cert warnings on offline LAN | ✓ Approved by user 2026-10-30 (see 11-ENTRY-GATE.md EG-4) |
+| Dedicated 600VA+ UPS with synchronous_commit = on (D-02) | Guarantees database durability against sudden Bhojpur grid cuts | ✓ Approved by user 2026-10-30 (see 11-ENTRY-GATE.md EG-2) |
+| Strict doctor silo partitioning by doctor_id (D-03) | Doctors only view and manage patients and encounters assigned to them | ✓ Approved by user 2026-10-30 (see 11-ENTRY-GATE.md EG-6) |
+| Strict default-deny for reception on clinical records (D-04) | Reception accesses demographics/billing; backend blocks SOAP notes/prescriptions | ✓ Approved by user 2026-10-30 (see 11-ENTRY-GATE.md EG-7) |
+| Configurable receipt numbering cycle (D-05) | Indian FY (1 Apr – 31 Mar) default aligns with trust accounting compliance | ✓ Approved by user 2026-10-30 (see 11-ENTRY-GATE.md EG-8) |
+| Payment reversals restricted to Admin role (D-06) | Requires mandatory reason; writes contra-record and immutable audit row | ✓ Approved by user 2026-10-30 (see 11-ENTRY-GATE.md EG-9) |
+| 30-min idle timeout and 5-failure lockout (D-07) | 15-min lockout cooldown or Admin unlock balances workflow with security | ✓ Approved by user 2026-10-30 (see 11-ENTRY-GATE.md EG-10) |
+| Optimistic concurrency via version_id with 409 and 1-click reload (D-08) | Prevents silent record overwrites during simultaneous edits | ✓ Approved by user 2026-10-30 (see 11-ENTRY-GATE.md EG-11) |
+| Backend package layout and sync ORM (EG-14, EG-20) | `backend/src/kalyan_api` avoids legacy `app/` collision; sync ORM guarantees atomic audit commits | ✓ Approved by user 2026-10-30 (see 11-ENTRY-GATE.md EG-14, EG-20) |
 
 ## Evolution
 
@@ -111,4 +120,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-10-30 after starting milestone v3.0 (Centralized LAN Web Platform)*
+*Last updated: 2026-10-30 after starting milestone v3.0 (Centralized LAN Web Platform) - Phase 11 Entry Gate*
