@@ -25,7 +25,7 @@ Ordering notes:
 ### Phase 11: Decisions Gate, Foundation & Auth
 **Goal**: Close the open client decisions, stand up the PostgreSQL + FastAPI + React scaffold with migrations, and deliver individual login with server-enforced permissions, safe concurrent updates and an audit-event writer that all later modules use.
 **Depends on**: Nothing (first v3.0 phase; v2.0 desktop app is reference only)
-**Requirements**: SEC-01, SEC-02, SEC-03, SEC-04, SEC-05, SEC-06, AUD-01
+**Requirements**: SEC-01, SEC-02, SEC-03, SEC-04, SEC-05, SEC-06, SEC-07, AUD-01
 **Entry gate (must be recorded before build work starts)**: server hardware, UPS and fixed IP (and whether client PCs may trust a local certificate); role/permission matrix for Admin, Reception, Doctor; whether doctors may read other doctors' patients (recommended: read yes, write only own); receipt numbering year (calendar vs April-March) and who may authorise a reversal. Unresolved items are logged with a default assumption and an owner.
 **Success Criteria**:
   1. The four entry-gate decisions are written down (with client confirmation or an explicit default) before any schema or API work is committed.
@@ -33,6 +33,7 @@ Ordering notes:
   3. An automated test enumerates every API route and fails if any route lacks a permission check; a role x endpoint test matrix passes with default-deny behaviour.
   4. Idle sessions expire, repeated failed logins lock the account, and admin can create, deactivate (not delete) and reset users; first login forces a password change and no default credentials exist in the repo or installer.
   5. Two simultaneous edits to the same record result in a 409 conflict for the stale update rather than overwriting, and sign-in, failed-login and user-admin events appear as append-only audit rows.
+  6. First-run setup wizard (SEC-07) passes these acceptance tests: with no users the wizard is available; an invalid code is rejected; a valid code creates exactly one administrator; two simultaneous valid submissions produce exactly one success; once an administrator exists every setup endpoint rejects creation, including direct API calls; after a server restart setup stays disabled; the setup code never appears in any HTTP response or application log.
 **Plans**: 16 plans (sequential waves 1-16)
 
 Plans:

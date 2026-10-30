@@ -14,6 +14,7 @@
 - [ ] **SEC-04**: Session expires after an idle timeout, and an account is locked after repeated failed logins.
 - [ ] **SEC-05**: Admin creates, deactivates (never deletes) and resets passwords for users; first login forces a password change; no default credentials ship.
 - [ ] **SEC-06**: Concurrent edits are safe: stale updates are rejected with a conflict response rather than overwriting.
+- [ ] **SEC-07**: The first administrator is created through a first-run web setup wizard that the server enables only while setup has never completed (verified database state, not frontend hiding), requires a one-time high-entropy code visible only on the server PC (never in API responses, browser responses or application logs, stored only as a hash), is throttled and temporarily locked against brute force, creates exactly one administrator even under simultaneous submissions (transaction, lock and database uniqueness constraint), consumes the code atomically with that creation, and stays permanently closed afterwards including after restarts and direct API calls; an authenticated console password-reset command remains for recovery.
 
 ### Clinic Setup
 
@@ -112,6 +113,7 @@ Deferred; tracked but not in the current roadmap.
 | SEC-04 | Phase 11 | Pending |
 | SEC-05 | Phase 11 | Pending |
 | SEC-06 | Phase 11 | Pending |
+| SEC-07 | Phase 11 | Pending |
 | AUD-01 | Phase 11 | Pending |
 | SET-01 | Phase 12 | Pending |
 | SET-02 | Phase 12 | Pending |
@@ -144,8 +146,8 @@ Deferred; tracked but not in the current roadmap.
 | PRN-01 | Phase 17 | Pending |
 
 **Coverage:**
-- v1 requirements: 36 total
-- Mapped to phases: 36
+- v1 requirements: 37 total
+- Mapped to phases: 37
 - Unmapped: 0
 
 ---
