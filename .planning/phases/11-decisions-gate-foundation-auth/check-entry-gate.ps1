@@ -50,7 +50,8 @@ if ($Mode -eq "order") {
     if ($gate -and (-not $code -or [int64]$gate -le [int64]$code)) {
         Write-Host "OK: gate precedes code"
         exit 0
-    } else {
+    }
+    else {
         Write-Host "FAIL: entry gate not committed before code"
         exit 1
     }
@@ -58,3 +59,4 @@ if ($Mode -eq "order") {
 
 Write-Host "OK"
 exit 0
+

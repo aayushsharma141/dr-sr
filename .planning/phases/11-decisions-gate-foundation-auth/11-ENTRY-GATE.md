@@ -3,6 +3,7 @@
 **Phase:** 11-decisions-gate-foundation-auth  
 **Date:** 2026-10-30  
 **Status Key:**  
+
 - `LOCKED`: Decided by project owner in `11-CONTEXT.md` (2026-10-30).  
 - `DECIDED-BY-USER`: Formally approved user requirement or policy decision.  
 - `DEFAULT`: Architectural assumption in force until confirmed by the named owner.  
@@ -14,7 +15,7 @@
 ## 1. Entry-Gate Decision Register
 
 | ID | Item | Decision / default | Status | Source | Owner | Confirm by | If it changes |
-|---|---|---|---|---|---|---|---|
+| --- | --- | --- | --- | --- | --- | --- | --- |
 | EG-1 | Server hardware | Dedicated always-on Windows PC, >= 4 GB RAM, SSD preferred, second physical drive/USB for backups, no daily-use login | DEFAULT | PROJECT.md "not yet confirmed" | Trust administrator | before Phase 17 | Sizing, backup target |
 | EG-2 | UPS | 600VA+ line-interactive UPS on the server; `synchronous_commit = on` | LOCKED | CONTEXT D-02 | Trust administrator | before Phase 17 | Costly: durability config. No UPS -> written risk acceptance |
 | EG-3 | Fixed IP / name | DHCP reservation (example 192.168.1.50); optional single-label alias `kalyan-server` via hosts file; never a fake FQDN | DEFAULT | CONTEXT D-01 example | Trust administrator / project owner | before Phase 17 | Bookmarks, firewall rule |
@@ -41,6 +42,7 @@
 ## 2. Accepted Risks
 
 ### RISK-01: Plaintext Credentials and Session on the LAN
+
 - **Risk Statement:** Under D-01 (plain HTTP on the LAN), login passwords, temporary passwords, the session cookie, and all patient records traverse the local network unencrypted. Anyone with access to the LAN segment (ARP spoofing, compromised PC, unauthorized Wi-Fi connection) could intercept credentials or session cookies.
 - **Likelihood:** Low-to-moderate on a dedicated, switched, staff-only wired network.
 - **Impact:** High (unauthorized exposure of patient health information).
@@ -57,12 +59,14 @@
   8. *Permanent Browser Indicator:* Staff informed that browser will display "Not secure" indicator due to plain HTTP on LAN.
 
 ### RISK-02: Server PC as Single Point of Failure
+
 - **Risk Statement:** With a centralized LAN deployment, if the reception server PC suffers hardware failure or corruption, all connected workstations lose system access.
 - **Likelihood:** Moderate over a multi-year horizon.
 - **Impact:** High (disruption of clinic operations).
 - **Mitigation & Runbook:** Dual physical backup targets (secondary physical drive / USB storage), daily checksummed backups (Phase 16), physical paper-pad clinical fallback forms, and tested bare-metal restore runbook (Phases 16-17).
 
 ### RISK-03: Account Lockout Denial-of-Service
+
 - **Risk Statement:** An attacker on the local network could deliberately submit 5 incorrect passwords for a known user (e.g. Dr. Dwivedi), locking their account for 15 minutes.
 - **Likelihood:** Low in an internal clinic setting.
 - **Impact:** Moderate (temporary inconvenience to the practitioner).
@@ -71,6 +75,7 @@
 ---
 
 ## 3. Deferred and Out of Scope Ideas
+
 - **FUT-01 (HTTPS with local CA / mkcert):** Deferred to post-v3.0 unless hospital network topology requires wireless untrusted links.
 - **FUT-02 (Multi-doctor co-management / cross-case sharing):** Strict silo enforced for v3.0 per D-03.
 - **FUT-03 (Legacy SQLite data migration):** Clean start for v3.0; legacy v2.0 desktop app retained as read-only historical archive if needed.
@@ -78,4 +83,5 @@
 ---
 
 ## 4. Evidence Convention Note
+
 Client acknowledgement evidence (such as WhatsApp confirmations, signed handover notes, or email acknowledgements from Sri Vashishtha Kalyan Trust) will be recorded in the `Evidence` column upon final deployment verification.

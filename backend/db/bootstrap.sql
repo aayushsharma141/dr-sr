@@ -57,3 +57,4 @@ GRANT CONNECT ON DATABASE kalyan_test TO kalyan_app;
 -- In production, the hospital server runs this script targeting a single database named `kalyan`.
 -- If the PostgreSQL distribution rejects LOCALE_PROVIDER builtin (e.g. on older libc/Windows builds),
 -- fall back to: LOCALE_PROVIDER icu ICU_LOCALE 'und-u-ks-level2'.
+

@@ -22,6 +22,7 @@ Reliable, internet-free shared patient records for reception and doctors across 
 **Goal:** Replace the single-PC desktop app with one central-server web platform: FastAPI + PostgreSQL backend and one React + TypeScript frontend serving role-based dashboards.
 
 **Target features:**
+
 - One React + TypeScript codebase with role-routed dashboards at `/admin`, `/reception`, `/doctor`; individual login, UI chosen by role.
 - FastAPI enforces permissions on every endpoint independently of what the UI shows.
 - PostgreSQL schema, migrations and authorization model; local filesystem storage for patient photos and documents.
@@ -83,7 +84,7 @@ Defined in `.planning/REQUIREMENTS.md` for v3.0.
 ## Key Decisions
 
 | Decision | Rationale | Outcome |
-|----------|-----------|---------|
+| ---------- | ----------- | --------- |
 | Centralized LAN server instead of per-PC installs | Shared records across reception and doctor PCs is the intended use case | — Pending hardware/LAN confirmation |
 | React + TypeScript, ONE codebase with `/admin` `/reception` `/doctor` routes | Avoids maintaining three frontends within ₹22,000 | ✓ Approved by user 2026-10-30 |
 | Python + FastAPI backend | Reuses existing Python domain logic; independent permission enforcement | ✓ Approved by user 2026-10-30 |
@@ -107,6 +108,7 @@ Defined in `.planning/REQUIREMENTS.md` for v3.0.
 This document evolves at phase transitions and milestone boundaries.
 
 **After each phase transition** (via `/gsd-transition`):
+
 1. Requirements invalidated? → Move to Out of Scope with reason
 2. Requirements validated? → Move to Validated with phase reference
 3. New requirements emerged? → Add to Active
@@ -114,6 +116,7 @@ This document evolves at phase transitions and milestone boundaries.
 5. "What This Is" still accurate? → Update if drifted
 
 **After each milestone** (via `/gsd-complete-milestone`):
+
 1. Full review of all sections
 2. Core Value check — still the right priority?
 3. Audit Out of Scope — reasons still valid?
