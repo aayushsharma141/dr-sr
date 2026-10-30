@@ -1066,7 +1066,22 @@ export default defineConfig({
 | A22 | The 85% coverage gate (project skill) is feasible for scaffold-heavy Phase 11 | Validation | Low: planner may lower |
 | A23 | Chrome/Edge are the staff browsers | Validation | Low |
 
-## Open Questions
+## Open Questions (RESOLVED)
+
+All questions below were resolved by the plan-phase orchestrator on 2026-10-30 and recorded in `11-ENTRY-GATE.md` (plan 11-01) as DEFAULT rows with an owner and confirm-by phase, not as client-confirmed facts:
+
+| Q | Resolution | Register row |
+|---|------------|--------------|
+| 1 | RESOLVED: adopt `backend/src/kalyan_api` | EG-14 |
+| 2 | RESOLVED: stub `doctors` table in `0001_baseline`, created with the DOCTOR user | EG-15 |
+| 3 | RESOLVED (DEFAULT): ADMIN least privilege, no clinical permissions, `/admin` only; confirm by Phase 13 | EG-16 |
+| 4 | RESOLVED (DEVIATION awaiting user confirmation): CLI `create-admin` + login-page notice, no unauthenticated web wizard | EG-17 |
+| 5 | RESOLVED (DEFAULT): only ADMIN reassigns between consultants; decided properly in Phase 13 | EG-18 |
+| 6 | RESOLVED (DEFAULT): 12 h absolute session limit and research password-policy numbers, held as settings | EG-19 |
+| 7 | RESOLVED (DEFAULT): client facts EG-1..EG-5 recorded with owner; D-01/D-02 locked | EG-1..EG-5 |
+| 8 | RESOLVED: pin FastAPI 0.162.0 + Starlette 1.10.0 exactly, with canary tests | EG-20 |
+| 9 | RESOLVED: no CI workflow in Phase 11 | EG-20 |
+| 10 | RESOLVED: no separate UI-SPEC (user chose to skip); ui-ux-pro-max rules folded into plans | — |
 
 1. **Package name / layout deviation** - `backend/src/kalyan_api` vs CONTEXT's example `backend/app/...`.
    - What we know: the legacy `app` package, `pythonpath = .`, and root pyright config make `app` ambiguous; layout experiment passed only by sys.path ordering.

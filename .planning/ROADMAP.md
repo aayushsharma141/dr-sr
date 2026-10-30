@@ -33,10 +33,24 @@ Ordering notes:
   3. An automated test enumerates every API route and fails if any route lacks a permission check; a role x endpoint test matrix passes with default-deny behaviour.
   4. Idle sessions expire, repeated failed logins lock the account, and admin can create, deactivate (not delete) and reset users; first login forces a password change and no default credentials exist in the repo or installer.
   5. Two simultaneous edits to the same record result in a 409 conflict for the stale update rather than overwriting, and sign-in, failed-login and user-admin events appear as append-only audit rows.
-**Plans**: TBD
+**Plans**: 15 plans (sequential waves 1-15)
 
 Plans:
-- [ ] TBD (created by plan-phase)
+- [ ] 11-01: Entry-gate register, decisions, toolchain installs (Node 24.22.1, PostgreSQL 18.6), roles and databases (human checkpoints)
+- [ ] 11-02: Backend skeleton tracer: settings, session dependency, `/api/health` on real PostgreSQL, error envelope
+- [ ] 11-03: Alembic `0001_baseline` (CHECKs, append-only audit triggers, grants) and in-transaction audit writer
+- [ ] 11-04: CLI migrate/check-db, revision and durability startup gates, clock seam, pin canaries
+- [ ] 11-05: Login and `/me`, permission catalogue, policy markers, idle/absolute sessions, logout
+- [ ] 11-06: 5-failure / 15-minute lockout and per-IP login throttle
+- [ ] 11-07: Forced first-login password change, password policy settings, CSRF token and Origin check
+- [ ] 11-08: Role dashboards, route-walk permission test, role x endpoint matrix, doctor/reception scope helpers
+- [ ] 11-09: Users create/list/get and PATCH with `version_id` and 409 conflict
+- [ ] 11-10: Deactivate/reactivate, reset password, unlock, CLI `create-admin`, no-default-credentials scan
+- [ ] 11-11: Frontend toolchain and API client
+- [ ] 11-12: Login to role area, route guards, CSRF token restore
+- [ ] 11-13: Admin Users screen with conflict banner, change-password page
+- [ ] 11-14: SPA serving from FastAPI with cache headers and traversal tests
+- [ ] 11-15: Phase gate: full suite, coverage, legacy-untouched check, manual LAN UAT (human checkpoint)
 
 ### Phase 12: Clinic Settings & Patient Registration
 **Goal**: Admin configures the clinic, doctors and fees; reception registers, finds and edits patients with unique URNs and photos, with the registration-card print spike started.
@@ -132,7 +146,7 @@ Phases execute in numeric order: 11 → 12 → 13 → 14 → 15 → 16 → 17
 
 | Phase | Plans Complete | Status | Completed |
 |---|---|---|---|
-| 11. Decisions Gate, Foundation & Auth | 0/TBD | Not started | - |
+| 11. Decisions Gate, Foundation & Auth | 0/15 | Planned | - |
 | 12. Clinic Settings & Patient Registration | 0/TBD | Not started | - |
 | 13. Appointments & Clinical Encounters | 0/TBD | Not started | - |
 | 14. Prescriptions, Treatment Plans & Sessions | 0/TBD | Not started | - |
