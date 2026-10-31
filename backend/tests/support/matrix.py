@@ -72,6 +72,54 @@ def _setup_admin_payload(_target: User | None = None) -> dict[str, Any]:
     }
 
 
+def _patch_settings_payload(target: Any = None) -> dict[str, Any]:
+    ver = target.version_id if target and hasattr(target, "version_id") else 1
+    return {
+        "name_en": "Kalyan Hospital Matrix",
+        "name_hi": "कल्याण हॉस्पिटल",
+        "address_1": "Hospital Road, Ara",
+        "phone": "+91 6182 000000",
+        "receipt_sequence_cycle": "FINANCIAL_YEAR",
+        "consultation_validity_days": 7,
+        "version_id": ver,
+    }
+
+
+def _create_doctor_payload(_target: Any = None) -> dict[str, Any]:
+    uid = uuid.uuid4().hex[:6]
+    return {
+        "name_en": f"Dr. Matrix {uid}",
+        "qualification": "MBBS",
+        "default_fee_paise": 30000,
+    }
+
+
+def _patch_doctor_payload(target: Any = None) -> dict[str, Any]:
+    ver = target.version_id if target and hasattr(target, "version_id") else 1
+    return {
+        "name_en": "Dr. Matrix Updated",
+        "default_fee_paise": 35000,
+        "is_active": True,
+        "version_id": ver,
+    }
+
+
+def _create_fee_payload(_target: Any = None) -> dict[str, Any]:
+    uid = uuid.uuid4().hex[:6]
+    return {
+        "name": f"Fee Matrix {uid}",
+        "fee_paise": 25000,
+    }
+
+
+def _patch_fee_payload(_target: Any = None) -> dict[str, Any]:
+    return {
+        "name": "Fee Matrix Updated",
+        "fee_paise": 30000,
+        "is_active": True,
+    }
+
+
 MATRIX: list[MatrixRow] = [
     MatrixRow(
         method="GET",
@@ -263,6 +311,102 @@ MATRIX: list[MatrixRow] = [
             "reception": 410,
             "doctor_a": 410,
             "doctor_b": 410,
+        },
+    ),
+    MatrixRow(
+        method="GET",
+        path="/api/settings",
+        body_factory=None,
+        expected={
+            "anonymous": 401,
+            "admin": 200,
+            "reception": 200,
+            "doctor_a": 200,
+            "doctor_b": 200,
+        },
+    ),
+    MatrixRow(
+        method="PATCH",
+        path="/api/settings",
+        body_factory=_patch_settings_payload,
+        expected={
+            "anonymous": 401,
+            "admin": 200,
+            "reception": 403,
+            "doctor_a": 403,
+            "doctor_b": 403,
+        },
+    ),
+    MatrixRow(
+        method="GET",
+        path="/api/doctors",
+        body_factory=None,
+        expected={
+            "anonymous": 401,
+            "admin": 200,
+            "reception": 200,
+            "doctor_a": 200,
+            "doctor_b": 200,
+        },
+    ),
+    MatrixRow(
+        method="POST",
+        path="/api/doctors",
+        body_factory=_create_doctor_payload,
+        expected={
+            "anonymous": 401,
+            "admin": 201,
+            "reception": 403,
+            "doctor_a": 403,
+            "doctor_b": 403,
+        },
+    ),
+    MatrixRow(
+        method="PATCH",
+        path="/api/doctors/{id}",
+        body_factory=_patch_doctor_payload,
+        expected={
+            "anonymous": 401,
+            "admin": 200,
+            "reception": 403,
+            "doctor_a": 403,
+            "doctor_b": 403,
+        },
+    ),
+    MatrixRow(
+        method="GET",
+        path="/api/fees",
+        body_factory=None,
+        expected={
+            "anonymous": 401,
+            "admin": 200,
+            "reception": 200,
+            "doctor_a": 200,
+            "doctor_b": 200,
+        },
+    ),
+    MatrixRow(
+        method="POST",
+        path="/api/fees",
+        body_factory=_create_fee_payload,
+        expected={
+            "anonymous": 401,
+            "admin": 201,
+            "reception": 403,
+            "doctor_a": 403,
+            "doctor_b": 403,
+        },
+    ),
+    MatrixRow(
+        method="PATCH",
+        path="/api/fees/{id}",
+        body_factory=_patch_fee_payload,
+        expected={
+            "anonymous": 401,
+            "admin": 200,
+            "reception": 403,
+            "doctor_a": 403,
+            "doctor_b": 403,
         },
     ),
 ]

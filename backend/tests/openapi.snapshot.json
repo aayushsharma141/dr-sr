@@ -74,6 +74,400 @@
         "title": "ChangePasswordRequest",
         "type": "object"
       },
+      "ClinicSettingsOut": {
+        "description": "Clinic configuration response.",
+        "properties": {
+          "address_1": {
+            "title": "Address 1",
+            "type": "string"
+          },
+          "address_2": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Address 2"
+          },
+          "consultation_validity_days": {
+            "title": "Consultation Validity Days",
+            "type": "integer"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "email": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Email"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "name_en": {
+            "title": "Name En",
+            "type": "string"
+          },
+          "name_hi": {
+            "title": "Name Hi",
+            "type": "string"
+          },
+          "phone": {
+            "title": "Phone",
+            "type": "string"
+          },
+          "print_footer_en": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Print Footer En"
+          },
+          "print_footer_hi": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Print Footer Hi"
+          },
+          "print_header_en": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Print Header En"
+          },
+          "print_header_hi": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Print Header Hi"
+          },
+          "receipt_sequence_cycle": {
+            "title": "Receipt Sequence Cycle",
+            "type": "string"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          },
+          "version_id": {
+            "title": "Version Id",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "name_en",
+          "name_hi",
+          "address_1",
+          "phone",
+          "receipt_sequence_cycle",
+          "consultation_validity_days",
+          "version_id",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "ClinicSettingsOut",
+        "type": "object"
+      },
+      "ClinicSettingsUpdate": {
+        "additionalProperties": false,
+        "description": "Payload for updating clinic settings with optimistic concurrency.",
+        "properties": {
+          "address_1": {
+            "maxLength": 255,
+            "minLength": 2,
+            "title": "Address 1",
+            "type": "string"
+          },
+          "address_2": {
+            "anyOf": [
+              {
+                "maxLength": 255,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Address 2"
+          },
+          "consultation_validity_days": {
+            "maximum": 365.0,
+            "minimum": 1.0,
+            "title": "Consultation Validity Days",
+            "type": "integer"
+          },
+          "email": {
+            "anyOf": [
+              {
+                "maxLength": 120,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Email"
+          },
+          "name_en": {
+            "maxLength": 120,
+            "minLength": 2,
+            "title": "Name En",
+            "type": "string"
+          },
+          "name_hi": {
+            "maxLength": 120,
+            "minLength": 2,
+            "title": "Name Hi",
+            "type": "string"
+          },
+          "phone": {
+            "maxLength": 64,
+            "minLength": 5,
+            "title": "Phone",
+            "type": "string"
+          },
+          "print_footer_en": {
+            "anyOf": [
+              {
+                "maxLength": 1000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Print Footer En"
+          },
+          "print_footer_hi": {
+            "anyOf": [
+              {
+                "maxLength": 1000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Print Footer Hi"
+          },
+          "print_header_en": {
+            "anyOf": [
+              {
+                "maxLength": 1000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Print Header En"
+          },
+          "print_header_hi": {
+            "anyOf": [
+              {
+                "maxLength": 1000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Print Header Hi"
+          },
+          "receipt_sequence_cycle": {
+            "pattern": "^(FINANCIAL_YEAR|CALENDAR_YEAR)$",
+            "title": "Receipt Sequence Cycle",
+            "type": "string"
+          },
+          "version_id": {
+            "minimum": 1.0,
+            "title": "Version Id",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "name_en",
+          "name_hi",
+          "address_1",
+          "phone",
+          "receipt_sequence_cycle",
+          "consultation_validity_days",
+          "version_id"
+        ],
+        "title": "ClinicSettingsUpdate",
+        "type": "object"
+      },
+      "DoctorCreate": {
+        "additionalProperties": false,
+        "description": "Payload for creating a new doctor profile.",
+        "properties": {
+          "default_fee_paise": {
+            "default": 0,
+            "minimum": 0.0,
+            "title": "Default Fee Paise",
+            "type": "integer"
+          },
+          "name_en": {
+            "maxLength": 120,
+            "minLength": 2,
+            "title": "Name En",
+            "type": "string"
+          },
+          "name_hi": {
+            "anyOf": [
+              {
+                "maxLength": 120,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name Hi"
+          },
+          "qualification": {
+            "anyOf": [
+              {
+                "maxLength": 120,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Qualification"
+          },
+          "registration_number": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Registration Number"
+          }
+        },
+        "required": [
+          "name_en"
+        ],
+        "title": "DoctorCreate",
+        "type": "object"
+      },
+      "DoctorOut": {
+        "description": "Doctor profile entity response.",
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "default_fee_paise": {
+            "title": "Default Fee Paise",
+            "type": "integer"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "is_active": {
+            "title": "Is Active",
+            "type": "boolean"
+          },
+          "name_en": {
+            "title": "Name En",
+            "type": "string"
+          },
+          "name_hi": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name Hi"
+          },
+          "qualification": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Qualification"
+          },
+          "registration_number": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Registration Number"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          },
+          "version_id": {
+            "title": "Version Id",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "name_en",
+          "default_fee_paise",
+          "is_active",
+          "version_id",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "DoctorOut",
+        "type": "object"
+      },
       "DoctorOverviewResponse": {
         "additionalProperties": false,
         "description": "Doctor dashboard summary including doctor ID and profile name.",
@@ -107,6 +501,168 @@
           "doctor_name_en"
         ],
         "title": "DoctorOverviewResponse",
+        "type": "object"
+      },
+      "DoctorUpdate": {
+        "additionalProperties": false,
+        "description": "Payload for updating a doctor profile with optimistic concurrency.",
+        "properties": {
+          "default_fee_paise": {
+            "minimum": 0.0,
+            "title": "Default Fee Paise",
+            "type": "integer"
+          },
+          "is_active": {
+            "default": true,
+            "title": "Is Active",
+            "type": "boolean"
+          },
+          "name_en": {
+            "maxLength": 120,
+            "minLength": 2,
+            "title": "Name En",
+            "type": "string"
+          },
+          "name_hi": {
+            "anyOf": [
+              {
+                "maxLength": 120,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name Hi"
+          },
+          "qualification": {
+            "anyOf": [
+              {
+                "maxLength": 120,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Qualification"
+          },
+          "registration_number": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Registration Number"
+          },
+          "version_id": {
+            "minimum": 1.0,
+            "title": "Version Id",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "name_en",
+          "default_fee_paise",
+          "version_id"
+        ],
+        "title": "DoctorUpdate",
+        "type": "object"
+      },
+      "FeeCreate": {
+        "additionalProperties": false,
+        "description": "Payload for creating a consultation fee schedule.",
+        "properties": {
+          "fee_paise": {
+            "minimum": 0.0,
+            "title": "Fee Paise",
+            "type": "integer"
+          },
+          "name": {
+            "maxLength": 120,
+            "minLength": 2,
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "fee_paise"
+        ],
+        "title": "FeeCreate",
+        "type": "object"
+      },
+      "FeeOut": {
+        "description": "Consultation fee schedule response.",
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "fee_paise": {
+            "title": "Fee Paise",
+            "type": "integer"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "is_active": {
+            "title": "Is Active",
+            "type": "boolean"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "fee_paise",
+          "is_active",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "FeeOut",
+        "type": "object"
+      },
+      "FeeUpdate": {
+        "additionalProperties": false,
+        "description": "Payload for modifying a consultation fee schedule.",
+        "properties": {
+          "fee_paise": {
+            "minimum": 0.0,
+            "title": "Fee Paise",
+            "type": "integer"
+          },
+          "is_active": {
+            "default": true,
+            "title": "Is Active",
+            "type": "boolean"
+          },
+          "name": {
+            "maxLength": 120,
+            "minLength": 2,
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "fee_paise"
+        ],
+        "title": "FeeUpdate",
         "type": "object"
       },
       "HTTPValidationError": {
@@ -759,6 +1315,272 @@
         ]
       }
     },
+    "/api/doctors": {
+      "get": {
+        "description": "List doctor profiles. Non-admin roles see only active doctors.",
+        "operationId": "list_doctors_api_doctors_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "include_inactive",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "Include Inactive",
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/DoctorOut"
+                  },
+                  "title": "Response List Doctors Api Doctors Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Doctors",
+        "tags": [
+          "doctors",
+          "fees"
+        ]
+      },
+      "post": {
+        "description": "Create a new doctor profile (ADMIN only).",
+        "operationId": "create_doctor_api_doctors_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DoctorCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DoctorOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Doctor",
+        "tags": [
+          "doctors",
+          "fees"
+        ]
+      }
+    },
+    "/api/doctors/{id}": {
+      "patch": {
+        "description": "Update doctor profile with optimistic concurrency control.",
+        "operationId": "update_doctor_api_doctors__id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "title": "Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DoctorUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DoctorOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Doctor",
+        "tags": [
+          "doctors",
+          "fees"
+        ]
+      }
+    },
+    "/api/fees": {
+      "get": {
+        "description": "List available consultation fee schedules.",
+        "operationId": "list_fees_api_fees_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/FeeOut"
+                  },
+                  "title": "Response List Fees Api Fees Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "List Fees",
+        "tags": [
+          "doctors",
+          "fees"
+        ]
+      },
+      "post": {
+        "description": "Create a new fee rate in paise (ADMIN only).",
+        "operationId": "create_fee_api_fees_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FeeCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FeeOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Fee",
+        "tags": [
+          "doctors",
+          "fees"
+        ]
+      }
+    },
+    "/api/fees/{id}": {
+      "patch": {
+        "description": "Modify a consultation fee rate.",
+        "operationId": "update_fee_api_fees__id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "title": "Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FeeUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FeeOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Fee",
+        "tags": [
+          "doctors",
+          "fees"
+        ]
+      }
+    },
     "/api/health": {
       "get": {
         "description": "Return health status, database ping, and authoritative setup_required flag (SEC-07).",
@@ -802,6 +1624,68 @@
         "summary": "Get Reception Overview",
         "tags": [
           "areas"
+        ]
+      }
+    },
+    "/api/settings": {
+      "get": {
+        "description": "Retrieve current clinic configuration.",
+        "operationId": "get_clinic_settings_api_settings_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClinicSettingsOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Get Clinic Settings",
+        "tags": [
+          "settings"
+        ]
+      },
+      "patch": {
+        "description": "Update clinic configuration with optimistic concurrency protection.",
+        "operationId": "update_clinic_settings_api_settings_patch",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ClinicSettingsUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClinicSettingsOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Clinic Settings",
+        "tags": [
+          "settings"
         ]
       }
     },

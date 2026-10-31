@@ -27,7 +27,7 @@ from support.matrix import (
 from kalyan_api.config import Settings
 from kalyan_api.core.permissions import Permission
 from kalyan_api.core.policy import require
-from kalyan_api.models import SystemSetup
+from kalyan_api.models import ClinicSettings, ConsultationFee, Doctor, SystemSetup
 
 FORBIDDEN_SECRET_KEYS: tuple[str, ...] = (
     "password_hash",
@@ -101,7 +101,7 @@ def test_rbac_matrix_cell(
         app, db_session, test_settings, login_client, identity, make_user
     )
 
-    target_user = None
+    target_entity: Any = None
     resolved_path = row.path
 
     if row.path.startswith("/api/setup"):
@@ -122,7 +122,24 @@ def test_rbac_matrix_cell(
             )
             db_session.flush()
 
-    if "{id}" in row.path:
+    elif row.path == "/api/settings":
+        target_entity = db_session.scalar(select(ClinicSettings).where(ClinicSettings.id == 1))
+
+    elif "/api/doctors/{id}" in row.path:
+        doc = Doctor(name_en=f"Dr. Target {uuid.uuid4().hex[:6]}", default_fee_paise=30000)
+        db_session.add(doc)
+        db_session.flush()
+        target_entity = doc
+        resolved_path = row.path.replace("{id}", str(doc.id))
+
+    elif "/api/fees/{id}" in row.path:
+        fee = ConsultationFee(name=f"Fee Target {uuid.uuid4().hex[:6]}", fee_paise=20000)
+        db_session.add(fee)
+        db_session.flush()
+        target_entity = fee
+        resolved_path = row.path.replace("{id}", str(fee.id))
+
+    elif "{id}" in row.path:
         is_active = "reactivate" not in row.path
         target_user = make_user(
             db_session,
@@ -137,9 +154,10 @@ def test_rbac_matrix_cell(
             target_user.failed_login_count = 5
             db_session.flush()
 
+        target_entity = target_user
         resolved_path = row.path.replace("{id}", str(target_user.id))
 
-    body = row.body_factory(target_user) if row.body_factory else None
+    body = row.body_factory(target_entity) if row.body_factory else None
     resp = client.request(row.method, resolved_path, json=body)
 
     expected_status = row.expected[identity]
