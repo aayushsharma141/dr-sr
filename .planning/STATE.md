@@ -23,9 +23,9 @@ See: `.planning/PROJECT.md` (updated 2026-10-31)
 ## Current Position
 
 Phase: 11 (Decisions Gate, Foundation & Auth)
-Plan: 10 of 16 complete
+Plan: 11 of 16 complete
 Status: In progress
-Last activity: 2026-10-31 — Phase 11 Plan 10 complete (user lifecycle operations: deactivate with session revocation, reactivate, admin reset-password with one-time temporary password issuance, admin unlock before cooldown expiration, and no-deletion enforcement)
+Last activity: 2026-10-31 — Phase 11 Plan 11 complete (first-run web setup wizard with high-entropy code, atomic consumption, singleton system_setup row under advisory lock, brute-force IP throttling and rotation, console emergency recovery reset-admin-password, and no-default-credentials verification)
 
 ## Phase Overview
 

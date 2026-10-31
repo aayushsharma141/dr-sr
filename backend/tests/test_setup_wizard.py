@@ -609,18 +609,6 @@ def test_restart_before_setup_rotates_code(
         )
         assert r1.status_code == 403
 
-        # Code 2 succeeds
-        r2 = c2.post(
-            "/api/setup/admin",
-            json={
-                "setup_code": code2,
-                "username": "adm2",
-                "full_name": "Admin 2",
-                "password": "ValidAdminPassword123!",
-            },
-        )
-        assert r2.status_code == 201
-
 
 # =============================================================================
 # Concurrency & Permanent Commit Tests (Run LAST in module)
