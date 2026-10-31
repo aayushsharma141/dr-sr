@@ -87,3 +87,4 @@ def validate_password_policy(
     pwd_stem = pwd_lower.rstrip("0123456789!@#$%^&*_-+=.")
     if len(pwd_stem) >= 3 and pwd_stem in BLOCKLIST:
         raise PasswordPolicyError("Password is based on a common easily guessable word")
+

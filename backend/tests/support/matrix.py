@@ -1,0 +1,186 @@
+"""RBAC role-by-endpoint matrix definition, runner, and completeness checker.
+
+Guarantees:
+- Every non-public route is defined in MATRIX with expected HTTP status for each role.
+- Completeness checker ensures no newly registered route ships without an RBAC matrix row.
+- Runner isolates each cell by provisioning dedicated users to avoid test pollution.
+"""
+
+import uuid
+from collections.abc import Callable
+from dataclasses import dataclass
+from typing import Any
+
+from fastapi import FastAPI
+from fastapi.testclient import TestClient
+from sqlalchemy.orm import Session
+from test_route_policies import _policies, walk_routes
+
+from kalyan_api.config import Settings
+from kalyan_api.models import User
+
+IDENTITIES = ("anonymous", "admin", "reception", "doctor_a", "doctor_b")
+
+
+@dataclass(frozen=True)
+class MatrixRow:
+    """RBAC matrix specification row."""
+
+    method: str
+    path: str
+    body_factory: Callable[[], dict[str, Any] | None] | None
+    expected: dict[str, int]
+
+
+def _change_password_payload() -> dict[str, Any]:
+    return {
+        "current_password": "ValidTestPassword123!",
+        "new_password": "NewSecretPassword123!",
+    }
+
+
+MATRIX: list[MatrixRow] = [
+    MatrixRow(
+        method="GET",
+        path="/api/auth/me",
+        body_factory=None,
+        expected={
+            "anonymous": 401,
+            "admin": 200,
+            "reception": 200,
+            "doctor_a": 200,
+            "doctor_b": 200,
+        },
+    ),
+    MatrixRow(
+        method="POST",
+        path="/api/auth/logout",
+        body_factory=None,
+        expected={
+            "anonymous": 401,
+            "admin": 204,
+            "reception": 204,
+            "doctor_a": 204,
+            "doctor_b": 204,
+        },
+    ),
+    MatrixRow(
+        method="POST",
+        path="/api/auth/change-password",
+        body_factory=_change_password_payload,
+        expected={
+            "anonymous": 401,
+            "admin": 200,
+            "reception": 200,
+            "doctor_a": 200,
+            "doctor_b": 200,
+        },
+    ),
+    MatrixRow(
+        method="GET",
+        path="/api/admin/overview",
+        body_factory=None,
+        expected={
+            "anonymous": 401,
+            "admin": 200,
+            "reception": 403,
+            "doctor_a": 403,
+            "doctor_b": 403,
+        },
+    ),
+    MatrixRow(
+        method="GET",
+        path="/api/reception/overview",
+        body_factory=None,
+        expected={
+            "anonymous": 401,
+            "admin": 403,
+            "reception": 200,
+            "doctor_a": 403,
+            "doctor_b": 403,
+        },
+    ),
+    MatrixRow(
+        method="GET",
+        path="/api/doctor/overview",
+        body_factory=None,
+        expected={
+            "anonymous": 401,
+            "admin": 403,
+            "reception": 403,
+            "doctor_a": 200,
+            "doctor_b": 200,
+        },
+    ),
+]
+
+
+def check_matrix_completeness(app: FastAPI, matrix: list[MatrixRow]) -> list[str]:
+    """Return all non-public (method, path) endpoints lacking an entry in matrix."""
+    matrix_pairs = {(r.method, r.path) for r in matrix}
+    uncovered: list[str] = []
+
+    for method, path, dep in walk_routes(app):
+        if dep is None:
+            continue
+        pols = list(_policies(dep))
+        if pols and pols[0].kind != "public":
+            if (method, path) not in matrix_pairs:
+                uncovered.append(f"{method} {path}")
+
+    return uncovered
+
+
+def build_isolated_client(
+    app: FastAPI,
+    db_session: Session,
+    settings: Settings,
+    login_client: Callable[[User], TestClient],
+    identity: str,
+    make_user_fn: Callable[..., User],
+) -> tuple[TestClient, User | None]:
+    """Provision a fresh user and client for the target role to prevent state leakage."""
+    if identity == "anonymous":
+        anon_client = TestClient(
+            app,
+            base_url="http://testserver",
+            headers={"Origin": "http://testserver"},
+        )
+        return anon_client, None
+
+    uid = uuid.uuid4().hex[:8]
+    if identity == "admin":
+        user = make_user_fn(
+            db_session,
+            settings,
+            role="ADMIN",
+            username=f"mat_admin_{uid}",
+        )
+    elif identity == "reception":
+        user = make_user_fn(
+            db_session,
+            settings,
+            role="RECEPTION",
+            username=f"mat_rec_{uid}",
+        )
+    elif identity == "doctor_a":
+        user = make_user_fn(
+            db_session,
+            settings,
+            role="DOCTOR",
+            username=f"mat_doc_a_{uid}",
+            doctor_name=f"Dr. Anil {uid}",
+        )
+    elif identity == "doctor_b":
+        user = make_user_fn(
+            db_session,
+            settings,
+            role="DOCTOR",
+            username=f"mat_doc_b_{uid}",
+            doctor_name=f"Dr. Bharati {uid}",
+        )
+    else:
+        raise ValueError(f"Unknown test identity: {identity}")
+
+    auth_client = login_client(user)
+    return auth_client, user

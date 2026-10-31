@@ -2,7 +2,10 @@
 
 import re
 
+from test_route_policies import _policies, walk_routes
+
 from kalyan_api.core.permissions import RESERVED, ROLE_PERMISSIONS, Permission, Role
+from kalyan_api.main import create_app
 
 CLINICAL_PERMISSIONS = frozenset({
     Permission.ENCOUNTER_READ,
@@ -44,11 +47,28 @@ def test_clinical_permissions_restricted_exclusively_to_doctor() -> None:
         assert cp in doctor_perms, f"DOCTOR must possess clinical permission {cp.value}"
 
 
-def test_reserved_mapping_covers_all_permissions() -> None:
-    """Every Permission enum entry is tracked with an owning plan or phase milestone in RESERVED."""
-    for perm in Permission:
-        assert perm in RESERVED, f"Permission {perm} missing from RESERVED catalogue"
-        assert isinstance(RESERVED[perm], str) and len(RESERVED[perm]) > 0
+def test_no_orphan_permissions() -> None:
+    """Every Permission is used by a route or tracked in RESERVED; no RESERVED key is in use."""
+    app = create_app()
+    used_permissions: set[Permission] = set()
+
+    for _, _, dep in walk_routes(app):
+        if dep is None:
+            continue
+        for pol in _policies(dep):
+            if pol.kind == "require":
+                for perm_str in pol.permissions:
+                    used_permissions.add(Permission(perm_str))
+
+    # Invariant 1: No RESERVED permission is currently bound to any route
+    conflict = used_permissions & set(RESERVED.keys())
+    assert not conflict, f"Permissions in RESERVED are actively used by routes: {conflict}"
+
+    # Invariant 2: Active permissions + RESERVED permissions cover the entire Permission enum
+    total_covered = used_permissions | set(RESERVED.keys())
+    missing = set(Permission) - total_covered
+    assert not missing, f"Permissions orphaned (not in active routes or RESERVED): {missing}"
+    assert total_covered == set(Permission)
 
 
 def test_golden_role_permissions_snapshot() -> None:
