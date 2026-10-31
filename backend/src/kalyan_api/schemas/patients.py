@@ -1,4 +1,6 @@
-"""Pydantic request and response schemas for patient registration and demographics (PAT-01)."""
+"""Pydantic request and response schemas for patient registration
+and demographics (PAT-01, PAT-02, PAT-03).
+"""
 
 from datetime import date, datetime
 
@@ -48,6 +50,29 @@ class PatientCreate(BaseModel):
     emergency_contact: str | None = Field(default=None, max_length=120)
     allergies: str = Field(default="None reported", max_length=1000)
     notes: str | None = Field(default=None, max_length=2000)
+
+
+class PatientUpdate(BaseModel):
+    """Payload for modifying demographic fields with optimistic concurrency control."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    version_id: int = Field(ge=1, description="Optimistic concurrency control version.")
+    full_name: str | None = Field(default=None, min_length=2, max_length=120)
+    guardian_name: str | None = Field(default=None, min_length=2, max_length=120)
+    gender: str | None = Field(default=None, pattern=r"^[MFO]$")
+    dob: date | None = None
+    age_years: int | None = Field(default=None, ge=0, le=150)
+    mobile: str | None = Field(
+        default=None, min_length=10, max_length=15, pattern=r"^[0-9+ -](10, 15)$"
+    )
+    address: str | None = Field(default=None, min_length=2, max_length=1000)
+    district: str | None = Field(default=None, min_length=2, max_length=64)
+    state: str | None = Field(default=None, min_length=2, max_length=64)
+    emergency_contact: str | None = Field(default=None, max_length=120)
+    allergies: str | None = Field(default=None, max_length=1000)
+    notes: str | None = Field(default=None, max_length=2000)
+    is_active: bool | None = None
 
 
 class DuplicateCheckResponse(BaseModel):

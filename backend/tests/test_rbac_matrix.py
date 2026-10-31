@@ -27,7 +27,7 @@ from support.matrix import (
 from kalyan_api.config import Settings
 from kalyan_api.core.permissions import Permission
 from kalyan_api.core.policy import require
-from kalyan_api.models import ClinicSettings, ConsultationFee, Doctor, SystemSetup
+from kalyan_api.models import ClinicSettings, ConsultationFee, Doctor, Patient, SystemSetup
 
 FORBIDDEN_SECRET_KEYS: tuple[str, ...] = (
     "password_hash",
@@ -142,6 +142,30 @@ def test_rbac_matrix_cell(
         target_entity = fee
         resolved_path = row.path.replace("{id}", str(fee.id))
 
+    elif "/api/patients/{id}" in row.path:
+        pat = Patient(
+            urn=f"KH-2026-{uuid.uuid4().hex[:4]}",
+            full_name="Matrix Patient",
+            guardian_name="Guardian",
+            gender="M",
+            age_years=30,
+            mobile="9876543210",
+            address="Ara",
+            district="Bhojpur",
+            state="Bihar",
+            allergies="None reported",
+        )
+        if "photo" in row.path:
+            test_settings.photos_dir.mkdir(parents=True, exist_ok=True)
+            photo_name = f"{uuid.uuid4().hex}.jpg"
+            (test_settings.photos_dir / photo_name).write_bytes(b"\xff\xd8\xff\xe0testjpeg")
+            pat.photo_path = photo_name
+
+        db_session.add(pat)
+        db_session.flush()
+        target_entity = pat
+        resolved_path = row.path.replace("{id}", str(pat.id))
+
     elif "{id}" in row.path:
         is_active = "reactivate" not in row.path
         target_user = make_user(
@@ -161,7 +185,14 @@ def test_rbac_matrix_cell(
         resolved_path = row.path.replace("{id}", str(target_user.id))
 
     body = row.body_factory(target_entity) if row.body_factory else None
-    resp = client.request(row.method, resolved_path, json=body)
+    if "photo" in row.path and row.method == "POST":
+        resp = client.request(
+            row.method,
+            resolved_path,
+            files={"file": ("test.jpg", b"\xff\xd8\xff\xe0testjpeg", "image/jpeg")},
+        )
+    else:
+        resp = client.request(row.method, resolved_path, json=body)
 
     expected_status = row.expected[identity]
     assert resp.status_code == expected_status, (

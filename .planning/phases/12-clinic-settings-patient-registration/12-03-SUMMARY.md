@@ -49,3 +49,4 @@ A 20-thread parallel race test against real PostgreSQL proves zero duplicates an
 - `backend/tests/test_openapi_snapshot.py`: 2 passed.
 - Full test suite: 318 passed, 1 skipped (frontend dist check), 0 failures.
 - Linter: `ruff check backend` clean (0 errors).
+

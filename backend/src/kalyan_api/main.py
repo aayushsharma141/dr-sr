@@ -50,7 +50,9 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
             response.headers[k] = v
 
         path = request.url.path
-        if path.startswith("/api"):
+        if path.endswith("/photo") and response.status_code < 400:
+            response.headers["Cache-Control"] = "private, no-cache"
+        elif path.startswith("/api"):
             response.headers["Cache-Control"] = "no-store"
         elif path.startswith("/assets/"):
             if response.status_code < 400:

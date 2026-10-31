@@ -61,6 +61,9 @@ class Settings(BaseSettings):
     # First-run setup code file location (SEC-07)
     setup_code_path: Path | None = None
 
+    # Patient photos storage location (PAT-05)
+    photos_dir: Path = BACKEND_DIR / "var" / "photos" 
+
     model_config = SettingsConfigDict(
         env_prefix="KALYAN_",
         env_file=str(ENV_FILE_PATH) if ENV_FILE_PATH.exists() else None,

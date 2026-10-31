@@ -44,3 +44,4 @@
 - `backend/tests/test_rbac_matrix.py`: 124 tests passing.
 - Full test suite: 303 passed, 1 skipped (frontend dist check when env var not set), 0 failures.
 - Linter: `ruff check backend` clean (0 errors).
+
