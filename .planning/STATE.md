@@ -8,7 +8,7 @@ progress:
   total_phases: 7
   completed_phases: 0
   active_phase: 11
-  percent: 9
+  percent: 10
 ---
 
 # Project State: Kalyan Hospital Patient & Physiotherapy Management
@@ -23,9 +23,9 @@ See: `.planning/PROJECT.md` (updated 2026-10-31)
 ## Current Position
 
 Phase: 11 (Decisions Gate, Foundation & Auth)
-Plan: 9 of 16 complete
+Plan: 10 of 16 complete
 Status: In progress
-Last activity: 2026-10-31 — Phase 11 Plan 09 complete (user creation with one-time temporary password, forced first-login password change flow, optimistic concurrency locking with version_id, 409 conflict envelope, and 20x concurrent HTTP race verification)
+Last activity: 2026-10-31 — Phase 11 Plan 10 complete (user lifecycle operations: deactivate with session revocation, reactivate, admin reset-password with one-time temporary password issuance, admin unlock before cooldown expiration, and no-deletion enforcement)
 
 ## Phase Overview
 
@@ -33,7 +33,7 @@ Phases 11-17 (continuing from v2.0, which ended at Phase 10). See `.planning/ROA
 
 | Phase | Name | Status |
 |-------|------|--------|
-| 11 | Decisions Gate, Foundation & Auth | In progress (9/16 plans) |
+| 11 | Decisions Gate, Foundation & Auth | In progress (10/16 plans) |
 | 12 | Clinic Settings & Patient Registration | Not started |
 | 13 | Appointments & Clinical Encounters | Not started |
 | 14 | Prescriptions, Treatment Plans & Sessions | Not started |
@@ -46,3 +46,4 @@ Phases 11-17 (continuing from v2.0, which ended at Phase 10). See `.planning/ROA
 - v2.0 PySide6 + SQLite desktop app (phases 1–10) is complete and archived at `.planning/milestones/v2.0-restart-phases/`. It is the reference for domain rules only.
 - Open items: confirm server hardware and LAN; plan SQLite to PostgreSQL data migration; client approval of the full feature list.
 - Toolchain: Node.js LTS v26.13.0 and PostgreSQL 18.6-5 active and operational.
+- Frontend UI Plan Proposal: Detailed architecture & design proposal drafted at `docs/plans/frontend-ui-plan.md` (uncommitted, under review). Proposes React + TypeScript (Vite, Tailwind CSS + shadcn/ui, React Router, TanStack Query & Table, React Hook Form + Zod, openapi-typescript), design tokens matching the approved crimson letterhead, role-based screens (/reception, /doctor, /admin), browser webcam capture over LAN HTTPS, A4 dual-signature print matching SAMPLE.pdf, and flags 5 open decisions (HTTPS for camera, doctor-to-doctor note visibility, department names, patient/attendant signature line, and library version/licence confirmation) before building.
