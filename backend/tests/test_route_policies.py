@@ -21,11 +21,15 @@ from kalyan_api.main import create_app
 PUBLIC_ALLOWLIST: set[tuple[str, str]] = {
     ("GET", "/api/health"),
     ("POST", "/api/auth/login"),
+    ("GET", "/api/setup/status"),
+    ("POST", "/api/setup/admin"),
 }
 
 MUST_EXIST: set[tuple[str, str]] = {
     ("GET", "/api/health"),
     ("POST", "/api/auth/login"),
+    ("GET", "/api/setup/status"),
+    ("POST", "/api/setup/admin"),
     ("GET", "/api/auth/me"),
     ("POST", "/api/auth/logout"),
     ("POST", "/api/auth/change-password"),

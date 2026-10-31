@@ -10,11 +10,16 @@ from starlette.responses import Response
 from kalyan_api.config import Settings, get_settings
 from kalyan_api.core.csrf import verify_origin
 from kalyan_api.core.errors import RequestIdMiddleware, install_error_handlers
+from kalyan_api.core.setup_code import (
+    get_default_setup_code_path,
+    issue_setup_code,
+)
 from kalyan_api.db.session import SessionLocal, build_engine
-from kalyan_api.db.startup import run_startup_checks
+from kalyan_api.db.startup import run_startup_checks, setup_completed
 from kalyan_api.routers.areas import router as areas_router
 from kalyan_api.routers.auth import router as auth_router
 from kalyan_api.routers.health import router as health_router
+from kalyan_api.routers.setup import router as setup_router
 from kalyan_api.routers.users import router as users_router
 
 SECURITY_HEADERS = {
@@ -53,6 +58,22 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     # Run pre-flight startup gates (wait for DB, schema revision, and D-02 durability)
     run_startup_checks(engine, settings)
 
+    # SEC-07: First-run setup code issuance
+    with engine.connect() as conn:
+        is_setup_done = setup_completed(conn)
+
+    code_path = getattr(settings, "setup_code_path", None)
+    if not is_setup_done:
+        issue_setup_code(app, settings, path=code_path)
+    else:
+        target_path = code_path or get_default_setup_code_path()
+        if target_path and target_path.exists():
+            try:
+                target_path.unlink()
+            except OSError:
+                pass
+        app.state.setup_code_hash = None
+
     try:
         yield
     finally:
@@ -76,6 +97,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     )
 
     app.state.settings = resolved_settings
+    app.state.setup_code_hash = None
+    app.state.setup_code_path = None
+    app.state.setup_failures_by_ip = {}
+    app.state.setup_total_failures = 0
 
     # Middleware execution: Outer RequestID -> SecurityHeaders -> Router
     app.add_middleware(SecurityHeadersMiddleware)
@@ -86,6 +111,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     # Route registrations
     app.include_router(health_router, prefix="/api")
+    app.include_router(setup_router, prefix="/api")
     app.include_router(auth_router, prefix="/api")
     app.include_router(areas_router, prefix="/api")
     app.include_router(users_router, prefix="/api")

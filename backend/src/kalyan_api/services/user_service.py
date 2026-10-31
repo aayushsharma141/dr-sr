@@ -56,8 +56,11 @@ def create_user(
     ctx: AuditContext,
     payload: UserCreate,
     settings: Settings,
+    explicit_password: str | None = None,
+    must_change_password: bool | None = None,
+    audit_action: AuditAction | None = AuditAction.USER_CREATED,
 ) -> tuple[User, str]:
-    """Create a new user account with one-time temporary password and audit record."""
+    """Create a new user account with temporary or explicit password and audit record."""
     # Pre-check case-insensitive username collision
     normalized_username = payload.username.lower()
     existing = session.scalar(
@@ -70,11 +73,21 @@ def create_user(
             message=f"Username '{normalized_username}' is already taken",
         )
 
-    temp_password = generate_temp_password(
-        settings, username=payload.username, full_name=payload.full_name
-    )
+    if explicit_password is not None:
+        password_to_use = explicit_password
+        must_change = (
+            must_change_password if must_change_password is not None else False
+        )
+    else:
+        password_to_use = generate_temp_password(
+            settings, username=payload.username, full_name=payload.full_name
+        )
+        must_change = (
+            must_change_password if must_change_password is not None else True
+        )
+
     hasher = build_hasher(settings)
-    pw_hash = hash_password(hasher, temp_password)
+    pw_hash = hash_password(hasher, password_to_use)
 
     doctor_id: int | None = None
     if payload.role == Role.DOCTOR:
@@ -95,7 +108,7 @@ def create_user(
         role=role_val,
         doctor_id=doctor_id,
         password_hash=pw_hash,
-        must_change_password=True,
+        must_change_password=must_change,
         is_active=True,
         created_by=ctx.actor_user_id,
     )
@@ -111,20 +124,21 @@ def create_user(
             message=f"Username '{normalized_username}' is already taken",
         ) from err
 
-    audit_service.record(
-        session,
-        ctx,
-        AuditAction.USER_CREATED,
-        "USER",
-        user.id,
-        after={
-            "role": user.role,
-            "full_name": user.full_name,
-            "doctor_id": user.doctor_id,
-        },
-    )
+    if audit_action is not None:
+        audit_service.record(
+            session,
+            ctx,
+            audit_action,
+            "USER",
+            user.id,
+            after={
+                "role": user.role,
+                "full_name": user.full_name,
+                "doctor_id": user.doctor_id,
+            },
+        )
 
-    return user, temp_password
+    return user, password_to_use
 
 
 def update_user(

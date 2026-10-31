@@ -35,6 +35,7 @@ class AuditAction(StrEnum):
     USER_REACTIVATED = "USER_REACTIVATED"
     USER_PASSWORD_RESET = "USER_PASSWORD_RESET"  # noqa: S105
     USER_UNLOCKED = "USER_UNLOCKED"
+    SETUP_CODE_REJECTED = "SETUP_CODE_REJECTED"
     ADMIN_BOOTSTRAPPED = "ADMIN_BOOTSTRAPPED"
     ADMIN_PASSWORD_RESET_CLI = "ADMIN_PASSWORD_RESET_CLI"  # noqa: S105
 
@@ -106,14 +107,19 @@ class AuditContext:
                 object.__setattr__(self, "request_id", None)
 
     @classmethod
-    def system(cls, label: str) -> "AuditContext":
+    def system(
+        cls,
+        label: str,
+        ip: str | None = None,
+        user_agent: str | None = None,
+    ) -> "AuditContext":
         """Factory for system, background task, or CLI actions."""
         return cls(
             actor_user_id=None,
             actor_username=label[:64],
             actor_role="SYSTEM",
-            ip=None,
-            user_agent=None,
+            ip=ip,
+            user_agent=user_agent,
             request_id=None,
         )
 

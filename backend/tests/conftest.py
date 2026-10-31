@@ -3,6 +3,7 @@
 import os
 from collections.abc import Generator
 from datetime import UTC, datetime
+from pathlib import Path
 
 import pytest
 from fastapi import FastAPI
@@ -12,6 +13,7 @@ from sqlalchemy.orm import Session
 
 from kalyan_api.config import Settings
 from kalyan_api.core.security import build_hasher, hash_password
+from kalyan_api.core.setup_code import issue_setup_code
 from kalyan_api.db.migrate import upgrade_head
 from kalyan_api.db.session import build_engine, get_session
 from kalyan_api.main import create_app
@@ -164,6 +166,13 @@ def without_active_admins(db_session: Session) -> None:
     """Deactivate all admin users within the test's rolled-back transaction."""
     db_session.execute(text("UPDATE users SET is_active = false WHERE role = 'ADMIN'"))
     db_session.flush()
+
+
+@pytest.fixture
+def setup_code(app: FastAPI, test_settings: Settings, tmp_path: Path) -> str:
+    """Issue a first-run setup code into the test app and return the plaintext code."""
+    code_path = tmp_path / "setup-code.txt"
+    return issue_setup_code(app, test_settings, path=code_path)
 
 
 TEST_PASSWORD = "ValidTestPassword123!"
