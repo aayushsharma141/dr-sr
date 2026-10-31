@@ -61,5 +61,5 @@ All acceptance criteria (SC6-1 through SC6-7) verified across test suites:
 - `backend/tests/test_cli_admin.py` (8 passed)
 - `backend/tests/test_no_default_credentials.py` (2 passed)
 - `backend/tests/test_rbac_matrix.py` (82 passed)
-- Full backend suite: **232 passed, 6 deselected, 1 warning (100% GREEN)**.
+- Full backend suite: **238 passed, 1 warning (100% GREEN)**.
 - `ruff check backend`: Clean.

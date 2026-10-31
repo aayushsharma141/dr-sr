@@ -8,7 +8,7 @@ progress:
   total_phases: 7
   completed_phases: 0
   active_phase: 11
-  percent: 10
+  percent: 11
 ---
 
 # Project State: Kalyan Hospital Patient & Physiotherapy Management
@@ -33,7 +33,7 @@ Phases 11-17 (continuing from v2.0, which ended at Phase 10). See `.planning/ROA
 
 | Phase | Name | Status |
 |-------|------|--------|
-| 11 | Decisions Gate, Foundation & Auth | In progress (10/16 plans) |
+| 11 | Decisions Gate, Foundation & Auth | In progress (11/16 plans) |
 | 12 | Clinic Settings & Patient Registration | Not started |
 | 13 | Appointments & Clinical Encounters | Not started |
 | 14 | Prescriptions, Treatment Plans & Sessions | Not started |
