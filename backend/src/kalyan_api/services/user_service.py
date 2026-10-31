@@ -169,17 +169,18 @@ def update_user(
 
         # Guard 3: Prevent demoting the last active administrator
         if user.role == Role.ADMIN.value and target_role != Role.ADMIN.value:
-            active_admin_count = session.scalar(
-                select(func.count(User.id)).where(
-                    User.role == Role.ADMIN.value, User.is_active.is_(True)
+            if user.is_active:
+                active_admin_count = session.scalar(
+                    select(func.count(User.id)).where(
+                        User.role == Role.ADMIN.value, User.is_active.is_(True)
+                    )
                 )
-            )
-            if active_admin_count is not None and active_admin_count <= 1:
-                raise ApiError(
-                    status_code=409,
-                    code="last_admin",
-                    message="Cannot change role of the last active administrator",
-                )
+                if active_admin_count is not None and active_admin_count <= 1:
+                    raise ApiError(
+                        status_code=409,
+                        code="last_admin",
+                        message="Cannot change role of the last active administrator",
+                    )
 
         old_role = user.role
         user.role = target_role
