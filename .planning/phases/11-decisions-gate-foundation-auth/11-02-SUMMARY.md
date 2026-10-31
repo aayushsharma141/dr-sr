@@ -75,3 +75,4 @@
   - Define declarative models (`User`, `Role`, `SystemSetup`, `AuditLog`, `SessionRecord`).
   - Implement append-only PostgreSQL triggers and permissions on `audit_logs` (`AUD-01`).
   - Run initial migration against `kalyan_dev` and `kalyan_test`.
+

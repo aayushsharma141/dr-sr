@@ -2,14 +2,16 @@
 
 import os
 from collections.abc import Generator
+from datetime import UTC, datetime
 
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
-from sqlalchemy import Engine
+from sqlalchemy import Engine, create_engine, text
 from sqlalchemy.orm import Session
 
 from kalyan_api.config import Settings
+from kalyan_api.db.migrate import upgrade_head
 from kalyan_api.db.session import build_engine, get_session
 from kalyan_api.main import create_app
 
@@ -37,7 +39,38 @@ def test_settings() -> Settings:
 
 
 @pytest.fixture(scope="session")
-def app_engine(test_settings: Settings) -> Generator[Engine, None, None]:
+def migrated_db(test_settings: Settings) -> dict[str, int]:
+    """Wipe public schema, run alembic migrations from head, and assert zero seed rows."""
+    owner_engine = create_engine(test_settings.owner_url, isolation_level="AUTOCOMMIT")
+    with owner_engine.connect() as conn:
+        conn.execute(text("DROP SCHEMA IF EXISTS public CASCADE"))
+        conn.execute(text("CREATE SCHEMA public"))
+
+    upgrade_head(test_settings.owner_url)
+
+    # SEC-05: Assert zero seed rows exist immediately after upgrade head
+    with owner_engine.connect() as conn:
+        users_count = conn.scalar(text("SELECT count(*) FROM users")) or 0
+        doctors_count = conn.scalar(text("SELECT count(*) FROM doctors")) or 0
+        setup_count = conn.scalar(text("SELECT count(*) FROM system_setup")) or 0
+
+    owner_engine.dispose()
+
+    assert users_count == 0, f"Expected 0 users after migration, found {users_count}"
+    assert doctors_count == 0, f"Expected 0 doctors after migration, found {doctors_count}"
+    assert setup_count == 0, f"Expected 0 system_setup rows after migration, found {setup_count}"
+
+    return {
+        "users": users_count,
+        "doctors": doctors_count,
+        "system_setup": setup_count,
+    }
+
+
+@pytest.fixture(scope="session")
+def app_engine(
+    test_settings: Settings, migrated_db: dict[str, int]
+) -> Generator[Engine, None, None]:
     """Session-scoped application runtime engine for kalyan_app."""
     engine = build_engine(test_settings, owner=False)
     yield engine
@@ -45,7 +78,9 @@ def app_engine(test_settings: Settings) -> Generator[Engine, None, None]:
 
 
 @pytest.fixture(scope="session")
-def owner_engine(test_settings: Settings) -> Generator[Engine, None, None]:
+def owner_engine(
+    test_settings: Settings, migrated_db: dict[str, int]
+) -> Generator[Engine, None, None]:
     """Session-scoped migration owner engine for kalyan_owner."""
     engine = build_engine(test_settings, owner=True)
     yield engine
@@ -94,3 +129,10 @@ def client(app: FastAPI) -> Generator[TestClient, None, None]:
     ) as c:
         yield c
 
+
+@pytest.fixture
+def clock(monkeypatch: pytest.MonkeyPatch) -> dict[str, datetime]:
+    """Time seam freezing utcnow for deterministic testing."""
+    now = {"t": datetime(2026, 11, 2, 4, 30, tzinfo=UTC)}
+    monkeypatch.setattr("kalyan_api.clock.utcnow", lambda: now["t"])
+    return now
