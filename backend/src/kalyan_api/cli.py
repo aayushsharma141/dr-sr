@@ -203,6 +203,26 @@ def cmd_reset_admin_password(
     return 0
 
 
+def cmd_export_openapi(out_path: str) -> int:
+    """Export normalized OpenAPI specification to JSON file."""
+    import json
+    from pathlib import Path
+
+    from kalyan_api.main import create_app
+
+    settings = get_settings()
+    app = create_app(settings)
+    schema = app.openapi()
+
+    target = Path(out_path)
+    target.parent.mkdir(parents=True, exist_ok=True)
+    with target.open("w", encoding="utf-8") as f:
+        json.dump(schema, f, indent=2, sort_keys=True)
+        f.write("\n")
+    print(f"OpenAPI specification exported to '{target}'.")
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     """Build top-level argument parser with extensible subcommands."""
     parser = argparse.ArgumentParser(
@@ -245,6 +265,17 @@ def build_parser() -> argparse.ArgumentParser:
         help="Generate a temporary password and print it to standard output once",
     )
 
+    # Subcommand: export-openapi
+    openapi_parser = subparsers.add_parser(
+        "export-openapi",
+        help="Export normalized OpenAPI 3.1 specification to JSON file",
+    )
+    openapi_parser.add_argument(
+        "--out",
+        required=True,
+        help="Target file path for the exported JSON schema",
+    )
+
     return parser
 
 
@@ -263,6 +294,8 @@ def main(argv: Sequence[str] | None = None) -> int:
             password_stdin=args.password_stdin,
             generate_password=args.generate_password,
         )
+    if args.command == "export-openapi":
+        return cmd_export_openapi(out_path=args.out)
 
     parser.print_help()
     return 1
