@@ -50,6 +50,14 @@ def migrated_db(test_settings: Settings) -> dict[str, int]:
 
     upgrade_head(test_settings.owner_url)
 
+    # Ensure runtime role kalyan_app has TEMPORARY table privileges on test database
+    with owner_engine.connect() as conn:
+        grant_sql = (
+            f'GRANT TEMPORARY ON DATABASE "{test_settings.db_name}" '
+            f'TO "{test_settings.db_app_user}"'
+        )
+        conn.execute(text(grant_sql))
+
     # SEC-05: Assert zero seed rows exist immediately after upgrade head
     with owner_engine.connect() as conn:
         users_count = conn.scalar(text("SELECT count(*) FROM users")) or 0
