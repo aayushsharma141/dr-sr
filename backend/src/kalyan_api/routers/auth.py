@@ -14,6 +14,7 @@ from kalyan_api.core.policy import authenticated_only, public
 from kalyan_api.core.principal import (
     Principal,
     build_audit_context,
+    current_principal_allow_pending,
     get_current_settings,
 )
 from kalyan_api.db.session import SessionDep
@@ -263,7 +264,7 @@ def login(
 @router.get("/me", dependencies=[Depends(authenticated_only)])
 def get_me(
     session: SessionDep,
-    principal: Principal = Depends(authenticated_only),
+    principal: Principal = Depends(current_principal_allow_pending),
 ) -> MeResponse:
     """Return profile, active permissions, and CSRF token for the authenticated caller."""
     user = session.scalar(select(User).where(User.id == principal.user_id))
@@ -291,7 +292,7 @@ def get_me(
 def logout(
     request: Request,
     session: SessionDep,
-    principal: Principal = Depends(authenticated_only),
+    principal: Principal = Depends(current_principal_allow_pending),
     settings: Settings = Depends(get_current_settings),
 ) -> Response:
     """Revoke active session and delete session cookie."""
@@ -323,7 +324,7 @@ def change_password(
     request: Request,
     body: ChangePasswordRequest,
     session: SessionDep,
-    principal: Principal = Depends(authenticated_only),
+    principal: Principal = Depends(current_principal_allow_pending),
     settings: Settings = Depends(get_current_settings),
 ) -> Response:
     """Change user password, enforce NIST policy, revoke all sessions, and issue fresh session."""
