@@ -8,7 +8,7 @@ progress:
   total_phases: 7
   completed_phases: 0
   active_phase: 11
-  percent: 7
+  percent: 8
 ---
 
 # Project State: Kalyan Hospital Patient & Physiotherapy Management
@@ -23,9 +23,9 @@ See: `.planning/PROJECT.md` (updated 2026-10-31)
 ## Current Position
 
 Phase: 11 (Decisions Gate, Foundation & Auth)
-Plan: 7 of 16 complete
+Plan: 8 of 16 complete
 Status: In progress
-Last activity: 2026-10-31 — Phase 11 Plan 07 complete (NIST-aligned password policy with 125-word blocklist, POST /api/auth/change-password endpoint revoking sessions, Origin verification for state-changing HTTP requests, and strict CSRF token validation)
+Last activity: 2026-10-31 — Phase 11 Plan 08 complete (iter_route_contexts policy marker route walk, exactly-one policy marker rule, role-by-endpoint RBAC matrix and completeness gate, forbidden secrets scanner, and default-deny row scope helpers for D-03/D-04)
 
 ## Phase Overview
 
@@ -33,7 +33,7 @@ Phases 11-17 (continuing from v2.0, which ended at Phase 10). See `.planning/ROA
 
 | Phase | Name | Status |
 |-------|------|--------|
-| 11 | Decisions Gate, Foundation & Auth | In progress (7/16 plans) |
+| 11 | Decisions Gate, Foundation & Auth | In progress (8/16 plans) |
 | 12 | Clinic Settings & Patient Registration | Not started |
 | 13 | Appointments & Clinical Encounters | Not started |
 | 14 | Prescriptions, Treatment Plans & Sessions | Not started |
