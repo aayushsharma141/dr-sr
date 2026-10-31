@@ -1,13 +1,14 @@
 """Database engine creation, session factory, and FastAPI request-scoped dependency."""
 
 from collections.abc import Generator
+from contextlib import contextmanager
 from typing import Annotated
 
 from fastapi import Depends
 from sqlalchemy import Engine, create_engine
 from sqlalchemy.orm import Session, sessionmaker
 
-from kalyan_api.config import Settings
+from kalyan_api.config import Settings, get_settings
 
 
 def build_engine(settings: Settings, owner: bool = False) -> Engine:
@@ -53,4 +54,30 @@ def get_session() -> Generator[Session, None, None]:
 
 # In FastAPI, dependencies with scope="function" commit and clean up before response sending
 SessionDep = Annotated[Session, Depends(get_session, scope="function")]
+
+
+@contextmanager
+def session_scope(
+    settings: Settings | None = None,
+) -> Generator[Session, None, None]:
+    """Provide a transactional session scope for CLI scripts and background workers."""
+    resolved_settings = settings or get_settings()
+    engine = build_engine(resolved_settings, owner=False)
+    factory = sessionmaker(
+        bind=engine,
+        autocommit=False,
+        autoflush=False,
+        expire_on_commit=False,
+    )
+    session = factory()
+    try:
+        yield session
+        session.commit()
+    except Exception:
+        session.rollback()
+        raise
+    finally:
+        session.close()
+        engine.dispose()
+
 

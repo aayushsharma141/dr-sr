@@ -1,21 +1,39 @@
 """Command-line interface for database migration, inspection, and operations.
 
+Recovery is authenticated by OS-level access to the server PC plus the protected
+backend/.env database credentials; it cannot create a first admin or reopen setup;
+first-admin creation is the web wizard (http://SERVER:8000/setup, or http://127.0.0.1:8000/setup
+on a headless server) with the code from backend/var/setup-code.txt; create-admin
+intentionally does not exist.
+
 Prohibitions:
+- Never accept a password as a command-line argument (--password is strictly prohibited).
 - Never print passwords or raw database connection URLs.
 - Migration commands must run under the owner role; status checks run under the app role.
 """
 
 import argparse
+import getpass
+import secrets
 import sys
 from collections.abc import Sequence
 
 from alembic.runtime.migration import MigrationContext
 from alembic.script import ScriptDirectory
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, func, select, update
 
+from kalyan_api import clock
 from kalyan_api.config import get_settings
+from kalyan_api.core.password_policy import PasswordPolicyError, validate_password_policy
+from kalyan_api.core.permissions import Role
+from kalyan_api.core.security import build_hasher, hash_password
+from kalyan_api.core.setup_code import SETUP_CODE_ALPHABET
 from kalyan_api.db.migrate import alembic_config, upgrade_head
+from kalyan_api.db.session import session_scope
 from kalyan_api.db.startup import check_durability
+from kalyan_api.models import AuthSession, User
+from kalyan_api.services import audit_service
+from kalyan_api.services.audit_service import AuditAction, AuditContext
 
 
 def cmd_migrate() -> int:
@@ -97,6 +115,94 @@ def cmd_check_db() -> int:
         app_engine.dispose()
 
 
+def cmd_reset_admin_password(
+    username: str,
+    password_stdin: bool = False,
+    generate_password: bool = False,
+) -> int:
+    """Reset the password for an existing active administrator via console recovery."""
+    settings = get_settings()
+
+    if generate_password:
+        new_pwd = "".join(
+            secrets.choice(SETUP_CODE_ALPHABET)
+            for _ in range(settings.temp_password_length)
+        )
+        must_change = True
+    elif password_stdin:
+        new_pwd = sys.stdin.read().strip()
+        must_change = False
+    else:
+        p1 = getpass.getpass("Enter new password: ")
+        p2 = getpass.getpass("Confirm new password: ")
+        if p1 != p2:
+            print("Error: Passwords do not match.", file=sys.stderr)
+            return 1
+        new_pwd = p1
+        must_change = False
+
+    # Validate password against NIST policy
+    try:
+        validate_password_policy(new_pwd, username, None, settings)
+    except PasswordPolicyError as err:
+        print(f"Error: Password policy violation: {err.message}", file=sys.stderr)
+        return 1
+
+    try:
+        with session_scope(settings) as session:
+            normalized_username = username.strip().lower()
+            user = session.scalar(
+                select(User).where(func.lower(User.username) == normalized_username)
+            )
+            if not user:
+                print(f"Error: User '{username}' not found.", file=sys.stderr)
+                return 1
+            if user.role != Role.ADMIN.value:
+                print(f"Error: User '{username}' is not an administrator.", file=sys.stderr)
+                return 1
+            if not user.is_active:
+                print(f"Error: Administrator '{username}' is deactivated.", file=sys.stderr)
+                return 1
+
+            hasher = build_hasher(settings)
+            user.password_hash = hash_password(hasher, new_pwd)
+            user.failed_login_count = 0
+            user.locked_until = None
+            user.must_change_password = must_change
+
+            # Revoke all active sessions for this user
+            now = clock.utcnow()
+            session.execute(
+                update(AuthSession)
+                .where(AuthSession.user_id == user.id, AuthSession.revoked_at.is_(None))
+                .values(revoked_at=now)
+            )
+            session.flush()
+
+            try:
+                operator = getpass.getuser()
+            except Exception:
+                operator = "unknown"
+
+            ctx = AuditContext.system(f"cli:{operator}")
+            audit_service.record(
+                session,
+                ctx,
+                AuditAction.ADMIN_PASSWORD_RESET_CLI,
+                "USER",
+                user.id,
+                after={"must_change_password": must_change},
+            )
+    except Exception as exc:
+        print(f"Error during password reset: {exc}", file=sys.stderr)
+        return 1
+
+    if generate_password:
+        print(f"Generated temporary password: {new_pwd}")
+    print(f"Password reset successfully for administrator '{username}'.")
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     """Build top-level argument parser with extensible subcommands."""
     parser = argparse.ArgumentParser(
@@ -117,6 +223,28 @@ def build_parser() -> argparse.ArgumentParser:
         help="Verify database connectivity, schema revision, and D-02 durability invariants",
     )
 
+    # Subcommand: reset-admin-password
+    reset_parser = subparsers.add_parser(
+        "reset-admin-password",
+        help="Emergency CLI password reset for an active administrator account",
+    )
+    reset_parser.add_argument(
+        "--username",
+        required=True,
+        help="Username of the active administrator account to reset",
+    )
+    pwd_group = reset_parser.add_mutually_exclusive_group(required=False)
+    pwd_group.add_argument(
+        "--password-stdin",
+        action="store_true",
+        help="Read the new password from standard input (stdin)",
+    )
+    pwd_group.add_argument(
+        "--generate-password",
+        action="store_true",
+        help="Generate a temporary password and print it to standard output once",
+    )
+
     return parser
 
 
@@ -129,6 +257,12 @@ def main(argv: Sequence[str] | None = None) -> int:
         return cmd_migrate()
     if args.command == "check-db":
         return cmd_check_db()
+    if args.command == "reset-admin-password":
+        return cmd_reset_admin_password(
+            username=args.username,
+            password_stdin=args.password_stdin,
+            generate_password=args.generate_password,
+        )
 
     parser.print_help()
     return 1

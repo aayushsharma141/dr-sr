@@ -175,6 +175,18 @@ def setup_code(app: FastAPI, test_settings: Settings, tmp_path: Path) -> str:
     return issue_setup_code(app, test_settings, path=code_path)
 
 
+@pytest.fixture
+def patch_cli_session(monkeypatch: pytest.MonkeyPatch, db_session: Session) -> None:
+    """Patch kalyan_api.cli.session_scope to yield db_session within the test's savepoint."""
+    from contextlib import contextmanager
+
+    @contextmanager
+    def _mock_session_scope(settings=None):
+        yield db_session
+
+    monkeypatch.setattr("kalyan_api.cli.session_scope", _mock_session_scope)
+
+
 TEST_PASSWORD = "ValidTestPassword123!"
 
 
