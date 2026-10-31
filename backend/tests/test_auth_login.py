@@ -149,7 +149,9 @@ def test_cookie_secure_trap_regression_guard(
 
     app.dependency_overrides[get_session] = _override_get_session
 
-    with TestClient(app, base_url="http://testserver") as client:
+    with TestClient(
+        app, base_url="http://testserver", headers={"Origin": "http://testserver"}
+    ) as client:
         # Login succeeds over plain HTTP and emits Set-Cookie with Secure
         res_login = client.post(
             "/api/auth/login",

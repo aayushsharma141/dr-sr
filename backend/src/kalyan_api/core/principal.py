@@ -17,6 +17,7 @@ from sqlalchemy import select, update
 from kalyan_api import clock
 from kalyan_api.config import Settings, get_settings
 from kalyan_api.core import net
+from kalyan_api.core.csrf import check_csrf_token
 from kalyan_api.core.errors import ApiError
 from kalyan_api.core.permissions import ROLE_PERMISSIONS, Permission, Role
 from kalyan_api.core.security import hash_token
@@ -84,6 +85,9 @@ def _resolve_principal_from_request(
             code="not_authenticated",
             message="Session has been revoked or user account is deactivated",
         )
+
+    # Cryptographic CSRF token check on all state-modifying HTTP methods
+    check_csrf_token(request, auth_session.csrf_token)
 
     now = clock.utcnow()
 

@@ -7,7 +7,8 @@ from sqlalchemy import select, update
 
 from kalyan_api import clock
 from kalyan_api.config import Settings
-from kalyan_api.core import net
+from kalyan_api.core import net, security
+from kalyan_api.core.password_policy import PasswordPolicyError, validate_password_policy
 from kalyan_api.core.permissions import ROLE_PERMISSIONS, Role
 from kalyan_api.core.policy import authenticated_only, public
 from kalyan_api.core.principal import (
@@ -33,6 +34,15 @@ class LoginRequest(BaseModel):
 
     username: str = Field(min_length=1, max_length=64)
     password: str = Field(min_length=1, max_length=1024)
+
+    model_config = ConfigDict(extra="forbid")
+
+
+class ChangePasswordRequest(BaseModel):
+    """Payload for user password change."""
+
+    current_password: str = Field(min_length=1, max_length=1024)
+    new_password: str = Field(min_length=1, max_length=1024)
 
     model_config = ConfigDict(extra="forbid")
 
@@ -304,5 +314,169 @@ def logout(
         httponly=True,
         samesite="strict",
         secure=settings.cookie_secure,
+    )
+    return response
+
+
+@router.post("/change-password", dependencies=[Depends(authenticated_only)])
+def change_password(
+    request: Request,
+    body: ChangePasswordRequest,
+    session: SessionDep,
+    principal: Principal = Depends(authenticated_only),
+    settings: Settings = Depends(get_current_settings),
+) -> Response:
+    """Change user password, enforce NIST policy, revoke all sessions, and issue fresh session."""
+    ctx = build_audit_context(request, principal)
+    peer_ip = net.client_ip(request)
+    now = clock.utcnow()
+
+    user = session.scalar(select(User).where(User.id == principal.user_id))
+    if not user or not user.is_active:
+        return JSONResponse(
+            status_code=401,
+            content={"code": "not_authenticated", "message": "User not found or deactivated"},
+        )
+
+    hasher = security.build_hasher(settings)
+
+    # Check if account is locked
+    if user.locked_until is not None and user.locked_until > now:
+        security.dummy_verify(hasher, body.current_password)
+        audit_service.record(
+            session,
+            ctx,
+            AuditAction.AUTH_PASSWORD_CHANGE_FAILED,
+            "USER",
+            str(user.id),
+            after={"reason": "locked"},
+            outcome=Outcome.FAILURE,
+        )
+        return JSONResponse(
+            status_code=403,
+            content={
+                "code": "current_password_invalid",
+                "message": "Current password is incorrect",
+            },
+        )
+
+    # Verify current password
+    if not security.verify_password(hasher, body.current_password, user.password_hash):
+        failed_count, locked_until = auth_service.record_failed_login(
+            session,
+            user.id,
+            now,
+            lockout_threshold=settings.lockout_threshold,
+            lockout_minutes=settings.lockout_minutes,
+        )
+        audit_service.record(
+            session,
+            ctx,
+            AuditAction.AUTH_PASSWORD_CHANGE_FAILED,
+            "USER",
+            str(user.id),
+            after={"failed_login_count": failed_count},
+            outcome=Outcome.FAILURE,
+        )
+        if failed_count == settings.lockout_threshold:
+            audit_service.record(
+                session,
+                ctx,
+                AuditAction.AUTH_ACCOUNT_LOCKED,
+                "USER",
+                str(user.id),
+                after={
+                    "locked_until": (
+                        locked_until.isoformat() if locked_until else None
+                    ),
+                    "failed_login_count": failed_count,
+                },
+                outcome=Outcome.FAILURE,
+            )
+        return JSONResponse(
+            status_code=403,
+            content={
+                "code": "current_password_invalid",
+                "message": "Current password is incorrect",
+            },
+        )
+
+    # Check if new password is identical to current password
+    if body.new_password == body.current_password:
+        return JSONResponse(
+            status_code=422,
+            content={
+                "code": "password_policy",
+                "message": "New password cannot be the same as current password",
+            },
+        )
+
+    # Validate new password against policy
+    try:
+        validate_password_policy(body.new_password, user.username, user.full_name, settings)
+    except PasswordPolicyError as err:
+        return JSONResponse(
+            status_code=422,
+            content={"code": "password_policy", "message": err.message},
+        )
+
+    # Apply new password
+    new_hash = security.hash_password(hasher, body.new_password)
+    old_must_change = user.must_change_password
+
+    session.execute(
+        update(User)
+        .where(User.id == user.id)
+        .values(
+            password_hash=new_hash,
+            must_change_password=False,
+            password_changed_at=now,
+            failed_login_count=0,
+            locked_until=None,
+        )
+    )
+
+    # Revoke all existing sessions for this user
+    auth_service.revoke_all_user_sessions(session, user.id)
+
+    # Issue fresh session
+    user_agent = request.headers.get("User-Agent")
+    new_sess, raw_token = auth_service.create_session(
+        session, user, client_ip=peer_ip, user_agent=user_agent
+    )
+
+    # Audit password changed (storing only state transition, NEVER any password text)
+    audit_service.record(
+        session,
+        ctx,
+        AuditAction.AUTH_PASSWORD_CHANGED,
+        "USER",
+        str(user.id),
+        before={"must_change_password": old_must_change},
+        after={"must_change_password": False},
+        outcome=Outcome.SUCCESS,
+    )
+
+    perms = sorted(p.value for p in ROLE_PERMISSIONS.get(Role(user.role), frozenset()))
+    me_data = MeResponse(
+        id=user.id,
+        username=user.username,
+        full_name=user.full_name,
+        role=user.role,
+        doctor_id=user.doctor_id,
+        permissions=perms,
+        must_change_password=False,
+        csrf_token=new_sess.csrf_token,
+        version_id=user.version_id,
+    )
+
+    response = JSONResponse(content=me_data.model_dump())
+    response.set_cookie(
+        key=settings.cookie_name,
+        value=raw_token,
+        httponly=True,
+        samesite="strict",
+        secure=settings.cookie_secure,
+        path="/",
     )
     return response

@@ -3,11 +3,12 @@
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, Request
+from fastapi import Depends, FastAPI, Request
 from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
 from starlette.responses import Response
 
 from kalyan_api.config import Settings, get_settings
+from kalyan_api.core.csrf import verify_origin
 from kalyan_api.core.errors import RequestIdMiddleware, install_error_handlers
 from kalyan_api.db.session import SessionLocal, build_engine
 from kalyan_api.db.startup import run_startup_checks
@@ -60,6 +61,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     """Build and configure the FastAPI application instance."""
     resolved_settings = settings or get_settings()
 
+    # verify_origin is the ONLY application-level global dependency.
+    # Authentication and permission checks must NEVER be global (public and SPA routes exist).
     app = FastAPI(
         title="Kalyan Hospital API",
         version="0.1.0",
@@ -67,6 +70,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         redoc_url=None,  # Offline compliance: disable remote ReDoc
         openapi_url=None,  # Offline compliance: disable runtime OpenAPI schema endpoint
         lifespan=lifespan,
+        dependencies=[Depends(verify_origin)],
     )
 
     app.state.settings = resolved_settings

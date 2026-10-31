@@ -238,7 +238,12 @@ def test_fail_closed_login_rolls_back_session_creation(
 
     from tests.conftest import TEST_PASSWORD
 
-    with TestClient(app, base_url="http://testserver", raise_server_exceptions=False) as client:
+    with TestClient(
+        app,
+        base_url="http://testserver",
+        headers={"Origin": "http://testserver"},
+        raise_server_exceptions=False,
+    ) as client:
         res = client.post(
             "/api/auth/login",
             json={"username": admin_user.username, "password": TEST_PASSWORD},

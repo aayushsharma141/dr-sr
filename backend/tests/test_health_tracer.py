@@ -205,7 +205,7 @@ def test_validation_error_envelope_does_not_echo_submitted_secrets(
 
     app.include_router(router)
 
-    client = TestClient(app, base_url="http://testserver")
+    client = TestClient(app, base_url="http://testserver", headers={"Origin": "http://testserver"})
     secret_value = "super_secret_cleartext_password_123"
     response = client.post(
         "/api/test-validation",

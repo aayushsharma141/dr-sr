@@ -6,7 +6,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
-from pydantic import field_validator
+from pydantic import field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from sqlalchemy.engine import URL
 
@@ -41,6 +41,11 @@ class Settings(BaseSettings):
     lockout_minutes: int = 15  # D-07
     throttle_max_failures: int = 20
     throttle_window_minutes: int = 15
+
+    # Password policy constraints (EG-19)
+    password_min_length: int = 10
+    password_max_length: int = 128
+    temp_password_length: int = 12
 
     # Argon2id password hashing parameters
     argon2_time_cost: int = 3
@@ -83,6 +88,18 @@ class Settings(BaseSettings):
         if v == "CHANGE_ME":
             raise ValueError("Database password cannot be default placeholder 'CHANGE_ME'")
         return v
+
+    @model_validator(mode="after")
+    def validate_password_policy_bounds(self) -> "Settings":
+        if self.password_min_length < 8:
+            raise ValueError("password_min_length must be at least 8 characters")
+        if self.password_max_length > 1024:
+            raise ValueError("password_max_length must not exceed 1024 characters")
+        if self.password_min_length > self.password_max_length:
+            raise ValueError("password_min_length cannot exceed password_max_length")
+        if self.temp_password_length < self.password_min_length:
+            raise ValueError("temp_password_length cannot be less than password_min_length")
+        return self
 
     @property
     def app_url(self) -> URL:
