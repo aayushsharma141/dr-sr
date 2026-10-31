@@ -152,6 +152,12 @@ $sessionCookieHeader = $null
 
 try {
     # Step 4: Start uvicorn server in background
+    # Ensure any stale setup code from prior runs/tests is removed before server startup
+    $setupCodePath = "$repoRoot\backend\var\setup-code.txt"
+    if (Test-Path $setupCodePath) {
+        Remove-Item -Force $setupCodePath -ErrorAction SilentlyContinue
+    }
+
     Write-Host "Starting uvicorn server on 127.0.0.1:8000..."
     $uvicorn = Start-Process -FilePath $pythonExe `
         -ArgumentList "-m", "uvicorn", "kalyan_api.main:create_app", "--factory", "--host", "127.0.0.1", "--port", "8000", "--no-server-header" `
