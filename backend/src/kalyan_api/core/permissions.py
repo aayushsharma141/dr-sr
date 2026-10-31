@@ -1,0 +1,177 @@
+"""Role definitions, granular permission enumeration, and system RBAC mapping.
+
+Locked decisions:
+- SEC-03: Roles strictly limited to ADMIN, RECEPTION, DOCTOR.
+- D-03: Doctor silo; clinical records belong exclusively to DOCTOR.
+- D-04: Reception default-deny for clinical encounters and notes.
+- D-06: Payment reversals restricted exclusively to ADMIN.
+- EG-16: Admin default: operational administration, audit, and user management; no clinical content.
+"""
+
+from enum import StrEnum
+
+
+class Role(StrEnum):
+    """System roles authorized across Kalyan Hospital platform."""
+
+    ADMIN = "ADMIN"
+    RECEPTION = "RECEPTION"
+    DOCTOR = "DOCTOR"
+
+
+class Permission(StrEnum):
+    """Granular permissions following noun:verb convention."""
+
+    # Phase 11: Foundation & User Administration
+    USER_READ = "user:read"
+    USER_CREATE = "user:create"
+    USER_UPDATE = "user:update"
+    USER_DEACTIVATE = "user:deactivate"
+    USER_RESET_PASSWORD = "user:reset_password"  # noqa: S105
+    USER_UNLOCK = "user:unlock"
+    DASHBOARD_ADMIN = "dashboard:admin"
+    DASHBOARD_RECEPTION = "dashboard:reception"
+    DASHBOARD_DOCTOR = "dashboard:doctor"
+
+    # Phase 12: Clinic Settings & Patient Registration (Reserved)
+    SETTINGS_READ = "settings:read"
+    SETTINGS_WRITE = "settings:write"
+    DOCTOR_READ = "doctor:read"
+    DOCTOR_MANAGE = "doctor:manage"
+    FEE_READ = "fee:read"
+    FEE_MANAGE = "fee:manage"
+    PATIENT_READ = "patient:read"
+    PATIENT_CREATE = "patient:create"
+    PATIENT_UPDATE = "patient:update"
+    PHOTO_READ = "photo:read"
+    PHOTO_WRITE = "photo:write"
+
+    # Phase 13: Appointments & Clinical Encounters (Reserved)
+    APPOINTMENT_READ = "appointment:read"
+    APPOINTMENT_WRITE = "appointment:write"
+    ENCOUNTER_READ = "encounter:read"
+    ENCOUNTER_WRITE = "encounter:write"
+
+    # Phase 14: Prescriptions, Treatment Plans & Sessions (Reserved)
+    PRESCRIPTION_READ = "prescription:read"
+    PRESCRIPTION_WRITE = "prescription:write"
+    PLAN_READ = "plan:read"
+    PLAN_WRITE = "plan:write"
+    SESSION_LOG_READ = "session_log:read"
+    SESSION_LOG_WRITE = "session_log:write"
+
+    # Phase 15: Billing, Receipts & Reversals (Reserved)
+    PAYMENT_READ = "payment:read"
+    PAYMENT_CREATE = "payment:create"
+    RECEIPT_REPRINT = "receipt:reprint"
+    PAYMENT_REVERSE = "payment:reverse"  # D-06: Admin only
+
+    # Phase 16: Audit Viewer, Backup/Restore & Integrity (Reserved)
+    AUDIT_READ = "audit:read"
+    BACKUP_RUN = "backup:run"
+    BACKUP_RESTORE = "backup:restore"
+    INTEGRITY_RUN = "integrity:run"
+
+
+# Authoritative role-to-permissions catalog
+ROLE_PERMISSIONS: dict[Role, frozenset[Permission]] = {
+    Role.ADMIN: frozenset({
+        Permission.USER_READ,
+        Permission.USER_CREATE,
+        Permission.USER_UPDATE,
+        Permission.USER_DEACTIVATE,
+        Permission.USER_RESET_PASSWORD,
+        Permission.USER_UNLOCK,
+        Permission.DASHBOARD_ADMIN,
+        Permission.SETTINGS_READ,
+        Permission.SETTINGS_WRITE,
+        Permission.DOCTOR_READ,
+        Permission.DOCTOR_MANAGE,
+        Permission.FEE_READ,
+        Permission.FEE_MANAGE,
+        Permission.PATIENT_READ,
+        Permission.APPOINTMENT_READ,
+        Permission.PAYMENT_READ,
+        Permission.RECEIPT_REPRINT,
+        Permission.PAYMENT_REVERSE,
+        Permission.AUDIT_READ,
+        Permission.BACKUP_RUN,
+        Permission.BACKUP_RESTORE,
+        Permission.INTEGRITY_RUN,
+    }),
+    Role.RECEPTION: frozenset({
+        Permission.DASHBOARD_RECEPTION,
+        Permission.SETTINGS_READ,
+        Permission.DOCTOR_READ,
+        Permission.FEE_READ,
+        Permission.PATIENT_READ,
+        Permission.PATIENT_CREATE,
+        Permission.PATIENT_UPDATE,
+        Permission.PHOTO_READ,
+        Permission.PHOTO_WRITE,
+        Permission.APPOINTMENT_READ,
+        Permission.APPOINTMENT_WRITE,
+        Permission.PAYMENT_READ,
+        Permission.PAYMENT_CREATE,
+        Permission.RECEIPT_REPRINT,
+    }),
+    Role.DOCTOR: frozenset({
+        Permission.DASHBOARD_DOCTOR,
+        Permission.SETTINGS_READ,
+        Permission.DOCTOR_READ,
+        Permission.FEE_READ,
+        Permission.PATIENT_READ,
+        Permission.APPOINTMENT_READ,
+        Permission.APPOINTMENT_WRITE,
+        Permission.ENCOUNTER_READ,
+        Permission.ENCOUNTER_WRITE,
+        Permission.PRESCRIPTION_READ,
+        Permission.PRESCRIPTION_WRITE,
+        Permission.PLAN_READ,
+        Permission.PLAN_WRITE,
+        Permission.SESSION_LOG_READ,
+        Permission.SESSION_LOG_WRITE,
+    }),
+}
+
+# Mapping of future permissions reserved for upcoming phases
+RESERVED: dict[Permission, str] = {
+    Permission.USER_READ: "11-09",
+    Permission.USER_CREATE: "11-09",
+    Permission.USER_UPDATE: "11-09",
+    Permission.USER_DEACTIVATE: "11-09",
+    Permission.USER_RESET_PASSWORD: "11-09",
+    Permission.USER_UNLOCK: "11-09",
+    Permission.DASHBOARD_ADMIN: "11-10",
+    Permission.DASHBOARD_RECEPTION: "11-10",
+    Permission.DASHBOARD_DOCTOR: "11-10",
+    Permission.SETTINGS_READ: "phase-12",
+    Permission.SETTINGS_WRITE: "phase-12",
+    Permission.DOCTOR_READ: "phase-12",
+    Permission.DOCTOR_MANAGE: "phase-12",
+    Permission.FEE_READ: "phase-12",
+    Permission.FEE_MANAGE: "phase-12",
+    Permission.PATIENT_READ: "phase-12",
+    Permission.PATIENT_CREATE: "phase-12",
+    Permission.PATIENT_UPDATE: "phase-12",
+    Permission.PHOTO_READ: "phase-12",
+    Permission.PHOTO_WRITE: "phase-12",
+    Permission.APPOINTMENT_READ: "phase-13",
+    Permission.APPOINTMENT_WRITE: "phase-13",
+    Permission.ENCOUNTER_READ: "phase-13",
+    Permission.ENCOUNTER_WRITE: "phase-13",
+    Permission.PRESCRIPTION_READ: "phase-14",
+    Permission.PRESCRIPTION_WRITE: "phase-14",
+    Permission.PLAN_READ: "phase-14",
+    Permission.PLAN_WRITE: "phase-14",
+    Permission.SESSION_LOG_READ: "phase-14",
+    Permission.SESSION_LOG_WRITE: "phase-14",
+    Permission.PAYMENT_READ: "phase-15",
+    Permission.PAYMENT_CREATE: "phase-15",
+    Permission.RECEIPT_REPRINT: "phase-15",
+    Permission.PAYMENT_REVERSE: "phase-15",
+    Permission.AUDIT_READ: "phase-16",
+    Permission.BACKUP_RUN: "phase-16",
+    Permission.BACKUP_RESTORE: "phase-16",
+    Permission.INTEGRITY_RUN: "phase-16",
+}

@@ -11,9 +11,11 @@ from sqlalchemy import Engine, create_engine, text
 from sqlalchemy.orm import Session
 
 from kalyan_api.config import Settings
+from kalyan_api.core.security import build_hasher, hash_password
 from kalyan_api.db.migrate import upgrade_head
 from kalyan_api.db.session import build_engine, get_session
 from kalyan_api.main import create_app
+from kalyan_api.models import Doctor, User
 
 
 @pytest.fixture(scope="session")
@@ -108,12 +110,8 @@ def app(test_settings: Settings, db_session: Session) -> FastAPI:
     app_instance = create_app(settings=test_settings)
 
     def _override_get_session() -> Generator[Session, None, None]:
-        try:
+        with db_session.begin_nested():
             yield db_session
-            db_session.commit()
-        except Exception:
-            db_session.rollback()
-            raise
 
     app_instance.dependency_overrides[get_session] = _override_get_session
     return app_instance
@@ -143,3 +141,84 @@ def without_active_admins(db_session: Session) -> None:
     """Deactivate all admin users within the test's rolled-back transaction."""
     db_session.execute(text("UPDATE users SET is_active = false WHERE role = 'ADMIN'"))
     db_session.flush()
+
+
+TEST_PASSWORD = "ValidTestPassword123!"
+
+
+def make_user(
+    session: Session,
+    settings: Settings,
+    role: str,
+    username: str,
+    password: str = TEST_PASSWORD,
+    must_change: bool = False,
+    is_active: bool = True,
+    doctor_name: str | None = None,
+) -> User:
+    """Helper creating user record (and linked Doctor stub if role is DOCTOR)."""
+    hasher = build_hasher(settings)
+    pw_hash = hash_password(hasher, password)
+    doc_id: int | None = None
+
+    if role == "DOCTOR":
+        d_name = doctor_name or f"Dr. {username.capitalize()}"
+        doc = Doctor(name_en=d_name, is_active=True)
+        session.add(doc)
+        session.flush()
+        doc_id = doc.id
+
+    user = User(
+        username=username.lower(),
+        full_name=username.replace("_", " ").title(),
+        role=role,
+        doctor_id=doc_id,
+        password_hash=pw_hash,
+        must_change_password=must_change,
+        is_active=is_active,
+    )
+    session.add(user)
+    session.flush()
+    return user
+
+
+@pytest.fixture
+def admin_user(db_session: Session, test_settings: Settings) -> User:
+    """Default active Admin user."""
+    return make_user(db_session, test_settings, "ADMIN", "fixture_admin")
+
+
+@pytest.fixture
+def reception_user(db_session: Session, test_settings: Settings) -> User:
+    """Default active Reception user."""
+    return make_user(db_session, test_settings, "RECEPTION", "fixture_reception")
+
+
+@pytest.fixture
+def doctor_a_user(db_session: Session, test_settings: Settings) -> User:
+    """Default active Doctor user (Doctor A)."""
+    return make_user(
+        db_session, test_settings, "DOCTOR", "fixture_doctor_a", doctor_name="Dr. Anil"
+    )
+
+
+@pytest.fixture
+def doctor_b_user(db_session: Session, test_settings: Settings) -> User:
+    """Default active Doctor user (Doctor B)."""
+    return make_user(
+        db_session, test_settings, "DOCTOR", "fixture_doctor_b", doctor_name="Dr. Bharati"
+    )
+
+
+@pytest.fixture
+def login_client(app: FastAPI):
+    """Factory fixture returning an authenticated TestClient for a given user."""
+    def _create(user: User, password: str = TEST_PASSWORD) -> TestClient:
+        c = TestClient(app, base_url="http://testserver", headers={"Origin": "http://testserver"})
+        res = c.post("/api/auth/login", json={"username": user.username, "password": password})
+        assert res.status_code == 200, f"login_client failed: {res.text}"
+        data = res.json()
+        c.headers["X-CSRF-Token"] = data["csrf_token"]
+        return c
+
+    return _create
