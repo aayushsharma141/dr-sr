@@ -32,6 +32,14 @@ class UserCreate(BaseModel):
         return self
 
 
+class ActionRequest(BaseModel):
+    """Payload for lifecycle actions requiring optimistic concurrency validation."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    version_id: int = Field(ge=1)
+
+
 class UserUpdate(BaseModel):
     """Payload for modifying an existing user account with optimistic concurrency."""
 

@@ -101,12 +101,20 @@ def test_rbac_matrix_cell(
     target_user = None
     resolved_path = row.path
     if "{id}" in row.path:
+        is_active = "reactivate" not in row.path
         target_user = make_user(
             db_session,
             test_settings,
             "RECEPTION",
             f"mat_tgt_{uuid.uuid4().hex[:6]}",
+            is_active=is_active,
         )
+        if "unlock" in row.path:
+            from datetime import UTC, datetime, timedelta
+            target_user.locked_until = datetime.now(UTC) + timedelta(minutes=15)
+            target_user.failed_login_count = 5
+            db_session.flush()
+
         resolved_path = row.path.replace("{id}", str(target_user.id))
 
     body = row.body_factory(target_user) if row.body_factory else None

@@ -56,6 +56,13 @@ def _patch_user_payload(target: User | None = None) -> dict[str, Any]:
     }
 
 
+def _action_user_payload(target: User | None = None) -> dict[str, Any]:
+    ver = target.version_id if target else 1
+    return {
+        "version_id": ver,
+    }
+
+
 MATRIX: list[MatrixRow] = [
     MatrixRow(
         method="GET",
@@ -169,6 +176,54 @@ MATRIX: list[MatrixRow] = [
         method="PATCH",
         path="/api/users/{id}",
         body_factory=_patch_user_payload,
+        expected={
+            "anonymous": 401,
+            "admin": 200,
+            "reception": 403,
+            "doctor_a": 403,
+            "doctor_b": 403,
+        },
+    ),
+    MatrixRow(
+        method="POST",
+        path="/api/users/{id}/deactivate",
+        body_factory=_action_user_payload,
+        expected={
+            "anonymous": 401,
+            "admin": 200,
+            "reception": 403,
+            "doctor_a": 403,
+            "doctor_b": 403,
+        },
+    ),
+    MatrixRow(
+        method="POST",
+        path="/api/users/{id}/reactivate",
+        body_factory=_action_user_payload,
+        expected={
+            "anonymous": 401,
+            "admin": 200,
+            "reception": 403,
+            "doctor_a": 403,
+            "doctor_b": 403,
+        },
+    ),
+    MatrixRow(
+        method="POST",
+        path="/api/users/{id}/reset-password",
+        body_factory=_action_user_payload,
+        expected={
+            "anonymous": 401,
+            "admin": 200,
+            "reception": 403,
+            "doctor_a": 403,
+            "doctor_b": 403,
+        },
+    ),
+    MatrixRow(
+        method="POST",
+        path="/api/users/{id}/unlock",
+        body_factory=_action_user_payload,
         expected={
             "anonymous": 401,
             "admin": 200,

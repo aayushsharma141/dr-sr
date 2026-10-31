@@ -15,7 +15,13 @@ from kalyan_api.core.principal import (
     get_current_settings,
 )
 from kalyan_api.db.session import SessionDep
-from kalyan_api.schemas.users import UserCreate, UserCreatedOut, UserOut, UserUpdate
+from kalyan_api.schemas.users import (
+    ActionRequest,
+    UserCreate,
+    UserCreatedOut,
+    UserOut,
+    UserUpdate,
+)
 from kalyan_api.services import user_service
 
 router = APIRouter(prefix="/users", tags=["users"])
@@ -99,4 +105,84 @@ def update_existing_user(
     """Update user account details subject to optimistic concurrency version check."""
     ctx = build_audit_context(request, principal)
     user = user_service.update_user(session, ctx, id, payload)
+    return UserOut.from_user(user, now=clock.utcnow())
+
+
+@router.post(
+    "/{id}/deactivate",
+    response_model=UserOut,
+    dependencies=[Depends(require(Permission.USER_DEACTIVATE))],
+)
+def deactivate_existing_user(
+    id: int,
+    request: Request,
+    payload: ActionRequest,
+    session: SessionDep,
+    principal: Principal = Depends(current_principal),
+) -> UserOut:
+    """Deactivate user account, terminate all sessions, and audit action."""
+    ctx = build_audit_context(request, principal)
+    user = user_service.deactivate_user(session, ctx, id, payload.version_id)
+    return UserOut.from_user(user, now=clock.utcnow())
+
+
+@router.post(
+    "/{id}/reactivate",
+    response_model=UserOut,
+    dependencies=[Depends(require(Permission.USER_DEACTIVATE))],
+)
+def reactivate_existing_user(
+    id: int,
+    request: Request,
+    payload: ActionRequest,
+    session: SessionDep,
+    principal: Principal = Depends(current_principal),
+) -> UserOut:
+    """Reactivate a previously deactivated user account."""
+    ctx = build_audit_context(request, principal)
+    user = user_service.reactivate_user(session, ctx, id, payload.version_id)
+    return UserOut.from_user(user, now=clock.utcnow())
+
+
+@router.post(
+    "/{id}/reset-password",
+    response_model=UserCreatedOut,
+    dependencies=[Depends(require(Permission.USER_RESET_PASSWORD))],
+)
+def reset_user_password(
+    id: int,
+    request: Request,
+    payload: ActionRequest,
+    session: SessionDep,
+    principal: Principal = Depends(current_principal),
+    settings: Settings = Depends(get_current_settings),
+) -> JSONResponse:
+    """Generate and return a one-time temporary password, revoking existing sessions."""
+    ctx = build_audit_context(request, principal)
+    user, temp_pwd = user_service.reset_password(
+        session, ctx, id, payload.version_id, settings
+    )
+    out = UserCreatedOut.from_user_and_secret(user, temp_pwd, now=clock.utcnow())
+    return JSONResponse(
+        status_code=200,
+        content=out.model_dump(mode="json"),
+        headers={"Cache-Control": "no-store"},
+    )
+
+
+@router.post(
+    "/{id}/unlock",
+    response_model=UserOut,
+    dependencies=[Depends(require(Permission.USER_UNLOCK))],
+)
+def unlock_existing_user(
+    id: int,
+    request: Request,
+    payload: ActionRequest,
+    session: SessionDep,
+    principal: Principal = Depends(current_principal),
+) -> UserOut:
+    """Clear failed login counters and lockout state for a locked account."""
+    ctx = build_audit_context(request, principal)
+    user = user_service.unlock_user(session, ctx, id, payload.version_id)
     return UserOut.from_user(user, now=clock.utcnow())

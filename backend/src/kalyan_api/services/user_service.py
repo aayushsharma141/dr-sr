@@ -2,16 +2,17 @@
 
 import secrets
 
-from sqlalchemy import func, select
+from sqlalchemy import func, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from kalyan_api import clock
 from kalyan_api.config import Settings
 from kalyan_api.core.errors import ApiError, require_version
 from kalyan_api.core.password_policy import PasswordPolicyError, validate_password_policy
 from kalyan_api.core.permissions import Role
 from kalyan_api.core.security import build_hasher, hash_password
-from kalyan_api.models import Doctor, User
+from kalyan_api.models import AuthSession, Doctor, User
 from kalyan_api.schemas.users import UserCreate, UserUpdate
 from kalyan_api.services import audit_service
 from kalyan_api.services.audit_service import AuditAction, AuditContext
@@ -208,4 +209,195 @@ def update_user(
         )
 
     session.flush()
+    return user
+
+
+def deactivate_user(
+    session: Session,
+    ctx: AuditContext,
+    user_id: int,
+    version_id: int,
+) -> User:
+    """Deactivate user, revoke active sessions, and record audit event."""
+    user = get_user(session, user_id)
+    if not user:
+        raise ApiError(status_code=404, code="not_found", message=f"User #{user_id} not found")
+
+    require_version(user, version_id, "user")
+
+    if not user.is_active:
+        raise ApiError(
+            status_code=409,
+            code="state_unchanged",
+            message="User is already deactivated",
+        )
+
+    if user.id == ctx.actor_user_id:
+        raise ApiError(
+            status_code=409,
+            code="self_action_forbidden",
+            message="Administrators cannot deactivate their own account",
+        )
+
+    if user.role == Role.ADMIN.value:
+        active_count = session.scalar(
+            select(func.count(User.id)).where(
+                User.role == Role.ADMIN.value, User.is_active.is_(True)
+            )
+        )
+        if active_count is not None and active_count <= 1:
+            raise ApiError(
+                status_code=409,
+                code="last_admin",
+                message="Cannot deactivate the last active administrator",
+            )
+
+    user.is_active = False
+
+    # Revoke all active sessions for this user
+    now = clock.utcnow()
+    session.execute(
+        update(AuthSession)
+        .where(AuthSession.user_id == user.id, AuthSession.revoked_at.is_(None))
+        .values(revoked_at=now)
+    )
+
+    session.flush()
+
+    audit_service.record(
+        session,
+        ctx,
+        AuditAction.USER_DEACTIVATED,
+        "USER",
+        user.id,
+        before={"is_active": True},
+        after={"is_active": False},
+    )
+
+    return user
+
+
+def reactivate_user(
+    session: Session,
+    ctx: AuditContext,
+    user_id: int,
+    version_id: int,
+) -> User:
+    """Reactivate a previously deactivated user account."""
+    user = get_user(session, user_id)
+    if not user:
+        raise ApiError(status_code=404, code="not_found", message=f"User #{user_id} not found")
+
+    require_version(user, version_id, "user")
+
+    if user.is_active:
+        raise ApiError(status_code=409, code="state_unchanged", message="User is already active")
+
+    user.is_active = True
+    session.flush()
+
+    audit_service.record(
+        session,
+        ctx,
+        AuditAction.USER_REACTIVATED,
+        "USER",
+        user.id,
+        before={"is_active": False},
+        after={"is_active": True},
+    )
+
+    return user
+
+
+def reset_password(
+    session: Session,
+    ctx: AuditContext,
+    user_id: int,
+    version_id: int,
+    settings: Settings,
+) -> tuple[User, str]:
+    """Admin resets user password, issues a temporary password, and revokes sessions."""
+    user = get_user(session, user_id)
+    if not user:
+        raise ApiError(status_code=404, code="not_found", message=f"User #{user_id} not found")
+
+    require_version(user, version_id, "user")
+
+    if user.id == ctx.actor_user_id:
+        raise ApiError(
+            status_code=409,
+            code="self_action_forbidden",
+            message="Administrators cannot reset their own password via admin API",
+        )
+
+    temp_pwd = generate_temp_password(
+        settings, username=user.username, full_name=user.full_name
+    )
+    hasher = build_hasher(settings)
+    user.password_hash = hash_password(hasher, temp_pwd)
+    user.must_change_password = True
+
+    # Revoke all active sessions for this user
+    now = clock.utcnow()
+    session.execute(
+        update(AuthSession)
+        .where(AuthSession.user_id == user.id, AuthSession.revoked_at.is_(None))
+        .values(revoked_at=now)
+    )
+
+    session.flush()
+
+    # Never log temporary passwords
+    audit_service.record(
+        session,
+        ctx,
+        AuditAction.USER_PASSWORD_RESET,
+        "USER",
+        user.id,
+        after={"must_change_password": True},
+    )
+
+    return user, temp_pwd
+
+
+def unlock_user(
+    session: Session,
+    ctx: AuditContext,
+    user_id: int,
+    version_id: int,
+) -> User:
+    """Reset lockout counters and release account cooldown (D-07)."""
+    user = get_user(session, user_id)
+    if not user:
+        raise ApiError(status_code=404, code="not_found", message=f"User #{user_id} not found")
+
+    require_version(user, version_id, "user")
+
+    now = clock.utcnow()
+    is_locked = bool(user.locked_until and user.locked_until > now)
+    if user.failed_login_count == 0 and not is_locked:
+        raise ApiError(
+            status_code=409,
+            code="state_unchanged",
+            message="User account is not locked",
+        )
+
+    old_count = user.failed_login_count
+    old_locked = user.locked_until.isoformat() if user.locked_until else None
+
+    user.failed_login_count = 0
+    user.locked_until = None
+
+    session.flush()
+
+    audit_service.record(
+        session,
+        ctx,
+        AuditAction.USER_UNLOCKED,
+        "USER",
+        user.id,
+        before={"failed_login_count": old_count, "locked_until": old_locked},
+        after={"failed_login_count": 0, "locked_until": None},
+    )
+
     return user
