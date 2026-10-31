@@ -39,8 +39,8 @@ All commands run from `D:\dr-sr` in PowerShell.
 
 | Task ID | Plan | Wave | Requirement | Secure Behavior | Test Type | Automated Command | File Exists | Status |
 |---------|------|------|-------------|-----------------|-----------|-------------------|-------------|--------|
-| 12-01-T1 | 12-01 | 1 | SET-01, SET-02, PAT-01 | schema migration 0002 applies cleanly and downgrades | migration | `pytest backend/tests/test_migrations.py -q` | pending | pending |
-| 12-01-T2 | 12-01 | 1 | SET-01, PAT-01 | model constraints, singleton check, gender check | unit | `pytest backend/tests/test_patient_models.py -q` | pending | pending |
+| 12-01-T1 | 12-01 | 1 | SET-01, SET-02, PAT-01 | schema migration 0002 applies cleanly and downgrades | migration | `pytest backend/tests/test_migrations.py -q` | created | green |
+| 12-01-T2 | 12-01 | 1 | SET-01, PAT-01 | model constraints, singleton check, gender check | unit | `pytest backend/tests/test_patient_models.py -q` | created | green |
 | 12-02-T1 | 12-02 | 2 | SET-01 | only admin can update clinic settings | integration | `pytest backend/tests/test_clinic_settings.py -q` | pending | pending |
 | 12-02-T2 | 12-02 | 2 | SET-02, SET-03 | doctor profiles and consultation fees CRUD | integration | `pytest backend/tests/test_doctor_admin.py -q` | pending | pending |
 | 12-03-T1 | 12-03 | 3 | PAT-01 | 20 parallel threads allocate zero duplicate URNs | concurrency | `pytest backend/tests/test_urn_concurrency.py -q` | pending | pending |

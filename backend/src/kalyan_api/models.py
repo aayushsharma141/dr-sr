@@ -9,12 +9,13 @@ Locked decisions:
 """
 
 import uuid
-from datetime import datetime
+from datetime import date, datetime
 
 from sqlalchemy import (
     BigInteger,
     Boolean,
     CheckConstraint,
+    Date,
     DateTime,
     ForeignKey,
     Identity,
@@ -47,12 +48,18 @@ class Base(DeclarativeBase):
 
 
 class Doctor(Base):
-    """Stub doctor profile referenced by users and clinical encounters."""
+    """Doctor profile entity (SET-02) referenced by users and clinical encounters."""
 
     __tablename__ = "doctors"
 
     id: Mapped[int] = mapped_column(BigInteger, Identity(always=False), primary_key=True)
     name_en: Mapped[str] = mapped_column(String(120), nullable=False)
+    name_hi: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    qualification: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    registration_number: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    default_fee_paise: Mapped[int] = mapped_column(
+        Integer, default=0, server_default="0", nullable=False
+    )
     is_active: Mapped[bool] = mapped_column(
         Boolean, default=True, server_default=text("true"), nullable=False
     )
@@ -241,3 +248,139 @@ class AuditLog(Base):
     request_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
     ip: Mapped[str | None] = mapped_column(INET, nullable=True)
     user_agent: Mapped[str | None] = mapped_column(String(255), nullable=True)
+
+
+class ClinicSettings(Base):
+    """Singleton clinic configuration entity (SET-01, id=1)."""
+
+    __tablename__ = "clinic_settings"
+    __table_args__ = (
+        CheckConstraint("id = 1", name="clinic_settings_singleton"),
+        CheckConstraint(
+            "receipt_sequence_cycle IN ('FINANCIAL_YEAR', 'CALENDAR_YEAR')",
+            name="clinic_settings_receipt_cycle_valid",
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, default=1)
+    name_en: Mapped[str] = mapped_column(
+        String(120), default="Kalyan Hospital", server_default="Kalyan Hospital", nullable=False
+    )
+    name_hi: Mapped[str] = mapped_column(
+        String(120), default="कल्याण हॉस्पिटल", server_default="कल्याण हॉस्पिटल", nullable=False
+    )
+    address_1: Mapped[str] = mapped_column(String(255), nullable=False)
+    address_2: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    phone: Mapped[str] = mapped_column(String(64), nullable=False)
+    email: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    receipt_sequence_cycle: Mapped[str] = mapped_column(
+        String(16), default="FINANCIAL_YEAR", server_default="FINANCIAL_YEAR", nullable=False
+    )
+    print_header_en: Mapped[str | None] = mapped_column(Text, nullable=True)
+    print_header_hi: Mapped[str | None] = mapped_column(Text, nullable=True)
+    print_footer_en: Mapped[str | None] = mapped_column(Text, nullable=True)
+    print_footer_hi: Mapped[str | None] = mapped_column(Text, nullable=True)
+    consultation_validity_days: Mapped[int] = mapped_column(
+        Integer, default=7, server_default="7", nullable=False
+    )
+    version_id: Mapped[int] = mapped_column(
+        Integer, default=1, server_default="1", nullable=False
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
+
+    __mapper_args__ = {"version_id_col": version_id}
+
+
+class ConsultationFee(Base):
+    """Configurable consultation fee schedule stored as integer paise (SET-03)."""
+
+    __tablename__ = "consultation_fees"
+    __table_args__ = (
+        CheckConstraint("fee_paise >= 0", name="consultation_fees_fee_non_negative"),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, Identity(always=False), primary_key=True)
+    name: Mapped[str] = mapped_column(String(120), nullable=False)
+    fee_paise: Mapped[int] = mapped_column(Integer, nullable=False)
+    is_active: Mapped[bool] = mapped_column(
+        Boolean, default=True, server_default=text("true"), nullable=False
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
+
+
+class UrnSequence(Base):
+    """Year-scoped atomic URN counter for gap-free sequence allocation (PAT-01)."""
+
+    __tablename__ = "urn_sequences"
+
+    year: Mapped[int] = mapped_column(Integer, primary_key=True)
+    last_seq: Mapped[int] = mapped_column(Integer, default=0, server_default="0", nullable=False)
+
+
+class Patient(Base):
+    """Patient demographic entity with the 12 canonical fields (PAT-01)."""
+
+    __tablename__ = "patients"
+    __table_args__ = (
+        CheckConstraint("gender IN ('M', 'F', 'O')", name="patients_gender_valid"),
+        CheckConstraint("age_years >= 0 AND age_years <= 150", name="patients_age_valid"),
+        Index("ix_patients_urn", "urn"),
+        Index("ix_patients_mobile", "mobile"),
+        Index("ix_patients_full_name", "full_name"),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, Identity(always=False), primary_key=True)
+    urn: Mapped[str] = mapped_column(String(32), unique=True, nullable=False)
+    full_name: Mapped[str] = mapped_column(String(120), nullable=False)
+    guardian_name: Mapped[str] = mapped_column(String(120), nullable=False)
+    gender: Mapped[str] = mapped_column(String(1), nullable=False)
+    dob: Mapped[date | None] = mapped_column(Date, nullable=True)
+    age_years: Mapped[int] = mapped_column(Integer, nullable=False)
+    mobile: Mapped[str] = mapped_column(String(15), nullable=False)
+    address: Mapped[str] = mapped_column(Text, nullable=False)
+    district: Mapped[str] = mapped_column(
+        String(64), default="Bhojpur", server_default="Bhojpur", nullable=False
+    )
+    state: Mapped[str] = mapped_column(
+        String(64), default="Bihar", server_default="Bihar", nullable=False
+    )
+    emergency_contact: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    allergies: Mapped[str] = mapped_column(
+        Text, default="None reported", server_default="None reported", nullable=False
+    )
+    notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    photo_path: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    is_active: Mapped[bool] = mapped_column(
+        Boolean, default=True, server_default=text("true"), nullable=False
+    )
+    version_id: Mapped[int] = mapped_column(
+        Integer, default=1, server_default="1", nullable=False
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
+
+    __mapper_args__ = {"version_id_col": version_id}
+
