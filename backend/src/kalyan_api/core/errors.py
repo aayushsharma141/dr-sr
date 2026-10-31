@@ -7,11 +7,28 @@ from typing import Any
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
+from sqlalchemy.orm.exc import StaleDataError
 from starlette.exceptions import HTTPException
 from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
 from starlette.responses import Response
 
 logger = logging.getLogger("kalyan_api.errors")
+
+
+class VersionConflict(Exception):
+    """Raised when an update request version_id does not match current entity version."""
+
+    def __init__(self, entity: str, entity_id: Any) -> None:
+        super().__init__(f"Record was modified by another user: {entity} #{entity_id}")
+        self.entity = entity
+        self.entity_id = entity_id
+
+
+def require_version(entity: Any, expected: int, label: str = "user") -> None:
+    """Enforce optimistic concurrency: entity version must equal expected version."""
+    current_ver = getattr(entity, "version_id", None)
+    if current_ver != expected:
+        raise VersionConflict(entity=label, entity_id=getattr(entity, "id", None))
 
 
 class ApiError(Exception):
@@ -53,6 +70,32 @@ STATUS_TO_CODE = {
 
 def install_error_handlers(app: FastAPI) -> None:
     """Register uniform error handlers conforming to the API error envelope."""
+
+    @app.exception_handler(VersionConflict)
+    def handle_version_conflict(_request: Request, exc: VersionConflict) -> JSONResponse:
+        return JSONResponse(
+            status_code=409,
+            content={
+                "code": "version_conflict",
+                "message": "Record was modified by another user",
+                "entity": exc.entity,
+                "id": exc.entity_id,
+            },
+            headers={"Cache-Control": "no-store"},
+        )
+
+    @app.exception_handler(StaleDataError)
+    def handle_stale_data_error(_request: Request, _exc: StaleDataError) -> JSONResponse:
+        return JSONResponse(
+            status_code=409,
+            content={
+                "code": "version_conflict",
+                "message": "Record was modified by another user",
+                "entity": "user",
+                "id": None,
+            },
+            headers={"Cache-Control": "no-store"},
+        )
 
     @app.exception_handler(ApiError)
     def handle_api_error(_request: Request, exc: ApiError) -> JSONResponse:

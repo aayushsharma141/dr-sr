@@ -32,6 +32,10 @@ MUST_EXIST: set[tuple[str, str]] = {
     ("GET", "/api/admin/overview"),
     ("GET", "/api/reception/overview"),
     ("GET", "/api/doctor/overview"),
+    ("GET", "/api/users"),
+    ("POST", "/api/users"),
+    ("GET", "/api/users/{id}"),
+    ("PATCH", "/api/users/{id}"),
 }
 
 

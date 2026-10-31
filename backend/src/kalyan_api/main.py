@@ -15,6 +15,7 @@ from kalyan_api.db.startup import run_startup_checks
 from kalyan_api.routers.areas import router as areas_router
 from kalyan_api.routers.auth import router as auth_router
 from kalyan_api.routers.health import router as health_router
+from kalyan_api.routers.users import router as users_router
 
 SECURITY_HEADERS = {
     "X-Content-Type-Options": "nosniff",
@@ -87,6 +88,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(health_router, prefix="/api")
     app.include_router(auth_router, prefix="/api")
     app.include_router(areas_router, prefix="/api")
+    app.include_router(users_router, prefix="/api")
 
     return app
 

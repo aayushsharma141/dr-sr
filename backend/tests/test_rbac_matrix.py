@@ -7,6 +7,7 @@ Guarantees:
 - Doctor dashboard isolation verifies doctor A and doctor B only observe their own identities.
 """
 
+import uuid
 from typing import Any
 
 import pytest
@@ -97,8 +98,19 @@ def test_rbac_matrix_cell(
         app, db_session, test_settings, login_client, identity, make_user
     )
 
-    body = row.body_factory() if row.body_factory else None
-    resp = client.request(row.method, row.path, json=body)
+    target_user = None
+    resolved_path = row.path
+    if "{id}" in row.path:
+        target_user = make_user(
+            db_session,
+            test_settings,
+            "RECEPTION",
+            f"mat_tgt_{uuid.uuid4().hex[:6]}",
+        )
+        resolved_path = row.path.replace("{id}", str(target_user.id))
+
+    body = row.body_factory(target_user) if row.body_factory else None
+    resp = client.request(row.method, resolved_path, json=body)
 
     expected_status = row.expected[identity]
     assert resp.status_code == expected_status, (

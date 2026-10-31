@@ -32,10 +32,27 @@ class MatrixRow:
     expected: dict[str, int]
 
 
-def _change_password_payload() -> dict[str, Any]:
+def _change_password_payload(_target: User | None = None) -> dict[str, Any]:
     return {
         "current_password": "ValidTestPassword123!",
         "new_password": "NewSecretPassword123!",
+    }
+
+
+def _create_user_payload(_target: User | None = None) -> dict[str, Any]:
+    uid = uuid.uuid4().hex[:6]
+    return {
+        "username": f"new_usr_{uid}",
+        "full_name": f"New User {uid}",
+        "role": "RECEPTION",
+    }
+
+
+def _patch_user_payload(target: User | None = None) -> dict[str, Any]:
+    ver = target.version_id if target else 1
+    return {
+        "full_name": "Updated Staff Name",
+        "version_id": ver,
     }
 
 
@@ -110,6 +127,54 @@ MATRIX: list[MatrixRow] = [
             "reception": 403,
             "doctor_a": 200,
             "doctor_b": 200,
+        },
+    ),
+    MatrixRow(
+        method="GET",
+        path="/api/users",
+        body_factory=None,
+        expected={
+            "anonymous": 401,
+            "admin": 200,
+            "reception": 403,
+            "doctor_a": 403,
+            "doctor_b": 403,
+        },
+    ),
+    MatrixRow(
+        method="POST",
+        path="/api/users",
+        body_factory=_create_user_payload,
+        expected={
+            "anonymous": 401,
+            "admin": 201,
+            "reception": 403,
+            "doctor_a": 403,
+            "doctor_b": 403,
+        },
+    ),
+    MatrixRow(
+        method="GET",
+        path="/api/users/{id}",
+        body_factory=None,
+        expected={
+            "anonymous": 401,
+            "admin": 200,
+            "reception": 403,
+            "doctor_a": 403,
+            "doctor_b": 403,
+        },
+    ),
+    MatrixRow(
+        method="PATCH",
+        path="/api/users/{id}",
+        body_factory=_patch_user_payload,
+        expected={
+            "anonymous": 401,
+            "admin": 200,
+            "reception": 403,
+            "doctor_a": 403,
+            "doctor_b": 403,
         },
     ),
 ]

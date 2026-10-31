@@ -72,6 +72,8 @@ class Doctor(Base):
     # Relationships
     user: Mapped["User"] = relationship("User", back_populates="doctor", uselist=False)
 
+    __mapper_args__ = {"version_id_col": version_id}
+
 
 class User(Base):
     """User account entity with role, authentication metadata, and lockout counters."""
@@ -140,6 +142,8 @@ class User(Base):
     sessions: Mapped[list["AuthSession"]] = relationship(
         "AuthSession", back_populates="user", cascade="all, delete-orphan"
     )
+
+    __mapper_args__ = {"version_id_col": version_id}
 
 
 class AuthSession(Base):
