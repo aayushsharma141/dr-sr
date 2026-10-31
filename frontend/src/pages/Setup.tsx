@@ -189,7 +189,7 @@ export function Setup() {
               className="w-full px-3 py-2 border border-neutral-300 rounded min-h-[44px] text-neutral-900 focus-visible:outline-2 focus-visible:outline-red-800"
             />
             <p id="setup-pwd-hint" className="mt-1 text-xs text-neutral-500">
-              Must be at least 8 characters long.
+              Must be at least 12 characters long.
             </p>
             {passwordError && (
               <p id="setup-pwd-error" role="alert" className="mt-1 text-xs text-red-700">

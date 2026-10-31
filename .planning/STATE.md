@@ -6,9 +6,9 @@ status: in_progress
 current_phase: 11
 progress:
   total_phases: 7
-  completed_phases: 0
-  active_phase: 11
-  percent: 15
+  completed_phases: 1
+  active_phase: 12
+  percent: 16
 ---
 
 # Project State: Kalyan Hospital Patient & Physiotherapy Management
@@ -18,14 +18,14 @@ progress:
 See: `.planning/PROJECT.md` (updated 2026-10-31)
 
 **Core value:** Reliable, internet-free shared patient records for reception and doctors across the hospital LAN, enforced by server-side permissions, with auditable changes and a backup proven to restore.
-**Current focus:** Milestone v3.0 — Phase 11 execution.
+**Current focus:** Milestone v3.0 — Phase 11 complete, ready for verification / Phase 12.
 
 ## Current Position
 
 Phase: 11 (Decisions Gate, Foundation & Auth)
-Plan: 15 of 16 complete
-Status: In progress
-Last activity: 2026-11-01 — Phase 11 Plan 15 complete (FastAPI app.frontend serving built Vite SPA from absolute frontend_dist, path-traversal hardening, immutable asset caching, and no-cache HTML navigation headers)
+Plan: 16 of 16 complete
+Status: Phase 11 Complete
+Last activity: 2026-11-01 — Phase 11 Plan 16 complete (Phase 11 gate passed: boot smoke test, frozen stack, OpenAPI snapshot, 91.38% test coverage, entry-gate order verified, legacy isolation preserved, and M-1..M-6 manual checks passed).
 
 ## Phase Overview
 
@@ -33,8 +33,8 @@ Phases 11-17 (continuing from v2.0, which ended at Phase 10). See `.planning/ROA
 
 | Phase | Name | Status |
 |-------|------|--------|
-| 11 | Decisions Gate, Foundation & Auth | In progress (15/16 plans) |
-| 12 | Clinic Settings & Patient Registration | Not started |
+| 11 | Decisions Gate, Foundation & Auth | Complete (16/16 plans) |
+| 12 | Clinic Settings & Patient Registration | Next |
 | 13 | Appointments & Clinical Encounters | Not started |
 | 14 | Prescriptions, Treatment Plans & Sessions | Not started |
 | 15 | Billing, Receipts & Reversals | Not started |
@@ -44,6 +44,6 @@ Phases 11-17 (continuing from v2.0, which ended at Phase 10). See `.planning/ROA
 ## Accumulated Context
 
 - v2.0 PySide6 + SQLite desktop app (phases 1–10) is complete and archived at `.planning/milestones/v2.0-restart-phases/`. It is the reference for domain rules only.
+- Phase 11 complete: offline LAN PostgreSQL 18.6 + sync SQLAlchemy 2.0.55 + FastAPI 0.162.0 backend, Vite 8.3.5 / React 19.3.1 SPA with Argon2id auth, HttpOnly session cookies, CSRF protection, optimistic locking with 409 ConflictBanner, first-run console setup wizard, and append-only audit trail.
 - Open items: confirm server hardware and LAN; plan SQLite to PostgreSQL data migration; client approval of the full feature list.
 - Toolchain: Node.js LTS v26.13.0 and PostgreSQL 18.6-5 active and operational.
-- Frontend UI Plan Proposal: Detailed architecture & design proposal drafted at `docs/plans/frontend-ui-plan.md` (uncommitted, under review). Proposes React + TypeScript (Vite, Tailwind CSS + shadcn/ui, React Router, TanStack Query & Table, React Hook Form + Zod, openapi-typescript), design tokens matching the approved crimson letterhead, role-based screens (/reception, /doctor, /admin), browser webcam capture over LAN HTTPS, A4 dual-signature print matching SAMPLE.pdf, and flags 5 open decisions (HTTPS for camera, doctor-to-doctor note visibility, department names, patient/attendant signature line, and library version/licence confirmation) before building.
