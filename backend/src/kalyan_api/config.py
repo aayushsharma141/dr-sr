@@ -68,6 +68,16 @@ class Settings(BaseSettings):
         extra="ignore",
     )
 
+    @field_validator("frontend_dist", mode="before")
+    @classmethod
+    def validate_frontend_dist_absolute(cls, v: Any) -> Path | None:
+        if v is None or v == "" or (isinstance(v, str) and not v.strip()):
+            return None
+        p = Path(v)
+        if not p.is_absolute():
+            raise ValueError(f"frontend_dist must be an absolute path, got: {v}")
+        return p
+
     @field_validator("extra_allowed_origins", mode="after")
     @classmethod
     def parse_allowed_origins(cls, v: Any) -> list[str]:

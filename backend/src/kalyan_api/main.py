@@ -1,5 +1,6 @@
 """FastAPI application factory, lifecycle management, and security middleware."""
 
+import logging
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
@@ -22,6 +23,8 @@ from kalyan_api.routers.health import router as health_router
 from kalyan_api.routers.setup import router as setup_router
 from kalyan_api.routers.users import router as users_router
 
+logger = logging.getLogger("kalyan_api.main")
+
 SECURITY_HEADERS = {
     "X-Content-Type-Options": "nosniff",
     "X-Frame-Options": "DENY",
@@ -36,14 +39,24 @@ SECURITY_HEADERS = {
 
 
 class SecurityHeadersMiddleware(BaseHTTPMiddleware):
-    """Enforces security response headers and no-store caching on all API endpoints."""
+    """Enforces security response headers and endpoint-specific caching."""
 
     async def dispatch(self, request: Request, call_next: RequestResponseEndpoint) -> Response:
         response = await call_next(request)
         for k, v in SECURITY_HEADERS.items():
             response.headers[k] = v
-        if request.url.path.startswith("/api"):
+
+        path = request.url.path
+        if path.startswith("/api"):
             response.headers["Cache-Control"] = "no-store"
+        elif path.startswith("/assets/"):
+            if response.status_code < 400:
+                response.headers["Cache-Control"] = "public, max-age=31536000, immutable"
+        else:
+            content_type = response.headers.get("content-type", "")
+            if "text/html" in content_type:
+                response.headers["Cache-Control"] = "no-cache"
+
         return response
 
 
@@ -115,6 +128,21 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(auth_router, prefix="/api")
     app.include_router(areas_router, prefix="/api")
     app.include_router(users_router, prefix="/api")
+
+    # SPA frontend distribution serving (app.frontend)
+    dist_dir = resolved_settings.frontend_dist
+    if dist_dir and (dist_dir / "index.html").is_file():
+        app.frontend(
+            "/",
+            directory=str(dist_dir),
+            fallback="index.html",
+            check_dir=False,
+        )
+    else:
+        logger.warning(
+            "Frontend dist not found or missing index.html; starting in API-only mode: %s",
+            dist_dir,
+        )
 
     return app
 
