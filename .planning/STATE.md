@@ -8,7 +8,7 @@ progress:
   total_phases: 7
   completed_phases: 0
   active_phase: 11
-  percent: 5
+  percent: 6
 ---
 
 # Project State: Kalyan Hospital Patient & Physiotherapy Management
@@ -23,9 +23,9 @@ See: `.planning/PROJECT.md` (updated 2026-10-31)
 ## Current Position
 
 Phase: 11 (Decisions Gate, Foundation & Auth)
-Plan: 5 of 16 complete
+Plan: 6 of 16 complete
 Status: In progress
-Last activity: 2026-10-31 — Phase 11 Plan 05 complete (user login, session lifecycle, sliding idle & absolute timeouts, touch throttling, policy markers, default-deny authorization, and RBAC permissions catalogue)
+Last activity: 2026-10-31 — Phase 11 Plan 06 complete (account lockout after 5 failures for 15 minutes, atomic Core updates preserving version_id, DB-backed per-IP throttling via login_throttle with 429 Retry-After, and enumeration-resistant byte-identical error envelopes)
 
 ## Phase Overview
 
@@ -33,7 +33,7 @@ Phases 11-17 (continuing from v2.0, which ended at Phase 10). See `.planning/ROA
 
 | Phase | Name | Status |
 |-------|------|--------|
-| 11 | Decisions Gate, Foundation & Auth | In progress (5/16 plans) |
+| 11 | Decisions Gate, Foundation & Auth | In progress (6/16 plans) |
 | 12 | Clinic Settings & Patient Registration | Not started |
 | 13 | Appointments & Clinical Encounters | Not started |
 | 14 | Prescriptions, Treatment Plans & Sessions | Not started |
