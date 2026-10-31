@@ -1,9 +1,26 @@
-"""Clock abstraction providing deterministic timestamps for sessions, lockout, and audit."""
+"""Clock abstraction providing deterministic timestamps for sessions, lockout, and audit.
 
-from datetime import UTC, datetime
+Guarantees:
+- Application code uses clock.utcnow() as the authoritative time seam.
+- IST helpers provide timezone-aware calculations for business workflows (OPD receipts, shifts).
+"""
+
+import zoneinfo
+from datetime import UTC, date, datetime
+
+IST = zoneinfo.ZoneInfo("Asia/Kolkata")
 
 
 def utcnow() -> datetime:
     """Return current timezone-aware UTC datetime."""
     return datetime.now(UTC)
 
+
+def ist_now() -> datetime:
+    """Return current timezone-aware IST datetime."""
+    return datetime.now(IST)
+
+
+def ist_today() -> date:
+    """Return current calendar date in Indian Standard Time (Asia/Kolkata)."""
+    return ist_now().date()

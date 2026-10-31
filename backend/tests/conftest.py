@@ -136,3 +136,10 @@ def clock(monkeypatch: pytest.MonkeyPatch) -> dict[str, datetime]:
     now = {"t": datetime(2026, 11, 2, 4, 30, tzinfo=UTC)}
     monkeypatch.setattr("kalyan_api.clock.utcnow", lambda: now["t"])
     return now
+
+
+@pytest.fixture
+def without_active_admins(db_session: Session) -> None:
+    """Deactivate all admin users within the test's rolled-back transaction."""
+    db_session.execute(text("UPDATE users SET is_active = false WHERE role = 'ADMIN'"))
+    db_session.flush()

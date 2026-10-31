@@ -10,6 +10,7 @@ from starlette.responses import Response
 from kalyan_api.config import Settings, get_settings
 from kalyan_api.core.errors import RequestIdMiddleware, install_error_handlers
 from kalyan_api.db.session import SessionLocal, build_engine
+from kalyan_api.db.startup import run_startup_checks
 from kalyan_api.routers.health import router as health_router
 
 SECURITY_HEADERS = {
@@ -44,6 +45,10 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     engine = build_engine(settings, owner=False)
     SessionLocal.configure(bind=engine)
     app.state.engine = engine
+
+    # Run pre-flight startup gates (wait for DB, schema revision, and D-02 durability)
+    run_startup_checks(engine, settings)
+
     try:
         yield
     finally:

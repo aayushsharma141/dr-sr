@@ -17,6 +17,7 @@ from sqlalchemy import (
     CheckConstraint,
     DateTime,
     ForeignKey,
+    Identity,
     Index,
     Integer,
     MetaData,
@@ -24,6 +25,7 @@ from sqlalchemy import (
     String,
     Text,
     func,
+    text,
 )
 from sqlalchemy.dialects.postgresql import INET, JSONB, UUID
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
@@ -49,9 +51,11 @@ class Doctor(Base):
 
     __tablename__ = "doctors"
 
-    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    id: Mapped[int] = mapped_column(BigInteger, Identity(always=False), primary_key=True)
     name_en: Mapped[str] = mapped_column(String(120), nullable=False)
-    is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    is_active: Mapped[bool] = mapped_column(
+        Boolean, default=True, server_default=text("true"), nullable=False
+    )
     version_id: Mapped[int] = mapped_column(
         Integer, default=1, server_default="1", nullable=False
     )
@@ -84,7 +88,7 @@ class User(Base):
         ),
     )
 
-    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    id: Mapped[int] = mapped_column(BigInteger, Identity(always=False), primary_key=True)
     username: Mapped[str] = mapped_column(String(64), unique=True, nullable=False)
     full_name: Mapped[str] = mapped_column(String(120), nullable=False)
     role: Mapped[str] = mapped_column(String(16), nullable=False)
@@ -143,7 +147,7 @@ class AuthSession(Base):
 
     __tablename__ = "sessions"
 
-    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    id: Mapped[int] = mapped_column(BigInteger, Identity(always=False), primary_key=True)
     token_hash: Mapped[str] = mapped_column(String(64), unique=True, nullable=False)
     user_id: Mapped[int] = mapped_column(
         BigInteger, ForeignKey("users.id", ondelete="CASCADE"), nullable=False
@@ -187,7 +191,7 @@ class SystemSetup(Base):
         CheckConstraint("id = 1", name="system_setup_single_row"),
     )
 
-    id: Mapped[int] = mapped_column(SmallInteger, primary_key=True, default=1)
+    id: Mapped[int] = mapped_column(SmallInteger, primary_key=True)
     completed_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False
     )
@@ -214,7 +218,7 @@ class AuditLog(Base):
         Index("ix_audit_logs_actor_time", "actor_user_id", "occurred_at"),
     )
 
-    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    id: Mapped[int] = mapped_column(BigInteger, Identity(always=False), primary_key=True)
     occurred_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
