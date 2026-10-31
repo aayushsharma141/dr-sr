@@ -16,9 +16,10 @@ from sqlalchemy import select, update
 
 from kalyan_api import clock
 from kalyan_api.config import Settings, get_settings
+from kalyan_api.core import net
 from kalyan_api.core.errors import ApiError
 from kalyan_api.core.permissions import ROLE_PERMISSIONS, Permission, Role
-from kalyan_api.core.security import clean_ip, hash_token
+from kalyan_api.core.security import hash_token
 from kalyan_api.db.session import SessionDep
 from kalyan_api.models import AuthSession, User
 from kalyan_api.services.audit_service import AuditContext
@@ -172,7 +173,7 @@ def build_audit_context(request: Request, principal: Principal | None = None) ->
         except ValueError:
             req_uuid = None
 
-    client_ip = clean_ip(request.client.host if request.client else None)
+    client_ip = net.client_ip(request)
     user_agent = request.headers.get("User-Agent")
 
     if principal:

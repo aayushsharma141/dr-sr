@@ -129,6 +129,21 @@ def client(app: FastAPI) -> Generator[TestClient, None, None]:
 
 
 @pytest.fixture
+def make_client(app: FastAPI):
+    """Factory fixture creating a TestClient with an explicit client peer IP address."""
+    def _builder(client_ip: str | None = None) -> TestClient:
+        client_tuple = (client_ip, 50000) if client_ip else None
+        return TestClient(
+            app,
+            base_url="http://testserver",
+            headers={"Origin": "http://testserver"},
+            client=client_tuple,
+        )
+
+    return _builder
+
+
+@pytest.fixture
 def clock(monkeypatch: pytest.MonkeyPatch) -> dict[str, datetime]:
     """Time seam freezing utcnow for deterministic testing."""
     now = {"t": datetime(2026, 11, 2, 4, 30, tzinfo=UTC)}

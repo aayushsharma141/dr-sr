@@ -7,6 +7,7 @@ from sqlalchemy import select, update
 
 from kalyan_api import clock
 from kalyan_api.config import Settings
+from kalyan_api.core import net
 from kalyan_api.core.permissions import ROLE_PERMISSIONS, Role
 from kalyan_api.core.policy import authenticated_only, public
 from kalyan_api.core.principal import (
@@ -14,10 +15,9 @@ from kalyan_api.core.principal import (
     build_audit_context,
     get_current_settings,
 )
-from kalyan_api.core.security import clean_ip
 from kalyan_api.db.session import SessionDep
 from kalyan_api.models import AuthSession, User
-from kalyan_api.services import audit_service, auth_service
+from kalyan_api.services import audit_service, auth_service, throttle_service
 from kalyan_api.services.audit_service import AuditAction, Outcome
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -60,10 +60,36 @@ def login(
 ) -> Response:
     """Authenticate credentials, create server-side session, set cookie, and return MeResponse.
 
-    Returns 401 invalid_credentials with a generic message for invalid passwords,
-    missing users, or deactivated accounts (no user enumeration).
+    Returns:
+        - 200 with MeResponse and cookie on success.
+        - 429 too_many_attempts with Retry-After when IP failure burst is reached.
+        - 401 invalid_credentials with a generic message for invalid passwords,
+          missing users, or locked/deactivated accounts (no user enumeration).
     """
     ctx = build_audit_context(request)
+    peer_ip = net.client_ip(request)
+    now = clock.utcnow()
+
+    # Rate limiting burst check prior to Argon2 execution
+    is_throttled, retry_after = throttle_service.limit_exceeded(
+        session,
+        peer_ip,
+        now,
+        max_failures=settings.throttle_max_failures,
+        window_minutes=settings.throttle_window_minutes,
+    )
+    if is_throttled:
+        return JSONResponse(
+            status_code=429,
+            headers={"Retry-After": str(retry_after)},
+            content={
+                "code": "too_many_attempts",
+                "message": (
+                    f"Too many failed login attempts. "
+                    f"Please wait {retry_after} seconds before trying again."
+                ),
+            },
+        )
 
     # If presenting an existing session token, revoke it first (session rotation on login)
     existing_token = request.cookies.get(settings.cookie_name)
@@ -75,20 +101,76 @@ def login(
     # Opportunistically purge stale sessions
     auth_service.purge_expired_sessions(session, max_age_hours=settings.session_absolute_hours + 24)
 
-    user, _rehashed = auth_service.authenticate(
-        session, settings, body.username, body.password
+    auth_result = auth_service.authenticate(
+        session, settings, body.username, body.password, now=now
     )
 
-    if user is None:
-        audit_service.record(
-            session,
-            ctx,
-            AuditAction.AUTH_LOGIN_FAILED,
-            "USER",
-            None,
-            after={"attempted_username": body.username.strip().lower()},
-            outcome=Outcome.FAILURE,
+    if auth_result.status != "ok":
+        # Register failure against peer IP
+        throttle_count = throttle_service.register_failure(
+            session, peer_ip, now, window_minutes=settings.throttle_window_minutes
         )
+        if throttle_count == settings.throttle_max_failures:
+            audit_service.record(
+                session,
+                ctx,
+                AuditAction.AUTH_LOGIN_THROTTLED,
+                "IP",
+                peer_ip,
+                outcome=Outcome.DENIED,
+                after={"attempt_count": throttle_count},
+            )
+
+        if auth_result.status == "locked":
+            matched = auth_result.matched_user
+            audit_service.record(
+                session,
+                ctx,
+                AuditAction.AUTH_LOGIN_FAILED,
+                "USER",
+                str(matched.id) if matched else None,
+                after={"reason": "locked"},
+                outcome=Outcome.FAILURE,
+            )
+        elif auth_result.status == "wrong_password":
+            matched = auth_result.matched_user
+            audit_service.record(
+                session,
+                ctx,
+                AuditAction.AUTH_LOGIN_FAILED,
+                "USER",
+                str(matched.id) if matched else None,
+                after={"failed_login_count": auth_result.failed_count},
+                outcome=Outcome.FAILURE,
+            )
+            if auth_result.failed_count == settings.lockout_threshold:
+                audit_service.record(
+                    session,
+                    ctx,
+                    AuditAction.AUTH_ACCOUNT_LOCKED,
+                    "USER",
+                    str(matched.id) if matched else None,
+                    after={
+                        "locked_until": (
+                            auth_result.locked_until.isoformat()
+                            if auth_result.locked_until
+                            else None
+                        ),
+                        "failed_login_count": auth_result.failed_count,
+                    },
+                    outcome=Outcome.FAILURE,
+                )
+        else:  # "unknown"
+            audit_service.record(
+                session,
+                ctx,
+                AuditAction.AUTH_LOGIN_FAILED,
+                "USER",
+                None,
+                after={"attempted_username": body.username.strip().lower()[:64]},
+                outcome=Outcome.FAILURE,
+            )
+
         return JSONResponse(
             status_code=401,
             content={
@@ -98,14 +180,21 @@ def login(
         )
 
     # Success path
-    client_ip = clean_ip(request.client.host if request.client else None)
+    user = auth_result.user
+    if user is None:
+        return JSONResponse(
+            status_code=401,
+            content={
+                "code": "invalid_credentials",
+                "message": GENERIC_INVALID_CREDENTIALS_MSG,
+            },
+        )
     user_agent = request.headers.get("User-Agent")
     auth_sess, raw_token = auth_service.create_session(
-        session, user, client_ip=client_ip, user_agent=user_agent
+        session, user, client_ip=peer_ip, user_agent=user_agent
     )
 
     # Atomic core update for login counters (avoids bumping users.version_id)
-    now = clock.utcnow()
     session.execute(
         update(User)
         .where(User.id == user.id)
