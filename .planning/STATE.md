@@ -3,12 +3,12 @@ gsd_state_version: '1.0'
 milestone: 'v3.0'
 milestone_name: 'Centralized LAN Web Platform'
 status: in_progress
-current_phase: 11
+current_phase: 12
 progress:
   total_phases: 7
   completed_phases: 1
   active_phase: 12
-  percent: 16
+  percent: 20
 ---
 
 # Project State: Kalyan Hospital Patient & Physiotherapy Management
@@ -18,14 +18,14 @@ progress:
 See: `.planning/PROJECT.md` (updated 2026-10-31)
 
 **Core value:** Reliable, internet-free shared patient records for reception and doctors across the hospital LAN, enforced by server-side permissions, with auditable changes and a backup proven to restore.
-**Current focus:** Milestone v3.0 — Phase 11 complete, ready for verification / Phase 12.
+**Current focus:** Milestone v3.0 — Phase 12 (Clinic Settings & Patient Registration) in progress.
 
 ## Current Position
 
-Phase: 11 (Decisions Gate, Foundation & Auth)
-Plan: 16 of 16 complete
-Status: Phase 11 Complete
-Last activity: 2026-11-01 — Phase 11 Plan 16 complete (Phase 11 gate passed: boot smoke test, frozen stack, OpenAPI snapshot, 91.38% test coverage, entry-gate order verified, legacy isolation preserved, and M-1..M-6 manual checks passed).
+Phase: 12 (Clinic Settings & Patient Registration)
+Plan: 2 of 8 complete (12-01 complete, 12-02 complete, 12-03 next)
+Status: In progress
+Last activity: 2026-11-01 — Phase 12 Plan 02 complete (Clinic Settings, Doctor Profiles, and Fee Schedules Endpoints implemented, RBAC matrix expanded to 124 cells, 303 tests passing, 0 lint errors).
 
 ## Phase Overview
 
@@ -34,7 +34,7 @@ Phases 11-17 (continuing from v2.0, which ended at Phase 10). See `.planning/ROA
 | Phase | Name | Status |
 |-------|------|--------|
 | 11 | Decisions Gate, Foundation & Auth | Complete (16/16 plans) |
-| 12 | Clinic Settings & Patient Registration | Next |
+| 12 | Clinic Settings & Patient Registration | In progress (2/8 plans complete) |
 | 13 | Appointments & Clinical Encounters | Not started |
 | 14 | Prescriptions, Treatment Plans & Sessions | Not started |
 | 15 | Billing, Receipts & Reversals | Not started |
