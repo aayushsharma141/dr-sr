@@ -8,6 +8,7 @@ export function Login() {
   const [searchParams] = useSearchParams()
   const navigate = useNavigate()
   const reason = searchParams.get('reason')
+  const notice = searchParams.get('notice')
 
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
@@ -47,6 +48,24 @@ export function Login() {
             Offline LAN Management Platform
           </p>
         </div>
+
+        {notice === 'created' && (
+          <div
+            role="status"
+            className="p-3 bg-green-50 border border-green-200 rounded text-sm text-green-900"
+          >
+            Administrator created. Please sign in.
+          </div>
+        )}
+
+        {notice === 'closed' && (
+          <div
+            role="status"
+            className="p-3 bg-amber-50 border border-amber-200 rounded text-sm text-amber-900"
+          >
+            Setup wizard is closed. Administrator already exists.
+          </div>
+        )}
 
         {setupStatus?.setup_required && (
           <div
