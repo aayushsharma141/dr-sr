@@ -8,11 +8,13 @@ Guarantees:
 """
 
 import uuid
+from datetime import UTC, datetime
 from typing import Any
 
 import pytest
 from conftest import make_user
 from fastapi import Depends, FastAPI
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 from support.matrix import (
     IDENTITIES,
@@ -25,6 +27,7 @@ from support.matrix import (
 from kalyan_api.config import Settings
 from kalyan_api.core.permissions import Permission
 from kalyan_api.core.policy import require
+from kalyan_api.models import SystemSetup
 
 FORBIDDEN_SECRET_KEYS: tuple[str, ...] = (
     "password_hash",
@@ -100,6 +103,25 @@ def test_rbac_matrix_cell(
 
     target_user = None
     resolved_path = row.path
+
+    if row.path.startswith("/api/setup"):
+        # Setup matrix preconditions: system_setup completed row exists
+        existing_setup = db_session.scalar(
+            select(SystemSetup).where(SystemSetup.id == 1)
+        )
+        if not existing_setup:
+            setup_admin = make_user(
+                db_session, test_settings, "ADMIN", f"mat_adm_{uuid.uuid4().hex[:6]}"
+            )
+            db_session.add(
+                SystemSetup(
+                    id=1,
+                    completed_at=datetime.now(UTC),
+                    admin_user_id=setup_admin.id,
+                )
+            )
+            db_session.flush()
+
     if "{id}" in row.path:
         is_active = "reactivate" not in row.path
         target_user = make_user(
@@ -110,7 +132,7 @@ def test_rbac_matrix_cell(
             is_active=is_active,
         )
         if "unlock" in row.path:
-            from datetime import UTC, datetime, timedelta
+            from datetime import timedelta
             target_user.locked_until = datetime.now(UTC) + timedelta(minutes=15)
             target_user.failed_login_count = 5
             db_session.flush()

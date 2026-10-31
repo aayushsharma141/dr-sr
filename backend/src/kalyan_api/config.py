@@ -58,6 +58,9 @@ class Settings(BaseSettings):
     # Frontend SPA distribution directory
     frontend_dist: Path | None = None
 
+    # First-run setup code file location (SEC-07)
+    setup_code_path: Path | None = None
+
     model_config = SettingsConfigDict(
         env_prefix="KALYAN_",
         env_file=str(ENV_FILE_PATH) if ENV_FILE_PATH.exists() else None,

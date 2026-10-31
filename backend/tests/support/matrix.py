@@ -63,6 +63,15 @@ def _action_user_payload(target: User | None = None) -> dict[str, Any]:
     }
 
 
+def _setup_admin_payload(_target: User | None = None) -> dict[str, Any]:
+    return {
+        "setup_code": "ANYCODE123",
+        "username": "matrix_admin",
+        "full_name": "Matrix Admin",
+        "password": "ValidAdminPassword123!",
+    }
+
+
 MATRIX: list[MatrixRow] = [
     MatrixRow(
         method="GET",
@@ -230,6 +239,30 @@ MATRIX: list[MatrixRow] = [
             "reception": 403,
             "doctor_a": 403,
             "doctor_b": 403,
+        },
+    ),
+    MatrixRow(
+        method="GET",
+        path="/api/setup/status",
+        body_factory=None,
+        expected={
+            "anonymous": 410,
+            "admin": 410,
+            "reception": 410,
+            "doctor_a": 410,
+            "doctor_b": 410,
+        },
+    ),
+    MatrixRow(
+        method="POST",
+        path="/api/setup/admin",
+        body_factory=_setup_admin_payload,
+        expected={
+            "anonymous": 410,
+            "admin": 410,
+            "reception": 410,
+            "doctor_a": 410,
+            "doctor_b": 410,
         },
     ),
 ]
