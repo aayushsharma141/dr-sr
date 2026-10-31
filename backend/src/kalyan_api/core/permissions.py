@@ -33,7 +33,7 @@ class Permission(StrEnum):
     DASHBOARD_RECEPTION = "dashboard:reception"
     DASHBOARD_DOCTOR = "dashboard:doctor"
 
-    # Phase 12: Clinic Settings & Patient Registration (Reserved)
+    # Phase 12: Clinic Settings & Patient Registration
     SETTINGS_READ = "settings:read"
     SETTINGS_WRITE = "settings:write"
     DOCTOR_READ = "doctor:read"
@@ -136,8 +136,6 @@ ROLE_PERMISSIONS: dict[Role, frozenset[Permission]] = {
 
 # Mapping of future permissions reserved for upcoming phases
 RESERVED: dict[Permission, str] = {
-    Permission.PATIENT_READ: "phase-12",
-    Permission.PATIENT_CREATE: "phase-12",
     Permission.PATIENT_UPDATE: "phase-12",
     Permission.PHOTO_READ: "phase-12",
     Permission.PHOTO_WRITE: "phase-12",

@@ -573,6 +573,30 @@
         "title": "DoctorUpdate",
         "type": "object"
       },
+      "DuplicateCheckResponse": {
+        "description": "Duplicate search check response.",
+        "properties": {
+          "has_duplicate": {
+            "title": "Has Duplicate",
+            "type": "boolean"
+          },
+          "matching_patient": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PatientOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "has_duplicate"
+        ],
+        "title": "DuplicateCheckResponse",
+        "type": "object"
+      },
       "FeeCreate": {
         "additionalProperties": false,
         "description": "Payload for creating a consultation fee schedule.",
@@ -764,6 +788,245 @@
           "version_id"
         ],
         "title": "MeResponse",
+        "type": "object"
+      },
+      "PatientCreate": {
+        "additionalProperties": false,
+        "description": "Payload for registering a new patient with 12 canonical fields.",
+        "properties": {
+          "address": {
+            "maxLength": 1000,
+            "minLength": 2,
+            "title": "Address",
+            "type": "string"
+          },
+          "age_years": {
+            "maximum": 150.0,
+            "minimum": 0.0,
+            "title": "Age Years",
+            "type": "integer"
+          },
+          "allergies": {
+            "default": "None reported",
+            "maxLength": 1000,
+            "title": "Allergies",
+            "type": "string"
+          },
+          "district": {
+            "default": "Bhojpur",
+            "maxLength": 64,
+            "minLength": 2,
+            "title": "District",
+            "type": "string"
+          },
+          "dob": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dob"
+          },
+          "emergency_contact": {
+            "anyOf": [
+              {
+                "maxLength": 120,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Emergency Contact"
+          },
+          "full_name": {
+            "maxLength": 120,
+            "minLength": 2,
+            "title": "Full Name",
+            "type": "string"
+          },
+          "gender": {
+            "pattern": "^[MFO]$",
+            "title": "Gender",
+            "type": "string"
+          },
+          "guardian_name": {
+            "maxLength": 120,
+            "minLength": 2,
+            "title": "Guardian Name",
+            "type": "string"
+          },
+          "mobile": {
+            "maxLength": 15,
+            "minLength": 10,
+            "pattern": "^[0-9+ -]{10,15}$",
+            "title": "Mobile",
+            "type": "string"
+          },
+          "notes": {
+            "anyOf": [
+              {
+                "maxLength": 2000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notes"
+          },
+          "state": {
+            "default": "Bihar",
+            "maxLength": 64,
+            "minLength": 2,
+            "title": "State",
+            "type": "string"
+          }
+        },
+        "required": [
+          "full_name",
+          "guardian_name",
+          "gender",
+          "age_years",
+          "mobile",
+          "address"
+        ],
+        "title": "PatientCreate",
+        "type": "object"
+      },
+      "PatientOut": {
+        "description": "Full patient demographic entity response.",
+        "properties": {
+          "address": {
+            "title": "Address",
+            "type": "string"
+          },
+          "age_years": {
+            "title": "Age Years",
+            "type": "integer"
+          },
+          "allergies": {
+            "title": "Allergies",
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "district": {
+            "title": "District",
+            "type": "string"
+          },
+          "dob": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dob"
+          },
+          "emergency_contact": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Emergency Contact"
+          },
+          "full_name": {
+            "title": "Full Name",
+            "type": "string"
+          },
+          "gender": {
+            "title": "Gender",
+            "type": "string"
+          },
+          "guardian_name": {
+            "title": "Guardian Name",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "is_active": {
+            "title": "Is Active",
+            "type": "boolean"
+          },
+          "mobile": {
+            "title": "Mobile",
+            "type": "string"
+          },
+          "notes": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notes"
+          },
+          "photo_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Photo Path"
+          },
+          "state": {
+            "title": "State",
+            "type": "string"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          },
+          "urn": {
+            "title": "Urn",
+            "type": "string"
+          },
+          "version_id": {
+            "title": "Version Id",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "urn",
+          "full_name",
+          "guardian_name",
+          "gender",
+          "age_years",
+          "mobile",
+          "address",
+          "district",
+          "state",
+          "allergies",
+          "is_active",
+          "version_id",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "PatientOut",
         "type": "object"
       },
       "ReceptionOverviewResponse": {
@@ -1602,6 +1865,102 @@
         "summary": "Health Check",
         "tags": [
           "health"
+        ]
+      }
+    },
+    "/api/patients": {
+      "post": {
+        "description": "Register a new patient with 12 canonical demographic fields and atomic URN.",
+        "operationId": "register_patient_api_patients_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PatientCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PatientOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Register Patient",
+        "tags": [
+          "patients"
+        ]
+      }
+    },
+    "/api/patients/check-duplicate": {
+      "get": {
+        "description": "Non-blocking duplicate warning matching normalized name and mobile.",
+        "operationId": "check_duplicate_patient_api_patients_check_duplicate_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "name",
+            "required": false,
+            "schema": {
+              "default": "",
+              "title": "Name",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "mobile",
+            "required": false,
+            "schema": {
+              "default": "",
+              "title": "Mobile",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DuplicateCheckResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Check Duplicate Patient",
+        "tags": [
+          "patients"
         ]
       }
     },

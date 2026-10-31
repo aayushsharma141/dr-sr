@@ -120,6 +120,20 @@ def _patch_fee_payload(_target: Any = None) -> dict[str, Any]:
     }
 
 
+def _create_patient_payload(_target: Any = None) -> dict[str, Any]:
+    uid = uuid.uuid4().hex[:6]
+    return {
+        "full_name": f"Patient Matrix {uid}",
+        "guardian_name": "Guardian S/o",
+        "gender": "M",
+        "age_years": 32,
+        "mobile": "9876543210",
+        "address": "Hospital Road, Ara",
+        "district": "Bhojpur",
+        "state": "Bihar",
+    }
+
+
 MATRIX: list[MatrixRow] = [
     MatrixRow(
         method="GET",
@@ -407,6 +421,31 @@ MATRIX: list[MatrixRow] = [
             "reception": 403,
             "doctor_a": 403,
             "doctor_b": 403,
+        },
+    ),
+
+    MatrixRow(
+        method="POST",
+        path="/api/patients",
+        body_factory=_create_patient_payload,
+        expected={
+            "anonymous": 401,
+            "admin": 403,
+            "reception": 201,
+            "doctor_a": 403,
+            "doctor_b": 403,
+        },
+    ),
+    MatrixRow(
+        method="GET",
+        path="/api/patients/check-duplicate",
+        body_factory=None,
+        expected={
+            "anonymous": 401,
+            "admin": 200,
+            "reception": 200,
+            "doctor_a": 200,
+            "doctor_b": 200,
         },
     ),
 ]
