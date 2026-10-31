@@ -8,7 +8,7 @@ progress:
   total_phases: 7
   completed_phases: 0
   active_phase: 11
-  percent: 14
+  percent: 15
 ---
 
 # Project State: Kalyan Hospital Patient & Physiotherapy Management
@@ -23,9 +23,9 @@ See: `.planning/PROJECT.md` (updated 2026-10-31)
 ## Current Position
 
 Phase: 11 (Decisions Gate, Foundation & Auth)
-Plan: 14 of 16 complete
+Plan: 15 of 16 complete
 Status: In progress
-Last activity: 2026-10-31 — Phase 11 Plan 14 complete (Admin Users screen, D-08 ConflictBanner with 1-click reload, ChangePassword screen with policy hints and forced-change handling, and first-run Setup wizard with console code validation and automatic routing)
+Last activity: 2026-11-01 — Phase 11 Plan 15 complete (FastAPI app.frontend serving built Vite SPA from absolute frontend_dist, path-traversal hardening, immutable asset caching, and no-cache HTML navigation headers)
 
 ## Phase Overview
 
@@ -33,7 +33,7 @@ Phases 11-17 (continuing from v2.0, which ended at Phase 10). See `.planning/ROA
 
 | Phase | Name | Status |
 |-------|------|--------|
-| 11 | Decisions Gate, Foundation & Auth | In progress (14/16 plans) |
+| 11 | Decisions Gate, Foundation & Auth | In progress (15/16 plans) |
 | 12 | Clinic Settings & Patient Registration | Not started |
 | 13 | Appointments & Clinical Encounters | Not started |
 | 14 | Prescriptions, Treatment Plans & Sessions | Not started |
