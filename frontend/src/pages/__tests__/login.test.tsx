@@ -8,7 +8,7 @@ import { RequireAuth, RequireRole } from '../../auth/guards'
 import { ROLE_HOME } from '../../auth/roles'
 import { AreaHome } from '../AreaHome'
 import { Login } from '../Login'
-import { ChangePasswordPending, Forbidden, NotFound } from '../StatusPages'
+import { Forbidden, NotFound } from '../StatusPages'
 import type { Me } from '../../api/types'
 import { useOutletContext } from 'react-router'
 
@@ -30,7 +30,7 @@ function createTestRouter(initialEntries = ['/login']) {
       },
       {
         path: '/change-password',
-        element: <ChangePasswordPending />,
+        element: <div data-testid="change-password-page">Change Password Page</div>,
       },
       {
         path: '/403',

@@ -2,7 +2,8 @@ import { createBrowserRouter, Navigate, useOutletContext } from 'react-router'
 import { RequireAuth, RequireRole } from './auth/guards'
 import { ROLE_HOME } from './auth/roles'
 import { Login } from './pages/Login'
-import { ChangePasswordPending, Forbidden, NotFound } from './pages/StatusPages'
+import { ChangePassword } from './pages/ChangePassword'
+import { Forbidden, NotFound } from './pages/StatusPages'
 import type { Me } from './api/types'
 
 function RootRedirect() {
@@ -16,16 +17,16 @@ export const router = createBrowserRouter([
     element: <Login />,
   },
   {
-    path: '/change-password',
-    element: <ChangePasswordPending />,
-  },
-  {
     path: '/403',
     element: <Forbidden />,
   },
   {
     element: <RequireAuth />,
     children: [
+      {
+        path: '/change-password',
+        element: <ChangePassword />,
+      },
       {
         path: '/',
         element: <RootRedirect />,

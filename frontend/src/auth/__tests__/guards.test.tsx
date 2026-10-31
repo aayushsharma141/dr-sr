@@ -4,7 +4,7 @@ import { createMemoryRouter, RouterProvider } from 'react-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { setCsrfToken } from '../../api/client'
 import { RequireAuth, RequireRole } from '../guards'
-import { ChangePasswordPending, Forbidden, NotFound } from '../../pages/StatusPages'
+import { Forbidden, NotFound } from '../../pages/StatusPages'
 
 function createGuardsRouter(initialEntries = ['/admin']) {
   return createMemoryRouter(
@@ -15,7 +15,7 @@ function createGuardsRouter(initialEntries = ['/admin']) {
       },
       {
         path: '/change-password',
-        element: <ChangePasswordPending />,
+        element: <div data-testid="change-password-page">Change Password Page</div>,
       },
       {
         path: '/403',
@@ -163,7 +163,7 @@ describe('RequireAuth & RequireRole UX Guards', () => {
     )
 
     await waitFor(() => {
-      expect(screen.getByText('Change Password Required')).toBeInTheDocument()
+      expect(screen.getByTestId('change-password-page')).toBeInTheDocument()
     })
   })
 

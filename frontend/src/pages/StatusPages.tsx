@@ -42,15 +42,3 @@ export function NotFound() {
   )
 }
 
-export function ChangePasswordPending() {
-  return (
-    <div className="min-h-screen bg-neutral-100 flex items-center justify-center p-6 text-neutral-900">
-      <div className="max-w-md w-full bg-white p-6 rounded-lg border border-neutral-200 text-center space-y-4">
-        <h1 className="text-xl font-bold text-neutral-900">Change Password Required</h1>
-        <p className="text-sm text-neutral-600">
-          Your account requires a password change before continuing.
-        </p>
-      </div>
-    </div>
-  )
-}
