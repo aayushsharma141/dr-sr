@@ -1,14 +1,13 @@
 @import "tailwindcss";
 
 :root {
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-  line-height: 1.5;
-  font-weight: 400;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen,
+    Ubuntu, Cantarell, "Fira Sans", "Droid Sans", "Helvetica Neue", Arial, sans-serif;
   color-scheme: light;
 }
 
-:focus-visible {
-  outline: 2px solid #991b1b;
+*:focus-visible {
+  outline: 2px solid #9e1b42;
   outline-offset: 2px;
 }
 
