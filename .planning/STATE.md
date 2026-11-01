@@ -1,41 +1,48 @@
 ---
 gsd_state_version: '1.0'
-status: milestone_complete
+status: planning
 progress:
-  total_phases: 5
-  completed_phases: 5
-  total_plans: 10
-  completed_plans: 10
-  percent: 100
+  total_phases: 7
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
-# Project State: Kalyan Hospital Offline Patient Management
+# Project State — Kalyan Hospital v3.0
 
-## Project Reference
+## Reference
+See .planning/PROJECT.md, .planning/REQUIREMENTS.md and .planning/ROADMAP.md.
 
-See: `.planning/PROJECT.md` (updated 2026-10-28)
+**Core value:** Shared, permission-controlled offline LAN records with auditable clinical/financial history and proven restore.
 
-**Core value:** Reliable, zero-cloud offline patient registration, physiotherapy clinical history, and payment tracking on a single clinic computer with 100% data persistence and verifiable local backup.  
-**Current focus:** Project Milestone Complete! Ready for Client Walkthrough & Deployment.  
-**Last completed:** Phase 5 — Demo Hardening & Security Controls (2/2 plans complete)  
-**Phase 5 Plans:**
-- [x] [05-01-PLAN.md](file:///d:/dr-sr/.planning/phases/05-demo-hardening-security/05-01-PLAN.md): PBKDF2 authentication service, permission guard dialogs, and offline regression test suite.
-- [x] [05-02-PLAN.md](file:///d:/dr-sr/.planning/phases/05-demo-hardening-security/05-02-PLAN.md): Synthetic demo dataset generator, reset utility, and client walkthrough script.
+**Current focus:** Establish v3 architecture and Phase 11 implementation plan.  
+**Current phase:** Phase 11 — Foundation and bootstrap.  
+**Status:** Not started.  
+**Progress:** 0% — no v3 plans executed.
 
-**Next step:** Conduct the 5-minute client demonstration using [DEMO_SCRIPT.md](file:///d:/dr-sr/DEMO_SCRIPT.md).
+## Important boundary
 
-## Current Position
+The prior v2 desktop project is marked complete in historical documentation. That does not mean v3 is implemented. Current source tree contains PySide6/SQLite desktop code; React/FastAPI/PostgreSQL target implementation is not yet evidenced.
 
-Phase: All 5 Phases Complete (Milestone Delivered)  
-Status: 100% Complete (10 of 10 plans finished, 22 of 22 requirements verified)  
-Last activity: Verified and completed Phase 5 execution.
+## Next actions
 
-Progress: [██████████] 100%
+1. Confirm open decisions in DECISIONS.md with client.
+2. Create Phase 11 specification, plan and verification plan.
+3. Establish frontend/backend/database skeleton.
+4. Implement and test first-admin setup and server-side permission framework before patient workflows.
 
-## Phase Overview
+## Phase overview
 
-1. [x] Phase 1: App Shell & Dashboard Foundation (2/2 plans) — Complete (2026-10-28)
-2. [x] Phase 2: Patient Registration & Search (2/2 plans) — Complete (2026-10-28)
-3. [x] Phase 3: Treatment Cases & Payment Tracking (2/2 plans) — Complete (2026-10-28)
-4. [x] Phase 4: A4 Print Preview, PDF Export & Local Backup (2/2 plans) — Complete (2026-10-28)
-5. [x] Phase 5: Demo Hardening & Security Controls (2/2 plans) — Complete (2026-10-28)
+1. [ ] Phase 11 — Foundation and bootstrap
+2. [ ] Phase 12 — Clinic setup and patient registry
+3. [ ] Phase 13 — Appointments and queue
+4. [ ] Phase 14 — Clinical workflows
+5. [ ] Phase 15 — Billing and receipts
+6. [ ] Phase 16 — Audit, backup and integrity
+7. [ ] Phase 17 — Deployment and acceptance
+
+Open client decisions are tracked in root DECISIONS.md. Recommendations are not client approvals.
+
+---
+*State reset: 2026-11-01. Planning state is not implementation evidence.*
