@@ -9,7 +9,7 @@ The active product direction is v3: a centralized, fully offline-capable web app
 - One designated central server PC hosts the API, PostgreSQL database, and private patient-photo storage.
 - Approximately 3–5 clinic PCs access the application through a browser over the trusted clinic LAN.
 - Browser clients do not connect directly to PostgreSQL or shared database files.
-- The server is the authoritative location for data, authentication, authorization, audit events, and backups.
+- The server is the authoritative location for data, authentication, authorization and audit events. Database-plus-patient-file backup ownership is the target architecture; backup operations are not implemented until Phase 16.
 
 ## Technology baseline
 
@@ -34,7 +34,7 @@ According to the project state ledger, Phases 11–13 are recorded complete:
 - Clinic settings, doctor profiles, fee catalogue, patient registry, URN allocation, search, demographic edits, duplicate warning, photo streaming, and registration print spike.
 - Appointments, per-doctor token queues, appointment status transitions, doctor queue, clinical encounters, finalization, and addenda.
 
-Phase 14 (prescriptions, treatment plans/packages, physiotherapy sessions and VAS) is next. Phases 15–17 (billing, receipts and reversals; audit viewer and backup/restore/integrity; LAN deployment and final acceptance) remain planned. Permission enum values or roadmap entries do not prove those modules are implemented.
+Phase 14 (prescriptions, treatment plans/packages, physiotherapy sessions and VAS) is next. Phases 15–17 (billing, receipts and reversals; full audit coverage/viewer and backup/restore/integrity; LAN deployment and final acceptance) remain planned. Permission enum values or roadmap entries do not prove those modules are implemented.
 
 ## Historical boundary
 
