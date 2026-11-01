@@ -8,7 +8,7 @@ A 7-phase delivery plan (Phases 11–17) for one central offline LAN server: Fas
 
 ## Planning notes
 
-- Audit-event writing was implemented in Phase 11 so later modules can write audit rows alongside business mutations. Audit viewer belongs to Phase 16.
+- Phase 11 delivered the audit writer/foundation. Each later module must add its own audit events; full domain coverage remains incomplete through Phases 14–16. The Admin audit viewer belongs to Phase 16.
 - The A4 registration-card print spike started in Phase 12; actual printer sign-off belongs to Phase 17.
 - Unified timeline including payments belongs to Phase 15, after billing exists.
 - Phase 16 owns backup tooling and restore rehearsal; Phase 17 repeats clean-machine restore as deployment acceptance.
@@ -49,7 +49,7 @@ A 7-phase delivery plan (Phases 11–17) for one central offline LAN server: Fas
 7. [x] 12-07 Searchable directory and detail view with optimistic locking.
 8. [x] 12-08 A4 registration-card print spike and phase gate.
 
-**Completion caveat:** actual printer acceptance is Phase 17. Current role mapping grants PHOTO_READ and PATIENT_UPDATE only to Reception; see SECURITY.md.
+**Completion caveat:** actual printer acceptance is Phase 17. Current role mapping grants PHOTO_READ and PATIENT_UPDATE only to Reception; see SECURITY.md. The current API patient schema also does not yet map one-to-one to all fields in the client-provided registration form; see PRD.md and brain/decisions/open-questions.md.
 
 ## Phase 13: Appointments & Clinical Encounters
 
@@ -72,7 +72,7 @@ A 7-phase delivery plan (Phases 11–17) for one central offline LAN server: Fas
 
 **Goal:** Doctors issue printable prescriptions, create treatment plans/packages and log immutable physiotherapy sessions with VAS pain scores.
 
-**Requirements:** RX-01, TRT-01, TRT-02.
+**Requirements:** RX-01, TRT-01, TRT-02, TRT-03.
 **Success criteria:**
 1. Encounter-linked prescription with medicines, dosage and advice; English clinical content with static Hindi labels.
 2. Treatment plan/package with sessions and price, available to the later billing module.
@@ -89,7 +89,7 @@ A 7-phase delivery plan (Phases 11–17) for one central offline LAN server: Fas
 
 ## Phase 16: Audit Viewer, Backup/Restore & Integrity
 
-**Requirements:** AUD-02, BAK-01–BAK-03.
+**Requirements:** AUD-01 (complete domain coverage), AUD-02, BAK-01–BAK-03.
 **Success criteria:** Admin audit filters; PostgreSQL + photo backup bundle with checksum manifest; manual and scheduled backup to second drive; staged verification and safe restore; integrity report; clean-machine restore drill.
 **Plans:** To be created.
 
