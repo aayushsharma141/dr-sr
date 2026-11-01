@@ -27,3 +27,4 @@
    - Legacy codebase isolation: strictly 0 lines modified in `app/`, legacy `tests/`, etc.
 3. **Manual Verification Records:**
    - Recorded `13-MANUAL-CHECKS.md` with PASS outcomes for `M-13-01` (Daily Token Allocation), `M-13-02` (Queue Status Flow), `M-13-03` (Doctor Clinical Workspace & Immutability), and `M-13-04` (Doctor Silo & Reception Default-Deny).
+
