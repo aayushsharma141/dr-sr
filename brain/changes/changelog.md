@@ -2,6 +2,16 @@
 
 This is a concise project-level history. Detailed implementation commits and phase plans remain in Git history and `.planning/`.
 
+## 2026-11-01 — Repository consistency audit
+
+- Reconciled doctor-silo policy wording with the implemented strict scope and client decision status.
+- Marked AUD-01 and PAT-01 partial where broad product requirements exceed current implementation evidence.
+- Added TRT-03 to phase and requirement traceability.
+- Corrected stale PostgreSQL target wording and clarified planned versus implemented backup/reversal capabilities.
+- Recorded the patient registration form-to-API schema mismatch as an explicit pre-implementation decision.
+- Replaced custom badge tags in GitHub Markdown with ordinary Markdown status labels.
+- Documentation-only; no application code or tests changed.
+
 ## 2026-11-01 — Knowledge base and documentation hygiene
 
 - Added the `brain/` knowledge-base structure for architecture, invariants, development rules, security, decisions, and current state.
