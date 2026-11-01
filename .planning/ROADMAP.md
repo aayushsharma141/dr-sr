@@ -85,10 +85,16 @@ Plans:
   2. Appointment status moves through Booked, Arrived, In consultation, Done, Cancelled and No-show, and a doctor sees only their own day's queue in order.
   3. A doctor records an encounter with clinical notes for a patient; reception cannot read clinical note content.
   4. Once a note is finalised it can no longer be edited (rejected at the API); changes appear as dated addenda attached to the original.
-**Plans**: TBD
+**Plans**: 7 plans
 
 Plans:
-- [ ] TBD (created by plan-phase)
+- [ ] 13-01-PLAN.md - Database Models & Migration 0003 (Appointments, Token Sequences, Encounters, Addenda)
+- [ ] 13-02-PLAN.md - Daily Token Service, Concurrency Stress Test & Appointment Booking Endpoints
+- [ ] 13-03-PLAN.md - Appointment Status State Machine & Doctor Queue API
+- [ ] 13-04-PLAN.md - Clinical Encounters & Addenda API with Doctor Silo & Note Immutability
+- [ ] 13-05-PLAN.md - Frontend Reception Appointment Booking Modal & Daily Queue Management Board
+- [ ] 13-06-PLAN.md - Frontend Doctor Consultation Queue & Clinical Encounter Workspace
+- [ ] 13-07-PLAN.md - Phase 13 Integration Gate, Coverage Verification & Browser DevTools Validation
 
 ### Phase 14: Prescriptions, Treatment Plans & Sessions
 **Goal**: Doctors issue printable prescriptions, create treatment plans/packages and log immutable physiotherapy sessions with VAS pain scores.
