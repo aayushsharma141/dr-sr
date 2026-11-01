@@ -11,6 +11,12 @@ Do not resolve these items by assumption. Record the client's answer and update 
 | OQ-03 | Should doctors see only their own appointments/encounters, or may authorized doctors see cross-doctor records? | Strict doctor silo is implemented | Obtain clinical governance decision; preserve strict silo until approved otherwise |
 | OQ-04 | What should happen to URN sequences when a registration is cancelled/voided? Are gaps acceptable? | Transactional annual allocator is implemented | Define void, cancellation, and gap policy before dependent workflows |
 
+## Data model and form reconciliation
+
+| ID | Question | Current implementation | Required next action |
+|---|---|---|---|
+| OQ-13 | How should the client-provided registration form map to the patient API/database schema? | API currently stores full_name, guardian_name, gender, dob, age_years, mobile, address, district, state, emergency_contact, allergies and notes. The client form also includes patient in/out date-time, referred by, condition, session count and total/paid/balance amounts; these are not equivalent fields in the current PatientCreate schema. | Approve a field-by-field mapping. Decide which values belong to patient demographics, visit/encounter records, treatment plans or the future payment ledger. Do not make balance an editable patient field. |
+
 ## Deployment and operations
 
 | ID | Question | Current evidence | Required next action |
@@ -28,6 +34,8 @@ Do not resolve these items by assumption. Record the client's answer and update 
 | OQ-10 | What is the final signed-off scope for the remaining phases? | Phases 14–17 remain planned | Review scope, timeline, and budget separately from the earlier desktop MVP estimate |
 | OQ-11 | What Hindi/English print formats and clinic identity details are final? | Clinic settings and registration print spike exist | Confirm exact print templates and content |
 | OQ-12 | Who signs off clinical workflows and production acceptance? | No production acceptance is established by phase test counts | Name authorized clinical and operational approvers |
+| OQ-14 | Who may authorize payment reversals? | Current permission catalogue reserves PAYMENT_REVERSE for Admin; billing is not implemented | Obtain written client approval before Phase 15; keep Admin-only as a provisional implementation baseline until confirmed |
+| OQ-15 | Should receipt numbering reset by calendar year or financial year? | Receipt module is not implemented | Confirm numbering cycle before Phase 15 implementation |
 
 ## Status discipline
 
