@@ -72,7 +72,8 @@ export async function apiFetch<T = unknown>(
     ...init.headers,
   }
 
-  if (init.body !== undefined && !headers['Content-Type']) {
+  const isFormData = typeof FormData !== 'undefined' && init.body instanceof FormData
+  if (init.body !== undefined && !headers['Content-Type'] && !isFormData) {
     headers['Content-Type'] = 'application/json'
   }
 
@@ -91,7 +92,7 @@ export async function apiFetch<T = unknown>(
     headers,
     signal: init.signal,
     credentials: 'same-origin',
-    body: init.body === undefined ? undefined : JSON.stringify(init.body),
+    body: init.body === undefined ? undefined : isFormData ? (init.body as BodyInit) : JSON.stringify(init.body),
   })
 
   if (res.status === 204) {

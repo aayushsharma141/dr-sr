@@ -36,10 +36,11 @@ export function RequireAuth() {
   return <Outlet context={me} />
 }
 
-export function RequireRole({ role }: { role: Role }) {
+export function RequireRole({ role }: { role: Role | Role[] }) {
   const me = useOutletContext<Me>()
+  const allowed = Array.isArray(role) ? role : [role]
 
-  if (!me || me.role !== role) {
+  if (!me || !allowed.includes(me.role)) {
     const targetHome = me ? ROLE_HOME[me.role] : '/login'
     return <Navigate to={targetHome} replace />
   }

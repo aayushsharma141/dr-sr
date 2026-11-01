@@ -199,3 +199,63 @@ export interface FeeUpdate {
   fee_paise: number
   is_active?: boolean
 }
+
+
+export interface PatientOut {
+  id: number
+  urn: string
+  full_name: string
+  guardian_name: string
+  gender: 'M' | 'F' | 'O'
+  dob: string | null
+  age_years: number
+  mobile: string
+  address: string
+  district: string
+  state: string
+  emergency_contact: string | null
+  allergies: string
+  notes: string | null
+  photo_path: string | null
+  is_active: boolean
+  version_id: number
+  created_at: string
+  updated_at: string
+}
+
+export interface PatientCreate {
+  full_name: string
+  guardian_name: string
+  gender: 'M' | 'F' | 'O'
+  dob?: string | null
+  age_years: number
+  mobile: string
+  address: string
+  district: string
+  state: string
+  emergency_contact?: string | null
+  allergies: string
+  notes?: string | null
+}
+
+export interface PatientUpdate {
+  version_id: number
+  full_name?: string
+  guardian_name?: string
+  gender?: 'M' | 'F' | 'O'
+  dob?: string | null
+  age_years?: number
+  mobile?: string
+  address?: string
+  district?: string
+  state?: string
+  emergency_contact?: string | null
+  allergies?: string
+  notes?: string | null
+  is_active?: boolean
+}
+
+export interface DuplicateCheckResponse {
+  has_duplicate: boolean
+  matching_patient: PatientOut | null
+}

@@ -1,4 +1,10 @@
 import type {
+  DuplicateCheckResponse,
+  PatientCreate,
+  PatientOut,
+  PatientUpdate,
+} from './types'
+import type {
   ClinicSettingsOut,
   ClinicSettingsUpdate,
   DoctorCreate,
@@ -394,6 +400,83 @@ export function useUpdateFee() {
       }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['fees'] })
+    },
+  })
+}
+
+export function useRegisterPatient() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (body: PatientCreate) =>
+      apiFetch<PatientOut>('/patients', {
+        method: 'POST',
+        body,
+      }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['patients'] })
+    },
+  })
+}
+
+export function useCheckDuplicate(name: string, mobile: string, enabled: boolean = true) {
+  return useQuery({
+    queryKey: ['check-duplicate', name, mobile],
+    queryFn: () =>
+      apiFetch<DuplicateCheckResponse>(
+        `/patients/check-duplicate?name=${encodeURIComponent(name.trim())}&mobile=${encodeURIComponent(mobile.trim())}`,
+      ),
+    enabled: enabled && name.trim().length >= 2 && mobile.trim().length >= 10,
+    staleTime: 5000,
+  })
+}
+
+export function usePatients(q: string = '', limit: number = 20, offset: number = 0) {
+  return useQuery({
+    queryKey: ['patients', { q, limit, offset }],
+    queryFn: () =>
+      apiFetch<PatientOut[]>(
+        `/patients?q=${encodeURIComponent(q)}&limit=${limit}&offset=${offset}`,
+      ),
+  })
+}
+
+export function usePatient(id: number | null) {
+  return useQuery({
+    queryKey: ['patient', id],
+    queryFn: () => apiFetch<PatientOut>(`/patients/${id}`),
+    enabled: id !== null && id > 0,
+  })
+}
+
+export function useUpdatePatient() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, body }: { id: number; body: PatientUpdate }) =>
+      apiFetch<PatientOut>(`/patients/${id}`, {
+        method: 'PATCH',
+        body,
+      }),
+    onSuccess: (data) => {
+      qc.setQueryData(['patient', data.id], data)
+      qc.invalidateQueries({ queryKey: ['patients'] })
+    },
+  })
+}
+
+export function useUploadPatientPhoto() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, file }: { id: number; file: File }) => {
+      const formData = new FormData()
+      formData.append('file', file)
+      return apiFetch<{ photo_path: string }>(`/patients/${id}/photo`, {
+        method: 'POST',
+        body: formData,
+      })
+    },
+    onSuccess: (_, variables) => {
+      qc.invalidateQueries({ queryKey: ['patient', variables.id] })
+      qc.invalidateQueries({ queryKey: ['patients'] })
     },
   })
 }
