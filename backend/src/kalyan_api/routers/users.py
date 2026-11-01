@@ -159,9 +159,7 @@ def reset_user_password(
 ) -> JSONResponse:
     """Generate and return a one-time temporary password, revoking existing sessions."""
     ctx = build_audit_context(request, principal)
-    user, temp_pwd = user_service.reset_password(
-        session, ctx, id, payload.version_id, settings
-    )
+    user, temp_pwd = user_service.reset_password(session, ctx, id, payload.version_id, settings)
     out = UserCreatedOut.from_user_and_secret(user, temp_pwd, now=clock.utcnow())
     return JSONResponse(
         status_code=200,

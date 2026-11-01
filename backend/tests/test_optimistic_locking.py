@@ -274,8 +274,8 @@ def test_no_version_id_assignment_in_source() -> None:
             if pattern.search(line):
                 violations.append(f"{py_file}:{idx}: {line.strip()}")
 
-    assert not violations, (
-        "Forbidden version_id assignment detected in source:\n" + "\n".join(violations)
+    assert not violations, "Forbidden version_id assignment detected in source:\n" + "\n".join(
+        violations
     )
 
 

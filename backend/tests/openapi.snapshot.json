@@ -17,6 +17,63 @@
         "title": "ActionRequest",
         "type": "object"
       },
+      "AddendumCreate": {
+        "description": "Payload to add a dated addendum to a finalised encounter.",
+        "properties": {
+          "addendum_text": {
+            "description": "Addendum text",
+            "maxLength": 5000,
+            "minLength": 2,
+            "title": "Addendum Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "addendum_text"
+        ],
+        "title": "AddendumCreate",
+        "type": "object"
+      },
+      "AddendumRead": {
+        "description": "Dated addendum attached to an encounter.",
+        "properties": {
+          "addendum_text": {
+            "title": "Addendum Text",
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "doctor_id": {
+            "title": "Doctor Id",
+            "type": "integer"
+          },
+          "doctor_name": {
+            "title": "Doctor Name",
+            "type": "string"
+          },
+          "encounter_id": {
+            "title": "Encounter Id",
+            "type": "integer"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "encounter_id",
+          "doctor_id",
+          "doctor_name",
+          "addendum_text",
+          "created_at"
+        ],
+        "title": "AddendumRead",
+        "type": "object"
+      },
       "AdminOverviewResponse": {
         "additionalProperties": false,
         "description": "Admin dashboard summary metrics and account totals.",
@@ -48,6 +105,234 @@
           "user_counts"
         ],
         "title": "AdminOverviewResponse",
+        "type": "object"
+      },
+      "AppointmentCreate": {
+        "description": "Payload to book an appointment (APT-01).",
+        "properties": {
+          "appointment_date": {
+            "description": "Scheduled appointment date",
+            "format": "date",
+            "title": "Appointment Date",
+            "type": "string"
+          },
+          "doctor_id": {
+            "description": "Target doctor ID",
+            "exclusiveMinimum": 0.0,
+            "title": "Doctor Id",
+            "type": "integer"
+          },
+          "notes": {
+            "anyOf": [
+              {
+                "maxLength": 1000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Reception notes",
+            "title": "Notes"
+          },
+          "patient_id": {
+            "description": "Target patient ID",
+            "exclusiveMinimum": 0.0,
+            "title": "Patient Id",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "patient_id",
+          "doctor_id",
+          "appointment_date"
+        ],
+        "title": "AppointmentCreate",
+        "type": "object"
+      },
+      "AppointmentListResponse": {
+        "description": "Paginated or filtered appointment list response.",
+        "properties": {
+          "appointments": {
+            "items": {
+              "$ref": "#/components/schemas/AppointmentRead"
+            },
+            "title": "Appointments",
+            "type": "array"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "total",
+          "appointments"
+        ],
+        "title": "AppointmentListResponse",
+        "type": "object"
+      },
+      "AppointmentRead": {
+        "description": "Detailed appointment record.",
+        "properties": {
+          "appointment_date": {
+            "format": "date",
+            "title": "Appointment Date",
+            "type": "string"
+          },
+          "cancellation_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cancellation Reason"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "doctor_id": {
+            "title": "Doctor Id",
+            "type": "integer"
+          },
+          "doctor_name_en": {
+            "title": "Doctor Name En",
+            "type": "string"
+          },
+          "doctor_name_hi": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Doctor Name Hi"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "notes": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notes"
+          },
+          "patient_id": {
+            "title": "Patient Id",
+            "type": "integer"
+          },
+          "patient_mobile": {
+            "title": "Patient Mobile",
+            "type": "string"
+          },
+          "patient_name": {
+            "title": "Patient Name",
+            "type": "string"
+          },
+          "patient_urn": {
+            "title": "Patient Urn",
+            "type": "string"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "status_updated_at": {
+            "format": "date-time",
+            "title": "Status Updated At",
+            "type": "string"
+          },
+          "token_number": {
+            "title": "Token Number",
+            "type": "integer"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          },
+          "version_id": {
+            "title": "Version Id",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "patient_id",
+          "patient_urn",
+          "patient_name",
+          "patient_mobile",
+          "doctor_id",
+          "doctor_name_en",
+          "appointment_date",
+          "token_number",
+          "status",
+          "status_updated_at",
+          "version_id",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "AppointmentRead",
+        "type": "object"
+      },
+      "AppointmentStatus": {
+        "description": "Appointment workflow status (APT-02).",
+        "enum": [
+          "BOOKED",
+          "ARRIVED",
+          "IN_CONSULTATION",
+          "DONE",
+          "CANCELLED",
+          "NO_SHOW"
+        ],
+        "title": "AppointmentStatus",
+        "type": "string"
+      },
+      "AppointmentStatusUpdate": {
+        "description": "Payload to transition appointment workflow status (APT-02).",
+        "properties": {
+          "cancellation_reason": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Required when moving to CANCELLED",
+            "title": "Cancellation Reason"
+          },
+          "status": {
+            "$ref": "#/components/schemas/AppointmentStatus",
+            "description": "Target status"
+          },
+          "version_id": {
+            "description": "Optimistic locking version ID",
+            "exclusiveMinimum": 0.0,
+            "title": "Version Id",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "status",
+          "version_id"
+        ],
+        "title": "AppointmentStatusUpdate",
         "type": "object"
       },
       "ChangePasswordRequest": {
@@ -503,6 +788,149 @@
         "title": "DoctorOverviewResponse",
         "type": "object"
       },
+      "DoctorQueueItem": {
+        "description": "Item in doctor consultation queue.",
+        "properties": {
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "notes": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notes"
+          },
+          "patient_age": {
+            "title": "Patient Age",
+            "type": "integer"
+          },
+          "patient_allergies": {
+            "title": "Patient Allergies",
+            "type": "string"
+          },
+          "patient_gender": {
+            "title": "Patient Gender",
+            "type": "string"
+          },
+          "patient_id": {
+            "title": "Patient Id",
+            "type": "integer"
+          },
+          "patient_mobile": {
+            "title": "Patient Mobile",
+            "type": "string"
+          },
+          "patient_name": {
+            "title": "Patient Name",
+            "type": "string"
+          },
+          "patient_urn": {
+            "title": "Patient Urn",
+            "type": "string"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "status_updated_at": {
+            "format": "date-time",
+            "title": "Status Updated At",
+            "type": "string"
+          },
+          "token_number": {
+            "title": "Token Number",
+            "type": "integer"
+          },
+          "version_id": {
+            "title": "Version Id",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "patient_id",
+          "patient_urn",
+          "patient_name",
+          "patient_gender",
+          "patient_age",
+          "patient_mobile",
+          "patient_allergies",
+          "token_number",
+          "status",
+          "status_updated_at",
+          "version_id"
+        ],
+        "title": "DoctorQueueItem",
+        "type": "object"
+      },
+      "DoctorQueueResponse": {
+        "description": "Doctor daily consultation queue divided by operational sections (APT-02).",
+        "properties": {
+          "booked": {
+            "items": {
+              "$ref": "#/components/schemas/DoctorQueueItem"
+            },
+            "title": "Booked",
+            "type": "array"
+          },
+          "completed": {
+            "items": {
+              "$ref": "#/components/schemas/DoctorQueueItem"
+            },
+            "title": "Completed",
+            "type": "array"
+          },
+          "doctor_id": {
+            "title": "Doctor Id",
+            "type": "integer"
+          },
+          "doctor_name": {
+            "title": "Doctor Name",
+            "type": "string"
+          },
+          "in_consultation": {
+            "items": {
+              "$ref": "#/components/schemas/DoctorQueueItem"
+            },
+            "title": "In Consultation",
+            "type": "array"
+          },
+          "queue_date": {
+            "format": "date",
+            "title": "Queue Date",
+            "type": "string"
+          },
+          "total_active": {
+            "title": "Total Active",
+            "type": "integer"
+          },
+          "waiting": {
+            "items": {
+              "$ref": "#/components/schemas/DoctorQueueItem"
+            },
+            "title": "Waiting",
+            "type": "array"
+          }
+        },
+        "required": [
+          "doctor_id",
+          "doctor_name",
+          "queue_date",
+          "in_consultation",
+          "waiting",
+          "booked",
+          "completed",
+          "total_active"
+        ],
+        "title": "DoctorQueueResponse",
+        "type": "object"
+      },
       "DoctorUpdate": {
         "additionalProperties": false,
         "description": "Payload for updating a doctor profile with optimistic concurrency.",
@@ -595,6 +1023,288 @@
           "has_duplicate"
         ],
         "title": "DuplicateCheckResponse",
+        "type": "object"
+      },
+      "EncounterCreate": {
+        "description": "Payload to record a clinical encounter (CLN-01).",
+        "properties": {
+          "appointment_id": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Optional linked appointment ID",
+            "title": "Appointment Id"
+          },
+          "clinical_notes": {
+            "description": "Examination and progress notes",
+            "maxLength": 10000,
+            "minLength": 2,
+            "title": "Clinical Notes",
+            "type": "string"
+          },
+          "diagnosis": {
+            "description": "Clinical diagnosis or impression",
+            "maxLength": 5000,
+            "minLength": 2,
+            "title": "Diagnosis",
+            "type": "string"
+          },
+          "patient_id": {
+            "description": "Target patient ID",
+            "exclusiveMinimum": 0.0,
+            "title": "Patient Id",
+            "type": "integer"
+          },
+          "symptoms": {
+            "description": "Chief complaints and symptoms",
+            "maxLength": 5000,
+            "minLength": 2,
+            "title": "Symptoms",
+            "type": "string"
+          }
+        },
+        "required": [
+          "patient_id",
+          "symptoms",
+          "clinical_notes",
+          "diagnosis"
+        ],
+        "title": "EncounterCreate",
+        "type": "object"
+      },
+      "EncounterRead": {
+        "description": "Detailed clinical encounter record with attached addenda.",
+        "properties": {
+          "addenda": {
+            "items": {
+              "$ref": "#/components/schemas/AddendumRead"
+            },
+            "title": "Addenda",
+            "type": "array"
+          },
+          "appointment_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Appointment Id"
+          },
+          "clinical_notes": {
+            "title": "Clinical Notes",
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "diagnosis": {
+            "title": "Diagnosis",
+            "type": "string"
+          },
+          "doctor_id": {
+            "title": "Doctor Id",
+            "type": "integer"
+          },
+          "doctor_name": {
+            "title": "Doctor Name",
+            "type": "string"
+          },
+          "encounter_date": {
+            "format": "date-time",
+            "title": "Encounter Date",
+            "type": "string"
+          },
+          "finalised_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finalised At"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "is_finalised": {
+            "title": "Is Finalised",
+            "type": "boolean"
+          },
+          "patient_id": {
+            "title": "Patient Id",
+            "type": "integer"
+          },
+          "patient_name": {
+            "title": "Patient Name",
+            "type": "string"
+          },
+          "patient_urn": {
+            "title": "Patient Urn",
+            "type": "string"
+          },
+          "symptoms": {
+            "title": "Symptoms",
+            "type": "string"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          },
+          "version_id": {
+            "title": "Version Id",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "patient_id",
+          "patient_urn",
+          "patient_name",
+          "doctor_id",
+          "doctor_name",
+          "encounter_date",
+          "symptoms",
+          "clinical_notes",
+          "diagnosis",
+          "is_finalised",
+          "version_id",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "EncounterRead",
+        "type": "object"
+      },
+      "EncounterSummary": {
+        "description": "Compact summary of encounter for patient historical timeline.",
+        "properties": {
+          "addenda_count": {
+            "default": 0,
+            "title": "Addenda Count",
+            "type": "integer"
+          },
+          "diagnosis": {
+            "title": "Diagnosis",
+            "type": "string"
+          },
+          "doctor_id": {
+            "title": "Doctor Id",
+            "type": "integer"
+          },
+          "doctor_name": {
+            "title": "Doctor Name",
+            "type": "string"
+          },
+          "encounter_date": {
+            "format": "date-time",
+            "title": "Encounter Date",
+            "type": "string"
+          },
+          "finalised_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finalised At"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "is_finalised": {
+            "title": "Is Finalised",
+            "type": "boolean"
+          },
+          "patient_id": {
+            "title": "Patient Id",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "patient_id",
+          "doctor_id",
+          "doctor_name",
+          "encounter_date",
+          "diagnosis",
+          "is_finalised"
+        ],
+        "title": "EncounterSummary",
+        "type": "object"
+      },
+      "EncounterUpdate": {
+        "description": "Payload to update an unfinalised draft encounter note.",
+        "properties": {
+          "clinical_notes": {
+            "anyOf": [
+              {
+                "maxLength": 10000,
+                "minLength": 2,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Clinical Notes"
+          },
+          "diagnosis": {
+            "anyOf": [
+              {
+                "maxLength": 5000,
+                "minLength": 2,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Diagnosis"
+          },
+          "symptoms": {
+            "anyOf": [
+              {
+                "maxLength": 5000,
+                "minLength": 2,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Symptoms"
+          },
+          "version_id": {
+            "description": "Optimistic locking version ID",
+            "exclusiveMinimum": 0.0,
+            "title": "Version Id",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "version_id"
+        ],
+        "title": "EncounterUpdate",
         "type": "object"
       },
       "FeeCreate": {
@@ -1619,6 +2329,271 @@
         ]
       }
     },
+    "/api/appointments": {
+      "get": {
+        "description": "List appointments filtered by date, doctor, patient or status (APT-02).",
+        "operationId": "list_appointments_api_appointments_get",
+        "parameters": [
+          {
+            "description": "Filter by appointment date",
+            "in": "query",
+            "name": "appointment_date",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by appointment date",
+              "title": "Appointment Date"
+            }
+          },
+          {
+            "description": "Filter by doctor ID",
+            "in": "query",
+            "name": "doctor_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by doctor ID",
+              "title": "Doctor Id"
+            }
+          },
+          {
+            "description": "Filter by patient ID",
+            "in": "query",
+            "name": "patient_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by patient ID",
+              "title": "Patient Id"
+            }
+          },
+          {
+            "description": "Filter by status",
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/AppointmentStatus"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by status",
+              "title": "Status"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AppointmentListResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Appointments",
+        "tags": [
+          "appointments"
+        ]
+      },
+      "post": {
+        "description": "Book a per-doctor daily appointment with atomic token generation (APT-01).",
+        "operationId": "book_appointment_api_appointments_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AppointmentCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AppointmentRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Book Appointment",
+        "tags": [
+          "appointments"
+        ]
+      }
+    },
+    "/api/appointments/queue/today": {
+      "get": {
+        "description": "Retrieve today's consultation queue for the authenticated doctor (APT-02).",
+        "operationId": "get_doctor_queue_api_appointments_queue_today_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DoctorQueueResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Get Doctor Queue",
+        "tags": [
+          "appointments"
+        ]
+      }
+    },
+    "/api/appointments/{id}": {
+      "get": {
+        "description": "Retrieve an appointment by ID.",
+        "operationId": "get_appointment_api_appointments__id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "title": "Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AppointmentRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Appointment",
+        "tags": [
+          "appointments"
+        ]
+      }
+    },
+    "/api/appointments/{id}/status": {
+      "patch": {
+        "description": "Transition appointment status with optimistic locking and validation (APT-02).",
+        "operationId": "update_appointment_status_api_appointments__id__status_patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "title": "Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AppointmentStatusUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AppointmentRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Appointment Status",
+        "tags": [
+          "appointments"
+        ]
+      }
+    },
     "/api/auth/change-password": {
       "post": {
         "description": "Change user password, enforce NIST policy, revoke all sessions, and issue fresh session.",
@@ -1755,6 +2730,28 @@
         "summary": "Get Doctor Overview",
         "tags": [
           "areas"
+        ]
+      }
+    },
+    "/api/doctor/queue": {
+      "get": {
+        "description": "Retrieve today's consultation queue for the authenticated doctor (APT-02).",
+        "operationId": "get_doctor_queue_api_doctor_queue_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DoctorQueueResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Get Doctor Queue",
+        "tags": [
+          "doctor"
         ]
       }
     },
@@ -1899,6 +2896,238 @@
         "tags": [
           "doctors",
           "fees"
+        ]
+      }
+    },
+    "/api/encounters": {
+      "post": {
+        "description": "Record a new clinical encounter note for a patient (CLN-01).",
+        "operationId": "create_encounter_api_encounters_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EncounterCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EncounterRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Encounter",
+        "tags": [
+          "encounters"
+        ]
+      }
+    },
+    "/api/encounters/{id}": {
+      "get": {
+        "description": "Retrieve encounter details including addenda (CLN-01). Scoped to doctor silo (D-03).",
+        "operationId": "get_encounter_api_encounters__id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "title": "Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EncounterRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Encounter",
+        "tags": [
+          "encounters"
+        ]
+      },
+      "patch": {
+        "description": "Update draft encounter notes. Locked if already finalised (CLN-02).",
+        "operationId": "update_encounter_api_encounters__id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "title": "Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EncounterUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EncounterRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Encounter",
+        "tags": [
+          "encounters"
+        ]
+      }
+    },
+    "/api/encounters/{id}/addenda": {
+      "post": {
+        "description": "Append a dated addendum to a finalised clinical encounter (CLN-02).",
+        "operationId": "add_encounter_addendum_api_encounters__id__addenda_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "title": "Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AddendumCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AddendumRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Add Encounter Addendum",
+        "tags": [
+          "encounters"
+        ]
+      }
+    },
+    "/api/encounters/{id}/finalise": {
+      "post": {
+        "description": "Finalise encounter notes, locking them against future updates (CLN-02).",
+        "operationId": "finalise_encounter_api_encounters__id__finalise_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "title": "Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EncounterRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Finalise Encounter",
+        "tags": [
+          "encounters"
         ]
       }
     },
@@ -2394,6 +3623,53 @@
         "summary": "Upload Patient Photo",
         "tags": [
           "patients"
+        ]
+      }
+    },
+    "/api/patients/{patient_id}/encounters": {
+      "get": {
+        "description": "List historical encounters for a patient scoped to the authenticated doctor (D-03).",
+        "operationId": "list_patient_encounters_api_patients__patient_id__encounters_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "patient_id",
+            "required": true,
+            "schema": {
+              "title": "Patient Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/EncounterSummary"
+                  },
+                  "title": "Response List Patient Encounters Api Patients  Patient Id  Encounters Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Patient Encounters",
+        "tags": [
+          "encounters"
         ]
       }
     },

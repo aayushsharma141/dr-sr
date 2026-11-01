@@ -99,4 +99,3 @@ def test_patient_multimodal_search(
 
     # 6. Detail retrieval for non-existent id
     assert rec_c.get("/api/patients/999999").status_code == 404
-

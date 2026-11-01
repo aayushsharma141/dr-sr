@@ -268,9 +268,7 @@ def get_me(
 ) -> MeResponse:
     """Return profile, active permissions, and CSRF token for the authenticated caller."""
     user = session.scalar(select(User).where(User.id == principal.user_id))
-    auth_sess = session.scalar(
-        select(AuthSession).where(AuthSession.id == principal.session_id)
-    )
+    auth_sess = session.scalar(select(AuthSession).where(AuthSession.id == principal.session_id))
     csrf_token = auth_sess.csrf_token if auth_sess else ""
     full_name = user.full_name if user else principal.username
     version_id = user.version_id if user else 1
@@ -387,9 +385,7 @@ def change_password(
                 "USER",
                 str(user.id),
                 after={
-                    "locked_until": (
-                        locked_until.isoformat() if locked_until else None
-                    ),
+                    "locked_until": (locked_until.isoformat() if locked_until else None),
                     "failed_login_count": failed_count,
                 },
                 outcome=Outcome.FAILURE,

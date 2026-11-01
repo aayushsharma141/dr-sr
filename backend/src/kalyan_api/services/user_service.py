@@ -63,9 +63,7 @@ def create_user(
     """Create a new user account with temporary or explicit password and audit record."""
     # Pre-check case-insensitive username collision
     normalized_username = payload.username.lower()
-    existing = session.scalar(
-        select(User).where(func.lower(User.username) == normalized_username)
-    )
+    existing = session.scalar(select(User).where(func.lower(User.username) == normalized_username))
     if existing is not None:
         raise ApiError(
             status_code=409,
@@ -75,16 +73,12 @@ def create_user(
 
     if explicit_password is not None:
         password_to_use = explicit_password
-        must_change = (
-            must_change_password if must_change_password is not None else False
-        )
+        must_change = must_change_password if must_change_password is not None else False
     else:
         password_to_use = generate_temp_password(
             settings, username=payload.username, full_name=payload.full_name
         )
-        must_change = (
-            must_change_password if must_change_password is not None else True
-        )
+        must_change = must_change_password if must_change_password is not None else True
 
     hasher = build_hasher(settings)
     pw_hash = hash_password(hasher, password_to_use)
@@ -99,9 +93,7 @@ def create_user(
         session.flush()
         doctor_id = doctor_stub.id
 
-    role_val = (
-        payload.role.value if hasattr(payload.role, "value") else str(payload.role)
-    )
+    role_val = payload.role.value if hasattr(payload.role, "value") else str(payload.role)
     user = User(
         username=normalized_username,
         full_name=payload.full_name,
@@ -344,9 +336,7 @@ def reset_password(
             message="Administrators cannot reset their own password via admin API",
         )
 
-    temp_pwd = generate_temp_password(
-        settings, username=user.username, full_name=user.full_name
-    )
+    temp_pwd = generate_temp_password(settings, username=user.username, full_name=user.full_name)
     hasher = build_hasher(settings)
     user.password_hash = hash_password(hasher, temp_pwd)
     user.must_change_password = True

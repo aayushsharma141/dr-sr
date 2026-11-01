@@ -1,6 +1,5 @@
 """Appointment workflow state machine and validation service (APT-02)."""
 
-
 from kalyan_api.core.errors import ApiError
 from kalyan_api.core.permissions import Role
 from kalyan_api.core.principal import Principal
@@ -71,9 +70,7 @@ def validate_status_transition(
             raise ApiError(
                 status_code=403,
                 code="doctor_status_forbidden",
-                message=(
-                    f"Transitioning to '{target_status.value}' is restricted to doctors."
-                ),
+                message=(f"Transitioning to '{target_status.value}' is restricted to doctors."),
             )
         # Furthermore, doctor can only transition their own appointments
         if principal.doctor_id != appt.doctor_id:

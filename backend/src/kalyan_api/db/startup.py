@@ -106,11 +106,7 @@ def check_durability(engine: Engine, strict: bool = False) -> dict[str, str]:
         "full_page_writes": full_page,
     }
 
-    is_compliant = (
-        sync_commit in ("on", "remote_apply")
-        and fsync == "on"
-        and full_page == "on"
-    )
+    is_compliant = sync_commit in ("on", "remote_apply") and fsync == "on" and full_page == "on"
 
     if not is_compliant:
         msg = (

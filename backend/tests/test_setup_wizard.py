@@ -73,9 +73,7 @@ def test_valid_code_creates_exactly_one_admin(
     assert setup_row.admin_user_id == created_id
 
     # Exactly one ADMIN_BOOTSTRAPPED audit row
-    audit_row = db_session.scalar(
-        select(AuditLog).where(AuditLog.action == "ADMIN_BOOTSTRAPPED")
-    )
+    audit_row = db_session.scalar(select(AuditLog).where(AuditLog.action == "ADMIN_BOOTSTRAPPED"))
     assert audit_row is not None
     assert audit_row.actor_username == "setup:wizard"
     assert audit_row.actor_role == "SYSTEM"
@@ -220,9 +218,7 @@ def test_setup_closed_after_completion(
 ) -> None:
     """Once system_setup row exists, status and admin reject with 410 for all roles and codes."""
     # Complete setup in the transaction
-    db_session.add(
-        SystemSetup(id=1, completed_at=datetime.now(UTC), admin_user_id=admin_user.id)
-    )
+    db_session.add(SystemSetup(id=1, completed_at=datetime.now(UTC), admin_user_id=admin_user.id))
     db_session.flush()
 
     # Anonymous GET /api/setup/status -> 410
@@ -283,9 +279,7 @@ def test_setup_not_reopened_by_deactivation(
     admin_user: User,
 ) -> None:
     """Deactivating all administrators does NOT reopen setup; 410 is permanent."""
-    db_session.add(
-        SystemSetup(id=1, completed_at=datetime.now(UTC), admin_user_id=admin_user.id)
-    )
+    db_session.add(SystemSetup(id=1, completed_at=datetime.now(UTC), admin_user_id=admin_user.id))
     db_session.execute(text("UPDATE users SET is_active = false WHERE role = 'ADMIN'"))
     db_session.flush()
 

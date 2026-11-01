@@ -61,9 +61,7 @@ def test_audit_record_writes_inside_caller_transaction(db_session: Session) -> N
     assert entry.occurred_at is not None
 
     # Query back using the same session
-    fetched = db_session.scalar(
-        select(AuditLog).where(AuditLog.id == entry.id)
-    )
+    fetched = db_session.scalar(select(AuditLog).where(AuditLog.id == entry.id))
     assert fetched is not None
     assert fetched.actor_username == "test_actor"
     assert fetched.action == "AUTH_LOGIN_SUCCEEDED"
@@ -96,9 +94,7 @@ def test_audit_row_disappears_on_rollback(app_engine) -> None:
     # Query from a fresh connection: the row must not exist
     with app_engine.connect() as check_conn:
         with Session(bind=check_conn) as check_session:
-            found = check_session.scalar(
-                select(AuditLog).where(AuditLog.id == entry_id)
-            )
+            found = check_session.scalar(select(AuditLog).where(AuditLog.id == entry_id))
             assert found is None
 
 
@@ -106,9 +102,7 @@ def test_audit_row_disappears_on_rollback(app_engine) -> None:
     "forbidden_key",
     ["password", "password_hash", "new_password", "current_password", "token", "csrf_token"],
 )
-def test_redaction_guard_raises_on_sensitive_keys(
-    db_session: Session, forbidden_key: str
-) -> None:
+def test_redaction_guard_raises_on_sensitive_keys(db_session: Session, forbidden_key: str) -> None:
     """Payload with sensitive credentials raises AuditPayloadError and writes nothing."""
     ctx = AuditContext.system("security_guard")
 
@@ -190,6 +184,7 @@ def test_diff_utility() -> None:
 
 def test_snapshot_utility() -> None:
     """snapshot captures only requested attributes from an object."""
+
     class DummyUser:
         id = 10
         username = "dr_anil"

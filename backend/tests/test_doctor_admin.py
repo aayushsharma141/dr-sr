@@ -88,8 +88,7 @@ def test_doctor_creation_and_listing_rbac(
 
     # Verify audit event DOCTOR_CREATED
     audit = db_session.scalar(
-        select(AuditLog)
-        .where(
+        select(AuditLog).where(
             AuditLog.action == "DOCTOR_CREATED",
             AuditLog.entity_id == str(created_doc["id"]),
         )
@@ -182,8 +181,7 @@ def test_doctor_update_and_optimistic_concurrency(
 
     # Verify audit event DOCTOR_UPDATED
     audit = db_session.scalar(
-        select(AuditLog)
-        .where(
+        select(AuditLog).where(
             AuditLog.action == "DOCTOR_UPDATED",
             AuditLog.entity_id == str(doc_id),
         )
@@ -219,8 +217,7 @@ def test_consultation_fees_crud_and_rbac(
 
     # Verify audit event FEE_CREATED
     audit_created = db_session.scalar(
-        select(AuditLog)
-        .where(
+        select(AuditLog).where(
             AuditLog.action == "FEE_CREATED",
             AuditLog.entity_id == str(fee_id),
         )
@@ -247,8 +244,7 @@ def test_consultation_fees_crud_and_rbac(
 
     # Verify audit event FEE_UPDATED
     audit_updated = db_session.scalar(
-        select(AuditLog)
-        .where(
+        select(AuditLog).where(
             AuditLog.action == "FEE_UPDATED",
             AuditLog.entity_id == str(fee_id),
         )

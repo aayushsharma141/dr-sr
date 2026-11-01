@@ -181,11 +181,7 @@ def build_audit_context(request: Request, principal: Principal | None = None) ->
     user_agent = request.headers.get("User-Agent")
 
     if principal:
-        role_val = (
-            principal.role.value
-            if hasattr(principal.role, "value")
-            else str(principal.role)
-        )
+        role_val = principal.role.value if hasattr(principal.role, "value") else str(principal.role)
         return AuditContext(
             actor_user_id=principal.user_id,
             actor_username=principal.username,

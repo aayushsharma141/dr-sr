@@ -22,9 +22,7 @@ from kalyan_api.core.principal import Principal
 from kalyan_api.core.scope import SCOPED_MODELS, ScopeFamily, get_scoped_or_404, row_scope
 
 
-def _make_test_principal(
-    role: Any, doctor_id: int | None = None, user_id: int = 1
-) -> Principal:
+def _make_test_principal(role: Any, doctor_id: int | None = None, user_id: int = 1) -> Principal:
     """Helper to construct lightweight Principal instances for scope testing."""
     return Principal(
         user_id=user_id,
@@ -58,9 +56,7 @@ def scoped_test_bed(db_session: Session) -> ScopedSpec:
     return spec
 
 
-def test_clinical_scope_doctor_isolation(
-    db_session: Session, scoped_test_bed: ScopedSpec
-) -> None:
+def test_clinical_scope_doctor_isolation(db_session: Session, scoped_test_bed: ScopedSpec) -> None:
     """D-03: Doctor selects only their own clinical records; NULL rows invisible to all."""
     spec = scoped_test_bed
     p_doc_a = _make_test_principal(Role.DOCTOR, doctor_id=101)
@@ -68,16 +64,20 @@ def test_clinical_scope_doctor_isolation(
 
     # Doctor A query
     filter_a = row_scope(p_doc_a, ScopeFamily.CLINICAL, spec.doctor_id_col)
-    rows_a = db_session.execute(
-        select(spec.table.c.id).where(filter_a).order_by(spec.id_col)
-    ).scalars().all()
+    rows_a = (
+        db_session.execute(select(spec.table.c.id).where(filter_a).order_by(spec.id_col))
+        .scalars()
+        .all()
+    )
     assert rows_a == [1]
 
     # Doctor B query
     filter_b = row_scope(p_doc_b, ScopeFamily.CLINICAL, spec.doctor_id_col)
-    rows_b = db_session.execute(
-        select(spec.table.c.id).where(filter_b).order_by(spec.id_col)
-    ).scalars().all()
+    rows_b = (
+        db_session.execute(select(spec.table.c.id).where(filter_b).order_by(spec.id_col))
+        .scalars()
+        .all()
+    )
     assert rows_b == [2]
 
 
@@ -97,9 +97,7 @@ def test_clinical_scope_default_deny_for_non_doctors(
         assert result == [], f"Expected 0 clinical rows for principal {p}, got {result}"
 
 
-def test_demographic_scope_rules(
-    db_session: Session, scoped_test_bed: ScopedSpec
-) -> None:
+def test_demographic_scope_rules(db_session: Session, scoped_test_bed: ScopedSpec) -> None:
     """Demographic: Reception and Admin see all rows; Doctor sees only own."""
     spec = scoped_test_bed
     p_admin = _make_test_principal(Role.ADMIN)
@@ -110,29 +108,29 @@ def test_demographic_scope_rules(
     # Admin and Reception see all 3 rows
     for p in (p_admin, p_reception):
         flt = row_scope(p, ScopeFamily.DEMOGRAPHIC, spec.doctor_id_col)
-        rows = db_session.execute(
-            select(spec.table.c.id).where(flt).order_by(spec.id_col)
-        ).scalars().all()
+        rows = (
+            db_session.execute(select(spec.table.c.id).where(flt).order_by(spec.id_col))
+            .scalars()
+            .all()
+        )
         assert rows == [1, 2, 3]
 
     # Doctor A sees only own
     flt_a = row_scope(p_doc_a, ScopeFamily.DEMOGRAPHIC, spec.doctor_id_col)
-    rows_a = db_session.execute(
-        select(spec.table.c.id).where(flt_a).order_by(spec.id_col)
-    ).scalars().all()
+    rows_a = (
+        db_session.execute(select(spec.table.c.id).where(flt_a).order_by(spec.id_col))
+        .scalars()
+        .all()
+    )
     assert rows_a == [1]
 
     # Doctor without doctor_id sees 0
     flt_none = row_scope(p_doc_none, ScopeFamily.DEMOGRAPHIC, spec.doctor_id_col)
-    rows_none = db_session.execute(
-        select(spec.table.c.id).where(flt_none)
-    ).scalars().all()
+    rows_none = db_session.execute(select(spec.table.c.id).where(flt_none)).scalars().all()
     assert rows_none == []
 
 
-def test_financial_scope_rules(
-    db_session: Session, scoped_test_bed: ScopedSpec
-) -> None:
+def test_financial_scope_rules(db_session: Session, scoped_test_bed: ScopedSpec) -> None:
     """Financial: Reception and Admin see all rows; Doctors see none."""
     spec = scoped_test_bed
     p_admin = _make_test_principal(Role.ADMIN)
@@ -141,15 +139,15 @@ def test_financial_scope_rules(
 
     for p in (p_admin, p_reception):
         flt = row_scope(p, ScopeFamily.FINANCIAL, spec.doctor_id_col)
-        rows = db_session.execute(
-            select(spec.table.c.id).where(flt).order_by(spec.id_col)
-        ).scalars().all()
+        rows = (
+            db_session.execute(select(spec.table.c.id).where(flt).order_by(spec.id_col))
+            .scalars()
+            .all()
+        )
         assert rows == [1, 2, 3]
 
     flt_doc = row_scope(p_doc_a, ScopeFamily.FINANCIAL, spec.doctor_id_col)
-    rows_doc = db_session.execute(
-        select(spec.table.c.id).where(flt_doc)
-    ).scalars().all()
+    rows_doc = db_session.execute(select(spec.table.c.id).where(flt_doc)).scalars().all()
     assert rows_doc == []
 
 
@@ -231,9 +229,11 @@ def test_all_scope_family_and_role_combinations(
     principal = _make_test_principal(role, doctor_id=doc_id)
 
     filter_expr = row_scope(principal, family, spec.doctor_id_col)
-    matched_ids = db_session.execute(
-        select(spec.table.c.id).where(filter_expr).order_by(spec.id_col)
-    ).scalars().all()
+    matched_ids = (
+        db_session.execute(select(spec.table.c.id).where(filter_expr).order_by(spec.id_col))
+        .scalars()
+        .all()
+    )
 
     assert matched_ids == expected_match_ids
 

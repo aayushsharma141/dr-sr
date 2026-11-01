@@ -78,4 +78,3 @@ class FeeUpdate(BaseModel):
     name: str = Field(min_length=2, max_length=120)
     fee_paise: int = Field(ge=0)
     is_active: bool = True
-

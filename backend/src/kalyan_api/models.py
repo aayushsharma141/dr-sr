@@ -412,7 +412,7 @@ class Appointment(Base):
         Index("ix_appointments_patient_date", "patient_id", "appointment_date"),
     )
 
-    id: Mapped[int] = mapped_column(BigInteger, Identity(always=False), primary_key=True)
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
     patient_id: Mapped[int] = mapped_column(
         BigInteger, ForeignKey("patients.id", ondelete="RESTRICT"), nullable=False, index=True
     )
@@ -426,7 +426,6 @@ class Appointment(Base):
         default=AppointmentStatus.BOOKED.value,
         server_default=text(f"'{AppointmentStatus.BOOKED.value}'"),
         nullable=False,
-        index=True,
     )
     status_updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
@@ -462,11 +461,12 @@ class ClinicalEncounter(Base):
         Index("ix_encounters_patient_id", "patient_id"),
         Index("ix_encounters_doctor_id", "doctor_id"),
         Index("ix_encounters_encounter_date", "encounter_date"),
+        Index("ix_encounters_appointment_id", "appointment_id"),
     )
 
-    id: Mapped[int] = mapped_column(BigInteger, Identity(always=False), primary_key=True)
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
     appointment_id: Mapped[int | None] = mapped_column(
-        BigInteger, ForeignKey("appointments.id", ondelete="SET NULL"), nullable=True, index=True
+        BigInteger, ForeignKey("appointments.id", ondelete="SET NULL"), nullable=True
     )
     patient_id: Mapped[int] = mapped_column(
         BigInteger, ForeignKey("patients.id", ondelete="RESTRICT"), nullable=False
@@ -517,7 +517,7 @@ class ClinicalAddendum(Base):
     __tablename__ = "clinical_addenda"
     __table_args__ = (Index("ix_clinical_addenda_encounter_id", "encounter_id"),)
 
-    id: Mapped[int] = mapped_column(BigInteger, Identity(always=False), primary_key=True)
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
     encounter_id: Mapped[int] = mapped_column(
         BigInteger, ForeignKey("clinical_encounters.id", ondelete="RESTRICT"), nullable=False
     )

@@ -32,9 +32,7 @@ def test_login_happy_path_sets_cookie_and_returns_me_response(
     assert data["version_id"] == admin_user.version_id
 
 
-def test_session_cookie_attributes_for_plain_http_lan(
-    client: TestClient, admin_user: User
-) -> None:
+def test_session_cookie_attributes_for_plain_http_lan(client: TestClient, admin_user: User) -> None:
     """Set-Cookie has HttpOnly, SameSite=Strict, Path=/, and lacks Secure, Max-Age, Expires."""
     response = client.post(
         "/api/auth/login",
@@ -192,10 +190,12 @@ def test_login_auditing_and_token_omission(
     assert audit_row.actor_username == admin_user.username
 
     # Verify neither raw token nor plaintext password appears in audit row fields
-    serialized_audit = json.dumps({
-        "before": audit_row.before_data,
-        "after": audit_row.after_data,
-        "reason": audit_row.reason,
-    })
+    serialized_audit = json.dumps(
+        {
+            "before": audit_row.before_data,
+            "after": audit_row.after_data,
+            "reason": audit_row.reason,
+        }
+    )
     assert cookie_token not in serialized_audit
     assert TEST_PASSWORD not in serialized_audit

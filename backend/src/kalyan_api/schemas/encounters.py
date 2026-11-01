@@ -8,9 +8,7 @@ from pydantic import BaseModel, ConfigDict, Field
 class AddendumCreate(BaseModel):
     """Payload to add a dated addendum to a finalised encounter."""
 
-    addendum_text: str = Field(
-        ..., min_length=2, max_length=5000, description="Addendum text"
-    )
+    addendum_text: str = Field(..., min_length=2, max_length=5000, description="Addendum text")
 
 
 class AddendumRead(BaseModel):

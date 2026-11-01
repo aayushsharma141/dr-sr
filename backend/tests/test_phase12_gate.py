@@ -172,11 +172,15 @@ def test_phase12_full_lifecycle_gate(
     assert conflict_res.json()["code"] == "version_conflict"
 
     # 8. Audit logs verification
-    logs = db_session.execute(
-        select(AuditLog)
-        .where(AuditLog.entity_id.in_([str(patient_id), "1"]))
-        .order_by(AuditLog.id.asc())
-    ).scalars().all()
+    logs = (
+        db_session.execute(
+            select(AuditLog)
+            .where(AuditLog.entity_id.in_([str(patient_id), "1"]))
+            .order_by(AuditLog.id.asc())
+        )
+        .scalars()
+        .all()
+    )
 
     action_names = {log.action for log in logs}
     assert "SETTINGS_UPDATED" in action_names

@@ -85,9 +85,7 @@ def authenticate(
     hasher = security.build_hasher(settings)
     clean_username = username.strip().lower()
 
-    user = session.scalar(
-        select(User).where(User.username == clean_username)
-    )
+    user = session.scalar(select(User).where(User.username == clean_username))
 
     if user is None or not user.is_active:
         security.dummy_verify(hasher, password)
@@ -106,9 +104,7 @@ def authenticate(
     # Step 3: Check expired lock
     if user.locked_until is not None and user.locked_until <= now:
         session.execute(
-            update(User)
-            .where(User.id == user.id)
-            .values(failed_login_count=0, locked_until=None)
+            update(User).where(User.id == user.id).values(failed_login_count=0, locked_until=None)
         )
         user.failed_login_count = 0
         user.locked_until = None
@@ -173,9 +169,7 @@ def create_session(
 def resolve_session(session: Session, raw_token: str) -> AuthSession | None:
     """Retrieve session record matching raw token hash."""
     token_h = security.hash_token(raw_token)
-    return session.scalar(
-        select(AuthSession).where(AuthSession.token_hash == token_h)
-    )
+    return session.scalar(select(AuthSession).where(AuthSession.token_hash == token_h))
 
 
 def revoke_session(session: Session, session_id: int) -> None:
@@ -201,7 +195,5 @@ def revoke_all_user_sessions(session: Session, user_id: int) -> None:
 def purge_expired_sessions(session: Session, max_age_hours: int = 36) -> int:
     """Delete ancient sessions from database to maintain table size (granted to kalyan_app)."""
     cutoff = clock.utcnow() - timedelta(hours=max_age_hours)
-    result = session.execute(
-        delete(AuthSession).where(AuthSession.created_at < cutoff)
-    )
+    result = session.execute(delete(AuthSession).where(AuthSession.created_at < cutoff))
     return result.rowcount or 0

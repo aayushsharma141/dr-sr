@@ -141,6 +141,7 @@ def client(app: FastAPI) -> Generator[TestClient, None, None]:
 @pytest.fixture
 def make_client(app: FastAPI):
     """Factory fixture creating a TestClient with an explicit client peer IP address."""
+
     def _builder(client_ip: str | None = None) -> TestClient:
         client_tuple = (client_ip, 50000) if client_ip else None
         return TestClient(
@@ -257,6 +258,7 @@ def doctor_b_user(db_session: Session, test_settings: Settings) -> User:
 @pytest.fixture
 def login_client(app: FastAPI):
     """Factory fixture returning an authenticated TestClient for a given user."""
+
     def _create(user: User, password: str = TEST_PASSWORD) -> TestClient:
         c = TestClient(app, base_url="http://testserver", headers={"Origin": "http://testserver"})
         res = c.post("/api/auth/login", json={"username": user.username, "password": password})

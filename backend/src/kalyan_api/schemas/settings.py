@@ -46,4 +46,3 @@ class ClinicSettingsUpdate(BaseModel):
     print_footer_hi: str | None = Field(default=None, max_length=1000)
     consultation_validity_days: int = Field(ge=1, le=365)
     version_id: int = Field(ge=1)
-

@@ -113,8 +113,8 @@ def test_check_durability_invariant_enforcement(
     assert res["synchronous_commit"] == "off"
 
     # remote_apply is accepted as compliant under D-02
-    mock_conn.scalar.side_effect = (
-        lambda stmt: "remote_apply" if "synchronous_commit" in str(stmt) else "on"
+    mock_conn.scalar.side_effect = lambda stmt: (
+        "remote_apply" if "synchronous_commit" in str(stmt) else "on"
     )
     res_remote = check_durability(mock_engine, strict=True)
     assert res_remote["synchronous_commit"] == "remote_apply"
@@ -135,10 +135,9 @@ def test_cli_commands_migrate_and_check_db(
         assert exit_code_check == 0
         captured_check = capsys.readouterr()
         assert (
-            "synchronous_commit: on" in captured_check.out
-            or "remote_apply" in captured_check.out
+            "synchronous_commit: on" in captured_check.out or "remote_apply" in captured_check.out
         )
-        assert "0002" in captured_check.out
+        assert "0003" in captured_check.out
         assert "Database health check: OK" in captured_check.out
 
         # migrate runs idempotently

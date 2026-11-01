@@ -32,12 +32,8 @@ def upgrade() -> None:
             "id", sa.BigInteger(), sa.Identity(always=False), nullable=False, primary_key=True
         ),
         sa.Column("name_en", sa.String(length=120), nullable=False),
-        sa.Column(
-            "is_active", sa.Boolean(), server_default=sa.text("true"), nullable=False
-        ),
-        sa.Column(
-            "version_id", sa.Integer(), server_default=sa.text("1"), nullable=False
-        ),
+        sa.Column("is_active", sa.Boolean(), server_default=sa.text("true"), nullable=False),
+        sa.Column("version_id", sa.Integer(), server_default=sa.text("1"), nullable=False),
         sa.Column(
             "created_at",
             sa.DateTime(timezone=True),
@@ -70,9 +66,7 @@ def upgrade() -> None:
             server_default=sa.text("true"),
             nullable=False,
         ),
-        sa.Column(
-            "is_active", sa.Boolean(), server_default=sa.text("true"), nullable=False
-        ),
+        sa.Column("is_active", sa.Boolean(), server_default=sa.text("true"), nullable=False),
         sa.Column(
             "failed_login_count",
             sa.Integer(),
@@ -95,9 +89,7 @@ def upgrade() -> None:
             server_default=sa.func.now(),
             nullable=False,
         ),
-        sa.Column(
-            "version_id", sa.Integer(), server_default=sa.text("1"), nullable=False
-        ),
+        sa.Column("version_id", sa.Integer(), server_default=sa.text("1"), nullable=False),
         sa.PrimaryKeyConstraint("id", name="pk_users"),
         sa.ForeignKeyConstraint(
             ["doctor_id"],
@@ -162,9 +154,7 @@ def upgrade() -> None:
         "login_throttle",
         sa.Column("ip", INET(), nullable=False),
         sa.Column("window_start", sa.DateTime(timezone=True), nullable=False),
-        sa.Column(
-            "attempt_count", sa.Integer(), server_default=sa.text("1"), nullable=False
-        ),
+        sa.Column("attempt_count", sa.Integer(), server_default=sa.text("1"), nullable=False),
         sa.PrimaryKeyConstraint("ip", name="pk_login_throttle"),
     )
 

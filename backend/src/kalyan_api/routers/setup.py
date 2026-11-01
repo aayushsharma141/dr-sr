@@ -165,9 +165,7 @@ def setup_first_admin(
 
     # 6. Validate proposed admin password against NIST complexity policy
     try:
-        validate_password_policy(
-            payload.password, payload.username, payload.full_name, settings
-        )
+        validate_password_policy(payload.password, payload.username, payload.full_name, settings)
     except PasswordPolicyError as err:
         return JSONResponse(
             status_code=422,

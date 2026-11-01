@@ -163,10 +163,7 @@ def test_assets_caching_and_missing_assets(
         # Existing asset
         resp_asset = client.get("/assets/app-abc123.js")
         assert resp_asset.status_code == 200
-        assert (
-            resp_asset.headers.get("Cache-Control")
-            == "public, max-age=31536000, immutable"
-        )
+        assert resp_asset.headers.get("Cache-Control") == "public, max-age=31536000, immutable"
         assert "console.log" in resp_asset.text
 
         # Missing asset
@@ -201,10 +198,7 @@ def test_head_requests_work(
         # HEAD /assets/app-abc123.js
         head_asset = client.head("/assets/app-abc123.js")
         assert head_asset.status_code == 200
-        assert (
-            head_asset.headers.get("Cache-Control")
-            == "public, max-age=31536000, immutable"
-        )
+        assert head_asset.headers.get("Cache-Control") == "public, max-age=31536000, immutable"
         assert head_asset.text == ""
 
 
@@ -241,9 +235,9 @@ def test_path_traversal_probes_never_leak_external_files(
     with _make_client(app) as client:
         for probe in probes:
             resp = client.get(probe)
-            assert (
-                SECRET_CONTENT not in resp.text
-            ), f"CRITICAL LEAK: Probe '{probe}' exposed secret file content!"
+            assert SECRET_CONTENT not in resp.text, (
+                f"CRITICAL LEAK: Probe '{probe}' exposed secret file content!"
+            )
 
 
 def test_settings_rejects_relative_frontend_dist() -> None:
@@ -303,9 +297,7 @@ def test_real_build_served(test_settings: Settings) -> None:
         pytest.skip("KALYAN_FRONTEND_DIST environment variable not set")
 
     dist_path = Path(dist_env).resolve()
-    assert (
-        dist_path / "index.html"
-    ).is_file(), f"Real index.html not found in {dist_path}"
+    assert (dist_path / "index.html").is_file(), f"Real index.html not found in {dist_path}"
 
     settings = Settings(
         env="test",
@@ -348,6 +340,6 @@ def test_real_build_served(test_settings: Settings) -> None:
                     if domain not in allowed_domains:
                         violating_urls.append(f"{file_path.name}: {url}")
 
-    assert (
-        not violating_urls
-    ), f"External host references found in production frontend bundle: {violating_urls}"
+    assert not violating_urls, (
+        f"External host references found in production frontend bundle: {violating_urls}"
+    )

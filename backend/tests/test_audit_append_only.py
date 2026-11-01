@@ -17,6 +17,7 @@ from sqlalchemy.exc import DBAPIError, IntegrityError, ProgrammingError
 # 1. Least-Privilege Role Grants (kalyan_app runtime user)
 # ==============================================================================
 
+
 def test_kalyan_app_cannot_update_audit_logs(app_engine: Engine) -> None:
     """kalyan_app lacks UPDATE privilege on audit_logs."""
     with app_engine.connect() as conn:
@@ -79,6 +80,7 @@ def test_kalyan_app_cannot_mutate_system_setup(app_engine: Engine) -> None:
 # ==============================================================================
 # 2. Append-Only Database Triggers (kalyan_owner migration user)
 # ==============================================================================
+
 
 @pytest.mark.db_owner
 def test_kalyan_owner_cannot_update_audit_logs(owner_engine: Engine) -> None:
@@ -199,6 +201,7 @@ def test_kalyan_owner_cannot_truncate_system_setup(owner_engine: Engine) -> None
 # ==============================================================================
 # 3. Model Constraints (system_setup singleton & users role constraints)
 # ==============================================================================
+
 
 def test_system_setup_enforces_single_row_id_1(app_engine: Engine) -> None:
     """system_setup table only permits id = 1 and rejects second row (SEC-07)."""

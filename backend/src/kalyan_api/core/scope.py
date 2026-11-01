@@ -44,9 +44,7 @@ def row_scope(
     if principal is None:
         return false()
 
-    role_str = (
-        principal.role.value if hasattr(principal.role, "value") else str(principal.role)
-    )
+    role_str = principal.role.value if hasattr(principal.role, "value") else str(principal.role)
 
     if family == ScopeFamily.CLINICAL:
         # D-03 & D-04: Clinical rows visible only to the owning doctor with valid doctor_id

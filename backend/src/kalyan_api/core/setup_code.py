@@ -88,9 +88,7 @@ def consume_setup_code(app: FastAPI, path: Path | None = None) -> None:
     """Atomically consume the setup code, clearing hash from memory and deleting file."""
     app.state.setup_code_hash = None
     target_path = (
-        path
-        or getattr(app.state, "setup_code_path", None)
-        or get_default_setup_code_path()
+        path or getattr(app.state, "setup_code_path", None) or get_default_setup_code_path()
     )
     try:
         if target_path and target_path.exists():
@@ -118,9 +116,7 @@ def register_setup_failure(
     Returns:
         (current_ip_failures, is_ip_locked, should_rotate_code)
     """
-    failures_by_ip: dict[str, tuple[int, datetime]] = getattr(
-        app.state, "setup_failures_by_ip", {}
-    )
+    failures_by_ip: dict[str, tuple[int, datetime]] = getattr(app.state, "setup_failures_by_ip", {})
     count, window_start = failures_by_ip.get(ip, (0, now))
 
     if (now - window_start) > timedelta(minutes=SETUP_LOCK_MINUTES):
@@ -146,9 +142,7 @@ def is_address_locked(app: FastAPI, ip: str, now: datetime) -> tuple[bool, int]:
     Returns:
         (is_locked, retry_after_seconds)
     """
-    failures_by_ip: dict[str, tuple[int, datetime]] = getattr(
-        app.state, "setup_failures_by_ip", {}
-    )
+    failures_by_ip: dict[str, tuple[int, datetime]] = getattr(app.state, "setup_failures_by_ip", {})
     if ip not in failures_by_ip:
         return False, 0
 

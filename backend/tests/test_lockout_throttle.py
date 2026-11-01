@@ -407,6 +407,7 @@ def test_concurrent_failed_logins_atomic_increment(
         target_user_id = user.id
 
     try:
+
         def _worker() -> tuple[int, Any]:
             with Session(app_engine) as sess:
                 with sess.begin():

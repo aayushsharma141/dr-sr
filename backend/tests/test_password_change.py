@@ -294,9 +294,7 @@ def test_audit_never_contains_plain_passwords(
     )
 
     # Inspect all audit records for this user
-    audits = db_session.scalars(
-        select(AuditLog).where(AuditLog.entity_id == str(user.id))
-    ).all()
+    audits = db_session.scalars(select(AuditLog).where(AuditLog.entity_id == str(user.id))).all()
 
     for a in audits:
         raw_text = f"{a.before_data} {a.after_data} {a.reason}"

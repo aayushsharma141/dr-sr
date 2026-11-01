@@ -9,9 +9,7 @@ Guarantees:
 from kalyan_api.models import Patient
 
 
-def test_clinical_encounter_lifecycle_and_immutability(
-    login_client, doctor_a_user, db_session
-):
+def test_clinical_encounter_lifecycle_and_immutability(login_client, doctor_a_user, db_session):
     """Doctor drafts encounter, updates it, finalises it, and appends an addendum."""
     # 1. Setup Patient
     patient = Patient(
@@ -108,9 +106,7 @@ def test_clinical_encounter_lifecycle_and_immutability(
     assert "Follow-up phone consultation" in full_data["addenda"][0]["addendum_text"]
 
 
-def test_reception_clinical_default_deny(
-    login_client, reception_user, doctor_a_user, db_session
-):
+def test_reception_clinical_default_deny(login_client, reception_user, doctor_a_user, db_session):
     """Reception role is default-denied from clinical encounters (D-04)."""
     patient = Patient(
         urn="KH-2026-6602",
@@ -162,9 +158,7 @@ def test_reception_clinical_default_deny(
     assert rec_hist.status_code == 403
 
 
-def test_doctor_silo_cross_isolation(
-    login_client, doctor_a_user, doctor_b_user, db_session
-):
+def test_doctor_silo_cross_isolation(login_client, doctor_a_user, doctor_b_user, db_session):
     """Doctor B cannot read or modify Doctor A's encounter notes (D-03)."""
     patient = Patient(
         urn="KH-2026-6603",

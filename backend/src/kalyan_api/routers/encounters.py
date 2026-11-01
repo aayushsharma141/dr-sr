@@ -43,6 +43,7 @@ router = APIRouter(tags=["encounters"])
 
 def _to_read_schema(enc: ClinicalEncounter) -> EncounterRead:
     """Format ClinicalEncounter to read schema including addenda."""
+    sorted_addenda = sorted(enc.addenda, key=lambda a: (a.created_at, a.id))
     addenda_list = [
         AddendumRead(
             id=a.id,
@@ -52,7 +53,7 @@ def _to_read_schema(enc: ClinicalEncounter) -> EncounterRead:
             addendum_text=a.addendum_text,
             created_at=a.created_at,
         )
-        for a in enc.addenda
+        for a in sorted_addenda
     ]
 
     return EncounterRead(

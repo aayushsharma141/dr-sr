@@ -118,9 +118,7 @@ def upgrade() -> None:
         ),
         sa.Column("name", sa.String(length=120), nullable=False),
         sa.Column("fee_paise", sa.Integer(), nullable=False),
-        sa.Column(
-            "is_active", sa.Boolean(), server_default=sa.text("true"), nullable=False
-        ),
+        sa.Column("is_active", sa.Boolean(), server_default=sa.text("true"), nullable=False),
         sa.Column(
             "created_at",
             sa.DateTime(timezone=True),
@@ -141,9 +139,7 @@ def upgrade() -> None:
     op.create_table(
         "urn_sequences",
         sa.Column("year", sa.Integer(), primary_key=True, nullable=False),
-        sa.Column(
-            "last_seq", sa.Integer(), server_default=sa.text("0"), nullable=False
-        ),
+        sa.Column("last_seq", sa.Integer(), server_default=sa.text("0"), nullable=False),
         sa.PrimaryKeyConstraint("year", name="pk_urn_sequences"),
     )
 
@@ -182,12 +178,8 @@ def upgrade() -> None:
         ),
         sa.Column("notes", sa.Text(), nullable=True),
         sa.Column("photo_path", sa.String(length=255), nullable=True),
-        sa.Column(
-            "is_active", sa.Boolean(), server_default=sa.text("true"), nullable=False
-        ),
-        sa.Column(
-            "version_id", sa.Integer(), server_default=sa.text("1"), nullable=False
-        ),
+        sa.Column("is_active", sa.Boolean(), server_default=sa.text("true"), nullable=False),
+        sa.Column("version_id", sa.Integer(), server_default=sa.text("1"), nullable=False),
         sa.Column(
             "created_at",
             sa.DateTime(timezone=True),
@@ -203,9 +195,7 @@ def upgrade() -> None:
         sa.PrimaryKeyConstraint("id", name="pk_patients"),
         sa.UniqueConstraint("urn", name="uq_patients_urn"),
         sa.CheckConstraint("gender IN ('M', 'F', 'O')", name="ck_patients_gender_valid"),
-        sa.CheckConstraint(
-            "age_years >= 0 AND age_years <= 150", name="ck_patients_age_valid"
-        ),
+        sa.CheckConstraint("age_years >= 0 AND age_years <= 150", name="ck_patients_age_valid"),
     )
 
     op.create_index("ix_patients_urn", "patients", ["urn"])

@@ -74,9 +74,8 @@ def get_admin_overview(
     user = session.scalar(select(User).where(User.id == principal.user_id))
     caller_name = user.full_name if user else principal.username
 
-    counts_stmt = (
-        select(User.role, User.is_active, func.count(User.id))
-        .group_by(User.role, User.is_active)
+    counts_stmt = select(User.role, User.is_active, func.count(User.id)).group_by(
+        User.role, User.is_active
     )
     rows = session.execute(counts_stmt).all()
 

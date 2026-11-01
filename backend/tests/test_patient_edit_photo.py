@@ -153,4 +153,3 @@ def test_patient_photo_upload_and_streaming(
     assert "image/jpeg" in stream_resp.headers.get("content-type", "")
     assert "private" in stream_resp.headers.get("cache-control", "")
     assert stream_resp.content == valid_jpeg
-

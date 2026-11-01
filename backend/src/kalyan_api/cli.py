@@ -125,8 +125,7 @@ def cmd_reset_admin_password(
 
     if generate_password:
         new_pwd = "".join(
-            secrets.choice(SETUP_CODE_ALPHABET)
-            for _ in range(settings.temp_password_length)
+            secrets.choice(SETUP_CODE_ALPHABET) for _ in range(settings.temp_password_length)
         )
         must_change = True
     elif password_stdin:

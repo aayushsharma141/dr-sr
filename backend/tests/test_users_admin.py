@@ -667,4 +667,3 @@ def test_admin_unlock_lifecycle(
     )
     assert clean_unlock.status_code == 409
     assert clean_unlock.json()["code"] == "state_unchanged"
-

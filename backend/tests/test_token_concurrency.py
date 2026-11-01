@@ -74,8 +74,7 @@ def test_parallel_token_allocation_no_duplicates_or_gaps(
         # Clean up
         with owner_engine.connect() as conn:
             del_seq_sql = (
-                "DELETE FROM daily_token_sequences "
-                "WHERE doctor_id = :d AND appointment_date = :dt"
+                "DELETE FROM daily_token_sequences WHERE doctor_id = :d AND appointment_date = :dt"
             )
             conn.execute(text(del_seq_sql), {"d": doc_id, "dt": test_date})
             conn.execute(text("DELETE FROM doctors WHERE id = :d"), {"d": doc_id})

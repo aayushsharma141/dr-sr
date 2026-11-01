@@ -27,7 +27,16 @@ from support.matrix import (
 from kalyan_api.config import Settings
 from kalyan_api.core.permissions import Permission
 from kalyan_api.core.policy import require
-from kalyan_api.models import ClinicSettings, ConsultationFee, Doctor, Patient, SystemSetup
+from kalyan_api.models import (
+    Appointment,
+    ClinicalEncounter,
+    ClinicSettings,
+    ConsultationFee,
+    Doctor,
+    Patient,
+    SystemSetup,
+    User,
+)
 
 FORBIDDEN_SECRET_KEYS: tuple[str, ...] = (
     "password_hash",
@@ -97,7 +106,7 @@ def test_rbac_matrix_cell(
     identity: str,
 ) -> None:
     """Execute RBAC authorization test cell with an isolated client and verify response status."""
-    client, _ = build_isolated_client(
+    client, current_user = build_isolated_client(
         app, db_session, test_settings, login_client, identity, make_user
     )
 
@@ -106,9 +115,7 @@ def test_rbac_matrix_cell(
 
     if row.path.startswith("/api/setup"):
         # Setup matrix preconditions: system_setup completed row exists
-        existing_setup = db_session.scalar(
-            select(SystemSetup).where(SystemSetup.id == 1)
-        )
+        existing_setup = db_session.scalar(select(SystemSetup).where(SystemSetup.id == 1))
         if not existing_setup:
             setup_admin = make_user(
                 db_session, test_settings, "ADMIN", f"mat_adm_{uuid.uuid4().hex[:6]}"
@@ -126,7 +133,7 @@ def test_rbac_matrix_cell(
         target_entity = db_session.scalar(select(ClinicSettings).where(ClinicSettings.id == 1))
 
     elif row.path == "/api/patients/check-duplicate":
-        resolved_path = "/api/patients/check-duplicate?name=Test&mobile=9876543210" 
+        resolved_path = "/api/patients/check-duplicate?name=Test&mobile=9876543210"
 
     elif "/api/doctors/{id}" in row.path:
         doc = Doctor(name_en=f"Dr. Target {uuid.uuid4().hex[:6]}", default_fee_paise=30000)
@@ -166,6 +173,107 @@ def test_rbac_matrix_cell(
         target_entity = pat
         resolved_path = row.path.replace("{id}", str(pat.id))
 
+    elif "/api/appointments" in row.path:
+        # Resolve doctor_a to own the appointment
+        doc_a_user = db_session.scalar(select(User).where(User.username.like("mat_doc_a%")))
+        doc_a_id = doc_a_user.doctor_id if doc_a_user else None
+        if not doc_a_id:
+            doc = Doctor(name_en=f"Dr. Appt {uuid.uuid4().hex[:6]}", default_fee_paise=30000)
+            db_session.add(doc)
+            db_session.flush()
+            doc_a_id = doc.id
+
+        pat = Patient(
+            urn=f"KH-2026-{uuid.uuid4().hex[:4]}",
+            full_name="Matrix Patient",
+            guardian_name="Guardian",
+            gender="M",
+            age_years=30,
+            mobile="9876543210",
+            address="Ara",
+            district="Bhojpur",
+            state="Bihar",
+        )
+        db_session.add(pat)
+        db_session.flush()
+        if "{id}" in row.path:
+            admin_u = make_user(db_session, test_settings, "ADMIN", f"adm_{uuid.uuid4().hex[:6]}")
+            appt = Appointment(
+                patient_id=pat.id,
+                doctor_id=doc_a_id,
+                appointment_date=datetime.now(UTC).date(),
+                token_number=1,
+                status="BOOKED",
+                created_by_user_id=admin_u.id,
+            )
+            db_session.add(appt)
+            db_session.flush()
+            target_entity = appt
+            resolved_path = row.path.replace("{id}", str(appt.id))
+        else:
+            target_entity = type("TargetAppt", (), {"patient_id": pat.id, "doctor_id": doc_a_id})()
+
+    elif "/api/patients/{patient_id}/encounters" in row.path:
+        pat = Patient(
+            urn=f"KH-2026-{uuid.uuid4().hex[:4]}",
+            full_name="Matrix Patient",
+            guardian_name="Guardian",
+            gender="M",
+            age_years=30,
+            mobile="9876543210",
+            address="Ara",
+            district="Bhojpur",
+            state="Bihar",
+        )
+        db_session.add(pat)
+        db_session.flush()
+        target_entity = pat
+        resolved_path = row.path.replace("{patient_id}", str(pat.id))
+
+    elif "/api/encounters" in row.path:
+        # Encounters are owned by doctor_a to test cross-doctor silo (doctor_b receives 404)
+        doc_a_user = db_session.scalar(select(User).where(User.username.like("mat_doc_a%")))
+        doc_a_id = doc_a_user.doctor_id if doc_a_user else None
+        if not doc_a_id:
+            doc = Doctor(name_en=f"Dr. Enc {uuid.uuid4().hex[:6]}")
+            db_session.add(doc)
+            db_session.flush()
+            doc_a_id = doc.id
+
+        pat = Patient(
+            urn=f"KH-2026-{uuid.uuid4().hex[:4]}",
+            full_name="Matrix Patient",
+            guardian_name="Guardian",
+            gender="M",
+            age_years=30,
+            mobile="9876543210",
+            address="Ara",
+            district="Bhojpur",
+            state="Bihar",
+        )
+        db_session.add(pat)
+        db_session.flush()
+
+        if "{id}" in row.path:
+            admin_u = make_user(db_session, test_settings, "ADMIN", f"adm_{uuid.uuid4().hex[:6]}")
+            is_fin = "addenda" in row.path
+            enc = ClinicalEncounter(
+                patient_id=pat.id,
+                doctor_id=doc_a_id,
+                symptoms="Back pain",
+                clinical_notes="Notes",
+                diagnosis="Diagnosis",
+                is_finalised=is_fin,
+                finalised_at=datetime.now(UTC) if is_fin else None,
+                created_by_user_id=admin_u.id,
+            )
+            db_session.add(enc)
+            db_session.flush()
+            target_entity = enc
+            resolved_path = row.path.replace("{id}", str(enc.id))
+        else:
+            target_entity = type("TargetEnc", (), {"patient_id": pat.id, "appointment_id": None})()
+
     elif "{id}" in row.path:
         is_active = "reactivate" not in row.path
         target_user = make_user(
@@ -177,6 +285,7 @@ def test_rbac_matrix_cell(
         )
         if "unlock" in row.path:
             from datetime import timedelta
+
             target_user.locked_until = datetime.now(UTC) + timedelta(minutes=15)
             target_user.failed_login_count = 5
             db_session.flush()

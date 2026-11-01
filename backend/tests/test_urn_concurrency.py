@@ -39,6 +39,7 @@ def test_parallel_urn_allocation_no_duplicates_or_gaps(
     )
 
     try:
+
         def _allocate_one() -> str:
             with Session(concurrent_engine) as session:
                 urn = allocate_next_urn(session, year=test_year)

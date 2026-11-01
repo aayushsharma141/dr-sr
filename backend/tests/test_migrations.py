@@ -13,7 +13,7 @@ def test_single_head(test_settings: Settings) -> None:
     cfg = alembic_config(test_settings.owner_url)
     script = ScriptDirectory.from_config(cfg)
     heads = script.get_heads()
-    assert heads == ["0002"]
+    assert heads == ["0003"]
 
 
 def test_migrations_match_models(migrated_db: dict[str, int], test_settings: Settings) -> None:

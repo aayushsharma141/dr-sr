@@ -128,10 +128,12 @@ def install_error_handlers(app: FastAPI) -> None:
         # Build fields array with loc and message ONLY; never echo input/passwords
         fields = []
         for err in exc.errors():
-            fields.append({
-                "loc": [str(x) for x in err.get("loc", [])],
-                "message": err.get("msg", "Invalid value"),
-            })
+            fields.append(
+                {
+                    "loc": [str(x) for x in err.get("loc", [])],
+                    "message": err.get("msg", "Invalid value"),
+                }
+            )
         return JSONResponse(
             status_code=422,
             content={
@@ -163,4 +165,3 @@ class RequestIdMiddleware(BaseHTTPMiddleware):
         response = await call_next(request)
         response.headers["X-Request-ID"] = req_id
         return response
-

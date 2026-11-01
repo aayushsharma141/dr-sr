@@ -62,7 +62,7 @@ class Settings(BaseSettings):
     setup_code_path: Path | None = None
 
     # Patient photos storage location (PAT-05)
-    photos_dir: Path = BACKEND_DIR / "var" / "photos" 
+    photos_dir: Path = BACKEND_DIR / "var" / "photos"
 
     model_config = SettingsConfigDict(
         env_prefix="KALYAN_",
@@ -146,4 +146,3 @@ class Settings(BaseSettings):
 def get_settings() -> Settings:
     """Return cached Settings instance."""
     return Settings()
-

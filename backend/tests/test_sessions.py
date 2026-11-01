@@ -80,9 +80,7 @@ def test_session_touch_throttling_and_passive_header(
     client = login_client(admin_user)
 
     # Retrieve initial session record
-    sess_row = db_session.scalar(
-        select(AuthSession).where(AuthSession.user_id == admin_user.id)
-    )
+    sess_row = db_session.scalar(select(AuthSession).where(AuthSession.user_id == admin_user.id))
     assert sess_row is not None
     initial_last_seen = sess_row.last_seen_at
 
@@ -127,16 +125,13 @@ def test_logout_revokes_session_deletes_cookie_and_audits(
     assert "max-age=0" in cookie_header.lower() or "expires=" in cookie_header.lower()
 
     # Session record marked revoked
-    sess_row = db_session.scalar(
-        select(AuthSession).where(AuthSession.user_id == admin_user.id)
-    )
+    sess_row = db_session.scalar(select(AuthSession).where(AuthSession.user_id == admin_user.id))
     assert sess_row is not None
     assert sess_row.revoked_at is not None
 
     # Audit log emitted
     audit_row = db_session.scalar(
-        select(AuditLog)
-        .where(
+        select(AuditLog).where(
             AuditLog.entity_type == "USER",
             AuditLog.entity_id == str(admin_user.id),
             AuditLog.action == "AUTH_LOGOUT",
@@ -181,9 +176,7 @@ def test_token_hash_stored_as_sha256_and_raw_token_never_persisted(
 
     expected_hash = hashlib.sha256(raw_cookie.encode("utf-8")).hexdigest()
 
-    sess_row = db_session.scalar(
-        select(AuthSession).where(AuthSession.user_id == admin_user.id)
-    )
+    sess_row = db_session.scalar(select(AuthSession).where(AuthSession.user_id == admin_user.id))
     assert sess_row is not None
     assert sess_row.token_hash == expected_hash
     assert sess_row.token_hash != raw_cookie
@@ -231,6 +224,7 @@ def test_fail_closed_login_rolls_back_session_creation(
     monkeypatch: MonkeyPatch,
 ) -> None:
     """If audit log write fails during login, request fails and no session row is persisted."""
+
     def _exploding_record(*args: Any, **kwargs: Any) -> None:
         raise RuntimeError("Audit storage failure injection")
 

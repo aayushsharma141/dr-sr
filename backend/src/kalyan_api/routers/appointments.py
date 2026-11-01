@@ -192,7 +192,7 @@ def get_appointment(
             message="Appointment not found.",
         )
 
-    # Role scope check for DOCTOR
+    # Role scope check for DOCTOR (D-04 doctor silo)
     if (
         principal.role == Role.DOCTOR
         and principal.doctor_id is not None
@@ -222,6 +222,18 @@ def update_appointment_status(
     """Transition appointment status with optimistic locking and validation (APT-02)."""
     appt = session.get(Appointment, id)
     if not appt:
+        raise ApiError(
+            status_code=404,
+            code="appointment_not_found",
+            message="Appointment not found.",
+        )
+
+    # Role scope check for DOCTOR (D-04 doctor silo)
+    if (
+        principal.role == Role.DOCTOR
+        and principal.doctor_id is not None
+        and appt.doctor_id != principal.doctor_id
+    ):
         raise ApiError(
             status_code=404,
             code="appointment_not_found",

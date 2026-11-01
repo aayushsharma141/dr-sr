@@ -69,12 +69,8 @@ def test_openapi_snapshot_matches() -> None:
     )
 
     # 3. Compare component schemas
-    current_schemas = set(
-        current_data.get("components", {}).get("schemas", {}).keys()
-    )
-    snapshot_schemas = set(
-        snapshot_data.get("components", {}).get("schemas", {}).keys()
-    )
+    current_schemas = set(current_data.get("components", {}).get("schemas", {}).keys())
+    snapshot_schemas = set(snapshot_data.get("components", {}).get("schemas", {}).keys())
 
     schemas_added = current_schemas - snapshot_schemas
     schemas_removed = snapshot_schemas - current_schemas

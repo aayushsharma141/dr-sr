@@ -7,16 +7,18 @@ from test_route_policies import _policies, walk_routes
 from kalyan_api.core.permissions import RESERVED, ROLE_PERMISSIONS, Permission, Role
 from kalyan_api.main import create_app
 
-CLINICAL_PERMISSIONS = frozenset({
-    Permission.ENCOUNTER_READ,
-    Permission.ENCOUNTER_WRITE,
-    Permission.PRESCRIPTION_READ,
-    Permission.PRESCRIPTION_WRITE,
-    Permission.PLAN_READ,
-    Permission.PLAN_WRITE,
-    Permission.SESSION_LOG_READ,
-    Permission.SESSION_LOG_WRITE,
-})
+CLINICAL_PERMISSIONS = frozenset(
+    {
+        Permission.ENCOUNTER_READ,
+        Permission.ENCOUNTER_WRITE,
+        Permission.PRESCRIPTION_READ,
+        Permission.PRESCRIPTION_WRITE,
+        Permission.PLAN_READ,
+        Permission.PLAN_WRITE,
+        Permission.SESSION_LOG_READ,
+        Permission.SESSION_LOG_WRITE,
+    }
+)
 
 
 def test_permissions_noun_verb_format() -> None:
@@ -74,62 +76,68 @@ def test_no_orphan_permissions() -> None:
 def test_golden_role_permissions_snapshot() -> None:
     """Golden snapshot test guaranteeing ROLE_PERMISSIONS remains identical to specification."""
     expected = {
-        Role.ADMIN: frozenset({
-            Permission.USER_READ,
-            Permission.USER_CREATE,
-            Permission.USER_UPDATE,
-            Permission.USER_DEACTIVATE,
-            Permission.USER_RESET_PASSWORD,
-            Permission.USER_UNLOCK,
-            Permission.DASHBOARD_ADMIN,
-            Permission.SETTINGS_READ,
-            Permission.SETTINGS_WRITE,
-            Permission.DOCTOR_READ,
-            Permission.DOCTOR_MANAGE,
-            Permission.FEE_READ,
-            Permission.FEE_MANAGE,
-            Permission.PATIENT_READ,
-            Permission.APPOINTMENT_READ,
-            Permission.PAYMENT_READ,
-            Permission.RECEIPT_REPRINT,
-            Permission.PAYMENT_REVERSE,
-            Permission.AUDIT_READ,
-            Permission.BACKUP_RUN,
-            Permission.BACKUP_RESTORE,
-            Permission.INTEGRITY_RUN,
-        }),
-        Role.RECEPTION: frozenset({
-            Permission.DASHBOARD_RECEPTION,
-            Permission.SETTINGS_READ,
-            Permission.DOCTOR_READ,
-            Permission.FEE_READ,
-            Permission.PATIENT_READ,
-            Permission.PATIENT_CREATE,
-            Permission.PATIENT_UPDATE,
-            Permission.PHOTO_READ,
-            Permission.PHOTO_WRITE,
-            Permission.APPOINTMENT_READ,
-            Permission.APPOINTMENT_WRITE,
-            Permission.PAYMENT_READ,
-            Permission.PAYMENT_CREATE,
-            Permission.RECEIPT_REPRINT,
-        }),
-        Role.DOCTOR: frozenset({
-            Permission.DASHBOARD_DOCTOR,
-            Permission.SETTINGS_READ,
-            Permission.DOCTOR_READ,
-            Permission.FEE_READ,
-            Permission.PATIENT_READ,
-            Permission.APPOINTMENT_READ,
-            Permission.APPOINTMENT_WRITE,
-            Permission.ENCOUNTER_READ,
-            Permission.ENCOUNTER_WRITE,
-            Permission.PRESCRIPTION_READ,
-            Permission.PRESCRIPTION_WRITE,
-            Permission.PLAN_READ,
-            Permission.PLAN_WRITE,
-            Permission.SESSION_LOG_READ,
-            Permission.SESSION_LOG_WRITE,
-        }),
+        Role.ADMIN: frozenset(
+            {
+                Permission.USER_READ,
+                Permission.USER_CREATE,
+                Permission.USER_UPDATE,
+                Permission.USER_DEACTIVATE,
+                Permission.USER_RESET_PASSWORD,
+                Permission.USER_UNLOCK,
+                Permission.DASHBOARD_ADMIN,
+                Permission.SETTINGS_READ,
+                Permission.SETTINGS_WRITE,
+                Permission.DOCTOR_READ,
+                Permission.DOCTOR_MANAGE,
+                Permission.FEE_READ,
+                Permission.FEE_MANAGE,
+                Permission.PATIENT_READ,
+                Permission.APPOINTMENT_READ,
+                Permission.PAYMENT_READ,
+                Permission.RECEIPT_REPRINT,
+                Permission.PAYMENT_REVERSE,
+                Permission.AUDIT_READ,
+                Permission.BACKUP_RUN,
+                Permission.BACKUP_RESTORE,
+                Permission.INTEGRITY_RUN,
+            }
+        ),
+        Role.RECEPTION: frozenset(
+            {
+                Permission.DASHBOARD_RECEPTION,
+                Permission.SETTINGS_READ,
+                Permission.DOCTOR_READ,
+                Permission.FEE_READ,
+                Permission.PATIENT_READ,
+                Permission.PATIENT_CREATE,
+                Permission.PATIENT_UPDATE,
+                Permission.PHOTO_READ,
+                Permission.PHOTO_WRITE,
+                Permission.APPOINTMENT_READ,
+                Permission.APPOINTMENT_WRITE,
+                Permission.PAYMENT_READ,
+                Permission.PAYMENT_CREATE,
+                Permission.RECEIPT_REPRINT,
+            }
+        ),
+        Role.DOCTOR: frozenset(
+            {
+                Permission.DASHBOARD_DOCTOR,
+                Permission.SETTINGS_READ,
+                Permission.DOCTOR_READ,
+                Permission.FEE_READ,
+                Permission.PATIENT_READ,
+                Permission.APPOINTMENT_READ,
+                Permission.APPOINTMENT_WRITE,
+                Permission.ENCOUNTER_READ,
+                Permission.ENCOUNTER_WRITE,
+                Permission.PRESCRIPTION_READ,
+                Permission.PRESCRIPTION_WRITE,
+                Permission.PLAN_READ,
+                Permission.PLAN_WRITE,
+                Permission.SESSION_LOG_READ,
+                Permission.SESSION_LOG_WRITE,
+            }
+        ),
     }
     assert ROLE_PERMISSIONS == expected

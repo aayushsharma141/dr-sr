@@ -43,6 +43,7 @@ def run_migrations_online() -> None:
         url = config.attributes.get("url") or config.get_main_option("sqlalchemy.url")
         if url:
             from sqlalchemy import create_engine
+
             # If string with doubled percent signs from config file, unescape
             if isinstance(url, str):
                 url = url.replace("%%", "%")
