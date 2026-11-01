@@ -1,0 +1,70 @@
+{
+  "schemaVersion": 1,
+  "ok": false,
+  "command": "finalize",
+  "status": "fail",
+  "type": "architecture",
+  "quality": "showcase",
+  "specification": {
+    "path": "D:\\dr-sr\\.archify\\architecture-kalyan-hospital-20261030-212600\\candidate.json",
+    "sha256": "df76bcdeb8547258bf2805db95c940c12f105eae8c5e7980fc9c1d493fd70c7f",
+    "bytes": 8569
+  },
+  "artifact": {
+    "path": "D:\\dr-sr\\.archify\\architecture-kalyan-hospital-20261030-212600\\kalyan-hospital-architecture.html",
+    "sha256": "fa12ea1c3ae86ba9e659894c520056e1a5055addce76e6e330fe31b5c84f9b8f",
+    "bytes": 859514
+  },
+  "gates": {
+    "validate": "pass",
+    "deliver": "pass",
+    "check": "pass",
+    "browser-check": "fail"
+  },
+  "failedStage": "browser-check",
+  "diagnostics": [
+    {
+      "code": "viewer/evidence-path-conflict",
+      "severity": "error",
+      "message": "browser-check will not replace the existing unowned evidence path \"D:\\dr-sr\\.archify\\architecture-kalyan-hospital-20261030-212600\\kalyan-hospital-architecture.browser-check.json\".",
+      "subject": {
+        "artifact": "D:\\dr-sr\\.archify\\architecture-kalyan-hospital-20261030-212600\\kalyan-hospital-architecture.html",
+        "evidencePath": "D:\\dr-sr\\.archify\\architecture-kalyan-hospital-20261030-212600\\kalyan-hospital-architecture.browser-check.json"
+      },
+      "evidence": {
+        "reason": {
+          "code": "ownership-artifact-mismatch"
+        }
+      },
+      "supportedFixes": [
+        "move the conflicting file aside, or choose a separate --out-dir, then rerun browser-check"
+      ]
+    }
+  ],
+  "diagnosticSummary": {
+    "total": 1,
+    "shown": 1,
+    "truncated": false
+  },
+  "evidence": {
+    "receipt": "D:\\dr-sr\\.archify\\architecture-kalyan-hospital-20261030-212600\\kalyan-hospital-architecture.finalize.json",
+    "summaryReceipt": "D:\\dr-sr\\.archify\\architecture-kalyan-hospital-20261030-212600\\kalyan-hospital-architecture.finalize-summary.json",
+    "browserCheckReceipt": "D:\\dr-sr\\.archify\\architecture-kalyan-hospital-20261030-212600\\kalyan-hospital-architecture.browser-check.json"
+  },
+  "update": {
+    "status": "current",
+    "installedVersion": "3.2.0",
+    "availableVersion": "3.2.0",
+    "releaseNotes": null,
+    "checkedAt": "2026-10-30T15:57:45.043Z",
+    "source": "cache",
+    "noticeRequired": false,
+    "noticeText": null
+  },
+  "visualReview": "not-requested",
+  "durationMs": 2708,
+  "browserCheck": {
+    "requested": true,
+    "ran": false
+  }
+}

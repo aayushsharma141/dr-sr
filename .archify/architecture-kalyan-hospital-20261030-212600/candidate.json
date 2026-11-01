@@ -1,0 +1,342 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "Kalyan Hospital Management System — Architecture Overview",
+    "output": ".archify/architecture-kalyan-hospital-20261030-212600/kalyan-hospital-architecture.html",
+    "quality_profile": "showcase",
+    "repository": {
+      "url": "https://github.com/aayushsharma141/dr-sr.git",
+      "provider": "github",
+      "revision": "7a353c207e15ae779b42b8194effa57e370a80f3"
+    }
+  },
+  "components": [
+    {
+      "id": "operator",
+      "type": "external",
+      "label": "Hospital Staff",
+      "sublabel": "Clinician / Receptionist",
+      "tag": "Clinic Operator",
+      "pos": [40, 220],
+      "size": [140, 64]
+    },
+    {
+      "id": "os_spooler",
+      "type": "external",
+      "label": "Windows Print Spooler",
+      "sublabel": "A4 Registration & Slips",
+      "tag": "Hardware Printer",
+      "pos": [40, 360],
+      "size": [140, 64],
+      "sources": [
+        {
+          "path": "app/services/print_service.py",
+          "line": 13,
+          "end_line": 35,
+          "label": "PrintService"
+        }
+      ]
+    },
+    {
+      "id": "ui_shell",
+      "type": "frontend",
+      "label": "PySide6 Desktop UI",
+      "sublabel": "MainWindow & Views",
+      "tag": "Qt 6 Shell",
+      "pos": [330, 220],
+      "size": [160, 64],
+      "sources": [
+        {
+          "path": "app/ui/main_window.py",
+          "line": 37,
+          "end_line": 60,
+          "label": "MainWindow"
+        }
+      ]
+    },
+    {
+      "id": "auth_guard",
+      "type": "security",
+      "label": "AuthService",
+      "sublabel": "PBKDF2-HMAC-SHA256",
+      "tag": "Role Guard",
+      "pos": [330, 80],
+      "size": [160, 64],
+      "sources": [
+        {
+          "path": "app/services/auth_service.py",
+          "line": 15,
+          "end_line": 40,
+          "label": "AuthService"
+        }
+      ]
+    },
+    {
+      "id": "billing_svc",
+      "type": "backend",
+      "label": "BillingService",
+      "sublabel": "Integer Paise Calculations",
+      "tag": "Zero-Drift Ledger",
+      "pos": [650, 80],
+      "size": [170, 64],
+      "sources": [
+        {
+          "path": "app/services/billing_service.py",
+          "line": 13,
+          "end_line": 38,
+          "label": "BillingService"
+        }
+      ]
+    },
+    {
+      "id": "patient_svc",
+      "type": "backend",
+      "label": "PatientService",
+      "sublabel": "Sequential ID: KH-YYYY-XXXX",
+      "tag": "Clinical Intake",
+      "pos": [650, 220],
+      "size": [170, 64],
+      "sources": [
+        {
+          "path": "app/services/patient_service.py",
+          "line": 21,
+          "end_line": 50,
+          "label": "PatientService"
+        }
+      ]
+    },
+    {
+      "id": "treatment_svc",
+      "type": "backend",
+      "label": "TreatmentService",
+      "sublabel": "Cases & VAS Pain Tracking",
+      "tag": "Clinical Sessions",
+      "pos": [650, 360],
+      "size": [170, 64],
+      "sources": [
+        {
+          "path": "app/services/treatment_service.py",
+          "line": 13,
+          "end_line": 35,
+          "label": "TreatmentService"
+        }
+      ]
+    },
+    {
+      "id": "backup_svc",
+      "type": "backend",
+      "label": "BackupService",
+      "sublabel": "Hot SQLite & Photo Tar",
+      "tag": "Disaster Recovery",
+      "pos": [650, 500],
+      "size": [170, 64],
+      "sources": [
+        {
+          "path": "app/services/backup_service.py",
+          "line": 31,
+          "end_line": 50,
+          "label": "BackupService"
+        }
+      ]
+    },
+    {
+      "id": "repo_layer",
+      "type": "backend",
+      "label": "Repository Layer",
+      "sublabel": "Patient / Treatment / Payment",
+      "tag": "Data Access Object",
+      "pos": [980, 220],
+      "size": [160, 64],
+      "sources": [
+        {
+          "path": "app/repositories/patient_repository.py",
+          "line": 13,
+          "end_line": 35,
+          "label": "PatientRepository"
+        }
+      ]
+    },
+    {
+      "id": "db_engine",
+      "type": "database",
+      "label": "SQLite 3 Engine",
+      "sublabel": "WAL Mode & FK Enforcement",
+      "tag": "Local ACID DB",
+      "pos": [1310, 220],
+      "size": [160, 64],
+      "sources": [
+        {
+          "path": "app/db/connection.py",
+          "line": 13,
+          "end_line": 35,
+          "label": "ConnectionFactory"
+        }
+      ]
+    },
+    {
+      "id": "local_store",
+      "type": "database",
+      "label": "Local App Data",
+      "sublabel": "%DATA_DIR%/photos & backups",
+      "tag": "Protected Files",
+      "pos": [1310, 360],
+      "size": [160, 64],
+      "sources": [
+        {
+          "path": "app/config.py",
+          "line": 8,
+          "end_line": 18,
+          "label": "PathsConfig"
+        }
+      ]
+    }
+  ],
+  "boundaries": [
+    {
+      "kind": "region",
+      "label": "Clinic Workstation Host (Offline Windows Environment)",
+      "wraps": [
+        "ui_shell",
+        "auth_guard",
+        "billing_svc",
+        "patient_svc",
+        "treatment_svc",
+        "backup_svc",
+        "repo_layer",
+        "db_engine",
+        "local_store"
+      ]
+    },
+    {
+      "kind": "security-group",
+      "label": "PySide6 Application Process Boundary",
+      "wraps": [
+        "ui_shell",
+        "auth_guard",
+        "billing_svc",
+        "patient_svc",
+        "treatment_svc",
+        "backup_svc",
+        "repo_layer"
+      ]
+    },
+    {
+      "kind": "security-group",
+      "label": "Local AppData Storage Sandbox (%DATA_DIR%)",
+      "wraps": [
+        "db_engine",
+        "local_store"
+      ]
+    }
+  ],
+  "connections": [
+    {
+      "id": "op-ui",
+      "from": "operator",
+      "to": "ui_shell",
+      "label": "Demographic Intake",
+      "variant": "emphasis"
+    },
+    {
+      "id": "ui-auth",
+      "from": "ui_shell",
+      "to": "auth_guard",
+      "label": "verify_role()",
+      "variant": "security",
+      "fromSide": "top",
+      "toSide": "bottom"
+    },
+    {
+      "id": "ui-pat",
+      "from": "ui_shell",
+      "to": "patient_svc",
+      "label": "register_patient()",
+      "variant": "emphasis"
+    },
+    {
+      "id": "pat-repo",
+      "from": "patient_svc",
+      "to": "repo_layer",
+      "label": "create(patient)",
+      "variant": "emphasis"
+    },
+    {
+      "id": "repo-db",
+      "from": "repo_layer",
+      "to": "db_engine",
+      "label": "INSERT INTO patients",
+      "variant": "emphasis"
+    },
+    {
+      "id": "ui-bill",
+      "from": "ui_shell",
+      "to": "billing_svc",
+      "label": "record_payment()",
+      "fromSide": "top",
+      "toSide": "left"
+    },
+    {
+      "id": "bill-repo",
+      "from": "billing_svc",
+      "to": "repo_layer",
+      "label": "persist_payment()",
+      "fromSide": "right",
+      "toSide": "top"
+    },
+    {
+      "id": "ui-treat",
+      "from": "ui_shell",
+      "to": "treatment_svc",
+      "label": "record_session()",
+      "fromSide": "bottom",
+      "toSide": "left"
+    },
+    {
+      "id": "treat-repo",
+      "from": "treatment_svc",
+      "to": "repo_layer",
+      "label": "persist_session()",
+      "fromSide": "right",
+      "toSide": "bottom"
+    },
+    {
+      "id": "ui-print",
+      "from": "ui_shell",
+      "to": "os_spooler",
+      "label": "Print A4 Slip",
+      "fromSide": "bottom",
+      "toSide": "right"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "Layered Architecture Principles",
+      "items": [
+        "No SQL in UI: PySide6 view classes invoke application services exclusively",
+        "Repository Layer isolates parameterized SQL queries and object mapping",
+        "Deterministic transactions ensure consistency across patient and financial records"
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "Deterministic Financials & Clinical Flow",
+      "items": [
+        "Integer Paise Arithmetic: All charges and payments stored in integer paise (1 INR = 100 paise)",
+        "Eliminates IEEE 754 floating-point rounding errors across installments and balances",
+        "Chronological, immutable session history tracking VAS pain progression (0–10)"
+      ]
+    },
+    {
+      "dot": "violet",
+      "title": "Offline Resilience & Data Durability",
+      "items": [
+        "100% offline desktop operation: zero external cloud or network dependencies",
+        "PRAGMA foreign_keys = ON enforced on every SQLite connection",
+        "WAL (Write-Ahead Logging) journal mode enables fast concurrent reads without locking",
+        "Verified backup archives (.kalyan_bak) bundle SQLite database and patient photos"
+      ]
+    }
+  ]
+}

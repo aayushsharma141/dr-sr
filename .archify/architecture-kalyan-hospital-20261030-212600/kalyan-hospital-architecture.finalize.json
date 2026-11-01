@@ -1,0 +1,403 @@
+{
+  "schemaVersion": 1,
+  "ok": false,
+  "command": "finalize",
+  "status": "fail",
+  "type": "architecture",
+  "quality": "showcase",
+  "startedAt": "2026-10-30T15:58:22.895Z",
+  "specification": {
+    "path": "D:\\dr-sr\\.archify\\architecture-kalyan-hospital-20261030-212600\\candidate.json",
+    "sha256": "df76bcdeb8547258bf2805db95c940c12f105eae8c5e7980fc9c1d493fd70c7f",
+    "bytes": 8569
+  },
+  "artifact": {
+    "path": "D:\\dr-sr\\.archify\\architecture-kalyan-hospital-20261030-212600\\kalyan-hospital-architecture.html",
+    "sha256": "fa12ea1c3ae86ba9e659894c520056e1a5055addce76e6e330fe31b5c84f9b8f",
+    "bytes": 859514
+  },
+  "stages": {
+    "validate": {
+      "status": "pass",
+      "exitCode": 0,
+      "durationMs": null,
+      "execution": "embedded-in-deliver",
+      "command": [
+        "C:\\Users\\147ha\\AppData\\Local\\ms-playwright-go\\1.57.0\\node.exe",
+        "C:\\Users\\147ha\\.gemini\\config\\skills\\archify\\bin\\archify.mjs",
+        "deliver",
+        "architecture",
+        "D:\\dr-sr\\.archify\\architecture-kalyan-hospital-20261030-212600\\candidate.json",
+        "D:\\dr-sr\\.archify\\architecture-kalyan-hospital-20261030-212600\\kalyan-hospital-architecture.html",
+        "--quality",
+        "showcase",
+        "--repo-root",
+        "d:\\dr-sr",
+        "--json"
+      ],
+      "receipt": {
+        "schemaVersion": 1,
+        "ok": true,
+        "command": "validate",
+        "specification": {
+          "sha256": "df76bcdeb8547258bf2805db95c940c12f105eae8c5e7980fc9c1d493fd70c7f",
+          "bytes": 8569
+        },
+        "validation": {
+          "checksPassed": 9,
+          "checkCount": 9,
+          "compositionProfile": "showcase",
+          "compositionStatus": "pass",
+          "errors": 0,
+          "warnings": 0
+        }
+      }
+    },
+    "deliver": {
+      "status": "pass",
+      "exitCode": 0,
+      "durationMs": 1745,
+      "command": [
+        "C:\\Users\\147ha\\AppData\\Local\\ms-playwright-go\\1.57.0\\node.exe",
+        "C:\\Users\\147ha\\.gemini\\config\\skills\\archify\\bin\\archify.mjs",
+        "deliver",
+        "architecture",
+        "D:\\dr-sr\\.archify\\architecture-kalyan-hospital-20261030-212600\\candidate.json",
+        "D:\\dr-sr\\.archify\\architecture-kalyan-hospital-20261030-212600\\kalyan-hospital-architecture.html",
+        "--quality",
+        "showcase",
+        "--repo-root",
+        "d:\\dr-sr",
+        "--json"
+      ],
+      "receipt": {
+        "schemaVersion": 1,
+        "receiptId": "93a93aaf-9252-4aff-96dc-a3e45ccc728a",
+        "ok": true,
+        "command": "deliver",
+        "type": "architecture",
+        "input": "D:\\dr-sr\\.archify\\architecture-kalyan-hospital-20261030-212600\\candidate.json",
+        "output": "D:\\dr-sr\\.archify\\architecture-kalyan-hospital-20261030-212600\\kalyan-hospital-architecture.html",
+        "specification": {
+          "sha256": "df76bcdeb8547258bf2805db95c940c12f105eae8c5e7980fc9c1d493fd70c7f",
+          "bytes": 8569
+        },
+        "artifact": {
+          "sha256": "fa12ea1c3ae86ba9e659894c520056e1a5055addce76e6e330fe31b5c84f9b8f",
+          "bytes": 859514
+        },
+        "validation": {
+          "checksPassed": 9,
+          "checkCount": 9,
+          "compositionProfile": "showcase",
+          "compositionStatus": "pass",
+          "errors": 0,
+          "warnings": 0
+        },
+        "evidence": {
+          "verified": true,
+          "repository": "https://github.com/aayushsharma141/dr-sr",
+          "revision": "7a353c207e15ae779b42b8194effa57e370a80f3",
+          "references": 10
+        },
+        "update": {
+          "status": "unavailable",
+          "installedVersion": null,
+          "availableVersion": null,
+          "releaseNotes": null,
+          "checkedAt": null,
+          "source": null,
+          "noticeRequired": false,
+          "noticeText": null,
+          "reason": "disabled"
+        }
+      }
+    },
+    "check": {
+      "status": "pass",
+      "exitCode": 0,
+      "durationMs": 285,
+      "command": [
+        "C:\\Users\\147ha\\AppData\\Local\\ms-playwright-go\\1.57.0\\node.exe",
+        "C:\\Users\\147ha\\.gemini\\config\\skills\\archify\\bin\\archify.mjs",
+        "check",
+        "D:\\dr-sr\\.archify\\architecture-kalyan-hospital-20261030-212600\\kalyan-hospital-architecture.html",
+        "--require-provenance"
+      ],
+      "receipt": {
+        "ok": true,
+        "file": "D:\\dr-sr\\.archify\\architecture-kalyan-hospital-20261030-212600\\kalyan-hospital-architecture.html",
+        "artifact": {
+          "sha256": "fa12ea1c3ae86ba9e659894c520056e1a5055addce76e6e330fe31b5c84f9b8f",
+          "bytes": 859514
+        },
+        "checks": [
+          {
+            "name": "single_svg",
+            "ok": true,
+            "details": [
+              "found 1 <svg> block(s)"
+            ]
+          },
+          {
+            "name": "finite_svg",
+            "ok": true,
+            "details": []
+          },
+          {
+            "name": "orthogonal_arrows",
+            "ok": true,
+            "details": []
+          },
+          {
+            "name": "label_route_clearance",
+            "ok": true,
+            "details": []
+          },
+          {
+            "name": "relationship_crossings",
+            "ok": true,
+            "details": []
+          },
+          {
+            "name": "relationship_corridors",
+            "ok": true,
+            "details": []
+          },
+          {
+            "name": "container_border_runs",
+            "ok": true,
+            "details": []
+          },
+          {
+            "name": "route_rhythm",
+            "ok": true,
+            "details": []
+          },
+          {
+            "name": "legend_clearance",
+            "ok": true,
+            "details": []
+          }
+        ],
+        "composition": {
+          "schemaVersion": 1,
+          "profile": "showcase",
+          "status": "pass",
+          "summary": {
+            "errors": 0,
+            "warnings": 0
+          },
+          "metrics": {
+            "properCrossings": 0,
+            "resolvedCrossovers": 0,
+            "ambiguousCorridors": 0,
+            "arrowheadCollisions": 0,
+            "containerBorderRuns": 0,
+            "labelRouteClearanceIssues": 0,
+            "labelCanvasOverflowIssues": 0,
+            "minLabelRouteClearance": 21.2,
+            "desktopReadabilityIssues": 0,
+            "viewportHeightIssues": 0,
+            "minProjectedNodeTextPx": 6.871729419272495,
+            "maxBends": 3,
+            "routesOverSuggestedBends": 1,
+            "maxStretch": 1,
+            "routesOverSuggestedStretch": 0,
+            "minSegmentPx": 24,
+            "minInteriorSegmentPx": 84,
+            "shortSegmentCount": 0,
+            "shortEndpointSegmentCount": 0,
+            "shortInteriorSegmentCount": 0,
+            "microSegmentCount": 0
+          },
+          "suggestedLimits": {
+            "bendsPerRelationship": 2,
+            "stretch": 1.35,
+            "segmentPx": 16,
+            "microSegmentPx": 8
+          },
+          "routeReview": {
+            "crossings": [],
+            "detours": [
+              {
+                "relationship": {
+                  "id": "ui-bill",
+                  "from": "ui_shell",
+                  "to": "billing_svc",
+                  "label": "record_payment()",
+                  "collectionIndex": 5,
+                  "artifactIndex": 6
+                },
+                "bends": 3,
+                "stretch": 1
+              }
+            ]
+          },
+          "leadingSpace": {
+            "measured": true,
+            "emptyTopPx": 34,
+            "emptyTopRatio": 0.052,
+            "occupiedTop": 34,
+            "viewBoxTop": 0,
+            "canvasHeight": 652,
+            "typicalNodeHeight": 64,
+            "reviewSuggested": false
+          },
+          "desktopReadability": {
+            "budgetBasis": "recognized-declared-wide",
+            "readerContract": "declared-wide-v1",
+            "availableDiagramWidth": 1346,
+            "actualBudgetPx": 1346,
+            "actualReaderWidth": 1376,
+            "desiredReaderWidth": 1499.0625,
+            "viewportCap": 1376,
+            "limit": "viewport-cap",
+            "requestedTargetPx": 7.5,
+            "requestedTargetMet": false,
+            "hardFloorPx": 6,
+            "hardFloorMet": true,
+            "minimumOwner": {
+              "kind": "edge",
+              "id": "op-ui",
+              "from": "operator",
+              "to": "ui_shell"
+            },
+            "minimumSourceTextPx": 8,
+            "minimumProjectedTextPx": 6.871729419272495,
+            "semanticTextCount": 35
+          },
+          "issues": []
+        },
+        "provenance": "current",
+        "deliveryReceiptId": "93a93aaf-9252-4aff-96dc-a3e45ccc728a"
+      }
+    },
+    "browser-check": {
+      "status": "fail",
+      "exitCode": 1,
+      "durationMs": 51,
+      "command": [
+        "C:\\Users\\147ha\\AppData\\Local\\ms-playwright-go\\1.57.0\\node.exe",
+        "C:\\Users\\147ha\\.gemini\\config\\skills\\archify\\bin\\archify.mjs",
+        "browser-check",
+        "D:\\dr-sr\\.archify\\architecture-kalyan-hospital-20261030-212600\\kalyan-hospital-architecture.html",
+        "--json",
+        "--require-provenance"
+      ],
+      "execution": "in-process",
+      "receipt": {
+        "schemaVersion": 1,
+        "ok": false,
+        "command": "browser-check",
+        "evidenceKind": "automated-browser",
+        "status": "fail",
+        "visualReview": "not-requested",
+        "provenance": "current",
+        "deliveryReceiptId": "93a93aaf-9252-4aff-96dc-a3e45ccc728a",
+        "artifact": {
+          "path": "D:\\dr-sr\\.archify\\architecture-kalyan-hospital-20261030-212600\\kalyan-hospital-architecture.html",
+          "sha256": "fa12ea1c3ae86ba9e659894c520056e1a5055addce76e6e330fe31b5c84f9b8f",
+          "bytes": 859514
+        },
+        "state": {
+          "detail": "read",
+          "motion": "still"
+        },
+        "chrome": {
+          "status": "not-checked",
+          "executable": null
+        },
+        "diagnostics": [
+          {
+            "code": "viewer/evidence-path-conflict",
+            "severity": "error",
+            "message": "browser-check will not replace the existing unowned evidence path \"D:\\dr-sr\\.archify\\architecture-kalyan-hospital-20261030-212600\\kalyan-hospital-architecture.browser-check.json\".",
+            "subject": {
+              "artifact": "D:\\dr-sr\\.archify\\architecture-kalyan-hospital-20261030-212600\\kalyan-hospital-architecture.html",
+              "evidencePath": "D:\\dr-sr\\.archify\\architecture-kalyan-hospital-20261030-212600\\kalyan-hospital-architecture.browser-check.json"
+            },
+            "evidence": {
+              "reason": {
+                "code": "ownership-artifact-mismatch"
+              }
+            },
+            "supportedFixes": [
+              "move the conflicting file aside, or choose a separate --out-dir, then rerun browser-check"
+            ]
+          }
+        ],
+        "containment": {
+          "status": "fail",
+          "policy": "fit-or-reader-declared-readable-vertical-scroll",
+          "viewports": []
+        },
+        "themeStates": {
+          "status": "fail",
+          "viewports": []
+        },
+        "readability": {
+          "status": "fail",
+          "minimumProjectedNodeTextPx": 6,
+          "viewports": []
+        },
+        "viewerChrome": {
+          "status": "fail",
+          "viewports": []
+        },
+        "captures": {
+          "status": "not-requested",
+          "screenshots": [],
+          "contactSheet": null
+        },
+        "sidecars": {
+          "receipt": "kalyan-hospital-architecture.browser-check.json",
+          "files": []
+        },
+        "error": "browser-check will not replace the existing unowned evidence path \"D:\\dr-sr\\.archify\\architecture-kalyan-hospital-20261030-212600\\kalyan-hospital-architecture.browser-check.json\"."
+      }
+    }
+  },
+  "browserCheck": {
+    "requested": true,
+    "ran": false
+  },
+  "diagnostics": [
+    {
+      "code": "viewer/evidence-path-conflict",
+      "severity": "error",
+      "message": "browser-check will not replace the existing unowned evidence path \"D:\\dr-sr\\.archify\\architecture-kalyan-hospital-20261030-212600\\kalyan-hospital-architecture.browser-check.json\".",
+      "subject": {
+        "artifact": "D:\\dr-sr\\.archify\\architecture-kalyan-hospital-20261030-212600\\kalyan-hospital-architecture.html",
+        "evidencePath": "D:\\dr-sr\\.archify\\architecture-kalyan-hospital-20261030-212600\\kalyan-hospital-architecture.browser-check.json"
+      },
+      "evidence": {
+        "reason": {
+          "code": "ownership-artifact-mismatch"
+        }
+      },
+      "supportedFixes": [
+        "move the conflicting file aside, or choose a separate --out-dir, then rerun browser-check"
+      ]
+    }
+  ],
+  "evidence": {
+    "receipt": "D:\\dr-sr\\.archify\\architecture-kalyan-hospital-20261030-212600\\kalyan-hospital-architecture.finalize.json",
+    "summaryReceipt": "D:\\dr-sr\\.archify\\architecture-kalyan-hospital-20261030-212600\\kalyan-hospital-architecture.finalize-summary.json",
+    "browserCheckReceipt": "D:\\dr-sr\\.archify\\architecture-kalyan-hospital-20261030-212600\\kalyan-hospital-architecture.browser-check.json"
+  },
+  "visualReview": "not-requested",
+  "failedStage": "browser-check",
+  "finishedAt": "2026-10-30T15:58:25.603Z",
+  "durationMs": 2708,
+  "update": {
+    "status": "current",
+    "installedVersion": "3.2.0",
+    "availableVersion": "3.2.0",
+    "releaseNotes": null,
+    "checkedAt": "2026-10-30T15:57:45.043Z",
+    "source": "cache",
+    "noticeRequired": false,
+    "noticeText": null
+  }
+}
