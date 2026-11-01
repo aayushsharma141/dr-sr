@@ -1,6 +1,6 @@
 # Product Requirements — Kalyan Hospital v3.0
 
-**Status:** Proposed baseline; client sign-off and open decisions pending.  
+**Status:** Product baseline for v3; Phases 11–13 are recorded implemented, Phases 14–17 remain planned/incomplete. Client sign-off and deployment acceptance are pending.  
 **Baseline:** 2026-11-01. This supersedes the single-workstation PRD for new development.
 
 ## 1. Product vision
