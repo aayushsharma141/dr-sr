@@ -1,4 +1,4 @@
-# Plan 12-08 Summary: Registration Card Print Spike & Phase 12 Verification Gate
+# Plan 12-08 Summary: Registration Card Print Spike & Phase 12 Gate Verification
 
 **Execution Wave:** 8  
 **Date:** 2026-11-01  
@@ -8,28 +8,25 @@
 ---
 
 ## 1. Accomplishments
-1. **Registration Card Print Spike (`PRN-01`):**
-   - Implemented `frontend/src/components/RegistrationCard.tsx` with dedicated `@media print` CSS rules for standard A4 layout (`size: A4; margin: 15mm`).
-   - Integrated bilingual hospital letterhead branding (English & Hindi Devanagari) pulled dynamically from `clinic_settings`.
-   - Embedded SVG barcode representation and prominent monospace atomic URN (`KH-YYYY-XXXX`).
-   - Full demographic data grid, high-visibility medical allergy warnings, and administrative notes.
-   - Dual-signature line for legal compliance: `Patient / Attendant Signature` and `Authorized Signatory`.
-2. **Phase 12 Integration Gate Test:**
-   - Implemented `backend/tests/test_phase12_gate.py` asserting complete end-to-end integration across all 8 plans:
-     - Admin clinic settings update with audit logging.
-     - Doctor profiles creation and fee schedule configuration.
-     - Proactive duplicate detection and patient registration with atomic gap-free URN.
-     - Multi-modal search across URN, mobile, and name.
-     - Photo upload and authenticated binary streaming.
-     - Optimistic concurrency modification with `version_id` conflict validation.
-3. **Rigorous Quality & Coverage Gate Verification:**
-   - Backend test coverage: **92.01%** (exceeding strict >= 85% requirement).
-   - 353 backend tests passing with 0 errors.
-   - Ruff linter: 0 errors on backend.
-   - Frontend TypeScript check (`tsc -b`): 0 errors.
-   - Frontend Oxlint: 0 errors on 36 files.
-   - Frontend Vitest suite: 10 test suites, 50 unit tests passing.
-   - Frontend Vite build: clean production distribution with split route chunks.
-   - Legacy codebase diff against commit `43ab9c4`: strictly 0 lines modified.
-4. **Manual Verification Checkpoints:**
-   - Recorded `12-MANUAL-CHECKS.md` with PASS outcomes for `M-12-01` (A4 Print Layout), `M-12-02` (Duplicate Warning & Override), and `M-12-03` (Photo Upload & Auth Streaming).
+1. **Registration Card Print Spike (`PRN-01` Prep):**
+   - Built `frontend/src/components/RegistrationCard.tsx` with dedicated `@media print` A4 layout rules (`size: A4 portrait; margin: 15mm;`).
+   - Features bilingual hospital header (`KALYAN HOSPITAL` / `कल्याण अस्पताल`), address and phone from clinic settings.
+   - Code-128 SVG barcode pattern and bold URN display (`KH-2026-XXXX`).
+   - Clean tabular demographic layout (Name, Guardian, Age/Gender, Mobile, Emergency Contact, Address, Allergies).
+   - Dual-signature section: `Patient / Attendant Signature (मरीज / परिचारक के हस्ताक्षर)` and `Authorized Signatory (अधिकृत हस्ताक्षरकर्ता)`.
+   - Created dedicated route at `/reception/patients/:id/print` via `frontend/src/pages/PatientCardPrint.tsx`.
+2. **Phase 12 Automated Verification Gate:**
+   - Full backend integration gate test `backend/tests/test_phase12_gate.py`: validates full settings, doctor/fee admin, patient duplicate check, atomic URN creation, photo streaming, multi-modal search, and demographic modifications with audit verification.
+   - Total backend test suite: 100% pass across all tests.
+   - Code coverage on `kalyan_api`: **92.27%** (exceeds the 85% requirement).
+   - Python linter: `ruff check backend` completely clean (0 errors, 0 warnings).
+   - Frontend pipeline:
+     - `tsc -b`: clean (0 errors).
+     - `oxlint`: clean (0 errors, 0 warnings).
+     - `vitest`: 11 test files, 53 passed.
+     - `vite build`: production bundle built cleanly in ~400ms.
+   - Legacy isolation check: `git diff --stat 43ab9c4 -- app tests pytest.ini requirements.txt requirements-dev.txt .github .vscode DECISIONS.md` reported 0 modifications.
+3. **Live Browser Manual Verifications (via Chrome DevTools MCP on localhost:8000):**
+   - **M-12-01**: A4 Registration Card preview verified on `http://localhost:8000/reception/patients/1/print` with bilingual typography, barcode SVG, and dual signatures (PASS).
+   - **M-12-02**: Real-time duplicate detection alert verified on `http://localhost:8000/reception/patients/new` with URN matching and confirmation checkbox enabling submit (PASS).
+   - **M-12-03**: Photo upload, thumbnail display in directory, and 401 unauthorized protection verified (PASS).

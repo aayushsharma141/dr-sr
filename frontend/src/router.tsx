@@ -127,6 +127,15 @@ export const router = createBrowserRouter([
               }
             },
           },
+          {
+            path: '/reception/patients/:id/print',
+            lazy: async () => {
+              const { PatientCardPrint } = await import('./pages/PatientCardPrint')
+              return {
+                Component: PatientCardPrint,
+              }
+            },
+          },
         ],
       },
       {
