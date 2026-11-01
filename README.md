@@ -41,6 +41,10 @@ Exact dependency pins are maintained in `backend/pyproject.toml` and `frontend/p
 - [Requirement traceability](.planning/REQUIREMENTS.md)
 - [Current project state](.planning/STATE.md)
 
+## Engineering knowledge base
+
+- [Project brain / engineering knowledge base](brain/README.md)
+
 ## First administrator setup
 
 The first administrator is created through the one-time server-console-code setup flow. No default production credentials are intended. Public bootstrap is disabled after successful creation; recovery is through the local administrative CLI procedure. See `SECURITY.md` and the Phase 11 plan/evidence.
