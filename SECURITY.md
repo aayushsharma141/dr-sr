@@ -1,55 +1,93 @@
-# Security Policy & Practical Controls
-## Kalyan Hospital — Offline Patient & Physiotherapy Management System
+# Security Policy — Kalyan Hospital v3.0
 
-**Scope:** Standalone Windows 10/11 Desktop Installation  
-**Deployment Model:** 100% Offline, Single Clinic PC  
+**Status:** Required target controls; implementation and acceptance evidence pending.
+
+## 1. Objectives and threat model
+
+Protect patient confidentiality, prevent unauthorized clinical/financial changes, preserve attribution and recover from device/data loss. LAN-only does not mean inherently secure.
+
+Assume shared/unattended workstations, direct API probing, concurrent edits, disconnects during writes, power loss, corrupt/lost backup drives and accidental or malicious staff actions. Full compromise of server OS/physical administrator is outside initial protection boundary and must be documented as residual risk.
+
+## 2. Authentication
+
+- Individual staff accounts; no shared or default production credentials.
+- Passwords stored using Argon2id or approved modern password hashing, never plaintext/reversible.
+- First login after reset forces password change.
+- Idle expiry, logout invalidation, failed-login rate limiting/lockout and security audit.
+- Deactivation blocks login, revokes sessions and preserves historical actor identity.
+- Password resets are authorized and audited.
+
+### First-run setup wizard
+
+- Enabled only when no administrator exists.
+- Cryptographically random one-time setup code printed only to local server console.
+- Short expiry, safe storage (preferably hash), rate limiting and atomic consumption.
+- Concurrent setup attempts must create exactly one administrator.
+- Successful setup permanently disables public bootstrap endpoints.
+- Recovery requires local server CLI access; never implement hidden HTTP backdoor or hardcoded master password.
+
+## 3. Server-side authorization
+
+Every protected API endpoint, patient object and file access must enforce permissions on the backend. Frontend route guards are usability only. Fixed Admin, Reception and Doctor roles; no custom permission editor in v1. A route/permission coverage test fails if any protected endpoint has no declared policy.
+
+### Proposed role matrix — client approval pending
+
+| Capability | Admin | Reception | Doctor |
+|---|---|---|---|
+| Users, clinic settings, doctor/fee setup | Yes | No | No |
+| Patient registration/demographic edit | Yes | Yes | Limited/pending |
+| Patient search/photo access | Yes | Yes | Subject to patient policy |
+| Appointments | Yes | Yes | Own queue/status |
+| Clinical notes and addenda | Read/admin | No authoring | Authorized clinician |
+| Prescription and treatment authoring | Read/admin | No | Assigned/authorized cases |
+| Record payments | Yes | Yes | No |
+| Authorize reversals | Yes | No | No |
+| Read audit | Yes | No | No |
+| Backup/restore | Yes | No | No |
+
+Recommended doctor access: read clinically relevant records across doctors, write only assigned cases. Not yet client-approved.
+
+## 4. Record integrity
+
+Finalized encounters, prescriptions and sessions cannot be silently edited/deleted. Corrections are dated addenda with author/reason. Payments are append-only; reversal is a compensating event with Admin authorization and mandatory reason. Balances derive from ledger. Stale updates return HTTP 409. Patient demographic edits retain before/after audit values.
+
+## 5. Audit events
+
+Cover login success/failure, lockout, logout, password reset, user activation/deactivation, patient create/update, clinical finalization/addenda, prescriptions, appointment status, payment, reversal, receipt print/reprint, backup, verification and restore.
+
+Minimum fields: actor, timestamp, action/outcome, entity type/id, request ID, reason where required, structured before/after values where applicable. Ordinary users cannot update/delete audit events. Never log passwords, setup codes, session tokens or unnecessary clinical narrative.
+
+## 6. Network and server
+
+Bind services to controlled LAN interface; firewall only required ports from trusted subnet. No router port forwarding/public exposure. HTTPS preferred. HTTP exception only with explicit client approval for isolated physically controlled LAN; it is unencrypted. Use secure cookies and CSRF protection where applicable. No runtime CDN, cloud auth or internet dependency.
+
+## 7. Patient files
+
+Private storage outside public web root; generated opaque names; validate content and size; path traversal prevention; checksum metadata; every download authorization-checked. Unauthorized file IDs must not reveal private file existence. Backup includes all referenced files.
+
+## 8. Backup security
+
+Database and patient files in one checksummed bundle. Access-controlled destinations and secure removable-drive storage. Stage and verify restore before live cutover; take pre-restore safety snapshot; scheduled failure visible to Admin. Clean-machine restore drill is mandatory.
+
+## 9. Security acceptance tests
+
+1. Anonymous users cannot access protected APIs/files.
+2. Reception cannot call Admin-only user, audit, restore or reversal APIs directly.
+3. Doctor cannot post payments or modify unassigned records under approved policy.
+4. Every protected route has permission coverage.
+5. Bootstrap is one-time and simultaneous submissions yield one success.
+6. Lockout, idle timeout, reset and session revocation work.
+7. Stale updates return 409.
+8. Finalized clinical records and posted payments cannot be overwritten/deleted.
+9. Audit is committed with sensitive mutation.
+10. Corrupt backup cannot replace live data.
+11. File authorization and path traversal tests pass.
+
+## 10. Incident response
+
+Isolate affected server/network; preserve logs, database and files before repair; do not overwrite only known-good backup; revoke affected sessions and reset credentials; restore only after verification; document timeline, impact and corrective action.
+
+Report vulnerabilities privately. Never attach real patient data, passwords, setup codes or production backups to public issues.
 
 ---
-
-## 1. Threat Model & Environment Constraints
-
-In a local clinic environment with an offline desktop PC, the primary security threats are:
-1. **Unauthorized Local Physical Access:** Walk-up access by unauthorized individuals or patients when staff leave the workstation unattended.
-2. **Accidental / Malicious Data Overwrite or Corruption:** Accidental file deletion, improper system shutdowns/power outages during database writes, or tampering with database files.
-3. **Improper Financial Record Alteration:** Staff altering past payment records or changing total fees to conceal missing cash collections.
-4. **Data Loss via Hardware Failure:** Hard drive crash or ransomware affecting the local PC without an off-machine copy.
-
----
-
-## 2. Practical Security Controls
-
-### 2.1 Credential & Authentication Management
-- **Zero Plaintext Passwords:** User passwords are never stored in plaintext. They are hashed using `PBKDF2-HMAC-SHA256` with a unique 16-byte cryptographically secure random salt (`os.urandom(16)`) and a minimum of 200,000 iterations.
-- **No Hardcoded Passwords:** The system does not ship with hardcoded default production passwords. On first startup, if no administrator account exists, an administrative onboarding dialog prompts the creation of the master clinic password.
-- **Role Separation:**
-  - `ADMIN`: User management, database backup/restore, financial corrections, and clinic settings.
-  - `RECEPTIONIST`: Patient registration, treatment logging, standard payment entry, and form printing.
-
-### 2.2 SQL Injection Prevention & Data Access Control
-- **100% Parameterized Queries:** All database interactions in the repository layer use parameterized queries (`cursor.execute("SELECT ... WHERE id = ?", (patient_id,))`). Dynamic SQL string concatenation or f-strings for SQL statements are strictly forbidden.
-- **Foreign Key Enforcement:** `PRAGMA foreign_keys = ON;` is enforced to prevent orphan records or inconsistent state.
-- **Immutable Financial Transactions:** Payments are recorded as ledger entries. Modifying or deleting an existing payment requires administrative authorization and creates an audit entry.
-
-### 2.3 Safe File Handling & Path Traversal Protection
-- **Restricted Directories:** Photos and backups are restricted to designated application paths (`data/photos/` and `data/backups/`).
-- **Filename Sanitization:** When a user selects a photo, the file is copied using a freshly generated filename based solely on the sanitized `patient_id` (e.g. `KH-2026-0001.jpg`). File extensions are strictly whitelisted to `.jpg`, `.jpeg`, and `.png`. Raw user-supplied filenames are never used as file paths.
-- **Backup Path Traversal Guards:** Backup restoration checks that candidate files are validated SQLite files before any interaction.
-
-### 2.4 Integrity & Power-Loss Resilience
-- **Write-Ahead Logging (WAL Mode):** The database operates in `PRAGMA journal_mode = WAL;` with `PRAGMA synchronous = NORMAL;`, offering high resistance to corruption during abrupt power failures or unexpected shutdowns.
-- **Pre-Restoration Snapshot:** Before executing any restore operation, the active live database is automatically cloned into a safety backup (`kalyan_pre_restore_safety.db.bak`).
-
----
-
-## 3. Honest Security Disclosures & Known Limitations
-
-1. **At-Rest Database Encryption:**
-   - The standard SQLite library does not encrypt database files on disk. Anyone with physical access to the hard drive and a generic SQLite viewer could inspect records unless operating system-level encryption (e.g., Windows BitLocker) is enabled.
-   - *Recommendation:* We explicitly recommend that the clinic PC have Windows BitLocker enabled on the drive. We do not claim the database is encrypted at the application level unless SQLCipher is explicitly funded and integrated in a future milestone.
-2. **Offline Hardware Theft:**
-   - Physical security of the clinic computer and external USB backup drives remains the responsibility of Kalyan Hospital staff.
-3. **No Network Telemetry:**
-   - The application makes zero outgoing network calls. There are no tracking pixels, analytics, remote crash loggers, or automatic update checks.
-
----
-*Security policy approved for implementation.*
+*Requirements only. Do not claim security compliance until test evidence exists.*

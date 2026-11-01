@@ -1,119 +1,71 @@
-# Architecture & Project Decisions Record (ADR)
-## Kalyan Hospital — Offline Patient & Physiotherapy Management System
+# Architecture Decision Record — Kalyan Hospital
 
-**Version:** 1.0  
-**Project Budget:** ₹22,000  
-**Delivery Scope:** 4–6 Weeks (Solo Developer + AI Pair)  
+**Current baseline:** v3.0 centralized LAN platform.  
+**Status:** Target decisions; unresolved items require client approval.  
+**Historical record:** ADR-01 through ADR-13 describe the earlier desktop application and are retained below as history, not current v3 architecture.
 
----
+## Current v3 decisions
 
-## Decision Log
+### ADR-14 — Centralized browser-based LAN application
+**Status:** Product direction agreed in project discussions. One central server provides a single React + TypeScript app and FastAPI API to 3–5 browser clients on LAN. Internet is not required at runtime.
 
-### ADR-01: Desktop Technology Stack — Python, PySide6, and SQLite
-- **Status:** Approved
-- **Context:** The software must run 100% offline on a single Windows desktop PC with high UI responsiveness, reliable local printing, and zero ongoing licensing/hosting costs within the ₹22,000 budget.
-- **Decision:** Use Python 3.10+, PySide6 (official Qt 6 bindings), and SQLite 3.
-- **Rationale:** PySide6 provides native Windows look-and-feel, rock-solid printing/PDF engines, and modular widgets without requiring a web browser runtime (Electron / Chromium) which consumes high RAM. SQLite is zero-configuration and built directly into Python.
+### ADR-15 — PostgreSQL for centralized transactions
+**Status:** Recommended target, subject to server hardware assessment. Do not share a SQLite database file over the network. PostgreSQL provides transactional concurrency, constraints and row-level locking.
 
----
+### ADR-16 — FastAPI backend and React frontend
+**Status:** Proposed target. Backend owns business rules and authorization; one frontend has role-specific routes. Separate frontend apps per role are not required.
 
-### ADR-02: Strictly Offline, Single-Workstation Boundary
-- **Status:** Approved
-- **Context:** Requests for multi-computer LAN syncing or cloud access were evaluated against the ₹22,000 budget ceiling.
-- **Decision:** The initial MVP is strictly limited to a single standalone Windows PC with local storage. Cloud syncing, web portals, and multi-PC LAN databases are explicitly deferred to future commercial contracts.
-- **Rationale:** Multi-master LAN synchronization or cloud API backends would introduce massive network resilience, latency, and concurrency challenges incompatible with the fixed budget and timeline.
+### ADR-17 — Fixed server-enforced role catalogue
+**Status:** Required scope; detailed matrix awaits client approval. Admin, Reception and Doctor. Every protected API endpoint must enforce permissions. Recommended doctor policy: read clinically relevant records, write assigned cases only.
 
----
+### ADR-18 — One-time first administrator bootstrap
+**Status:** Required target behavior. When no administrator exists, server prints a cryptographically random one-time code to local console. Browser wizard consumes code and creates first administrator atomically. Public setup is permanently disabled after success. Recovery is local CLI only.
 
-### ADR-03: Currency Arithmetic Stored in Integer Paise
-- **Status:** Approved
-- **Context:** Medical billing and treatment fee tracking require 100% precision without IEEE 754 binary floating-point rounding errors (e.g., `0.1 + 0.2 != 0.3`).
-- **Decision:** Store all monetary figures (`agreed_fee_paise`, `amount_paise`) as integers representing paise (1 INR = 100 paise). The UI handles conversion to and from decimal rupees only for display and input parsing.
-- **Rationale:** Ensures exact arithmetic when summing installments and calculating remaining balances.
+### ADR-19 — Immutable finalized clinical and financial history
+**Status:** Required. Finalized clinical records are corrected by dated addenda. Posted payments are corrected by authorized compensating reversal with mandatory reason. No silent deletion/edit.
 
----
+### ADR-20 — Transactional numbering and concurrency
+**Status:** Required. URN and receipt allocation must be unique under concurrency. Stale updates return 409. Payment validation and posting occur in one transaction. Define gap semantics for rolled-back/void records before promising gap-free numbers.
 
-### ADR-04: Full 12-Field Form Layout with Dual Signatures (Patient/Attendant & Authorized)
-- **Status:** Approved per Official Prescription Pad & Form Specification
-- **Context:** The initial brief explored omitting the patient signature, but the client's physical layout and form specification provided on 2026-10-28 explicitly includes:
-  1. Deep maroon Kalyan Hospital header with dual clinic branches (Ara & Gadhani) and consulting physiotherapists (Dr. Madan Mohan Dwivedi & Dr. Chandan Kr. Dwivedi).
-  2. The 12 numbered fields + Patient Picture box.
-  3. Dual bottom signatures: `Patient / Attendant Signature` and `Authorized Signature`, along with `Date`.
-- **Decision:** The registration and print engine will faithfully implement all 12 canonical fields, the dedicated Patient Picture box, and both signature lines as specified by the client.
-- **Rationale:** Aligns 100% with Kalyan Hospital's active physical workflow and legal/patient consent documentation.
+### ADR-21 — Database plus files backup
+**Status:** Required. Backup PostgreSQL data and referenced files with checksums, manual/scheduled runs and second physical drive. Verify in staging before restore cutover. Clean-machine restore is a handover gate.
 
----
+### ADR-22 — Legacy desktop is reference, not v3 runtime
+**Status:** Proposed. Preserve PySide6/SQLite code; reuse only reviewed business rules, assets, print layouts and tests. Migration only if real data exists and client approves.
 
-### ADR-05: Strict Layered Service-Repository Architecture
-- **Status:** Approved
-- **Context:** AI coding assistants often generate tight coupling between UI button click handlers and raw SQL queries, making code brittle and difficult to test or refactor.
-- **Decision:** Enforce four distinct layers:
-  1. Presentation (`app/ui/`)
-  2. Business Logic (`app/services/`)
-  3. Data Access (`app/repositories/`)
-  4. Storage (`app/db/`)
-- **Rationale:** UI events only call services; services handle rules and validation; repositories execute parameterized SQL. This allows 100% automated test coverage without launching the Qt event loop for every business rule.
+## Open decisions — do not silently assume
+
+| ID | Decision | Recommendation | Status |
+|---|---|---|---|
+| OD-01 | Server PC, OS, RAM, storage, fixed IP, UPS | Assess existing PC; UPS strongly recommended | Pending |
+| OD-02 | Doctor record visibility | Read clinically relevant records; write assigned only | Pending |
+| OD-03 | Financial reversal authority | Admin only, mandatory reason | Pending |
+| OD-04 | Receipt sequence reset | Calendar or financial year; client chooses | Pending |
+| OD-05 | Genuine v2 data exists? | Inspect before migration; demo data is not production data | Pending |
+| OD-06 | Printer | Confirm actual A4 model/driver; thermal separate | Pending |
+| OD-07 | HTTPS | Prefer HTTPS; HTTP only by explicit approval on isolated LAN | Pending |
+| OD-08 | Idle timeout and lockout thresholds | Agree during security acceptance | Pending |
+| OD-09 | Backup schedule, retention and owner | Daily scheduled plus manual pre-upgrade/restore; confirm policy | Pending |
+| OD-10 | Fee catalogue/effective dates | Admin-managed and audited | Pending |
+| OD-11 | Demographic edit rights | Reception edits with audit; clinical notes separate | Pending |
+| OD-12 | URN gap semantics | Define rollback/void behavior before gap-free guarantee | Pending |
 
 ---
 
-### ADR-06: Verified Restore Pipeline for Local Backups
-- **Status:** Approved
-- **Context:** A backup is useless if it cannot be restored or if restoring an incomplete file corrupts live clinic data.
-- **Decision:** Use SQLite's native hot backup API (`Connection.backup()`). Restores are verified by testing into an isolated temporary database and verifying row counts and integrity before replacing active data.
-- **Rationale:** Prevents data corruption and ensures honest, verifiable backup status in clinic operations.
+## Historical v2 desktop decisions — superseded or retained as principles
 
----
+- **ADR-01 Python/PySide6/SQLite:** approved for single-workstation desktop only; superseded for v3.
+- **ADR-02 Single-workstation boundary:** superseded by centralized LAN requirement.
+- **ADR-03 Integer paise:** retained for v3 billing.
+- **ADR-04 12-field form and dual signatures:** retained; actual printer acceptance required.
+- **ADR-05 Layered service/repository architecture:** retained as separation principle; v3 adds API layer.
+- **ADR-06 SQLite hot backup:** superseded by PostgreSQL + files bundle.
+- **ADR-07 Five-stage desktop demo:** superseded by v3 Phases 11–17.
+- **ADR-08 Synthetic demo data:** retained.
+- **ADR-09 Trust-led UI palette and maroon print branding:** retained as design guidance.
+- **ADR-10 QFluentWidgets licensing:** historical Qt decision only.
+- **ADR-11 Dashboard activity must reflect persisted events:** retained.
+- **ADR-12 Payment statuses derived from financial data:** retained.
+- **ADR-13 Thermal receipt balance labeled current-at-print:** historical print rule; revalidate for v3.
 
-### ADR-07: Staged 5-Phase Demo Delivery Strategy
-- **Status:** Approved
-- **Context:** Building the entire system in one monolithic push risks delivering an untestable application or discovering misaligned requirements at the final hour.
-- **Decision:** Deconstruct the build into 5 incremental stages (Stage A: Shell & Dashboard → Stage B: Patient Registration → Stage C: Treatment & Payments → Stage D: A4 Printing & Backup → Stage E: Demo Hardening).
-- **Rationale:** Enables early demonstration to the client after Stage B, validating form layouts and workflows well before final handover.
-
----
-
-### ADR-08: Fictional Data Policy for Development and Demos
-- **Status:** Approved
-- **Context:** Patient privacy and healthcare confidentiality must be maintained during AI assistance and client demonstrations.
-- **Decision:** All automated tests, sample databases, screenshots, and client walkthroughs utilize 100% synthetic fictional patient records (e.g. "Ramesh Kumar", "Sita Devi").
-- **Rationale:** Eliminates any risk of exposing real patient medical data in version control, logs, or public demos.
-
----
-
-### ADR-09: Separate Application Palette from Physical Prescription Branding
-- **Status:** Approved for UI redesign branch
-- **Context:** The earlier app shell used deep maroon across most interface surfaces because the physical prescription pad uses maroon. The supplied trust and hospital marks emphasize green, blue, and gold, and the maroon-heavy UI competed with clinical content.
-- **Decision:** Use trust green (`#155B43`) for the application identity and primary actions, clinical blue (`#234B86`) for secondary actions, restrained gold (`#C39A35`) for small highlights, a neutral canvas (`#F5F7F5`), and teal (`#0D9488`) for focus/interaction. Keep the maroon prescription header in the A4 document builder.
-- **Rationale:** Distinguishes the working desktop application from the printed form while grounding the UI palette in the actual trust/hospital branding.
-
----
-
-### ADR-10: Use Native PySide6 Components Until Fluent Widgets Are Commercially Licensed
-- **Status:** Approved for Phase 1
-- **Context:** The app is being developed for delivery as a client-facing Windows desktop application. The QFluentWidgets upstream documentation states that its Python library is licensed under GPLv3 for non-commercial projects and that commercial use requires a commercial license.
-- **Decision:** Do not add `PySide6-Fluent-Widgets` as a runtime dependency unless the project owner has obtained and confirmed the required commercial license. Build the Fluent-inspired command bar, quick launcher, toast feedback, and modern cards with the existing PySide6 dependency in the meantime.
-- **Rationale:** Keeps the deployment dependency footprint small and avoids assuming that a non-commercial license permits a proprietary client delivery.
-- **References:** [QFluentWidgets license](https://qfluentwidgets.com/pages/about/) · [QFluentWidgets FAQ](https://qfluentwidgets.com/pages/faq/)
-
-### ADR-11: Show Only Verifiable Events in the Today's Activity Panel
-- **Status:** Approved for Phase 1
-- **Context:** The current SQLite schema stores patients, treatment cases, treatment sessions, and payments; it does not contain an appointment entity or persisted waiting-room status.
-- **Decision:** The dashboard's day feed shows only registrations and treatment sessions that have actually been persisted for the current local date. Do not label a person "Waiting", "In Therapy", or "Completed" without a source field and defined workflow that supports that state.
-- **Rationale:** Prevents the operational dashboard from presenting inferred clinical or appointment states as facts. Appointment scheduling and queue state can be designed as a separate feature if the hospital requires it.
-
----
-
-### ADR-12: Keep Payment Statuses Grounded in Stored Financial Data
-- **Status:** Approved for Phase 3
-- **Context:** The existing schema stores case fees, payments, and treatment-case status, but has no payment due-date or overdue timestamp.
-- **Decision:** Render `PAID IN FULL`, `PARTIAL DUE`, `BALANCE DUE`, or `OVERPAID` strictly from the existing `BillingService.get_financial_summary()` values. Do not display `OVERDUE` without a persisted due date and agreed rules for calculating overdue.
-- **Rationale:** Prevents a decorative payment badge from incorrectly asserting a collection deadline that the database cannot verify.
-
-### ADR-13: Mark Thermal Receipt Balance as Current-at-Print
-- **Status:** Approved for Phase 3
-- **Context:** Historical payment rows do not store a balance-after-payment snapshot. The existing ledger can calculate the current case balance but cannot reliably reconstruct the exact balance after an old installment without replaying the ledger.
-- **Decision:** The 80mm receipt displays the installment amount and labels the displayed aggregate balance as `Current balance as of this receipt's print time`. The receipt preview uses a custom 80mm page and remains separate from the A4 prescription and registration record.
-- **Rationale:** Avoids presenting today's balance as if it were a historical transaction snapshot.
-
----
-*Decisions logged and baselined.*
+Update this record whenever a client decision changes the approved v3 baseline.
