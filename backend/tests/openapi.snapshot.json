@@ -1919,6 +1919,399 @@
         "title": "PatientUpdate",
         "type": "object"
       },
+      "PrescriptionCreate": {
+        "additionalProperties": false,
+        "description": "Schema for doctor creating a prescription.",
+        "properties": {
+          "diagnosis": {
+            "description": "Clinical diagnosis",
+            "maxLength": 1000,
+            "minLength": 2,
+            "title": "Diagnosis",
+            "type": "string"
+          },
+          "dietary_advice": {
+            "anyOf": [
+              {
+                "maxLength": 1000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dietary Advice"
+          },
+          "encounter_id": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Optional linked clinical encounter ID",
+            "title": "Encounter Id"
+          },
+          "follow_up_date": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Follow Up Date"
+          },
+          "general_advice": {
+            "anyOf": [
+              {
+                "maxLength": 1000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "General Advice"
+          },
+          "items": {
+            "description": "At least one prescribed medicine item required",
+            "items": {
+              "$ref": "#/components/schemas/PrescriptionItemCreate"
+            },
+            "minItems": 1,
+            "title": "Items",
+            "type": "array"
+          },
+          "patient_id": {
+            "description": "Patient ID",
+            "exclusiveMinimum": 0.0,
+            "title": "Patient Id",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "patient_id",
+          "diagnosis",
+          "items"
+        ],
+        "title": "PrescriptionCreate",
+        "type": "object"
+      },
+      "PrescriptionItemCreate": {
+        "additionalProperties": false,
+        "description": "Schema for itemized medication line creation.",
+        "properties": {
+          "dosage": {
+            "description": "Dosage (e.g. 500mg, 10ml)",
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Dosage",
+            "type": "string"
+          },
+          "duration_days": {
+            "description": "Treatment duration in days",
+            "maximum": 365.0,
+            "minimum": 1.0,
+            "title": "Duration Days",
+            "type": "integer"
+          },
+          "frequency": {
+            "description": "Frequency (e.g. 1-0-1, OD, BD, TDS)",
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Frequency",
+            "type": "string"
+          },
+          "instructions": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Specific instructions (e.g. After food)",
+            "title": "Instructions"
+          },
+          "item_order": {
+            "description": "1-based sequence order of medication item",
+            "minimum": 1.0,
+            "title": "Item Order",
+            "type": "integer"
+          },
+          "medicine_name": {
+            "description": "Brand or generic name",
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Medicine Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "item_order",
+          "medicine_name",
+          "dosage",
+          "frequency",
+          "duration_days"
+        ],
+        "title": "PrescriptionItemCreate",
+        "type": "object"
+      },
+      "PrescriptionItemOut": {
+        "description": "Schema for reading a medication item.",
+        "properties": {
+          "dosage": {
+            "title": "Dosage",
+            "type": "string"
+          },
+          "duration_days": {
+            "title": "Duration Days",
+            "type": "integer"
+          },
+          "frequency": {
+            "title": "Frequency",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "instructions": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Instructions"
+          },
+          "item_order": {
+            "title": "Item Order",
+            "type": "integer"
+          },
+          "medicine_name": {
+            "title": "Medicine Name",
+            "type": "string"
+          },
+          "prescription_id": {
+            "title": "Prescription Id",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "prescription_id",
+          "item_order",
+          "medicine_name",
+          "dosage",
+          "frequency",
+          "duration_days"
+        ],
+        "title": "PrescriptionItemOut",
+        "type": "object"
+      },
+      "PrescriptionOut": {
+        "description": "Schema for full prescription reading including items.",
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "diagnosis": {
+            "title": "Diagnosis",
+            "type": "string"
+          },
+          "dietary_advice": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dietary Advice"
+          },
+          "doctor_id": {
+            "title": "Doctor Id",
+            "type": "integer"
+          },
+          "doctor_name": {
+            "title": "Doctor Name",
+            "type": "string"
+          },
+          "encounter_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Encounter Id"
+          },
+          "follow_up_date": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Follow Up Date"
+          },
+          "general_advice": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "General Advice"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/PrescriptionItemOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "patient_id": {
+            "title": "Patient Id",
+            "type": "integer"
+          },
+          "patient_name": {
+            "title": "Patient Name",
+            "type": "string"
+          },
+          "patient_urn": {
+            "title": "Patient Urn",
+            "type": "string"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          },
+          "version_id": {
+            "title": "Version Id",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "patient_id",
+          "patient_urn",
+          "patient_name",
+          "doctor_id",
+          "doctor_name",
+          "diagnosis",
+          "version_id",
+          "created_at",
+          "updated_at",
+          "items"
+        ],
+        "title": "PrescriptionOut",
+        "type": "object"
+      },
+      "PrescriptionSummary": {
+        "description": "Schema for prescription summary in patient prescription lists.",
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "diagnosis": {
+            "title": "Diagnosis",
+            "type": "string"
+          },
+          "doctor_id": {
+            "title": "Doctor Id",
+            "type": "integer"
+          },
+          "doctor_name": {
+            "title": "Doctor Name",
+            "type": "string"
+          },
+          "encounter_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Encounter Id"
+          },
+          "follow_up_date": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Follow Up Date"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "items_count": {
+            "title": "Items Count",
+            "type": "integer"
+          },
+          "patient_id": {
+            "title": "Patient Id",
+            "type": "integer"
+          },
+          "patient_name": {
+            "title": "Patient Name",
+            "type": "string"
+          },
+          "patient_urn": {
+            "title": "Patient Urn",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "patient_id",
+          "patient_urn",
+          "patient_name",
+          "doctor_id",
+          "doctor_name",
+          "diagnosis",
+          "items_count",
+          "created_at"
+        ],
+        "title": "PrescriptionSummary",
+        "type": "object"
+      },
       "ReceptionOverviewResponse": {
         "additionalProperties": false,
         "description": "Reception dashboard summary.",
@@ -3670,6 +4063,138 @@
         "summary": "List Patient Encounters",
         "tags": [
           "encounters"
+        ]
+      }
+    },
+    "/api/patients/{patient_id}/prescriptions": {
+      "get": {
+        "description": "List historical prescriptions for a given patient.",
+        "operationId": "list_patient_prescriptions_api_patients__patient_id__prescriptions_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "patient_id",
+            "required": true,
+            "schema": {
+              "title": "Patient Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/PrescriptionSummary"
+                  },
+                  "title": "Response List Patient Prescriptions Api Patients  Patient Id  Prescriptions Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Patient Prescriptions",
+        "tags": [
+          "prescriptions"
+        ]
+      }
+    },
+    "/api/prescriptions": {
+      "post": {
+        "description": "Issue a new structured prescription with medication lines (RX-01).",
+        "operationId": "create_prescription_api_prescriptions_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PrescriptionCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PrescriptionOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Prescription",
+        "tags": [
+          "prescriptions"
+        ]
+      }
+    },
+    "/api/prescriptions/{id}": {
+      "get": {
+        "description": "Retrieve full prescription details including all medication lines (RX-01).",
+        "operationId": "get_prescription_api_prescriptions__id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "title": "Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PrescriptionOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Prescription",
+        "tags": [
+          "prescriptions"
         ]
       }
     },
