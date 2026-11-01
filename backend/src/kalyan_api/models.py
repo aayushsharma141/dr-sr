@@ -535,3 +535,242 @@ class ClinicalAddendum(Base):
     encounter = relationship("ClinicalEncounter", back_populates="addenda")
     doctor = relationship("Doctor", lazy="joined")
     created_by_user = relationship("User", lazy="joined")
+
+
+class TreatmentPlanStatus(StrEnum):
+    """Lifecycle statuses for multi-session physiotherapy treatment packages."""
+
+    ACTIVE = "ACTIVE"
+    COMPLETED = "COMPLETED"
+    CANCELLED = "CANCELLED"
+
+
+class TreatmentPlan(Base):
+    """Multi-session physiotherapy treatment plan / package (TRT-01, OQ-13)."""
+
+    __tablename__ = "treatment_plans"
+    __table_args__ = (
+        Index("ix_treatment_plans_patient_id", "patient_id"),
+        Index("ix_treatment_plans_doctor_id", "doctor_id"),
+        Index("ix_treatment_plans_status", "status"),
+        CheckConstraint(
+            "total_sessions >= 1 AND total_sessions <= 200",
+            name="ck_treatment_plans_total_sessions",
+        ),
+        CheckConstraint(
+            "completed_sessions >= 0 AND completed_sessions <= total_sessions",
+            name="ck_treatment_plans_completed_sessions",
+        ),
+        CheckConstraint("agreed_price_paise >= 0", name="ck_treatment_plans_agreed_price"),
+        CheckConstraint(
+            "status IN ('ACTIVE', 'COMPLETED', 'CANCELLED')", name="ck_treatment_plans_status"
+        ),
+        CheckConstraint(
+            "status != 'CANCELLED' OR ("
+            "cancellation_reason IS NOT NULL AND length(trim(cancellation_reason)) >= 3)",
+            name="ck_treatment_plans_cancellation",
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    patient_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("patients.id", ondelete="RESTRICT"), nullable=False
+    )
+    doctor_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("doctors.id", ondelete="RESTRICT"), nullable=False
+    )
+    encounter_id: Mapped[int | None] = mapped_column(
+        BigInteger, ForeignKey("clinical_encounters.id", ondelete="SET NULL"), nullable=True
+    )
+    plan_name: Mapped[str] = mapped_column(String(128), nullable=False)
+    condition_diagnosis: Mapped[str] = mapped_column(Text, nullable=False)
+    referred_by: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    total_sessions: Mapped[int] = mapped_column(Integer, nullable=False)
+    completed_sessions: Mapped[int] = mapped_column(
+        Integer, default=0, server_default="0", nullable=False
+    )
+    agreed_price_paise: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    status: Mapped[str] = mapped_column(
+        String(32),
+        default=TreatmentPlanStatus.ACTIVE.value,
+        server_default=TreatmentPlanStatus.ACTIVE.value,
+        nullable=False,
+    )
+    cancellation_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+    version_id: Mapped[int] = mapped_column(Integer, default=1, server_default="1", nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
+
+    __mapper_args__ = {"version_id_col": version_id}
+
+    patient = relationship("Patient", lazy="joined")
+    doctor = relationship("Doctor", lazy="joined")
+    encounter = relationship("ClinicalEncounter", lazy="select")
+    sessions = relationship(
+        "TreatmentSession",
+        back_populates="treatment_plan",
+        cascade="all, delete-orphan",
+        order_by="TreatmentSession.session_number",
+    )
+
+
+class TreatmentSession(Base):
+    """Chronological individual physiotherapy session logs with VAS scoring (TRT-02, TRT-03)."""
+
+    __tablename__ = "treatment_sessions"
+    __table_args__ = (
+        UniqueConstraint(
+            "treatment_plan_id", "session_number", name="uq_treatment_sessions_plan_session"
+        ),
+        Index("ix_treatment_sessions_treatment_plan_id", "treatment_plan_id"),
+        Index("ix_treatment_sessions_patient_id", "patient_id"),
+        Index("ix_treatment_sessions_session_date", "session_date"),
+        CheckConstraint("vas_score >= 0 AND vas_score <= 10", name="ck_treatment_sessions_vas"),
+        CheckConstraint("session_number >= 1", name="ck_treatment_sessions_number"),
+        CheckConstraint("length(trim(clinical_notes)) >= 2", name="ck_treatment_sessions_notes"),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    treatment_plan_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("treatment_plans.id", ondelete="RESTRICT"), nullable=False
+    )
+    patient_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("patients.id", ondelete="RESTRICT"), nullable=False
+    )
+    doctor_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("doctors.id", ondelete="RESTRICT"), nullable=False
+    )
+    session_number: Mapped[int] = mapped_column(Integer, nullable=False)
+    session_date: Mapped[date] = mapped_column(
+        Date, server_default=func.current_date(), nullable=False
+    )
+    vas_score: Mapped[int] = mapped_column(Integer, nullable=False)
+    modalities: Mapped[list] = mapped_column(
+        JSONB, default=list, server_default=text("'[]'::jsonb"), nullable=False
+    )
+    clinical_notes: Mapped[str] = mapped_column(Text, nullable=False)
+    is_finalised: Mapped[bool] = mapped_column(
+        Boolean, default=True, server_default=text("true"), nullable=False
+    )
+    created_by_user_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("users.id", ondelete="RESTRICT"), nullable=False
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    treatment_plan = relationship("TreatmentPlan", back_populates="sessions")
+    patient = relationship("Patient", lazy="joined")
+    doctor = relationship("Doctor", lazy="joined")
+    created_by_user = relationship("User", lazy="joined")
+    addenda = relationship(
+        "TreatmentSessionAddendum",
+        back_populates="session",
+        cascade="all, delete-orphan",
+        order_by="TreatmentSessionAddendum.created_at",
+    )
+
+
+class TreatmentSessionAddendum(Base):
+    """Chronologically ordered addenda for finalised physiotherapy sessions (TRT-03)."""
+
+    __tablename__ = "treatment_session_addenda"
+    __table_args__ = (Index("ix_treatment_session_addenda_session_id", "session_id"),)
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    session_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("treatment_sessions.id", ondelete="RESTRICT"), nullable=False
+    )
+    author_user_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("users.id", ondelete="RESTRICT"), nullable=False
+    )
+    note: Mapped[str] = mapped_column(Text, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    session = relationship("TreatmentSession", back_populates="addenda")
+    author_user = relationship("User", lazy="joined")
+
+
+class Prescription(Base):
+    """Doctor medical prescription record (RX-01)."""
+
+    __tablename__ = "prescriptions"
+    __table_args__ = (
+        Index("ix_prescriptions_patient_id", "patient_id"),
+        Index("ix_prescriptions_doctor_id", "doctor_id"),
+        Index("ix_prescriptions_encounter_id", "encounter_id"),
+        CheckConstraint("length(trim(diagnosis)) >= 2", name="ck_prescriptions_diagnosis"),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    patient_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("patients.id", ondelete="RESTRICT"), nullable=False
+    )
+    doctor_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("doctors.id", ondelete="RESTRICT"), nullable=False
+    )
+    encounter_id: Mapped[int | None] = mapped_column(
+        BigInteger, ForeignKey("clinical_encounters.id", ondelete="SET NULL"), nullable=True
+    )
+    diagnosis: Mapped[str] = mapped_column(Text, nullable=False)
+    dietary_advice: Mapped[str | None] = mapped_column(Text, nullable=True)
+    general_advice: Mapped[str | None] = mapped_column(Text, nullable=True)
+    follow_up_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    version_id: Mapped[int] = mapped_column(Integer, default=1, server_default="1", nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
+
+    __mapper_args__ = {"version_id_col": version_id}
+
+    patient = relationship("Patient", lazy="joined")
+    doctor = relationship("Doctor", lazy="joined")
+    encounter = relationship("ClinicalEncounter", lazy="select")
+    items = relationship(
+        "PrescriptionItem",
+        back_populates="prescription",
+        cascade="all, delete-orphan",
+        order_by="PrescriptionItem.item_order",
+    )
+
+
+class PrescriptionItem(Base):
+    """Individual itemized medication line on a prescription (RX-01)."""
+
+    __tablename__ = "prescription_items"
+    __table_args__ = (
+        UniqueConstraint("prescription_id", "item_order", name="uq_prescription_items_order"),
+        Index("ix_prescription_items_prescription_id", "prescription_id"),
+        CheckConstraint(
+            "duration_days >= 1 AND duration_days <= 365", name="ck_prescription_items_duration"
+        ),
+        CheckConstraint("length(trim(medicine_name)) >= 1", name="ck_prescription_items_medicine"),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    prescription_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("prescriptions.id", ondelete="CASCADE"), nullable=False
+    )
+    item_order: Mapped[int] = mapped_column(Integer, nullable=False)
+    medicine_name: Mapped[str] = mapped_column(String(128), nullable=False)
+    dosage: Mapped[str] = mapped_column(String(64), nullable=False)
+    frequency: Mapped[str] = mapped_column(String(64), nullable=False)
+    duration_days: Mapped[int] = mapped_column(Integer, nullable=False)
+    instructions: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    prescription = relationship("Prescription", back_populates="items")
