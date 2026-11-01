@@ -28,7 +28,9 @@ Recorded Phase 13 gate evidence: 422 backend tests, 92.51% backend coverage, and
 - Admin lacks `PATIENT_UPDATE`; Reception has it.
 - Strict doctor silo is implemented, but clinical policy confirmation is pending.
 - URN allocation is transactional; cancellation/void/gap semantics remain unresolved.
-- Financial, audit-viewer, backup/restore/integrity, and final deployment acceptance phases are not yet delivered.
+- The audit writer/foundation exists, but full domain coverage and the Admin audit viewer are not complete.
+- The current patient API schema does not yet map one-to-one to all fields in the client-provided registration form; PAT-01 is therefore partial pending approved mapping.
+- Financial, backup/restore/integrity, and final deployment acceptance phases are not yet delivered.
 
 ## Release posture
 
