@@ -51,6 +51,8 @@ See `.planning/PROJECT.md`, `PRD.md`, `ARCHITECTURE.md`, `SECURITY.md` and `DECI
 1. `PHOTO_READ` is granted only to Reception, while the patient-photo download endpoint requires it. Admin and Doctor are denied by the current role map.
 2. `PATIENT_UPDATE` is granted to Reception only. Admin cannot update demographics under the current role map.
 3. Doctor appointments and encounters are scoped to the authenticated doctor. Confirm the strict silo with the client before production.
+4. The current `PatientCreate` API schema has 12 fields, but they do not match the client's 12 registration-form categories; visit in/out, referral, condition, session-count and payment-total fields are not represented as equivalent patient fields.
+5. Phase 11 provides an audit-event writer/foundation; full audit event coverage across later clinical, billing and backup modules remains incomplete.
 
 Track remediation as code changes with role-allowed and role-denied tests; this documentation branch does not change application code.
 
@@ -63,6 +65,9 @@ Server hardware/OS, fixed IP, UPS, HTTPS policy, doctor visibility approval, Adm
 1. Begin Phase 14 planning/specification and keep prescription/session requirements separate from billing work.
 2. Resolve the permission findings with explicit client policy decisions and tests.
 3. Keep Phase 15–17 requirements planned until their implementation and acceptance evidence exists.
+4. Resolve the client registration-form-to-API schema mapping before claiming full PAT-01 completion.
+5. Extend audit events as each future module is implemented; do not treat the Phase 11 audit foundation as complete domain coverage.
+6. Obtain written client decisions for doctor visibility, Admin photo/demographic permissions, reversal authority and receipt numbering before affected workflows are finalized.
 
 ---
 *State synchronized to the recorded Phase 13 milestone on 2026-11-01. Documentation update only; no code tests rerun.*
