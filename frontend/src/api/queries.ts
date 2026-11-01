@@ -1,4 +1,17 @@
 import type {
+  AddendumCreate,
+  AddendumRead,
+  Appointment,
+  AppointmentCreate,
+  AppointmentListResponse,
+  AppointmentStatusUpdate,
+  DoctorQueueResponse,
+  EncounterCreate,
+  EncounterRead,
+  EncounterSummary,
+  EncounterUpdate,
+} from './types'
+import type {
   DuplicateCheckResponse,
   PatientCreate,
   PatientOut,
@@ -477,6 +490,154 @@ export function useUploadPatientPhoto() {
     onSuccess: (_, variables) => {
       qc.invalidateQueries({ queryKey: ['patient', variables.id] })
       qc.invalidateQueries({ queryKey: ['patients'] })
+    },
+  })
+}
+
+
+// ==============================================================================
+// Appointments & Clinical Encounters (Phase 13)
+// ==============================================================================
+
+export function useAppointments(params?: {
+  appointment_date?: string
+  doctor_id?: number
+  patient_id?: number
+  status?: string
+}) {
+  const q = new URLSearchParams()
+  if (params?.appointment_date) q.set('appointment_date', params.appointment_date)
+  if (params?.doctor_id) q.set('doctor_id', String(params.doctor_id))
+  if (params?.patient_id) q.set('patient_id', String(params.patient_id))
+  if (params?.status) q.set('status', params.status)
+  const qs = q.toString() ? `?${q.toString()}` : ''
+
+  return useQuery({
+    queryKey: ['appointments', params],
+    queryFn: () => apiFetch<AppointmentListResponse>(`/appointments${qs}`),
+  })
+}
+
+export function useAppointment(id: number) {
+  return useQuery({
+    queryKey: ['appointment', id],
+    queryFn: () => apiFetch<Appointment>(`/appointments/${id}`),
+    enabled: id > 0,
+  })
+}
+
+export function useBookAppointment() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (body: AppointmentCreate) =>
+      apiFetch<Appointment>('/appointments', {
+        method: 'POST',
+        body,
+      }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['appointments'] })
+      qc.invalidateQueries({ queryKey: ['doctor-queue'] })
+    },
+  })
+}
+
+export function useUpdateAppointmentStatus() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, body }: { id: number; body: AppointmentStatusUpdate }) =>
+      apiFetch<Appointment>(`/appointments/${id}/status`, {
+        method: 'PATCH',
+        body,
+      }),
+    onSuccess: (data) => {
+      qc.setQueryData(['appointment', data.id], data)
+      qc.invalidateQueries({ queryKey: ['appointments'] })
+      qc.invalidateQueries({ queryKey: ['doctor-queue'] })
+    },
+  })
+}
+
+export function useDoctorQueue() {
+  return useQuery({
+    queryKey: ['doctor-queue'],
+    queryFn: () => apiFetch<DoctorQueueResponse>('/doctor/queue'),
+    refetchInterval: 10000, // Poll every 10s for real-time queue refresh
+  })
+}
+
+export function usePatientEncounters(patientId: number) {
+  return useQuery({
+    queryKey: ['patient-encounters', patientId],
+    queryFn: () => apiFetch<EncounterSummary[]>(`/patients/${patientId}/encounters`),
+    enabled: patientId > 0,
+  })
+}
+
+export function useEncounter(id: number) {
+  return useQuery({
+    queryKey: ['encounter', id],
+    queryFn: () => apiFetch<EncounterRead>(`/encounters/${id}`),
+    enabled: id > 0,
+  })
+}
+
+export function useCreateEncounter() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (body: EncounterCreate) =>
+      apiFetch<EncounterRead>('/encounters', {
+        method: 'POST',
+        body,
+      }),
+    onSuccess: (data) => {
+      qc.invalidateQueries({ queryKey: ['patient-encounters', data.patient_id] })
+      qc.invalidateQueries({ queryKey: ['doctor-queue'] })
+      qc.invalidateQueries({ queryKey: ['appointments'] })
+    },
+  })
+}
+
+export function useUpdateEncounter() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, body }: { id: number; body: EncounterUpdate }) =>
+      apiFetch<EncounterRead>(`/encounters/${id}`, {
+        method: 'PATCH',
+        body,
+      }),
+    onSuccess: (data) => {
+      qc.setQueryData(['encounter', data.id], data)
+      qc.invalidateQueries({ queryKey: ['patient-encounters', data.patient_id] })
+    },
+  })
+}
+
+export function useFinaliseEncounter() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (id: number) =>
+      apiFetch<EncounterRead>(`/encounters/${id}/finalise`, {
+        method: 'POST',
+      }),
+    onSuccess: (data) => {
+      qc.setQueryData(['encounter', data.id], data)
+      qc.invalidateQueries({ queryKey: ['patient-encounters', data.patient_id] })
+      qc.invalidateQueries({ queryKey: ['doctor-queue'] })
+      qc.invalidateQueries({ queryKey: ['appointments'] })
+    },
+  })
+}
+
+export function useAddAddendum() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, body }: { id: number; body: AddendumCreate }) =>
+      apiFetch<AddendumRead>(`/encounters/${id}/addenda`, {
+        method: 'POST',
+        body,
+      }),
+    onSuccess: (_, variables) => {
+      qc.invalidateQueries({ queryKey: ['encounter', variables.id] })
     },
   })
 }

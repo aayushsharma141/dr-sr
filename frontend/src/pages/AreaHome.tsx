@@ -133,14 +133,23 @@ export function AreaHome({ area }: AreaHomeProps) {
                 <h3 className="text-sm font-semibold text-neutral-700 uppercase tracking-wider mb-3">
                   Reception Operations
                 </h3>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <Link
+                    to="/reception/appointments"
+                    className="p-4 bg-white rounded border border-neutral-300 hover:border-red-800 hover:shadow-xs transition-all block"
+                  >
+                    <p className="font-bold text-neutral-900">Appointments & Queue</p>
+                    <p className="text-xs text-neutral-500 mt-1">
+                      Book daily tokens, track arrived patients & manage waiting hall
+                    </p>
+                  </Link>
                   <Link
                     to="/reception/patients/new"
                     className="p-4 bg-white rounded border border-neutral-300 hover:border-red-800 hover:shadow-xs transition-all block"
                   >
-                    <p className="font-bold text-neutral-900">+ New Patient Registration</p>
+                    <p className="font-bold text-neutral-900">+ New Registration</p>
                     <p className="text-xs text-neutral-500 mt-1">
-                      Register new patient demographics, capture photo & generate URN
+                      Register patient demographics, capture photo & generate URN
                     </p>
                   </Link>
                   <Link
