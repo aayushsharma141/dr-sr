@@ -2,15 +2,13 @@
 
 **Product direction: v3.0 centralized offline LAN web platform.**
 
-<badge>Cannot be rendered in Markdown</badge>
-
 ## Current implementation status
 
 The current `main` branch contains both the legacy PySide6 + SQLite desktop application and the v3 centralized LAN web platform.
 
 - **v2 desktop:** retained as historical reference; do not share its SQLite database over a network drive.
 - **v3 Phase 11:** foundation, authentication, fixed roles, server-side permission checks, optimistic concurrency, first-admin bootstrap and audit-event writing implemented. Phase gate evidence is recorded in `.planning/STATE.md`.
-- **v3 Phase 12:** clinic settings, doctor profiles, fee catalogue, patient registry, atomic URN allocation, search, demographic edits, duplicate warning, photo streaming and A4 registration print spike implemented.
+- **v3 Phase 12:** clinic settings, doctor profiles, fee catalogue, patient registry, transactional URN allocation, search, demographic edits, duplicate warning, photo streaming and A4 print spike recorded complete. The exact client registration-form fields still need reconciliation with the current API schema; see `PRD.md` and `brain/decisions/open-questions.md`.
 - **v3 Phase 13:** appointments, per-doctor token queues, appointment status transitions, doctor queue, clinical encounters, finalization and addenda implemented.
 - **Next:** Phase 14 — prescriptions, treatment plans/packages and physiotherapy sessions with VAS.
 - **Not yet delivered:** Phase 15 billing/receipts/reversals; Phase 16 audit viewer/backup/restore/integrity; Phase 17 LAN deployment and final acceptance.
@@ -56,6 +54,8 @@ The current role catalogue grants `PHOTO_READ` to Reception but not Admin or Doc
 ## Development and verification
 
 The current Phase 13 state record reports 422 backend tests, 92.51% backend coverage and 58 frontend tests passing at the Phase 13 gate. These are recorded project results, not a fresh test run in this documentation pass. Re-run CI against the target commit before release.
+
+**Form/schema gap:** the current API patient schema does not yet represent all fields in the client-provided registration form. Do not claim full form parity until the field mapping is approved and implemented.
 
 Use synthetic patient data in tests and demos. Never commit real patient records/photos, credentials, setup codes, production databases or backups.
 
