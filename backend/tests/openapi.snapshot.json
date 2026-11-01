@@ -2700,6 +2700,213 @@
         "title": "TreatmentPlanUpdate",
         "type": "object"
       },
+      "TreatmentSessionAddendumCreate": {
+        "additionalProperties": false,
+        "description": "Schema for appending a dated addendum to a finalised session.",
+        "properties": {
+          "note": {
+            "description": "Clinical observation or correction",
+            "maxLength": 2000,
+            "minLength": 2,
+            "title": "Note",
+            "type": "string"
+          }
+        },
+        "required": [
+          "note"
+        ],
+        "title": "TreatmentSessionAddendumCreate",
+        "type": "object"
+      },
+      "TreatmentSessionAddendumOut": {
+        "description": "Schema for reading an addendum attached to a session.",
+        "properties": {
+          "author_name": {
+            "title": "Author Name",
+            "type": "string"
+          },
+          "author_user_id": {
+            "title": "Author User Id",
+            "type": "integer"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "note": {
+            "title": "Note",
+            "type": "string"
+          },
+          "session_id": {
+            "title": "Session Id",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "session_id",
+          "author_user_id",
+          "author_name",
+          "note",
+          "created_at"
+        ],
+        "title": "TreatmentSessionAddendumOut",
+        "type": "object"
+      },
+      "TreatmentSessionCreate": {
+        "additionalProperties": false,
+        "description": "Schema for recording a new physiotherapy treatment session.",
+        "properties": {
+          "clinical_notes": {
+            "description": "Session observations and patient response",
+            "maxLength": 2000,
+            "minLength": 2,
+            "title": "Clinical Notes",
+            "type": "string"
+          },
+          "modalities": {
+            "description": "Physiotherapy modalities applied (e.g. IFT, Traction)",
+            "items": {
+              "type": "string"
+            },
+            "title": "Modalities",
+            "type": "array"
+          },
+          "session_date": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Date session took place (defaults to today)",
+            "title": "Session Date"
+          },
+          "vas_score": {
+            "description": "Visual Analog Scale pain rating (0-10)",
+            "maximum": 10.0,
+            "minimum": 0.0,
+            "title": "Vas Score",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "vas_score",
+          "clinical_notes"
+        ],
+        "title": "TreatmentSessionCreate",
+        "type": "object"
+      },
+      "TreatmentSessionOut": {
+        "description": "Schema for reading full treatment session details including addenda.",
+        "properties": {
+          "addenda": {
+            "items": {
+              "$ref": "#/components/schemas/TreatmentSessionAddendumOut"
+            },
+            "title": "Addenda",
+            "type": "array"
+          },
+          "clinical_notes": {
+            "title": "Clinical Notes",
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "created_by_user_id": {
+            "title": "Created By User Id",
+            "type": "integer"
+          },
+          "created_by_username": {
+            "title": "Created By Username",
+            "type": "string"
+          },
+          "doctor_id": {
+            "title": "Doctor Id",
+            "type": "integer"
+          },
+          "doctor_name": {
+            "title": "Doctor Name",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "is_finalised": {
+            "title": "Is Finalised",
+            "type": "boolean"
+          },
+          "modalities": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Modalities",
+            "type": "array"
+          },
+          "patient_id": {
+            "title": "Patient Id",
+            "type": "integer"
+          },
+          "patient_name": {
+            "title": "Patient Name",
+            "type": "string"
+          },
+          "patient_urn": {
+            "title": "Patient Urn",
+            "type": "string"
+          },
+          "session_date": {
+            "format": "date",
+            "title": "Session Date",
+            "type": "string"
+          },
+          "session_number": {
+            "title": "Session Number",
+            "type": "integer"
+          },
+          "treatment_plan_id": {
+            "title": "Treatment Plan Id",
+            "type": "integer"
+          },
+          "vas_score": {
+            "title": "Vas Score",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "treatment_plan_id",
+          "patient_id",
+          "patient_urn",
+          "patient_name",
+          "doctor_id",
+          "doctor_name",
+          "session_number",
+          "session_date",
+          "vas_score",
+          "modalities",
+          "clinical_notes",
+          "is_finalised",
+          "created_by_user_id",
+          "created_by_username",
+          "created_at",
+          "addenda"
+        ],
+        "title": "TreatmentSessionOut",
+        "type": "object"
+      },
       "UserCreate": {
         "additionalProperties": false,
         "description": "Payload for creating a new user account.",
@@ -4820,6 +5027,237 @@
         "summary": "Update Treatment Plan",
         "tags": [
           "treatment-plans"
+        ]
+      }
+    },
+    "/api/treatment-plans/{plan_id}/sessions": {
+      "get": {
+        "description": "Retrieve chronological sessions and VAS scores for a treatment plan.",
+        "operationId": "list_treatment_sessions_api_treatment_plans__plan_id__sessions_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "plan_id",
+            "required": true,
+            "schema": {
+              "title": "Plan Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/TreatmentSessionOut"
+                  },
+                  "title": "Response List Treatment Sessions Api Treatment Plans  Plan Id  Sessions Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Treatment Sessions",
+        "tags": [
+          "treatment-sessions"
+        ]
+      },
+      "post": {
+        "description": "Log an individual physiotherapy session with VAS score and modalities (TRT-02).",
+        "operationId": "log_treatment_session_api_treatment_plans__plan_id__sessions_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "plan_id",
+            "required": true,
+            "schema": {
+              "title": "Plan Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TreatmentSessionCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TreatmentSessionOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Log Treatment Session",
+        "tags": [
+          "treatment-sessions"
+        ]
+      }
+    },
+    "/api/treatment-sessions/{id}": {
+      "delete": {
+        "description": "Rejects direct session deletion; records are immutable (TRT-03).",
+        "operationId": "delete_treatment_session_api_treatment_sessions__id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "title": "Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Treatment Session",
+        "tags": [
+          "treatment-sessions"
+        ]
+      },
+      "patch": {
+        "description": "Rejects direct session modification; records are immutable (TRT-03).",
+        "operationId": "update_treatment_session_api_treatment_sessions__id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "title": "Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Treatment Session",
+        "tags": [
+          "treatment-sessions"
+        ]
+      }
+    },
+    "/api/treatment-sessions/{id}/addenda": {
+      "post": {
+        "description": "Append a retrospective clinical note or correction to a finalised session (TRT-03).",
+        "operationId": "create_session_addendum_api_treatment_sessions__id__addenda_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "title": "Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TreatmentSessionAddendumCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TreatmentSessionAddendumOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Session Addendum",
+        "tags": [
+          "treatment-sessions"
         ]
       }
     },
