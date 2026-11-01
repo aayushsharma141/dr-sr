@@ -8,7 +8,7 @@
 
 One testable phase at a time. A feature is not complete merely because a screen exists. Security, financial correctness, audit and restore testing cannot be deferred. Use synthetic data. Keep the legacy PySide6 app separate from v3 runtime. Treat the phase state file as the execution ledger and link each completion claim to tests/evidence.
 
-## Phase 11 — Decisions Gate, Foundation & Auth <badge>Complete — recorded</badge>
+## Phase 11 — Decisions Gate, Foundation & Auth **(Complete — recorded)**
 
 - [x] Repository, toolchain, PostgreSQL and backend/frontend scaffolding.
 - [x] SQLAlchemy/Alembic baseline and append-only audit-event foundation.
@@ -22,10 +22,11 @@ One testable phase at a time. A feature is not complete merely because a screen 
 - [x] Phase 11 gate recorded as 16/16 plans in `.planning/STATE.md`.
 **Evidence note:** Verify the current CI logs and exact Phase 11 gate commit before release; this documentation pass did not rerun tests.
 
-## Phase 12 — Clinic Settings & Patient Registration <badge>Complete — recorded</badge>
+## Phase 12 — Clinic Settings & Patient Registration **(Complete — recorded)**
 
 - [x] Clinic settings, doctor profiles and fee catalogue.
-- [x] Canonical patient registration fields and private photo metadata/storage.
+- [x] Current patient registration schema and private photo metadata/storage.
+- [ ] Reconcile the current API schema with all client-provided registration-form fields before claiming full form parity.
 - [x] Transactional annual `KH-YYYY-XXXX` URN allocation.
 - [x] Search by URN/name/mobile, including Devanagari names.
 - [x] Duplicate warning for same name and mobile.
@@ -34,7 +35,7 @@ One testable phase at a time. A feature is not complete merely because a screen 
 - [x] A4 registration-card print spike.
 **Evidence note:** Phase 12 is recorded as 8/8 plans complete. Actual printer sign-off remains Phase 17.
 
-## Phase 13 — Appointments & Clinical Encounters <badge>Complete — recorded</badge>
+## Phase 13 — Appointments & Clinical Encounters **(Complete — recorded)**
 
 - [x] Appointment models and migration 0003.
 - [x] Per-doctor daily token allocation and booking API.
@@ -70,7 +71,7 @@ One testable phase at a time. A feature is not complete merely because a screen 
 ## Phase 16 — Audit, Backup and Integrity
 
 - [ ] Admin audit viewer and filters.
-- [ ] Full append-only audit coverage across security, patient, clinical, billing and backup events.
+- [ ] Complete append-only audit coverage across security, patient, clinical, billing and backup events; Phase 11 delivered the writer/foundation only.
 - [ ] PostgreSQL + patient-file backup bundle and checksum manifest.
 - [ ] Manual and scheduled backup to second drive.
 - [ ] Staged verification and safe restore.
