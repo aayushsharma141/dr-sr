@@ -1,107 +1,52 @@
-# Kalyan Hospital — Patient & Physiotherapy Management System
+# Kalyan Hospital — Patient & Physiotherapy Platform
 
-A standalone, 100% offline Windows desktop application built with Python, PySide6 (Qt 6), and SQLite 3 for **Kalyan Hospital** (operated by श्री वशिष्ठ कल्याण ट्रस्ट, Ara, Bhojpur, Bihar).
+**Product direction: v3.0 centralized offline LAN web platform.**
 
----
+> Status: The current main branch contains the earlier PySide6 + SQLite single-workstation desktop application. The v3 React + FastAPI + PostgreSQL platform is the target architecture and has not yet been implemented. Do not deploy or describe the legacy desktop application as the v3 LAN system.
 
-## Features (Phase 1 — Stage A)
+## Product goal
 
-- **Trust-Led Clinical Branding:** Forest green (`#155B43`) and clinical blue (`#234B86`) with restrained gold accents (`#C39A35`), supplied hospital logo, bilingual trust identity, clinician credentials, and both clinic branch addresses (Ara & Gadhani). The printed A4 prescription retains the physical pad's maroon header.
-- **Navigation Sidebar:** Clear routing between Dashboard, Patients, Treatment Sessions, Billing & Payments, and Backups.
-- **Keyboard-First Quick Launcher:** Press `Ctrl+K` from any workspace to find a patient by name, URN, or mobile number, or jump to an app section.
-- **Live Database-Backed Dashboard:** Real metrics from local SQLite for total patients, today's registrations, active treatment cases, and outstanding balance in ₹.
-- **Today's Patient Activity:** Displays registrations and treatment sessions actually recorded today; it does not fabricate appointment/waiting states that the current schema cannot represent.
-- **Non-Blocking Feedback:** Native toast notifications confirm patient saves, data refreshes, treatment sessions, and successful restore completion without interrupting work.
-- **Clinical VAS Pain Scale:** Session logging uses a color-graded 0–10 score with explicit No Pain, Mild, Moderate, and Severe labels while storing the existing integer `pain_score` field.
-- **Modality Chips:** One-click selection for TENS, IFT, UST, cervical/lumbar traction, moist heat, therapeutic exercise, and manual mobilization; selections still serialize to the existing `modalities_used` text field.
-- **Session Pain Trend:** A local sparkline summarizes recorded pain scores by session number. It only plots saved scores and does not infer a clinical outcome or change the treatment plan.
-- **Patient Registry Filters & Quick Profile:** Filter the saved registry by all patients, admissions today, active treatment cases, or any unpaid case balance. Selecting a row opens a profile panel with the patient's condition, session progress, total balance, and direct edit/treatment/print actions.
-- **Payment Status & Quick Amounts:** Ledger status is derived from saved financial summaries (`PAID IN FULL`, `PARTIAL DUE`, `BALANCE DUE`, or `OVERPAID`) and the form provides full-balance/₹500/₹1,000/₹2,000 presets. No `OVERDUE` label is used because the current schema does not store a payment due date.
-- **80mm Thermal Receipts:** Each installment row has a Print action that opens an 80mm custom-page receipt preview with patient URN, receipt number, payment mode, amount, total paid, and current balance as of print time. The A4 prescription and registration record remain separate formats.
-- **Local-First & Offline:** Zero runtime internet dependency, no telemetry, no cloud accounts.
+Shared patient records for reception and doctors across 3–5 PCs on the hospital LAN without internet dependency. One central server owns authentication, permissions, records, files, clinical history, payments, audit and backups.
 
----
+## Target stack
 
-## Requirements
+- React + TypeScript frontend
+- Python FastAPI backend
+- PostgreSQL central database and Alembic migrations
+- Private server-side patient file storage
+- One on-premises server and browser-based LAN clients
 
-- Python 3.10+ (64-bit recommended)
-- Windows 10 or Windows 11
+## Documentation
 
----
+- [PRD](PRD.md): requirements and acceptance gates
+- [Architecture](ARCHITECTURE.md): system design and data boundaries
+- [Security](SECURITY.md): threat model, bootstrap and permission tests
+- [Decisions](DECISIONS.md): proposed, historical and unresolved decisions
+- [Tasks](TASKS.md): v3 implementation phases
+- [Deployment](DEPLOYMENT.md): server setup and handover
+- [Migration](MIGRATION.md): legacy code/data policy
+- [Planning state](.planning/STATE.md): current v3 planning status
 
-## Quick Start (VS Code / PowerShell)
+## First administrator setup
 
-### 1. Create and Activate Virtual Environment
+No default production credentials. On a fresh server with no administrator, a one-time code is printed only to the server console. The browser setup wizard consumes it atomically to create the first administrator. Public bootstrap is permanently disabled after success. Recovery is local CLI only.
 
-```powershell
-python -m venv .venv
-.\.venv\Scripts\Activate.ps1
-```
+## Legacy desktop application
 
-*(If PowerShell execution policy prevents activation, run commands directly via `.venv\Scripts\python.exe`)*
+The existing app/ source is a Python/PySide6 desktop app backed by local SQLite. It contains patient, treatment, billing, print and local backup functionality. It remains a reference/migration source, not a centralized LAN server. Never share its SQLite database over a network drive.
 
-### 2. Install Dependencies
+## Development status
 
-```powershell
-pip install -r requirements.txt
-```
+- Legacy desktop planning milestone: previously marked complete.
+- v3 documentation: being baselined on a dedicated branch.
+- v3 implementation: not yet evidenced in the current source tree.
+- Client approval: open hardware, role, receipt, printer and HTTPS decisions remain.
 
-### 3. Launch the Application
+A green CI run or checked planning box is not clinic acceptance. Record tests, printer validation and restore evidence before release.
 
-- **Option A (One-click double-click):** Double-click `run.bat` in File Explorer.
-- **Option B (PowerShell):**
-  ```powershell
-  .\.venv\Scripts\python.exe main.py
-  ```
+## Privacy
+
+Use synthetic patient data in tests and demos. Never commit patient records/photos, credentials, setup codes, production databases or backups.
 
 ---
-
-## Build Standalone Windows Executable
-
-After installing the development dependencies, run `build_exe.bat` from the repository root on Windows. The build includes the SQLite schema and `app/assets/` (hospital logo, physiotherapy banner, and Caduceus emblem) in the `dist/KalyanHospital/` folder.
-
-Before distributing the build, launch `dist/KalyanHospital/KalyanHospital.exe` on a clean Windows workstation and verify the sidebar logo, dashboard therapy image, prescription letterhead emblem, print preview, and a test print. The headless test suite does not replace Windows printer validation.
-
----
-
-## Running Automated Tests
-
-Run the automated test suite in headless mode:
-
-```powershell
-pytest
-```
-
----
-
-## Project Structure
-
-```text
-├── main.py                     # Application entry point
-├── requirements.txt            # Python dependencies (PySide6, pytest)
-├── README.md                   # Setup and execution guide
-├── PRD.md                      # Product Requirements Document
-├── ARCHITECTURE.md             # Technical design & schema DDL
-├── TASKS.md                    # Implementation breakdown
-├── TEST_PLAN.md                # Quality assurance test matrix
-├── SECURITY.md                 # Offline security controls
-├── DECISIONS.md                # Architecture Decision Records (ADRs)
-├── app/
-│   ├── config.py               # Paths, constants, and clinic metadata
-│   ├── db/
-│   │   ├── connection.py       # SQLite connection factory (WAL, foreign keys)
-│   │   └── schema.sql          # Canonical 12-field DDL
-│   ├── services/
-│   │   └── dashboard_service.py # Live metric calculations
-│   └── ui/
-│       ├── main_window.py      # Top QMainWindow and page container
-│       ├── sidebar.py          # Left navigation sidebar
-│       ├── styles.py           # Hospital QSS stylesheet
-│       └── views/
-│           ├── dashboard_view.py # Live clinic dashboard
-│           └── placeholder_view.py # Staging placeholder cards
-└── tests/
-    ├── conftest.py             # Headless QApplication fixture
-    ├── test_main_window.py     # Shell & navigation tests
-    └── test_dashboard.py       # Database & dashboard metric tests
-```
+Kalyan Hospital — श्री वशिष्ठ कल्याण ट्रस्ट
