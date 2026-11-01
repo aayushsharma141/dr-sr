@@ -32,7 +32,7 @@ Last activity: 2026-11-01 — Phase 13 Plan 07 complete (Daily per-doctor token 
 Phases 11-17 (continuing from v2.0, which ended at Phase 10). See `.planning/ROADMAP.md` and `TASKS.md`.
 
 | Phase | Name | Status |
-|-------|------|--------|
+| ------- | ------ | -------- |
 | 11 | Decisions Gate, Foundation & Auth | Complete (16/16 plans) |
 | 12 | Clinic Settings & Patient Registration | Complete (8/8 plans) |
 | 13 | Appointments & Clinical Encounters | Complete (7/7 plans) |
