@@ -4,7 +4,7 @@
 **Last synchronized:** 2026-11-01  
 **Core value:** Reliable, internet-free shared patient records for reception and doctors across the hospital LAN, enforced by server-side permissions, with auditable changes and a backup proven to restore.
 
-**Status convention:** [x] means the implementation is recorded complete in the phase ledger. It does not imply client acceptance or deployment sign-off. [ ] means not yet implemented/verified.
+**Status convention:** [x] means implemented and recorded complete; [~] means partially implemented or awaiting required coverage/mapping; [ ] means not yet implemented/verified. None of these statuses implies client acceptance or deployment sign-off.
 
 ## v1 Requirements
 
@@ -17,7 +17,7 @@
 - [x] **SEC-05** Admin user create/deactivate/reset, forced first-login password change and no default production credentials.
 - [x] **SEC-06** Optimistic concurrency; stale updates return conflict response.
 - [x] **SEC-07** First-run setup wizard with one-time server-console code, atomic first-admin creation and permanent public bootstrap shutdown.
-- [x] **AUD-01** Audit-event writer and append-only audit foundation.
+- [~] **AUD-01** Audit-event writer and append-only audit foundation implemented in Phase 11; full event coverage across future clinical, billing and backup modules remains incomplete through Phases 14–16.
 
 ### Clinic Setup
 
@@ -27,7 +27,7 @@
 
 ### Reception: Patients and Appointments
 
-- [x] **PAT-01** Patient registration and unique annual `KH-YYYY-XXXX` URN allocation under concurrency.
+- [~] **PAT-01** Current patient registration schema and unique annual `KH-YYYY-XXXX` URN allocation under concurrency are implemented; exact mapping to all client-provided registration-form fields remains unresolved.
 - [x] **PAT-02** Search by URN, name and mobile, including Devanagari names.
 - [x] **PAT-03** Demographic edits audited with before/after values and optimistic concurrency.
 - [x] **PAT-04** Duplicate-patient warning for same name and mobile.
@@ -42,7 +42,8 @@
 - [x] **CLN-02** Finalized encounter notes are locked; later changes use dated addenda.
 - [ ] **RX-01** Prescription items, dosage, advice and bilingual print output.
 - [ ] **TRT-01** Treatment plans/packages.
-- [ ] **TRT-02** Immutable physiotherapy session logs with VAS.
+- [ ] **TRT-02** Chronological physiotherapy session logs with VAS 0–10.
+- [ ] **TRT-03** Finalized sessions immutable; corrections by dated addendum.
 - [ ] **CLN-03** Unified timeline including encounters, sessions and payments.
 
 ### Billing
@@ -100,12 +101,13 @@ IPD, pharmacy inventory, laboratory, Aadhaar, SMS/WhatsApp, cloud backup, patien
 | Requirement | Phase | Implementation status |
 |---|---:|---|
 | SEC-01–SEC-07 | 11 | Recorded complete |
-| AUD-01 | 11 | Recorded complete |
+| AUD-01 | 11, 14–16 | Partial: Phase 11 writer/foundation recorded complete; full domain coverage remains planned/incomplete |
 | SET-01–SET-03 | 12 | Recorded complete |
-| PAT-01–PAT-05 | 12 | Recorded complete; role policy findings remain |
+| PAT-01 | 12 | Partial: current API schema/URN implemented; client-form mapping outstanding |
+| PAT-02–PAT-05 | 12 | Recorded complete; role policy findings remain |
 | APT-01–APT-02 | 13 | Recorded complete |
 | CLN-01–CLN-02 | 13 | Recorded complete |
-| RX-01, TRT-01–TRT-02 | 14 | Planned |
+| RX-01, TRT-01–TRT-03 | 14 | Planned |
 | BIL-01–BIL-05, CLN-03 | 15 | Planned |
 | AUD-02, BAK-01–BAK-03 | 16 | Planned |
 | PRN-01, DEP-01–DEP-03 | 17 | Planned |
