@@ -40,7 +40,6 @@ Exact dependency pins are maintained in `backend/pyproject.toml` and `frontend/p
 - [Detailed phase roadmap](.planning/ROADMAP.md)
 - [Requirement traceability](.planning/REQUIREMENTS.md)
 - [Current project state](.planning/STATE.md)
-- [Project knowledge base](brain/README.md)
 
 ## First administrator setup
 
