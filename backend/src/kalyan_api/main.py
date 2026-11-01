@@ -17,6 +17,7 @@ from kalyan_api.core.setup_code import (
 )
 from kalyan_api.db.session import SessionLocal, build_engine
 from kalyan_api.db.startup import run_startup_checks, setup_completed
+from kalyan_api.routers.appointments import router as appointments_router
 from kalyan_api.routers.areas import router as areas_router
 from kalyan_api.routers.auth import router as auth_router
 from kalyan_api.routers.doctors import router as doctors_router
@@ -33,10 +34,7 @@ SECURITY_HEADERS = {
     "X-Frame-Options": "DENY",
     "Referrer-Policy": "no-referrer",
     "Content-Security-Policy": (
-        "default-src 'self'; "
-        "frame-ancestors 'none'; "
-        "base-uri 'none'; "
-        "form-action 'self'"
+        "default-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'"
     ),
 }
 
@@ -136,6 +134,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(settings_router, prefix="/api")
     app.include_router(doctors_router, prefix="/api")
     app.include_router(patients_router, prefix="/api")
+    app.include_router(appointments_router, prefix="/api")
 
     # SPA frontend distribution serving (app.frontend)
     dist_dir = resolved_settings.frontend_dist
@@ -153,4 +152,3 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         )
 
     return app
-

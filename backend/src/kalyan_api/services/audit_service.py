@@ -47,6 +47,12 @@ class AuditAction(StrEnum):
     PATIENT_REGISTERED = "PATIENT_REGISTERED"
     PATIENT_UPDATED = "PATIENT_UPDATED"
     PHOTO_UPLOADED = "PHOTO_UPLOADED"
+    # Phase 13 actions
+    APPOINTMENT_CREATED = "APPOINTMENT_CREATED"
+    APPOINTMENT_STATUS_UPDATED = "APPOINTMENT_STATUS_UPDATED"
+    ENCOUNTER_CREATED = "ENCOUNTER_CREATED"
+    ENCOUNTER_FINALISED = "ENCOUNTER_FINALISED"
+    ENCOUNTER_ADDENDUM_ADDED = "ENCOUNTER_ADDENDUM_ADDED"
 
 
 class Outcome(StrEnum):
@@ -61,14 +67,16 @@ class AuditPayloadError(Exception):
     """Raised when an audit payload fails structural validation or contains sensitive data."""
 
 
-REDACTED_KEYS = frozenset({
-    "password",
-    "password_hash",
-    "new_password",
-    "current_password",
-    "token",
-    "csrf_token",
-})
+REDACTED_KEYS = frozenset(
+    {
+        "password",
+        "password_hash",
+        "new_password",
+        "current_password",
+        "token",
+        "csrf_token",
+    }
+)
 
 
 def _assert_no_redacted_keys(data: Any, path: str = "") -> None:
