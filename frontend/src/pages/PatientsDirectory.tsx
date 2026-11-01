@@ -9,169 +9,222 @@ export function PatientsDirectory() {
   const { data: me } = useMe()
   const navigate = useNavigate()
 
-  const [searchTerm, setSearchTerm] = useState('')
+  const [searchInput, setSearchInput] = useState('')
   const [debouncedQuery, setDebouncedQuery] = useState('')
   const [selectedPatientForEdit, setSelectedPatientForEdit] = useState<PatientOut | null>(null)
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false)
+  const [successBanner, setSuccessBanner] = useState<string | null>(null)
 
   useEffect(() => {
-    const timer = setTimeout(() => {
-      setDebouncedQuery(searchTerm.trim())
+    const handler = setTimeout(() => {
+      setDebouncedQuery(searchInput.trim())
     }, 300)
-    return () => clearTimeout(timer)
-  }, [searchTerm])
+    return () => clearTimeout(handler)
+  }, [searchInput])
 
-  const { data: patients, isPending, isError, error, refetch } = usePatients(debouncedQuery)
+  const {
+    data: patients = [],
+    isPending,
+    isError,
+    error,
+    refetch,
+  } = usePatients(debouncedQuery)
+
+  const handleEditClick = (patient: PatientOut) => {
+    setSelectedPatientForEdit(patient)
+    setIsEditModalOpen(true)
+  }
+
+  const handleEditSuccess = (updated: PatientOut) => {
+    setIsEditModalOpen(false)
+    setSelectedPatientForEdit(null)
+    setSuccessBanner(`Patient ${updated.full_name} (${updated.urn}) updated successfully.`)
+    refetch()
+  }
 
   return (
-    <AppShell name={me?.full_name || 'Staff'} role={me?.role || 'RECEPTION'}>
+    <AppShell
+      name={me?.full_name || 'Staff'}
+      role={me?.role || 'RECEPTION'}
+    >
       <div className="space-y-6 max-w-7xl mx-auto">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
-            <div className="flex items-center gap-2">
-              <Link
-                to={me?.role === 'ADMIN' ? '/admin' : me?.role === 'DOCTOR' ? '/doctor' : '/reception'}
-                className="text-sm text-red-900 hover:underline font-medium"
-              >
-                &larr; Back to Dashboard
-              </Link>
-            </div>
-            <h2 className="text-2xl font-bold text-neutral-900 tracking-tight mt-2">
+            <h2 className="text-2xl font-bold text-neutral-900 tracking-tight">
               Patient Directory
             </h2>
             <p className="text-sm text-neutral-500">
-              Multi-modal search across atomic URNs, mobile numbers, and patient names.
+              Search and manage registered patients across the hospital LAN
             </p>
           </div>
-          <div>
-            <Link
-              to="/reception/patients/new"
-              className="px-4 py-2 bg-red-900 text-white rounded font-medium text-sm hover:bg-red-800 cursor-pointer inline-flex items-center gap-2"
-            >
-              + Register New Patient
-            </Link>
-          </div>
+          <Link
+            to="/reception/patients/new"
+            className="inline-flex items-center justify-center px-4 py-2 bg-red-900 text-white rounded text-sm font-medium hover:bg-red-800 focus-visible:outline-2 focus-visible:outline-red-800 min-h-[44px] min-w-[44px] shadow-xs"
+          >
+            + Register New Patient
+          </Link>
         </div>
 
-        {/* Search Bar */}
+        {successBanner && (
+          <div
+            role="status"
+            className="p-4 bg-emerald-50 border border-emerald-300 rounded text-emerald-900 text-sm flex items-center justify-between"
+          >
+            <span>{successBanner}</span>
+            <button
+              type="button"
+              onClick={() => setSuccessBanner(null)}
+              className="text-emerald-700 hover:text-emerald-950 font-bold ml-4"
+              aria-label="Dismiss message"
+            >
+              &times;
+            </button>
+          </div>
+        )}
+
+        {/* Search Controls */}
         <div className="bg-white p-4 rounded-lg border border-neutral-200 shadow-xs">
-          <label htmlFor="patient-search-input" className="block text-xs font-semibold uppercase text-neutral-600 mb-1">
-            Search Patients
-          </label>
           <div className="relative">
+            <label htmlFor="patient-search-input" className="sr-only">
+              Search patients by URN, Mobile, or Name
+            </label>
             <input
               id="patient-search-input"
-              type="text"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="Search by URN (KH-...), 10-digit mobile, or name (English / हिंदी)..."
-              className="w-full pl-3 pr-10 py-2.5 border border-neutral-300 rounded text-neutral-900 focus:outline-hidden focus:border-red-900 text-sm"
+              type="search"
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
+              placeholder="Search by URN (e.g. KH-2026-0001), mobile number, or patient name..."
+              className="w-full px-4 py-3 pl-10 border border-neutral-300 rounded-md text-sm text-neutral-900 focus-visible:outline-2 focus-visible:outline-red-800"
             />
-            {searchTerm && (
+            <span
+              className="absolute left-3 top-3.5 text-neutral-400 select-none text-base"
+              aria-hidden="true"
+            >
+              🔍
+            </span>
+            {searchInput && (
               <button
                 type="button"
-                onClick={() => setSearchTerm('')}
-                className="absolute right-3 top-2.5 text-neutral-400 hover:text-neutral-700 text-sm font-bold"
+                onClick={() => setSearchInput('')}
+                className="absolute right-3 top-3 text-neutral-400 hover:text-neutral-600 text-sm font-medium px-2 py-1"
+                aria-label="Clear search"
               >
-                &times;
+                Clear
               </button>
             )}
           </div>
         </div>
 
-        {/* Patients Table */}
-        <div className="bg-white rounded-lg border border-neutral-200 shadow-xs overflow-hidden">
-          <div className="px-6 py-4 border-b border-neutral-200 flex items-center justify-between">
-            <h3 className="text-lg font-bold text-neutral-900">Registered Patients</h3>
-            <span className="text-xs font-mono text-neutral-500">
-              {patients?.length ?? 0} found
-            </span>
+        {/* Content Section */}
+        {isPending ? (
+          <div className="bg-white p-12 text-center rounded-lg border border-neutral-200">
+            <p className="text-sm text-neutral-500" role="status">
+              Loading patients...
+            </p>
           </div>
-
-          {isPending ? (
-            <div className="p-8 text-center text-neutral-500 text-sm">
-              Loading patients directory...
+        ) : isError ? (
+          <div
+            role="alert"
+            className="p-4 bg-red-50 border border-red-200 rounded text-red-900 text-sm"
+          >
+            Failed to load patients: {error.message}
+          </div>
+        ) : patients.length === 0 ? (
+          <div className="bg-white p-12 text-center rounded-lg border border-neutral-200 space-y-4">
+            <div className="w-12 h-12 mx-auto rounded-full bg-neutral-100 flex items-center justify-center text-neutral-400 text-xl font-bold">
+              ?
             </div>
-          ) : isError ? (
-            <div role="alert" className="p-6 text-center text-red-600 text-sm">
-              Failed to load patients: {error?.message}
-            </div>
-          ) : !patients || patients.length === 0 ? (
-            <div className="p-8 text-center space-y-3">
-              <p className="text-neutral-500 text-sm">
+            <div>
+              <p className="text-base font-semibold text-neutral-900">
                 {debouncedQuery
-                  ? `No patients found matching "${debouncedQuery}".`
-                  : 'No patients registered in the system.'}
+                  ? `No patients found matching "${debouncedQuery}"`
+                  : 'No patients registered yet'}
               </p>
-              <Link
-                to="/reception/patients/new"
-                className="inline-block px-4 py-2 border border-red-900 text-red-900 rounded font-medium text-sm hover:bg-red-50"
-              >
-                Register New Patient
-              </Link>
+              <p className="text-sm text-neutral-500 mt-1">
+                {debouncedQuery
+                  ? 'Check for spelling errors or try searching by mobile number or URN.'
+                  : 'Get started by creating the first patient record.'}
+              </p>
             </div>
-          ) : (
+            <Link
+              to="/reception/patients/new"
+              className="inline-flex items-center justify-center px-4 py-2 bg-red-900 text-white rounded text-sm font-medium hover:bg-red-800 min-h-[44px]"
+            >
+              Register New Patient
+            </Link>
+          </div>
+        ) : (
+          <div className="bg-white rounded-lg border border-neutral-200 overflow-hidden shadow-xs">
             <div className="overflow-x-auto">
-              <table className="w-full text-left text-sm text-neutral-800">
+              <table className="w-full text-left text-sm text-neutral-700">
                 <thead className="bg-neutral-50 border-b border-neutral-200 text-xs font-semibold text-neutral-600 uppercase tracking-wider">
                   <tr>
-                    <th className="px-4 py-3">Photo</th>
-                    <th className="px-4 py-3">URN</th>
-                    <th className="px-4 py-3">Patient Name</th>
-                    <th className="px-4 py-3">Guardian</th>
-                    <th className="px-4 py-3">Age / Sex</th>
-                    <th className="px-4 py-3">Mobile</th>
-                    <th className="px-4 py-3">District</th>
-                    <th className="px-4 py-3 text-right">Actions</th>
+                    <th scope="col" className="px-4 py-3">Photo</th>
+                    <th scope="col" className="px-4 py-3">URN</th>
+                    <th scope="col" className="px-4 py-3">Patient Name</th>
+                    <th scope="col" className="px-4 py-3">Guardian</th>
+                    <th scope="col" className="px-4 py-3">Age / Gender</th>
+                    <th scope="col" className="px-4 py-3">Mobile</th>
+                    <th scope="col" className="px-4 py-3">District</th>
+                    <th scope="col" className="px-4 py-3 text-right">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-neutral-200">
-                  {patients.map((pat) => (
-                    <tr key={pat.id} className="hover:bg-neutral-50">
-                      <td className="px-4 py-3">
-                        <div className="w-10 h-10 rounded-full bg-neutral-200 overflow-hidden flex items-center justify-center border border-neutral-300">
-                          {pat.photo_path ? (
+                  {patients.map((p) => (
+                    <tr
+                      key={p.id}
+                      className="hover:bg-neutral-50 transition-colors"
+                      data-testid={`patient-row-${p.id}`}
+                    >
+                      <td className="px-4 py-3 whitespace-nowrap">
+                        <div className="w-10 h-10 rounded-full border border-neutral-200 bg-neutral-100 flex items-center justify-center overflow-hidden">
+                          {p.photo_path ? (
                             <img
-                              src={`/api/patients/${pat.id}/photo`}
-                              alt={pat.full_name}
+                              src={`/api/patients/${p.id}/photo`}
+                              alt={p.full_name}
                               className="w-full h-full object-cover"
+                              onError={(e) => {
+                                // Fallback avatar on broken/unauthorized image
+                                (e.currentTarget as HTMLImageElement).style.display = 'none'
+                              }}
                             />
                           ) : (
-                            <span className="font-bold text-xs text-neutral-500">
-                              {pat.full_name.charAt(0).toUpperCase()}
+                            <span className="text-xs font-bold text-neutral-400">
+                              {p.full_name.charAt(0).toUpperCase()}
                             </span>
                           )}
                         </div>
                       </td>
-                      <td className="px-4 py-3 font-mono text-xs font-bold text-neutral-900">
-                        {pat.urn}
+                      <td className="px-4 py-3 whitespace-nowrap font-mono font-bold text-red-900">
+                        {p.urn}
                       </td>
-                      <td className="px-4 py-3 font-medium text-neutral-900">
-                        {pat.full_name}
-                      </td>
-                      <td className="px-4 py-3 text-neutral-600">
-                        {pat.guardian_name}
-                      </td>
-                      <td className="px-4 py-3 text-neutral-700">
-                        {pat.age_years}y / {pat.gender}
-                      </td>
-                      <td className="px-4 py-3 font-mono text-xs text-neutral-700">
-                        {pat.mobile}
+                      <td className="px-4 py-3 font-semibold text-neutral-900">
+                        {p.full_name}
                       </td>
                       <td className="px-4 py-3 text-neutral-600">
-                        {pat.district}
+                        {p.guardian_name}
                       </td>
-                      <td className="px-4 py-3 text-right space-x-2">
+                      <td className="px-4 py-3 whitespace-nowrap text-neutral-600">
+                        {p.age_years}y / {p.gender}
+                      </td>
+                      <td className="px-4 py-3 whitespace-nowrap font-mono text-neutral-700">
+                        {p.mobile}
+                      </td>
+                      <td className="px-4 py-3 text-neutral-600">
+                        {p.district}
+                      </td>
+                      <td className="px-4 py-3 whitespace-nowrap text-right space-x-2">
                         <button
                           type="button"
-                          onClick={() => navigate(`/reception/patients/${pat.id}`)}
-                          className="text-xs font-medium text-neutral-700 bg-neutral-100 hover:bg-neutral-200 px-2.5 py-1.5 rounded cursor-pointer"
+                          onClick={() => navigate(`/reception/patients/${p.id}`)}
+                          className="px-2.5 py-1.5 text-xs font-medium text-red-900 bg-red-50 hover:bg-red-100 rounded focus-visible:outline-2 focus-visible:outline-red-800 cursor-pointer min-h-[36px]"
                         >
-                          View File
+                          View Card
                         </button>
                         <button
                           type="button"
-                          onClick={() => setSelectedPatientForEdit(pat)}
-                          className="text-xs font-medium text-red-900 bg-red-50 hover:bg-red-100 px-2.5 py-1.5 rounded cursor-pointer"
+                          onClick={() => handleEditClick(p)}
+                          className="px-2.5 py-1.5 text-xs font-medium text-neutral-700 bg-neutral-100 hover:bg-neutral-200 rounded focus-visible:outline-2 focus-visible:outline-neutral-500 cursor-pointer min-h-[36px]"
                         >
                           Edit
                         </button>
@@ -181,19 +234,20 @@ export function PatientsDirectory() {
                 </tbody>
               </table>
             </div>
-          )}
-        </div>
+          </div>
+        )}
       </div>
 
+      {/* Demographic Edit Modal */}
       {selectedPatientForEdit && (
         <PatientEditModal
           patient={selectedPatientForEdit}
-          isOpen={true}
-          onClose={() => setSelectedPatientForEdit(null)}
-          onSuccess={() => {
-            refetch()
+          isOpen={isEditModalOpen}
+          onClose={() => {
+            setIsEditModalOpen(false)
             setSelectedPatientForEdit(null)
           }}
+          onSuccess={handleEditSuccess}
         />
       )}
     </AppShell>

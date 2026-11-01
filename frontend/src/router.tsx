@@ -98,14 +98,32 @@ export const router = createBrowserRouter([
         ],
       },
       {
-        element: <RequireRole role={['ADMIN', 'RECEPTION']} />,
+        element: <RequireRole role={['ADMIN', 'RECEPTION', 'DOCTOR']} />,
         children: [
+          {
+            path: '/reception/patients',
+            lazy: async () => {
+              const { PatientsDirectory } = await import('./pages/PatientsDirectory')
+              return {
+                Component: PatientsDirectory,
+              }
+            },
+          },
           {
             path: '/reception/patients/new',
             lazy: async () => {
               const { PatientRegister } = await import('./pages/PatientRegister')
               return {
                 Component: PatientRegister,
+              }
+            },
+          },
+          {
+            path: '/reception/patients/:id',
+            lazy: async () => {
+              const { PatientDetail } = await import('./pages/PatientDetail')
+              return {
+                Component: PatientDetail,
               }
             },
           },
