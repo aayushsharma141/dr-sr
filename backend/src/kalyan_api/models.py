@@ -10,6 +10,7 @@ Locked decisions:
 
 import uuid
 from datetime import date, datetime
+from enum import StrEnum
 
 from sqlalchemy import (
     BigInteger,
@@ -25,6 +26,7 @@ from sqlalchemy import (
     SmallInteger,
     String,
     Text,
+    UniqueConstraint,
     func,
     text,
 )
@@ -63,9 +65,7 @@ class Doctor(Base):
     is_active: Mapped[bool] = mapped_column(
         Boolean, default=True, server_default=text("true"), nullable=False
     )
-    version_id: Mapped[int] = mapped_column(
-        Integer, default=1, server_default="1", nullable=False
-    )
+    version_id: Mapped[int] = mapped_column(Integer, default=1, server_default="1", nullable=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
@@ -117,12 +117,8 @@ class User(Base):
     failed_login_count: Mapped[int] = mapped_column(
         Integer, default=0, server_default="0", nullable=False
     )
-    locked_until: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True
-    )
-    last_login_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True
-    )
+    locked_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    last_login_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     password_changed_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
@@ -140,9 +136,7 @@ class User(Base):
         onupdate=func.now(),
         nullable=False,
     )
-    version_id: Mapped[int] = mapped_column(
-        Integer, default=1, server_default="1", nullable=False
-    )
+    version_id: Mapped[int] = mapped_column(Integer, default=1, server_default="1", nullable=False)
 
     # Relationships
     doctor: Mapped["Doctor | None"] = relationship("Doctor", back_populates="user")
@@ -172,9 +166,7 @@ class AuthSession(Base):
     )
     ip: Mapped[str | None] = mapped_column(INET, nullable=True)
     user_agent: Mapped[str | None] = mapped_column(String(255), nullable=True)
-    revoked_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True
-    )
+    revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     # Relationships
     user: Mapped["User"] = relationship("User", back_populates="sessions")
@@ -186,9 +178,7 @@ class LoginThrottle(Base):
     __tablename__ = "login_throttle"
 
     ip: Mapped[str] = mapped_column(INET, primary_key=True)
-    window_start: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False
-    )
+    window_start: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     attempt_count: Mapped[int] = mapped_column(
         Integer, default=1, server_default="1", nullable=False
     )
@@ -198,14 +188,10 @@ class SystemSetup(Base):
     """Authoritative singleton record of first-run setup completion (SEC-07)."""
 
     __tablename__ = "system_setup"
-    __table_args__ = (
-        CheckConstraint("id = 1", name="system_setup_single_row"),
-    )
+    __table_args__ = (CheckConstraint("id = 1", name="system_setup_single_row"),)
 
     id: Mapped[int] = mapped_column(SmallInteger, primary_key=True)
-    completed_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False
-    )
+    completed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     admin_user_id: Mapped[int] = mapped_column(
         BigInteger, ForeignKey("users.id", ondelete="RESTRICT"), nullable=False
     )
@@ -283,9 +269,7 @@ class ClinicSettings(Base):
     consultation_validity_days: Mapped[int] = mapped_column(
         Integer, default=7, server_default="7", nullable=False
     )
-    version_id: Mapped[int] = mapped_column(
-        Integer, default=1, server_default="1", nullable=False
-    )
+    version_id: Mapped[int] = mapped_column(Integer, default=1, server_default="1", nullable=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
@@ -303,9 +287,7 @@ class ConsultationFee(Base):
     """Configurable consultation fee schedule stored as integer paise (SET-03)."""
 
     __tablename__ = "consultation_fees"
-    __table_args__ = (
-        CheckConstraint("fee_paise >= 0", name="consultation_fees_fee_non_negative"),
-    )
+    __table_args__ = (CheckConstraint("fee_paise >= 0", name="consultation_fees_fee_non_negative"),)
 
     id: Mapped[int] = mapped_column(BigInteger, Identity(always=False), primary_key=True)
     name: Mapped[str] = mapped_column(String(120), nullable=False)
@@ -369,9 +351,7 @@ class Patient(Base):
     is_active: Mapped[bool] = mapped_column(
         Boolean, default=True, server_default=text("true"), nullable=False
     )
-    version_id: Mapped[int] = mapped_column(
-        Integer, default=1, server_default="1", nullable=False
-    )
+    version_id: Mapped[int] = mapped_column(Integer, default=1, server_default="1", nullable=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
@@ -384,3 +364,174 @@ class Patient(Base):
 
     __mapper_args__ = {"version_id_col": version_id}
 
+
+class AppointmentStatus(StrEnum):
+    """Appointment workflow status (APT-02)."""
+
+    BOOKED = "BOOKED"
+    ARRIVED = "ARRIVED"
+    IN_CONSULTATION = "IN_CONSULTATION"
+    DONE = "DONE"
+    CANCELLED = "CANCELLED"
+    NO_SHOW = "NO_SHOW"
+
+
+class DailyTokenSequence(Base):
+    """Per-doctor daily sequential token counter for gap-free appointment allocation (APT-01)."""
+
+    __tablename__ = "daily_token_sequences"
+
+    doctor_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("doctors.id", ondelete="RESTRICT"), primary_key=True
+    )
+    appointment_date: Mapped[date] = mapped_column(Date, primary_key=True)
+    last_token: Mapped[int] = mapped_column(Integer, default=0, server_default="0", nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
+
+
+class Appointment(Base):
+    """Per-doctor daily appointment booking with atomic token and status (APT-01, APT-02)."""
+
+    __tablename__ = "appointments"
+    __table_args__ = (
+        UniqueConstraint(
+            "doctor_id",
+            "appointment_date",
+            "token_number",
+            name="uq_appointments_doctor_date_token",
+        ),
+        Index("ix_appointments_doctor_date_status", "doctor_id", "appointment_date", "status"),
+        Index("ix_appointments_patient_date", "patient_id", "appointment_date"),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, Identity(always=False), primary_key=True)
+    patient_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("patients.id", ondelete="RESTRICT"), nullable=False, index=True
+    )
+    doctor_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("doctors.id", ondelete="RESTRICT"), nullable=False, index=True
+    )
+    appointment_date: Mapped[date] = mapped_column(Date, nullable=False, index=True)
+    token_number: Mapped[int] = mapped_column(Integer, nullable=False)
+    status: Mapped[str] = mapped_column(
+        String(32),
+        default=AppointmentStatus.BOOKED.value,
+        server_default=text(f"'{AppointmentStatus.BOOKED.value}'"),
+        nullable=False,
+        index=True,
+    )
+    status_updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    cancellation_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+    notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_by_user_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("users.id", ondelete="RESTRICT"), nullable=False
+    )
+    version_id: Mapped[int] = mapped_column(Integer, default=1, server_default="1", nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
+
+    __mapper_args__ = {"version_id_col": version_id}
+
+    patient = relationship("Patient", lazy="joined")
+    doctor = relationship("Doctor", lazy="joined")
+    created_by_user = relationship("User", lazy="joined")
+
+
+class ClinicalEncounter(Base):
+    """Clinical encounter recorded by doctor; locked once finalised (CLN-01, CLN-02)."""
+
+    __tablename__ = "clinical_encounters"
+    __table_args__ = (
+        Index("ix_encounters_patient_id", "patient_id"),
+        Index("ix_encounters_doctor_id", "doctor_id"),
+        Index("ix_encounters_encounter_date", "encounter_date"),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, Identity(always=False), primary_key=True)
+    appointment_id: Mapped[int | None] = mapped_column(
+        BigInteger, ForeignKey("appointments.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    patient_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("patients.id", ondelete="RESTRICT"), nullable=False
+    )
+    doctor_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("doctors.id", ondelete="RESTRICT"), nullable=False
+    )
+    encounter_date: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    symptoms: Mapped[str] = mapped_column(Text, nullable=False)
+    clinical_notes: Mapped[str] = mapped_column(Text, nullable=False)
+    diagnosis: Mapped[str] = mapped_column(Text, nullable=False)
+    is_finalised: Mapped[bool] = mapped_column(
+        Boolean, default=False, server_default=text("false"), nullable=False
+    )
+    finalised_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_by_user_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("users.id", ondelete="RESTRICT"), nullable=False
+    )
+    version_id: Mapped[int] = mapped_column(Integer, default=1, server_default="1", nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
+
+    __mapper_args__ = {"version_id_col": version_id}
+
+    patient = relationship("Patient", lazy="joined")
+    doctor = relationship("Doctor", lazy="joined")
+    appointment = relationship("Appointment", lazy="select")
+    addenda = relationship(
+        "ClinicalAddendum",
+        back_populates="encounter",
+        cascade="all, delete-orphan",
+        order_by="ClinicalAddendum.created_at",
+    )
+
+
+class ClinicalAddendum(Base):
+    """Chronologically ordered, dated addenda attached to finalised encounters (CLN-02)."""
+
+    __tablename__ = "clinical_addenda"
+    __table_args__ = (Index("ix_clinical_addenda_encounter_id", "encounter_id"),)
+
+    id: Mapped[int] = mapped_column(BigInteger, Identity(always=False), primary_key=True)
+    encounter_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("clinical_encounters.id", ondelete="RESTRICT"), nullable=False
+    )
+    doctor_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("doctors.id", ondelete="RESTRICT"), nullable=False
+    )
+    addendum_text: Mapped[str] = mapped_column(Text, nullable=False)
+    created_by_user_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("users.id", ondelete="RESTRICT"), nullable=False
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    encounter = relationship("ClinicalEncounter", back_populates="addenda")
+    doctor = relationship("Doctor", lazy="joined")
+    created_by_user = relationship("User", lazy="joined")
