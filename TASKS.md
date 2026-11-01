@@ -1,66 +1,76 @@
 # Implementation Roadmap — Kalyan Hospital v3.0
 
-**Status:** Planned, not implemented.  
-**Commercial note:** Prior client budget ceiling was ₹22,000 and prior 4–6 week estimate related to the smaller desktop MVP. Full v3 scope is materially larger; re-scope price and schedule before promising delivery.
+**Current status:** Phases 11, 12 and 13 are recorded complete in `.planning/STATE.md`. Phase 14 is next. Phases 15–17 remain unstarted.
+
+**Commercial note:** Prior client budget ceiling was ₹22,000 and the earlier 4–6 week estimate applied to the smaller desktop MVP. The full LAN platform is materially larger; commercial scope, price and schedule must be agreed separately.
 
 ## Delivery rules
 
-One testable phase at a time. A feature is not complete merely because a screen exists. Security, financial correctness, audit and restore testing cannot be deferred. Use synthetic data. Keep legacy PySide6 app separate from v3 runtime.
+One testable phase at a time. A feature is not complete merely because a screen exists. Security, financial correctness, audit and restore testing cannot be deferred. Use synthetic data. Keep the legacy PySide6 app separate from v3 runtime. Treat the phase state file as the execution ledger and link each completion claim to tests/evidence.
 
-## Phase 11 — Foundation and bootstrap
-- [ ] React + TypeScript frontend and FastAPI backend skeleton.
-- [ ] PostgreSQL, SQLAlchemy models and Alembic migrations.
-- [ ] Configuration/secrets strategy for offline deployment.
-- [ ] One-time first-admin console code and browser setup wizard.
-- [ ] Atomic code consumption; concurrent bootstrap test; permanent shutdown.
-- [ ] Individual accounts, modern password hashing, sessions, idle timeout and lockout.
-- [ ] Fixed permission catalogue and server-side enforcement.
-- [ ] Route coverage test fails on unguarded protected endpoint.
-- [ ] Structured logs, request IDs and standard API error contract.
-**Exit:** clean install creates exactly one admin; no defaults; migrations and authorization tests pass.
+## Phase 11 — Decisions Gate, Foundation & Auth <badge>Complete — recorded</badge>
 
-## Phase 12 — Clinic setup and patient registry
-- [ ] Clinic English/Hindi identity, branch addresses, phone and print settings.
-- [ ] Doctor profiles and consultation fee catalogue.
-- [ ] Canonical 12-field patient record and photo metadata.
-- [ ] Transaction-safe URN allocation and duplicate warning.
-- [ ] Devanagari-safe search by URN/name/mobile.
-- [ ] Demographic edits with before/after audit.
-- [ ] Authorized photo upload/download and path validation.
-- [ ] Registry/detail screens and A4 registration print.
-**Exit:** concurrent registrations yield unique URNs; unauthorized photo access denied; actual printer verified.
+- [x] Repository, toolchain, PostgreSQL and backend/frontend scaffolding.
+- [x] SQLAlchemy/Alembic baseline and append-only audit-event foundation.
+- [x] Individual accounts, Argon2id, sessions, CSRF and logout.
+- [x] Idle/session controls and failed-login lockout.
+- [x] First-login password change and user administration.
+- [x] Fixed Admin/Reception/Doctor permission catalogue and server-side policy enforcement.
+- [x] Optimistic concurrency with 409 conflict behavior.
+- [x] One-time first-admin console-code wizard and local CLI recovery.
+- [x] React SPA role routing and FastAPI serving.
+- [x] Phase 11 gate recorded as 16/16 plans in `.planning/STATE.md`.
+**Evidence note:** Verify the current CI logs and exact Phase 11 gate commit before release; this documentation pass did not rerun tests.
 
-## Phase 13 — Appointments and queue
-- [ ] Daily per-doctor appointments and token numbers.
-- [ ] Doctor assignment, rescheduling and queue.
-- [ ] Booked, Arrived, In consultation, Done, Cancelled, No-show states.
-- [ ] Appointment audit and permission-scoped doctor queue.
-**Exit:** concurrent token allocation and state transitions tested.
+## Phase 12 — Clinic Settings & Patient Registration <badge>Complete — recorded</badge>
 
-## Phase 14 — Clinical workflows
-- [ ] Encounter drafts and finalization.
-- [ ] Immutable finalized notes and dated addenda.
-- [ ] Prescription items, dosage, frequency, duration and advice.
-- [ ] Printable prescription with English content/static Hindi labels.
+- [x] Clinic settings, doctor profiles and fee catalogue.
+- [x] Canonical patient registration fields and private photo metadata/storage.
+- [x] Transactional annual `KH-YYYY-XXXX` URN allocation.
+- [x] Search by URN/name/mobile, including Devanagari names.
+- [x] Duplicate warning for same name and mobile.
+- [x] Demographic updates with optimistic locking and before/after audit.
+- [x] Authenticated photo upload/download.
+- [x] A4 registration-card print spike.
+**Evidence note:** Phase 12 is recorded as 8/8 plans complete. Actual printer sign-off remains Phase 17.
+
+## Phase 13 — Appointments & Clinical Encounters <badge>Complete — recorded</badge>
+
+- [x] Appointment models and migration 0003.
+- [x] Per-doctor daily token allocation and booking API.
+- [x] Appointment status state machine and doctor queue.
+- [x] Clinical encounter API, doctor silo, reception default-deny.
+- [x] Finalized encounter immutability and dated addenda.
+- [x] Reception booking/queue UI and doctor consultation workspace.
+- [x] Phase 13 integration gate recorded as 7/7 plans complete.
+**Evidence note:** `.planning/STATE.md` records 422 backend tests, 92.51% backend coverage and 58 frontend tests passing at the Phase 13 gate. These are historical recorded results, not a fresh run during this docs update.
+
+## Phase 14 — Prescriptions, Treatment Plans & Sessions
+
+- [ ] Encounter-linked prescription items, dosage, frequency, duration and advice.
+- [ ] Printable prescription with English clinical content and static Hindi labels.
 - [ ] Treatment plans/packages and session allocation.
-- [ ] Chronological immutable sessions with VAS, modalities, notes and clinician.
-- [ ] Unified timeline of encounters, sessions and payments.
-**Exit:** original finalized records preserved; addenda and chronology verified.
+- [ ] Chronological physiotherapy sessions with VAS 0–10, clinician, modalities and notes.
+- [ ] Finalized session immutability and dated addenda.
+- [ ] Unified clinical timeline groundwork; payments join in Phase 15.
+**Exit:** API/database immutability, chronology, authorization and print-format tests pass.
 
-## Phase 15 — Billing and receipts
+## Phase 15 — Billing and Receipts
+
 - [ ] Consultation charges and treatment financial accounts.
 - [ ] Integer-paise ledger and computed balances.
 - [ ] Transactional concurrent payment validation; reject negative/overpayment.
 - [ ] Pending dues list.
 - [ ] Transaction-safe receipt numbering after client numbering policy.
-- [ ] Printable receipt; DUPLICATE reprint marker.
+- [ ] Printable receipts; DUPLICATE reprint marker.
 - [ ] Admin-authorized reversal with mandatory reason.
-- [ ] Financial audit events.
+- [ ] Unified timeline includes payments.
 **Exit:** two-PC race tests cannot overpay; receipt uniqueness, reversal and reprint semantics pass.
 
-## Phase 16 — Audit, backup and integrity
-- [ ] Append-only audit for security, patient, clinical, billing and backup events.
-- [ ] Admin audit filters.
+## Phase 16 — Audit, Backup and Integrity
+
+- [ ] Admin audit viewer and filters.
+- [ ] Full append-only audit coverage across security, patient, clinical, billing and backup events.
 - [ ] PostgreSQL + patient-file backup bundle and checksum manifest.
 - [ ] Manual and scheduled backup to second drive.
 - [ ] Staged verification and safe restore.
@@ -68,27 +78,27 @@ One testable phase at a time. A feature is not complete merely because a screen 
 - [ ] Clean-machine restore drill.
 **Exit:** corrupt backup rejected; restored data/files match checksums; integrity report reconciles.
 
-## Phase 17 — Deployment and handover
+## Phase 17 — Deployment and Handover
+
 - [ ] Central server, fixed LAN address and firewall.
 - [ ] Browser clients on 3–5 PCs.
 - [ ] Offline operation with internet disconnected.
 - [ ] Auto-start after power restoration and controlled recovery.
 - [ ] UPS and backup drive checks.
 - [ ] Actual A4 printer acceptance.
-- [ ] Role, security, concurrency and data integrity acceptance.
+- [ ] Role, security, concurrency and data-integrity acceptance.
 - [ ] Staff training, admin guide, backup/restore runbook and signed handover.
-**Exit:** DEP acceptance evidence recorded and client signs off.
+**Exit:** deployment acceptance evidence recorded and client signs off.
 
-## Deferred
+## Deferred scope
+
 v2 reports: VAS charts, daily collection, printable dues, missed-session reports, treatment templates, canned Hindi advice, patient summary and backup health banner.
 
 v4+: webcam/HTTPS if not in v1 deployment decision, document/scan attachments and conditional legacy SQLite migration.
 
-## Traceability
-Requirement-to-phase mapping is maintained in .planning/REQUIREMENTS.md. Each requirement needs an acceptance test and evidence artifact before release.
-
 ## Legacy desktop work
+
 Existing PySide6/SQLite implementation and tests belong to the previous desktop milestone. They are not v3 phase completion evidence.
 
 ---
-*This roadmap is the v3 plan; execution has not begun.*
+*Roadmap execution status synchronized with .planning/STATE.md on 2026-11-01.*
