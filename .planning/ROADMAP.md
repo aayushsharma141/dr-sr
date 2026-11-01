@@ -13,7 +13,7 @@ Ordering notes:
 ## Phases
 
 - [ ] **Phase 11: Decisions Gate, Foundation & Auth** - Open decisions closed, repo/PostgreSQL/Alembic scaffold, individual accounts, role-routed login, server-enforced permissions, optimistic concurrency, and the audit-event writer.
-- [ ] **Phase 12: Clinic Settings & Patient Registration** - Clinic details, doctor profiles, fee list, patient registration with atomic URN, search, edit, duplicate warning and photos (print spike starts).
+- [x] **Phase 12: Clinic Settings & Patient Registration** - Clinic details, doctor profiles, fee list, patient registration with atomic URN, search, edit, duplicate warning and photos (print spike starts).
 - [ ] **Phase 13: Appointments & Clinical Encounters** - Per-doctor daily appointments with tokens and status, doctor queue, encounters, finalised notes with addenda.
 - [ ] **Phase 14: Prescriptions, Treatment Plans & Sessions** - Bilingual prescriptions, treatment plans/packages, immutable physiotherapy session log with VAS.
 - [ ] **Phase 15: Billing, Receipts & Reversals** - Integer-paise payments, computed balances, dues list, gap-free receipts with DUPLICATE reprints, admin reversals, unified patient timeline.
@@ -64,10 +64,17 @@ Plans:
   3. Searching by URN, name (including Devanagari) or mobile returns the right patient, and a same-name-and-mobile registration shows a duplicate warning.
   4. Editing a patient records an audit row with before and after values; a stale concurrent edit is rejected.
   5. A patient photo is uploaded, stored on the server, and is only served to authenticated, authorised users (direct file URL access without a session is refused).
-**Plans**: TBD
+**Plans**: 8 plans
 
 Plans:
-- [ ] TBD (created by plan-phase)
+- [x] 12-01: Database Models & Migration 0002 (Settings, Doctors, Fees, Patients, Sequences)
+- [x] 12-02: Settings, Doctors, Fees REST Endpoints & Concurrency Control
+- [x] 12-03: Atomic KH-YYYY-XXXX URN Generator & Reception Registration Endpoint
+- [x] 12-04: Multi-Modal Patient Search, Demographic Edit & Authenticated Photo Streaming
+- [x] 12-05: Frontend Clinic Settings & Doctor Profiles Management
+- [x] 12-06: Frontend Patient Registration, Photo Uploader & Duplicate Warning
+- [x] 12-07: Searchable Directory & Detail View with Optimistic Locking
+- [x] 12-08: A4 Registration Card Print Spike & Phase 12 Gate Verification
 
 ### Phase 13: Appointments & Clinical Encounters
 **Goal**: Reception books and tracks per-doctor daily appointments, and doctors work their day's queue and record finalised encounter notes with addenda.
