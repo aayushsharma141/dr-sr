@@ -169,11 +169,27 @@ export const router = createBrowserRouter([
           {
             path: '/doctor',
             lazy: async () => {
-              const { AreaHome } = await import('./pages/AreaHome')
+              const { DoctorDashboard } = await import('./pages/DoctorDashboard')
               return {
-                Component: function DoctorArea() {
-                  return <AreaHome area="doctor" />
-                },
+                Component: DoctorDashboard,
+              }
+            },
+          },
+          {
+            path: '/doctor/encounters/new',
+            lazy: async () => {
+              const { ClinicalEncounterWorkspace } = await import('./pages/ClinicalEncounterWorkspace')
+              return {
+                Component: ClinicalEncounterWorkspace,
+              }
+            },
+          },
+          {
+            path: '/doctor/encounters/:id',
+            lazy: async () => {
+              const { ClinicalEncounterWorkspace } = await import('./pages/ClinicalEncounterWorkspace')
+              return {
+                Component: ClinicalEncounterWorkspace,
               }
             },
           },
