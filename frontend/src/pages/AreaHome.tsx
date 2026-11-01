@@ -1,3 +1,4 @@
+import { Link } from 'react-router'
 import { AppShell } from '../components/AppShell'
 import { useOverview } from '../api/queries'
 import type { AdminOverview, DoctorOverview, Role } from '../api/types'
@@ -59,29 +60,66 @@ export function AreaHome({ area }: AreaHomeProps) {
           )}
 
           {area === 'admin' && (
-            <div className="mt-6">
-              <h3 className="text-sm font-semibold text-neutral-700 uppercase tracking-wider mb-3">
-                System User Counts
-              </h3>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                {Object.entries((data as AdminOverview).user_counts || {}).map(
-                  ([rName, counts]) => (
-                    <div
-                      key={rName}
-                      className="p-4 bg-neutral-50 rounded border border-neutral-200"
-                    >
-                      <p className="text-xs font-mono font-medium text-neutral-500">
-                        {rName}
-                      </p>
-                      <p className="text-lg font-bold text-neutral-900 mt-1">
-                        {counts.active} active
-                      </p>
-                      <p className="text-xs text-neutral-500">
-                        {counts.inactive} inactive
-                      </p>
-                    </div>
-                  ),
-                )}
+            <div className="mt-6 space-y-6">
+              <div>
+                <h3 className="text-sm font-semibold text-neutral-700 uppercase tracking-wider mb-3">
+                  System User Counts
+                </h3>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  {Object.entries((data as AdminOverview).user_counts || {}).map(
+                    ([rName, counts]) => (
+                      <div
+                        key={rName}
+                        className="p-4 bg-neutral-50 rounded border border-neutral-200"
+                      >
+                        <p className="text-xs font-mono font-medium text-neutral-500">
+                          {rName}
+                        </p>
+                        <p className="text-lg font-bold text-neutral-900 mt-1">
+                          {counts.active} active
+                        </p>
+                        <p className="text-xs text-neutral-500">
+                          {counts.inactive} inactive
+                        </p>
+                      </div>
+                    ),
+                  )}
+                </div>
+              </div>
+
+              <div>
+                <h3 className="text-sm font-semibold text-neutral-700 uppercase tracking-wider mb-3">
+                  Administration Modules
+                </h3>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <Link
+                    to="/admin/settings"
+                    className="p-4 bg-white rounded border border-neutral-300 hover:border-red-800 hover:shadow-xs transition-all block"
+                  >
+                    <p className="font-bold text-neutral-900">Clinic Settings</p>
+                    <p className="text-xs text-neutral-500 mt-1">
+                      Clinic identity, numbering cycles & print slips
+                    </p>
+                  </Link>
+                  <Link
+                    to="/admin/doctors"
+                    className="p-4 bg-white rounded border border-neutral-300 hover:border-red-800 hover:shadow-xs transition-all block"
+                  >
+                    <p className="font-bold text-neutral-900">Doctors & Fees</p>
+                    <p className="text-xs text-neutral-500 mt-1">
+                      Doctor profiles, qualifications & fee schedules
+                    </p>
+                  </Link>
+                  <Link
+                    to="/admin/users"
+                    className="p-4 bg-white rounded border border-neutral-300 hover:border-red-800 hover:shadow-xs transition-all block"
+                  >
+                    <p className="font-bold text-neutral-900">User Management</p>
+                    <p className="text-xs text-neutral-500 mt-1">
+                      User accounts, roles, locks & passwords
+                    </p>
+                  </Link>
+                </div>
               </div>
             </div>
           )}

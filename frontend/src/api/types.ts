@@ -112,3 +112,90 @@ export interface SetupAdminRequest {
   full_name: string
   password: string
 }
+
+
+export interface ClinicSettingsOut {
+  id: number
+  name_en: string
+  name_hi: string
+  address_1: string
+  address_2: string | null
+  phone: string
+  email: string | null
+  receipt_sequence_cycle: 'FINANCIAL_YEAR' | 'CALENDAR_YEAR'
+  print_header_en: string | null
+  print_header_hi: string | null
+  print_footer_en: string | null
+  print_footer_hi: string | null
+  consultation_validity_days: number
+  version_id: number
+  created_at: string
+  updated_at: string
+}
+
+export interface ClinicSettingsUpdate {
+  name_en: string
+  name_hi: string
+  address_1: string
+  address_2?: string | null
+  phone: string
+  email?: string | null
+  receipt_sequence_cycle: 'FINANCIAL_YEAR' | 'CALENDAR_YEAR'
+  print_header_en?: string | null
+  print_header_hi?: string | null
+  print_footer_en?: string | null
+  print_footer_hi?: string | null
+  consultation_validity_days: number
+  version_id: number
+}
+
+export interface DoctorOut {
+  id: number
+  name_en: string
+  name_hi: string | null
+  qualification: string | null
+  registration_number: string | null
+  default_fee_paise: number
+  is_active: boolean
+  version_id: number
+  created_at: string
+  updated_at: string
+}
+
+export interface DoctorCreate {
+  name_en: string
+  name_hi?: string | null
+  qualification?: string | null
+  registration_number?: string | null
+  default_fee_paise?: number
+}
+
+export interface DoctorUpdate {
+  name_en: string
+  name_hi?: string | null
+  qualification?: string | null
+  registration_number?: string | null
+  default_fee_paise: number
+  is_active: boolean
+  version_id: number
+}
+
+export interface FeeOut {
+  id: number
+  name: string
+  fee_paise: number
+  is_active: boolean
+  created_at: string
+  updated_at: string
+}
+
+export interface FeeCreate {
+  name: string
+  fee_paise: number
+}
+
+export interface FeeUpdate {
+  name: string
+  fee_paise: number
+  is_active?: boolean
+}

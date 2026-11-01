@@ -1,3 +1,13 @@
+import type {
+  ClinicSettingsOut,
+  ClinicSettingsUpdate,
+  DoctorCreate,
+  DoctorOut,
+  DoctorUpdate,
+  FeeCreate,
+  FeeOut,
+  FeeUpdate,
+} from './types'
 import {
   QueryClient,
   useMutation,
@@ -294,3 +304,96 @@ export function useSetupAdmin() {
   })
 }
 
+
+export function useClinicSettings() {
+  return useQuery({
+    queryKey: ['clinic-settings'],
+    queryFn: () => apiFetch<ClinicSettingsOut>('/settings'),
+  })
+}
+
+export function useUpdateClinicSettings() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (body: ClinicSettingsUpdate) =>
+      apiFetch<ClinicSettingsOut>('/settings', {
+        method: 'PATCH',
+        body,
+      }),
+    onSuccess: (data) => {
+      qc.setQueryData(['clinic-settings'], data)
+    },
+  })
+}
+
+export function useDoctors(activeOnly: boolean = false) {
+  return useQuery({
+    queryKey: ['doctors', { activeOnly }],
+    queryFn: () =>
+      apiFetch<DoctorOut[]>(activeOnly ? '/doctors' : '/doctors?include_inactive=true'),
+  })
+}
+
+export function useCreateDoctor() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (body: DoctorCreate) =>
+      apiFetch<DoctorOut>('/doctors', {
+        method: 'POST',
+        body,
+      }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['doctors'] })
+    },
+  })
+}
+
+export function useUpdateDoctor() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, body }: { id: number; body: DoctorUpdate }) =>
+      apiFetch<DoctorOut>(`/doctors/${id}`, {
+        method: 'PATCH',
+        body,
+      }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['doctors'] })
+    },
+  })
+}
+
+export function useFees(activeOnly: boolean = false) {
+  return useQuery({
+    queryKey: ['fees', { activeOnly }],
+    queryFn: () =>
+      apiFetch<FeeOut[]>(activeOnly ? '/fees' : '/fees?include_inactive=true'),
+  })
+}
+
+export function useCreateFee() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (body: FeeCreate) =>
+      apiFetch<FeeOut>('/fees', {
+        method: 'POST',
+        body,
+      }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['fees'] })
+    },
+  })
+}
+
+export function useUpdateFee() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, body }: { id: number; body: FeeUpdate }) =>
+      apiFetch<FeeOut>(`/fees/${id}`, {
+        method: 'PATCH',
+        body,
+      }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['fees'] })
+    },
+  })
+}

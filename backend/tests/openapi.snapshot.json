@@ -1162,7 +1162,7 @@
               {
                 "maxLength": 15,
                 "minLength": 10,
-                "pattern": "^[0-9+ -](10, 15)$",
+                "pattern": "^[0-9+ -]{10,15}$",
                 "type": "string"
               },
               {
