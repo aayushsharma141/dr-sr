@@ -22,6 +22,7 @@ This directory is the durable engineering knowledge base for the Kalyan Hospital
 - [Open questions](decisions/open-questions.md) — policy and acceptance items still requiring resolution.
 - [Current state](changes/current-state.md) — concise snapshot of implementation and known gaps.
 - [Changelog](changes/changelog.md) — durable project-level change history.
+- [Documentation audit](changes/documentation-audit-2026-11-01.md) — findings, corrections, unresolved gaps, and verification limits from the repository consistency review.
 
 ## Source-of-truth order
 
