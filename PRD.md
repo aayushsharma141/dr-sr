@@ -1,17 +1,18 @@
 # Product Requirements — Kalyan Hospital v3.0
 
-**Status:** Proposed baseline; client sign-off and open decisions pending.  
+**Status:** Product baseline for v3; Phases 11–13 are recorded implemented, Phases 14–17 remain planned/incomplete. Client sign-off and deployment acceptance are pending.  
 **Baseline:** 2026-11-01. This supersedes the single-workstation PRD for new development.
 
 ## 1. Product vision
 
-An internet-independent, centralized hospital workflow platform. One on-premises server provides shared patient records to 3–5 browser-based PCs on the hospital LAN. Reception, doctors and administrators use individual accounts. The server owns authentication, permissions, database, patient files, audit history and backups.
+An internet-independent, centralized hospital workflow platform. One on-premises server provides shared patient records to 3–5 browser-based PCs on the hospital LAN. Reception, doctors and administrators use individual accounts. The server is the system of record for authentication, permissions, database, patient files and audit events; backup operations are a planned Phase 16 capability, not yet delivered.
 
 ## 2. Users and roles
 
-- **Admin:** users, clinic configuration, doctors, fee catalogue, audit, backup/restore and authorized financial reversals.
-- **Reception:** patient registration/search/edit, appointments, registration printing, permitted billing and dues.
-- **Doctor:** assigned queue, authorized patient timeline, encounters, prescriptions, treatment plans and sessions.
+These are target role responsibilities; a capability is available only when its phase is implemented.
+- **Admin:** user and clinic administration; planned audit/backup oversight and financial reversal authority (reversal policy requires client confirmation).
+- **Reception:** patient registration/search/edit, appointments, registration printing and planned permitted billing/dues.
+- **Doctor:** own appointment queue and doctor-scoped clinical records; prescriptions, treatment plans and sessions are Phase 14 scope.
 
 Fixed role catalogue for v1; no shared accounts or custom per-user permission builder.
 
@@ -32,7 +33,7 @@ Fixed role catalogue for v1; no shared accounts or custom per-user permission bu
 - SET-03 Consultation fee catalogue with effective dates and audit.
 
 ### Reception and registry
-- PAT-01 Canonical 12 fields; unique KH-YYYY-XXXX URN under concurrent registration. Define gap semantics for rolled-back/cancelled records.
+- PAT-01 Implement the client-approved registration form fields and unique KH-YYYY-XXXX URN under concurrent registration. The current API schema stores `full_name`, `guardian_name`, `gender`, `dob`, `age_years`, `mobile`, `address`, `district`, `state`, `emergency_contact`, `allergies` and `notes`; this does not yet map one-to-one to the client form fields listed below. Resolve the mapping before claiming full form parity. Define gap semantics for rolled-back/cancelled records.
 - PAT-02 Search URN/name/mobile; Devanagari supported.
 - PAT-03 Demographic edits audited with before/after values.
 - PAT-04 Duplicate warning for same name + mobile.
@@ -41,7 +42,7 @@ Fixed role catalogue for v1; no shared accounts or custom per-user permission bu
 - APT-02 Statuses: Booked, Arrived, In consultation, Done, Cancelled, No-show; doctor sees daily queue.
 - PRN-01 A4 registration card with Patient/Attendant and Authorized signatures; verify on actual hospital printer.
 
-Canonical 12 fields: Serial/URN; patient name; age; sex; address (town/village, district, PIN); mobile; patient in date/time; patient out date/time; reference/referred by; condition/diagnosis/chief complaints; number of sessions agreed; total agreed fee, paid to date and balance due. Patient picture is a separate element.
+Client-provided form fields to preserve in the final approved workflow: Serial/URN; patient name; age; sex; address (town/village, district, PIN); mobile; patient in date/time; patient out date/time; reference/referred by; patient condition; number of sessions; total amount; amount paid; balance amount. Patient picture is a separate element. The current API schema additionally stores guardian name, date of birth, emergency contact, allergies and notes; the exact mapping, ownership and lifecycle of each field remains an open requirement.
 
 ### Clinical
 - CLN-01 Dated clinical encounters and notes.
@@ -60,7 +61,7 @@ Canonical 12 fields: Serial/URN; patient name; age; sex; address (town/village, 
 - BIL-05 Admin-authorized reversal with mandatory reason; no silent deletion/edit of posted financial records.
 
 ### Audit, backup and deployment
-- AUD-01 Append-only audit for security, patient, clinical, billing and backup events.
+- AUD-01 Append-only audit events for security, patient, clinical, billing and backup operations. The Phase 11 writer/foundation is implemented; complete coverage must be extended as Phase 14–16 modules are delivered.
 - AUD-02 Admin filters audit by user, action, entity and date.
 - BAK-01 Database + files backup bundle with checksums, manual and scheduled backup, second drive.
 - BAK-02 Verify and restore on clean machine as handover gate.
@@ -81,18 +82,20 @@ IPD, pharmacy, laboratory, advanced ERP, Aadhaar, SMS/WhatsApp, cloud backup, pa
 
 ## 6. Target technical direction
 
-React + TypeScript frontend; FastAPI backend; PostgreSQL central database; Alembic migrations; private server-side file storage; one on-premises server and browser clients. Runtime must not require CDN, cloud services or internet. PostgreSQL is the recommended target pending server hardware assessment.
+Implemented v3 stack: React + TypeScript frontend; FastAPI backend; PostgreSQL central database; Alembic migrations; private server-side file storage; one on-premises server and browser clients. Runtime must not require CDN, cloud services or internet. Server hardware assessment remains a deployment prerequisite; PostgreSQL is already the implemented database.
 
 ## 7. Open decisions requiring client confirmation
 
 1. Server PC specification, OS, fixed IP and UPS.
-2. Doctor visibility; recommended read all clinically relevant records, write assigned cases only.
-3. Reversal authority; recommended Admin only.
-4. Receipt numbering reset: calendar year or financial year.
-5. Whether genuine v2 data exists and requires migration.
-6. Actual printer model and whether thermal receipts are required.
-7. HTTPS required immediately or explicitly accepted HTTP on isolated trusted LAN.
-8. Fee catalogue, idle timeout, lockout thresholds, backup schedule and retention.
+2. Doctor visibility: the current implementation enforces a strict doctor silo; confirm whether to retain it or explicitly authorize cross-doctor access. Preserve the current silo until approval.
+3. Admin photo viewing and demographic-edit rights; both are currently denied by the role map.
+4. Financial reversal authority: current permission mapping reserves reversal for Admin; obtain client approval before Phase 15.
+5. Receipt numbering reset: calendar year or financial year.
+6. Whether genuine v2 data exists and requires migration.
+7. Actual printer model and whether thermal receipts are required.
+8. HTTPS required immediately or explicitly accepted HTTP on isolated trusted LAN.
+9. Fee catalogue values, idle timeout, lockout thresholds, backup schedule and retention.
+10. Patient registration form-to-API schema mapping, including patient in/out, referred by, condition, session count and payment fields.
 
 Do not silently treat recommendations as client approval.
 
@@ -102,7 +105,7 @@ Do not silently treat recommendations as client approval.
 - **B — Core workflows:** registry, appointments, clinical records, prescriptions, treatment, billing, receipts and audit.
 - **C — Handover:** verified database+files backup, clean-machine restore, integrity report, offline LAN test, actual printer test, power-recovery test and staff walkthrough.
 
-A demo is not production acceptance. Each gate requires recorded test evidence and client approval.
+A demo is not production acceptance. Each gate requires recorded test evidence and client approval. The Phase 11 audit writer is a foundation only; full domain coverage remains incomplete until later modules are instrumented.
 
 ## 9. Legacy boundary
 

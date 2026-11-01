@@ -1,93 +1,104 @@
 # Security Policy — Kalyan Hospital v3.0
 
-**Status:** Required target controls; implementation and acceptance evidence pending.
+**Status:** Phase 11 security foundation and Phase 12–13 authorization controls are implemented. Remaining module-specific controls and deployment acceptance are pending. Client policy sign-off is still required.
 
 ## 1. Objectives and threat model
 
 Protect patient confidentiality, prevent unauthorized clinical/financial changes, preserve attribution and recover from device/data loss. LAN-only does not mean inherently secure.
 
-Assume shared/unattended workstations, direct API probing, concurrent edits, disconnects during writes, power loss, corrupt/lost backup drives and accidental or malicious staff actions. Full compromise of server OS/physical administrator is outside initial protection boundary and must be documented as residual risk.
+Assume shared/unattended workstations, direct API probing, concurrent edits, disconnects during writes, power loss, corrupt/lost backup drives and accidental or malicious staff actions. Full compromise of the server OS or physical administrator is outside the initial protection boundary and must be documented as residual risk.
 
-## 2. Authentication
+## 2. Implemented authentication baseline
 
-- Individual staff accounts; no shared or default production credentials.
-- Passwords stored using Argon2id or approved modern password hashing, never plaintext/reversible.
-- First login after reset forces password change.
-- Idle expiry, logout invalidation, failed-login rate limiting/lockout and security audit.
-- Deactivation blocks login, revokes sessions and preserves historical actor identity.
-- Password resets are authorized and audited.
+Phase 11 implementation includes:
+- Individual staff accounts; fixed Admin, Reception and Doctor roles.
+- Argon2id password hashing.
+- HttpOnly session cookies and CSRF protections.
+- Idle/session expiry and failed-login lockout controls.
+- First-login password-change workflow.
+- User creation, deactivation/reactivation, password reset and unlock operations.
+- One-time first-admin setup using a code shown on the local server console, with atomic consumption and permanent public bootstrap shutdown after successful setup.
+- Local administrative CLI recovery; no hidden HTTP recovery backdoor.
 
-### First-run setup wizard
-
-- Enabled only when no administrator exists.
-- Cryptographically random one-time setup code printed only to local server console.
-- Short expiry, safe storage (preferably hash), rate limiting and atomic consumption.
-- Concurrent setup attempts must create exactly one administrator.
-- Successful setup permanently disables public bootstrap endpoints.
-- Recovery requires local server CLI access; never implement hidden HTTP backdoor or hardcoded master password.
+Verify exact timeout, lockout and password-policy values from current configuration before client sign-off. Never log or commit passwords, setup codes, session tokens or production secrets.
 
 ## 3. Server-side authorization
 
-Every protected API endpoint, patient object and file access must enforce permissions on the backend. Frontend route guards are usability only. Fixed Admin, Reception and Doctor roles; no custom permission editor in v1. A route/permission coverage test fails if any protected endpoint has no declared policy.
+The backend permission catalogue is defined in `backend/src/kalyan_api/core/permissions.py`; enforcement is implemented through backend policy dependencies. Frontend route guards are usability controls, not the security boundary.
 
-### Proposed role matrix — client approval pending
+### Current role mapping (source-derived)
 
 | Capability | Admin | Reception | Doctor |
-|---|---|---|---|
-| Users, clinic settings, doctor/fee setup | Yes | No | No |
-| Patient registration/demographic edit | Yes | Yes | Limited/pending |
-| Patient search/photo access | Yes | Yes | Subject to patient policy |
-| Appointments | Yes | Yes | Own queue/status |
-| Clinical notes and addenda | Read/admin | No authoring | Authorized clinician |
-| Prescription and treatment authoring | Read/admin | No | Assigned/authorized cases |
-| Record payments | Yes | Yes | No |
-| Authorize reversals | Yes | No | No |
-| Read audit | Yes | No | No |
-| Backup/restore | Yes | No | No |
+|---|---:|---:|---:|
+| User administration | Yes | No | No |
+| Clinic settings / doctor / fee management | Yes | No | No |
+| Patient read | Yes | Yes | Yes |
+| Patient create | No | Yes | No |
+| Patient demographic update | No | Yes | No |
+| Patient photo upload | No | Yes | No |
+| Patient photo read | **No** | **Yes** | **No** |
+| Appointment read | Yes | Yes | Yes |
+| Appointment write | No | Yes | Yes |
+| Clinical encounter read/write | No | No | Yes |
+| Payment and reversal permissions | Reserved for Phase 15; current catalogue entries are not proof of completed billing |
+| Audit / backup permissions | Reserved for Phase 16; current catalogue entries are not proof of completed audit viewer or backup UI |
 
-Recommended doctor access: read clinically relevant records across doctors, write only assigned cases. Not yet client-approved.
+This table describes the current `ROLE_PERMISSIONS` mapping, not a client-approved policy.
 
-## 4. Record integrity
+### Tracked permission findings
 
-Finalized encounters, prescriptions and sessions cannot be silently edited/deleted. Corrections are dated addenda with author/reason. Payments are append-only; reversal is a compensating event with Admin authorization and mandatory reason. Balances derive from ledger. Stale updates return HTTP 409. Patient demographic edits retain before/after audit values.
+1. **PHOTO_READ mismatch:** `GET /patients/{id}/photo` requires `PHOTO_READ`, but the role map grants `PHOTO_READ` only to Reception. Admin and Doctor cannot use that endpoint through their current roles. Decide explicitly whether either role needs photo access; then update role grants and allowed/denied tests in a separate code change.
+2. **Admin demographic edit:** `PATCH /patients/{id}` requires `PATIENT_UPDATE`; current role map grants it to Reception but not Admin. Confirm whether Admin should also edit demographics. Do not silently infer the answer.
+3. **Doctor silo:** appointment and encounter APIs scope doctors to their own doctor ID; encounter reads/writes are doctor-owned. Reception is denied encounter access. This is implemented behavior, but the client must confirm that a strict silo is the intended clinical policy.
 
-## 5. Audit events
+Any permission change must include both positive and negative API tests and update this matrix.
 
-Cover login success/failure, lockout, logout, password reset, user activation/deactivation, patient create/update, clinical finalization/addenda, prescriptions, appointment status, payment, reversal, receipt print/reprint, backup, verification and restore.
+## 4. Record integrity and audit
 
-Minimum fields: actor, timestamp, action/outcome, entity type/id, request ID, reason where required, structured before/after values where applicable. Ordinary users cannot update/delete audit events. Never log passwords, setup codes, session tokens or unnecessary clinical narrative.
+Implemented through Phase 13:
+- Patient demographic updates use version checks and record before/after audit values.
+- Appointment status changes are validated, versioned and audited.
+- Encounter drafts can be updated; finalized encounters are locked and corrections are dated addenda.
+- Doctor-scoped clinical and appointment access is enforced.
+
+Not yet complete:
+- Full audit coverage across every future domain; Phase 11 provides the writer/foundation, while Phase 14–16 modules must add and test their own events.
+- Prescription and physiotherapy-session immutability (Phase 14).
+- Financial append-only ledger, reversals and receipt audit (Phase 15).
+- Admin audit viewer and full audit-domain review (Phase 16).
+
+Do not treat reserved permission enum values as proof that the corresponding business module exists.
+
+## 5. Patient photo security
+
+Photos are stored server-side and streamed through an authenticated endpoint protected by `PHOTO_READ`; uploads require `PHOTO_WRITE`. Reception currently has both grants. Admin and Doctor do not. Direct URL access must remain authenticated and permission-checked. Validate content, size, generated filenames, path traversal resistance and cleanup behavior with tests.
 
 ## 6. Network and server
 
-Bind services to controlled LAN interface; firewall only required ports from trusted subnet. No router port forwarding/public exposure. HTTPS preferred. HTTP exception only with explicit client approval for isolated physically controlled LAN; it is unencrypted. Use secure cookies and CSRF protection where applicable. No runtime CDN, cloud auth or internet dependency.
+Phase 17 must confirm:
+- Bind services only to the intended LAN interface and restrict firewall access to the clinic subnet.
+- No public exposure, router port forwarding, runtime CDN, cloud auth, telemetry or internet API.
+- HTTPS is preferred; any HTTP exception must be explicit because HTTP is unencrypted.
+- Stable LAN addressing, UPS, service auto-start and power-recovery behavior.
+- Physical server access and OS administrator responsibilities.
 
-## 7. Patient files
+## 7. Future financial controls — Phase 15
 
-Private storage outside public web root; generated opaque names; validate content and size; path traversal prevention; checksum metadata; every download authorization-checked. Unauthorized file IDs must not reveal private file existence. Backup includes all referenced files.
+Require integer paise, ledger-derived balances, transactional overpayment protection under two-PC concurrency, sequential receipts, duplicate reprint markers, and reversal with a mandatory reason. The current permission catalogue reserves `PAYMENT_REVERSE` for Admin, but client approval of reversal authority is still pending (OD-03); do not treat the role mapping as client sign-off. No silent deletion or editing of posted payments.
 
-## 8. Backup security
+## 8. Future audit and recovery controls — Phase 16/17
 
-Database and patient files in one checksummed bundle. Access-controlled destinations and secure removable-drive storage. Stage and verify restore before live cutover; take pre-restore safety snapshot; scheduled failure visible to Admin. Clean-machine restore drill is mandatory.
+Require append-only audit review, PostgreSQL + referenced-file backup bundles, checksummed manifests, manual and scheduled backups to a second physical drive, staging verification, safe restore, pre-restore snapshot, integrity report and clean-machine restore drill.
 
-## 9. Security acceptance tests
+## 9. Release security gates
 
-1. Anonymous users cannot access protected APIs/files.
-2. Reception cannot call Admin-only user, audit, restore or reversal APIs directly.
-3. Doctor cannot post payments or modify unassigned records under approved policy.
-4. Every protected route has permission coverage.
-5. Bootstrap is one-time and simultaneous submissions yield one success.
-6. Lockout, idle timeout, reset and session revocation work.
-7. Stale updates return 409.
-8. Finalized clinical records and posted payments cannot be overwritten/deleted.
-9. Audit is committed with sensitive mutation.
-10. Corrupt backup cannot replace live data.
-11. File authorization and path traversal tests pass.
-
-## 10. Incident response
-
-Isolate affected server/network; preserve logs, database and files before repair; do not overwrite only known-good backup; revoke affected sessions and reset credentials; restore only after verification; document timeline, impact and corrective action.
-
-Report vulnerabilities privately. Never attach real patient data, passwords, setup codes or production backups to public issues.
+Before production use:
+- Re-run backend and frontend tests on the exact release SHA.
+- Verify every protected route has a policy and test both allowed and denied role/action pairs.
+- Resolve PHOTO_READ and Admin demographic-edit policy findings.
+- Obtain client sign-off for doctor silo and role matrix.
+- Complete Phase 14–16 controls and Phase 17 LAN/offline/restore acceptance.
+- Record test logs, configuration, hardware and client approval.
 
 ---
-*Requirements only. Do not claim security compliance until test evidence exists.*
+*Security policy synchronized to the Phase 13 source and current permission catalogue on 2026-11-01.*

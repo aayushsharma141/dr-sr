@@ -1,6 +1,6 @@
 # Test and Acceptance Plan — Kalyan Hospital v3.0
 
-**Status:** Test strategy for target platform; v3 implementation not yet present.
+**Status:** Test strategy for implemented v3 foundation and upcoming modules. Phase 13 gate results are recorded in .planning/STATE.md; no fresh test run was performed by this documentation update.
 
 ## 1. Test principles
 
