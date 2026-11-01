@@ -2404,6 +2404,302 @@
         "title": "SetupAdminRequest",
         "type": "object"
       },
+      "TreatmentPlanCreate": {
+        "additionalProperties": false,
+        "description": "Schema for creating a multi-session treatment plan / package.",
+        "properties": {
+          "agreed_price_paise": {
+            "description": "Total agreed fee in integer paise (INR x 100)",
+            "minimum": 0.0,
+            "title": "Agreed Price Paise",
+            "type": "integer"
+          },
+          "condition_diagnosis": {
+            "description": "Clinical diagnosis/condition being treated",
+            "maxLength": 1000,
+            "minLength": 2,
+            "title": "Condition Diagnosis",
+            "type": "string"
+          },
+          "encounter_id": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Optional linked clinical encounter ID",
+            "title": "Encounter Id"
+          },
+          "patient_id": {
+            "description": "Patient ID",
+            "exclusiveMinimum": 0.0,
+            "title": "Patient Id",
+            "type": "integer"
+          },
+          "plan_name": {
+            "description": "Treatment plan package name",
+            "maxLength": 128,
+            "minLength": 2,
+            "title": "Plan Name",
+            "type": "string"
+          },
+          "referred_by": {
+            "anyOf": [
+              {
+                "maxLength": 128,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Referring doctor or source",
+            "title": "Referred By"
+          },
+          "total_sessions": {
+            "description": "Total planned physiotherapy sessions (1-200)",
+            "maximum": 200.0,
+            "minimum": 1.0,
+            "title": "Total Sessions",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "patient_id",
+          "plan_name",
+          "condition_diagnosis",
+          "total_sessions",
+          "agreed_price_paise"
+        ],
+        "title": "TreatmentPlanCreate",
+        "type": "object"
+      },
+      "TreatmentPlanOut": {
+        "description": "Schema for reading treatment plan details and progress.",
+        "properties": {
+          "agreed_price_paise": {
+            "title": "Agreed Price Paise",
+            "type": "integer"
+          },
+          "cancellation_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cancellation Reason"
+          },
+          "completed_sessions": {
+            "title": "Completed Sessions",
+            "type": "integer"
+          },
+          "condition_diagnosis": {
+            "title": "Condition Diagnosis",
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "doctor_id": {
+            "title": "Doctor Id",
+            "type": "integer"
+          },
+          "doctor_name": {
+            "title": "Doctor Name",
+            "type": "string"
+          },
+          "encounter_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Encounter Id"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "patient_id": {
+            "title": "Patient Id",
+            "type": "integer"
+          },
+          "patient_name": {
+            "title": "Patient Name",
+            "type": "string"
+          },
+          "patient_urn": {
+            "title": "Patient Urn",
+            "type": "string"
+          },
+          "plan_name": {
+            "title": "Plan Name",
+            "type": "string"
+          },
+          "referred_by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Referred By"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "total_sessions": {
+            "title": "Total Sessions",
+            "type": "integer"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          },
+          "version_id": {
+            "title": "Version Id",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "patient_id",
+          "patient_urn",
+          "patient_name",
+          "doctor_id",
+          "doctor_name",
+          "plan_name",
+          "condition_diagnosis",
+          "total_sessions",
+          "completed_sessions",
+          "agreed_price_paise",
+          "status",
+          "version_id",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "TreatmentPlanOut",
+        "type": "object"
+      },
+      "TreatmentPlanStatus": {
+        "description": "Lifecycle statuses for multi-session physiotherapy treatment packages.",
+        "enum": [
+          "ACTIVE",
+          "COMPLETED",
+          "CANCELLED"
+        ],
+        "title": "TreatmentPlanStatus",
+        "type": "string"
+      },
+      "TreatmentPlanUpdate": {
+        "additionalProperties": false,
+        "description": "Schema for modifying or cancelling a treatment plan.",
+        "properties": {
+          "cancellation_reason": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "minLength": 3,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Required when cancelling plan",
+            "title": "Cancellation Reason"
+          },
+          "condition_diagnosis": {
+            "anyOf": [
+              {
+                "maxLength": 1000,
+                "minLength": 2,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Condition Diagnosis"
+          },
+          "plan_name": {
+            "anyOf": [
+              {
+                "maxLength": 128,
+                "minLength": 2,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Plan Name"
+          },
+          "referred_by": {
+            "anyOf": [
+              {
+                "maxLength": 128,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Referred By"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TreatmentPlanStatus"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Status update (e.g. CANCELLED)"
+          },
+          "total_sessions": {
+            "anyOf": [
+              {
+                "maximum": 200.0,
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total Sessions"
+          },
+          "version_id": {
+            "description": "Version ID for optimistic concurrency control",
+            "minimum": 1.0,
+            "title": "Version Id",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "version_id"
+        ],
+        "title": "TreatmentPlanUpdate",
+        "type": "object"
+      },
       "UserCreate": {
         "additionalProperties": false,
         "description": "Payload for creating a new user account.",
@@ -4113,6 +4409,53 @@
         ]
       }
     },
+    "/api/patients/{patient_id}/treatment-plans": {
+      "get": {
+        "description": "List historical and active treatment plans for a patient.",
+        "operationId": "list_patient_treatment_plans_api_patients__patient_id__treatment_plans_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "patient_id",
+            "required": true,
+            "schema": {
+              "title": "Patient Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/TreatmentPlanOut"
+                  },
+                  "title": "Response List Patient Treatment Plans Api Patients  Patient Id  Treatment Plans Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Patient Treatment Plans",
+        "tags": [
+          "treatment-plans"
+        ]
+      }
+    },
     "/api/prescriptions": {
       "post": {
         "description": "Issue a new structured prescription with medication lines (RX-01).",
@@ -4341,6 +4684,142 @@
         "summary": "Get Setup Status",
         "tags": [
           "setup"
+        ]
+      }
+    },
+    "/api/treatment-plans": {
+      "post": {
+        "description": "Create a new multi-session physiotherapy treatment package (TRT-01, OQ-13).",
+        "operationId": "create_treatment_plan_api_treatment_plans_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TreatmentPlanCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TreatmentPlanOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Treatment Plan",
+        "tags": [
+          "treatment-plans"
+        ]
+      }
+    },
+    "/api/treatment-plans/{id}": {
+      "get": {
+        "description": "Retrieve details and progress of a treatment plan.",
+        "operationId": "get_treatment_plan_api_treatment_plans__id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "title": "Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TreatmentPlanOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Treatment Plan",
+        "tags": [
+          "treatment-plans"
+        ]
+      },
+      "patch": {
+        "description": "Update or cancel a treatment plan with optimistic concurrency control.",
+        "operationId": "update_treatment_plan_api_treatment_plans__id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "title": "Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TreatmentPlanUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TreatmentPlanOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Treatment Plan",
+        "tags": [
+          "treatment-plans"
         ]
       }
     },
