@@ -286,3 +286,4 @@ def allocate_next_session_number(session: Session, treatment_plan_id: int) -> in
 | `TREATMENT_SESSION_ADDENDUM`| ❌ | ❌ | ✅ | Clinical corrections require clinical authorship and accountability. |
 
 *Note on Doctor Silo*: Unlike consultation encounter notes (which are strictly siloed per doctor per `D-03`/`D-04`), **physiotherapy sessions and prescriptions are shared within the clinical team** attending to the patient's physical therapy rehabilitation.
+

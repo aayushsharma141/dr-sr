@@ -116,3 +116,4 @@ graph TD
   - Ruff check 0 errors.
   - Frontend typecheck (`tsc -b`), oxlint, and vitest suite.
   - Legacy isolation check: `git diff --stat 43ab9c4 -- app tests ...`.
+

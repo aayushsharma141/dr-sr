@@ -108,3 +108,4 @@ flowchart TD
     E --> F["Save Addendum (Linked to Session ID with UTC Timestamp & Author User ID)"]
     F --> G["Rendered Chronologically below Session Entry"]
 ```
+
