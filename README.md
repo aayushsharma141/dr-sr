@@ -2,51 +2,60 @@
 
 **Product direction: v3.0 centralized offline LAN web platform.**
 
-> Status: The current main branch contains the earlier PySide6 + SQLite single-workstation desktop application. The v3 React + FastAPI + PostgreSQL platform is the target architecture and has not yet been implemented. Do not deploy or describe the legacy desktop application as the v3 LAN system.
+<badge>Cannot be rendered in Markdown</badge>
 
-## Product goal
+## Current implementation status
 
-Shared patient records for reception and doctors across 3–5 PCs on the hospital LAN without internet dependency. One central server owns authentication, permissions, records, files, clinical history, payments, audit and backups.
+The current `main` branch contains both the legacy PySide6 + SQLite desktop application and the v3 centralized LAN web platform.
 
-## Target stack
+- **v2 desktop:** retained as historical reference; do not share its SQLite database over a network drive.
+- **v3 Phase 11:** foundation, authentication, fixed roles, server-side permission checks, optimistic concurrency, first-admin bootstrap and audit-event writing implemented. Phase gate evidence is recorded in `.planning/STATE.md`.
+- **v3 Phase 12:** clinic settings, doctor profiles, fee catalogue, patient registry, atomic URN allocation, search, demographic edits, duplicate warning, photo streaming and A4 registration print spike implemented.
+- **v3 Phase 13:** appointments, per-doctor token queues, appointment status transitions, doctor queue, clinical encounters, finalization and addenda implemented.
+- **Next:** Phase 14 — prescriptions, treatment plans/packages and physiotherapy sessions with VAS.
+- **Not yet delivered:** Phase 15 billing/receipts/reversals; Phase 16 audit viewer/backup/restore/integrity; Phase 17 LAN deployment and final acceptance.
 
-- React + TypeScript frontend
+Phase completion is not equivalent to client production acceptance. Review the recorded test evidence and unresolved permission findings before deployment.
+
+## Architecture
+
+- React 19 + TypeScript + Vite single-page application
 - Python FastAPI backend
-- PostgreSQL central database and Alembic migrations
-- Private server-side patient file storage
-- One on-premises server and browser-based LAN clients
+- PostgreSQL 18, SQLAlchemy 2 and Alembic migrations
+- Cookie-based sessions, Argon2id password hashing and CSRF protections
+- One central server with browser clients over the clinic LAN; runtime does not require internet
+
+Exact dependency pins are maintained in `backend/pyproject.toml` and `frontend/package.json`.
 
 ## Documentation
 
-- [PRD](PRD.md): requirements and acceptance gates
-- [Architecture](ARCHITECTURE.md): system design and data boundaries
-- [Security](SECURITY.md): threat model, bootstrap and permission tests
-- [Decisions](DECISIONS.md): proposed, historical and unresolved decisions
-- [Tasks](TASKS.md): v3 implementation phases
-- [Deployment](DEPLOYMENT.md): server setup and handover
-- [Migration](MIGRATION.md): legacy code/data policy
-- [Planning state](.planning/STATE.md): current v3 planning status
+- [Product requirements](PRD.md)
+- [Architecture](ARCHITECTURE.md)
+- [Security policy and permission findings](SECURITY.md)
+- [Architecture decisions](DECISIONS.md)
+- [Implementation roadmap](TASKS.md)
+- [Test and acceptance plan](TEST_PLAN.md)
+- [Deployment plan](DEPLOYMENT.md)
+- [Legacy migration policy](MIGRATION.md)
+- [Detailed phase roadmap](.planning/ROADMAP.md)
+- [Requirement traceability](.planning/REQUIREMENTS.md)
+- [Current project state](.planning/STATE.md)
+- [Project knowledge base](brain/README.md)
 
 ## First administrator setup
 
-No default production credentials. On a fresh server with no administrator, a one-time code is printed only to the server console. The browser setup wizard consumes it atomically to create the first administrator. Public bootstrap is permanently disabled after success. Recovery is local CLI only.
+The first administrator is created through the one-time server-console-code setup flow. No default production credentials are intended. Public bootstrap is disabled after successful creation; recovery is through the local administrative CLI procedure. See `SECURITY.md` and the Phase 11 plan/evidence.
 
-## Legacy desktop application
+## Known permission follow-up
 
-The existing app/ source is a Python/PySide6 desktop app backed by local SQLite. It contains patient, treatment, billing, print and local backup functionality. It remains a reference/migration source, not a centralized LAN server. Never share its SQLite database over a network drive.
+The current role catalogue grants `PHOTO_READ` to Reception but not Admin or Doctor, while the patient-photo download endpoint requires `PHOTO_READ`. This is tracked as a permission-matrix finding; do not assume Admin/Doctor photo access. The role policy also needs client review before production acceptance. See `SECURITY.md`.
 
-## Development status
+## Development and verification
 
-- Legacy desktop planning milestone: previously marked complete.
-- v3 documentation: being baselined on a dedicated branch.
-- v3 implementation: not yet evidenced in the current source tree.
-- Client approval: open hardware, role, receipt, printer and HTTPS decisions remain.
+The current Phase 13 state record reports 422 backend tests, 92.51% backend coverage and 58 frontend tests passing at the Phase 13 gate. These are recorded project results, not a fresh test run in this documentation pass. Re-run CI against the target commit before release.
 
-A green CI run or checked planning box is not clinic acceptance. Record tests, printer validation and restore evidence before release.
-
-## Privacy
-
-Use synthetic patient data in tests and demos. Never commit patient records/photos, credentials, setup codes, production databases or backups.
+Use synthetic patient data in tests and demos. Never commit real patient records/photos, credentials, setup codes, production databases or backups.
 
 ---
+
 Kalyan Hospital — श्री वशिष्ठ कल्याण ट्रस्ट
