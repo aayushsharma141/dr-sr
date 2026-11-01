@@ -55,3 +55,34 @@ class AppointmentListResponse(BaseModel):
 
     total: int
     appointments: list[AppointmentRead]
+
+
+class DoctorQueueItem(BaseModel):
+    """Item in doctor consultation queue."""
+
+    id: int
+    patient_id: int
+    patient_urn: str
+    patient_name: str
+    patient_gender: str
+    patient_age: int
+    patient_mobile: str
+    patient_allergies: str
+    token_number: int
+    status: str
+    status_updated_at: datetime
+    notes: str | None = None
+    version_id: int
+
+
+class DoctorQueueResponse(BaseModel):
+    """Doctor daily consultation queue divided by operational sections (APT-02)."""
+
+    doctor_id: int
+    doctor_name: str
+    queue_date: date
+    in_consultation: list[DoctorQueueItem]
+    waiting: list[DoctorQueueItem]
+    booked: list[DoctorQueueItem]
+    completed: list[DoctorQueueItem]
+    total_active: int

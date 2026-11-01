@@ -5,7 +5,8 @@ from datetime import date
 from fastapi import APIRouter, Depends, Query, Request
 from sqlalchemy import select
 
-from kalyan_api.core.errors import ApiError
+from kalyan_api import clock
+from kalyan_api.core.errors import ApiError, require_version
 from kalyan_api.core.permissions import Permission, Role
 from kalyan_api.core.policy import require
 from kalyan_api.core.principal import (
@@ -20,11 +21,16 @@ from kalyan_api.schemas.appointments import (
     AppointmentCreate,
     AppointmentListResponse,
     AppointmentRead,
+    AppointmentStatusUpdate,
+    DoctorQueueItem,
+    DoctorQueueResponse,
 )
 from kalyan_api.services import audit_service, token_service
+from kalyan_api.services.appointment_service import validate_status_transition
 from kalyan_api.services.audit_service import AuditAction
 
 router = APIRouter(prefix="/appointments", tags=["appointments"])
+doctor_router = APIRouter(prefix="/doctor", tags=["doctor"])
 
 
 def _to_read_schema(appt: Appointment) -> AppointmentRead:
@@ -199,3 +205,133 @@ def get_appointment(
         )
 
     return _to_read_schema(appt)
+
+
+@router.patch(
+    "/{id}/status",
+    response_model=AppointmentRead,
+    dependencies=[Depends(require(Permission.APPOINTMENT_WRITE))],
+)
+def update_appointment_status(
+    id: int,
+    payload: AppointmentStatusUpdate,
+    request: Request,
+    session: SessionDep,
+    principal: Principal = Depends(current_principal),
+) -> AppointmentRead:
+    """Transition appointment status with optimistic locking and validation (APT-02)."""
+    appt = session.get(Appointment, id)
+    if not appt:
+        raise ApiError(
+            status_code=404,
+            code="appointment_not_found",
+            message="Appointment not found.",
+        )
+
+    require_version(appt, payload.version_id, label="appointment")
+    validate_status_transition(appt, payload.status, principal, payload.cancellation_reason)
+
+    old_status = appt.status
+    appt.status = payload.status.value
+    appt.status_updated_at = clock.utcnow()
+    if payload.cancellation_reason is not None:
+        appt.cancellation_reason = payload.cancellation_reason
+    appt.version_id += 1
+    session.flush()
+
+    ctx = build_audit_context(request, principal)
+    audit_service.record(
+        session,
+        ctx,
+        action=AuditAction.APPOINTMENT_STATUS_UPDATED,
+        entity_type="appointment",
+        entity_id=appt.id,
+        before={"status": old_status, "version_id": payload.version_id},
+        after={"status": appt.status, "version_id": appt.version_id},
+        reason=payload.cancellation_reason,
+    )
+
+    return _to_read_schema(appt)
+
+
+@doctor_router.get(
+    "/queue",
+    response_model=DoctorQueueResponse,
+    dependencies=[Depends(require(Permission.DASHBOARD_DOCTOR))],
+)
+@router.get(
+    "/queue/today",
+    response_model=DoctorQueueResponse,
+    dependencies=[Depends(require(Permission.DASHBOARD_DOCTOR))],
+)
+def get_doctor_queue(
+    session: SessionDep,
+    principal: Principal = Depends(current_principal),
+) -> DoctorQueueResponse:
+    """Retrieve today's consultation queue for the authenticated doctor (APT-02)."""
+    if principal.role != Role.DOCTOR or principal.doctor_id is None:
+        raise ApiError(
+            status_code=403,
+            code="doctor_only",
+            message="Only authenticated doctors can inspect consultation queues.",
+        )
+
+    doctor = session.get(Doctor, principal.doctor_id)
+    if not doctor:
+        raise ApiError(status_code=404, code="doctor_not_found", message="Doctor not found.")
+
+    today = clock.utcnow().date()
+
+    # Query today's appointments for this doctor
+    stmt = (
+        select(Appointment)
+        .where(
+            Appointment.doctor_id == principal.doctor_id,
+            Appointment.appointment_date == today,
+        )
+        .order_by(Appointment.token_number.asc())
+    )
+    appointments = session.execute(stmt).scalars().all()
+
+    in_consultation: list[DoctorQueueItem] = []
+    waiting: list[DoctorQueueItem] = []
+    booked: list[DoctorQueueItem] = []
+    completed: list[DoctorQueueItem] = []
+
+    for a in appointments:
+        item = DoctorQueueItem(
+            id=a.id,
+            patient_id=a.patient_id,
+            patient_urn=a.patient.urn,
+            patient_name=a.patient.full_name,
+            patient_gender=a.patient.gender,
+            patient_age=a.patient.age_years,
+            patient_mobile=a.patient.mobile,
+            patient_allergies=a.patient.allergies,
+            token_number=a.token_number,
+            status=a.status,
+            status_updated_at=a.status_updated_at,
+            notes=a.notes,
+            version_id=a.version_id,
+        )
+        if a.status == AppointmentStatus.IN_CONSULTATION.value:
+            in_consultation.append(item)
+        elif a.status == AppointmentStatus.ARRIVED.value:
+            waiting.append(item)
+        elif a.status == AppointmentStatus.BOOKED.value:
+            booked.append(item)
+        else:
+            completed.append(item)
+
+    total_active = len(in_consultation) + len(waiting) + len(booked)
+
+    return DoctorQueueResponse(
+        doctor_id=doctor.id,
+        doctor_name=doctor.name_en,
+        queue_date=today,
+        in_consultation=in_consultation,
+        waiting=waiting,
+        booked=booked,
+        completed=completed,
+        total_active=total_active,
+    )
