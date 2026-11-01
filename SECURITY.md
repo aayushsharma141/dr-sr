@@ -62,6 +62,7 @@ Implemented through Phase 13:
 - Doctor-scoped clinical and appointment access is enforced.
 
 Not yet complete:
+- Full audit coverage across every future domain; Phase 11 provides the writer/foundation, while Phase 14–16 modules must add and test their own events.
 - Prescription and physiotherapy-session immutability (Phase 14).
 - Financial append-only ledger, reversals and receipt audit (Phase 15).
 - Admin audit viewer and full audit-domain review (Phase 16).
@@ -83,7 +84,7 @@ Phase 17 must confirm:
 
 ## 7. Future financial controls — Phase 15
 
-Require integer paise, ledger-derived balances, transactional overpayment protection under two-PC concurrency, sequential receipts, duplicate reprint markers, and Admin-only reversal with mandatory reason. No silent deletion or editing of posted payments.
+Require integer paise, ledger-derived balances, transactional overpayment protection under two-PC concurrency, sequential receipts, duplicate reprint markers, and reversal with a mandatory reason. The current permission catalogue reserves `PAYMENT_REVERSE` for Admin, but client approval of reversal authority is still pending (OD-03); do not treat the role mapping as client sign-off. No silent deletion or editing of posted payments.
 
 ## 8. Future audit and recovery controls — Phase 16/17
 
