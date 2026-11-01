@@ -200,7 +200,7 @@ describe('Patients Directory and Profile Screens', () => {
   })
 
   it('handles 409 version_conflict in edit modal and reloads fresh data', async () => {
-    let patientFetchCount = 0
+    let _patientFetchCount = 0
 
     const mockFetch = vi.fn().mockImplementation((url: string, init?: RequestInit) => {
       if (url.includes('/api/auth/me')) {
@@ -227,7 +227,7 @@ describe('Patients Directory and Profile Screens', () => {
         })
       }
       if (url.includes('/api/patients/101')) {
-        patientFetchCount++
+        _patientFetchCount++
         return Promise.resolve({
           ok: true,
           status: 200,

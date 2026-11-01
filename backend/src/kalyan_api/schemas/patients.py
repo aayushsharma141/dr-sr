@@ -1,4 +1,4 @@
-"""Pydantic request and response schemas for patient registration and demographics (PAT-01, PAT-02, PAT-03)."""
+"""Pydantic request and response schemas for patient registration and demographics."""
 
 from datetime import date, datetime
 
@@ -61,7 +61,9 @@ class PatientUpdate(BaseModel):
     gender: str | None = Field(default=None, pattern=r"^[MFO]$")
     dob: date | None = None
     age_years: int | None = Field(default=None, ge=0, le=150)
-    mobile: str | None = Field(default=None, min_length=10, max_length=15, pattern=r"^[0-9+ -]{10,15}$")
+    mobile: str | None = Field(
+        default=None, min_length=10, max_length=15, pattern=r"^[0-9+ -]{10,15}$"
+    )
     address: str | None = Field(default=None, min_length=2, max_length=1000)
     district: str | None = Field(default=None, min_length=2, max_length=64)
     state: str | None = Field(default=None, min_length=2, max_length=64)

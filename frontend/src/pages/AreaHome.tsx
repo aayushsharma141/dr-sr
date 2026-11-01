@@ -126,6 +126,9 @@ export function AreaHome({ area }: AreaHomeProps) {
 
           {area === 'reception' && (
             <div className="mt-6 space-y-6">
+              <div className="text-sm text-neutral-600">
+                Reception area active. Ready for patient check-ins and appointments.
+              </div>
               <div>
                 <h3 className="text-sm font-semibold text-neutral-700 uppercase tracking-wider mb-3">
                   Reception Operations
