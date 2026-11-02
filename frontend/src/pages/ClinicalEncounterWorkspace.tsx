@@ -366,6 +366,14 @@ export function ClinicalEncounterWorkspace() {
             {/* Buttons when not finalised */}
             {!isFinalised && (
               <div className="flex flex-col sm:flex-row justify-end gap-3 pt-4 border-t">
+                {effectivePatientId > 0 && (
+                  <Link
+                    to={`/doctor/prescriptions/new?patient_id=${effectivePatientId}${encounterId ? `&encounter_id=${encounterId}` : ''}`}
+                    className="px-4 py-2.5 border border-teal-600 text-teal-800 rounded font-semibold text-sm hover:bg-teal-50 flex items-center gap-1.5"
+                  >
+                    ℞ Write Prescription
+                  </Link>
+                )}
                 <button
                   type="submit"
                   disabled={createMutation.isPending || updateMutation.isPending}

@@ -193,6 +193,15 @@ export const router = createBrowserRouter([
               }
             },
           },
+          {
+            path: '/doctor/prescriptions/new',
+            lazy: async () => {
+              const { PrescriptionWorkspace } = await import('./pages/PrescriptionWorkspace')
+              return {
+                Component: PrescriptionWorkspace,
+              }
+            },
+          },
         ],
       },
     ],
