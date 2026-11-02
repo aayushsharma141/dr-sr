@@ -1,18 +1,185 @@
 import { useState } from 'react'
-import { Link } from 'react-router'
+import { Link, useSearchParams } from 'react-router'
 import { AppShell } from '../components/AppShell'
 import { ConflictBanner } from '../components/ConflictBanner'
 import { AppointmentBookingModal } from '../components/AppointmentBookingModal'
 import {
   useAppointments,
   useDoctors,
+  usePrescriptionFollowUps,
   useUpdateAppointmentStatus,
   useMe,
 } from '../api/queries'
 import type { Appointment, AppointmentStatus, DoctorOut } from '../api/types'
 
+
+type FollowUpWindow = 'all' | 'today' | 'week' | 'overdue'
+
+function localDateValue(date: Date) {
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
+function FollowUpVisits() {
+  const [selectedWindow, setSelectedWindow] = useState<FollowUpWindow>('all')
+  const today = localDateValue(new Date())
+  const weekEnd = new Date()
+  weekEnd.setDate(weekEnd.getDate() + 6)
+
+  const dateRange =
+    selectedWindow === 'today'
+      ? { date_from: today, date_to: today }
+      : selectedWindow === 'week'
+        ? { date_from: today, date_to: localDateValue(weekEnd) }
+        : selectedWindow === 'overdue'
+          ? { date_to: today }
+          : undefined
+
+  const { data, isPending, isError, error, refetch } = usePrescriptionFollowUps(dateRange)
+  const followUps = data ?? []
+
+  const windows: { key: FollowUpWindow; label: string }[] = [
+    { key: 'all', label: 'All dated follow-ups' },
+    { key: 'today', label: 'Due today' },
+    { key: 'week', label: 'Next 7 days' },
+    { key: 'overdue', label: 'Overdue' },
+  ]
+
+  return (
+    <section className="space-y-4" aria-labelledby="followups-heading">
+      <div className="flex flex-col gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-xs sm:flex-row sm:items-center sm:justify-between sm:p-5">
+        <div>
+          <h2 id="followups-heading" className="text-lg font-bold text-slate-900">
+            Follow-up & Visits
+          </h2>
+          <p className="mt-1 max-w-2xl text-sm text-slate-600">
+            Return dates recorded on your prescriptions. These are clinical follow-up reminders,
+            not booked appointment tokens.
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={() => refetch()}
+          className="inline-flex min-h-11 items-center justify-center rounded-lg border border-slate-300 px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#8E1C3D]"
+        >
+          Refresh
+        </button>
+      </div>
+
+      <div className="flex flex-wrap gap-2" aria-label="Follow-up date filters">
+        {windows.map((window) => (
+          <button
+            key={window.key}
+            type="button"
+            aria-pressed={selectedWindow === window.key}
+            onClick={() => setSelectedWindow(window.key)}
+            className={[
+              'min-h-11 rounded-full border px-4 text-sm font-semibold transition-colors',
+              'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#8E1C3D]',
+              selectedWindow === window.key
+                ? 'border-[#5D0B26] bg-[#5D0B26] text-white'
+                : 'border-slate-300 bg-white text-slate-700 hover:border-[#8E1C3D] hover:text-[#5D0B26]',
+            ].join(' ')}
+          >
+            {window.label}
+          </button>
+        ))}
+      </div>
+
+      {isPending ? (
+        <div className="rounded-xl border border-slate-200 bg-white p-12 text-center text-sm text-slate-500" role="status">
+          Loading prescription follow-ups…
+        </div>
+      ) : isError ? (
+        <div className="rounded-xl border border-red-200 bg-red-50 p-5 text-sm text-red-900" role="alert">
+          Unable to load follow-ups: {error.message}
+        </div>
+      ) : followUps.length === 0 ? (
+        <div className="rounded-xl border border-dashed border-slate-300 bg-white p-12 text-center">
+          <p className="font-semibold text-slate-800">No follow-ups in this date range</p>
+          <p className="mt-2 text-sm text-slate-500">
+            Follow-up dates are added when a prescription is issued. Only prescriptions authored by your account are shown.
+          </p>
+        </div>
+      ) : (
+        <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xs">
+          <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3 sm:px-5">
+            <h3 className="text-sm font-bold text-slate-900">Prescription follow-up list</h3>
+            <span className="text-xs font-medium text-slate-500">{followUps.length} record{followUps.length === 1 ? '' : 's'}</span>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[760px] text-left text-sm">
+              <thead className="border-b border-slate-200 bg-slate-50 text-[11px] font-bold uppercase tracking-wide text-slate-600">
+                <tr>
+                  <th scope="col" className="px-4 py-3">Follow-up date</th>
+                  <th scope="col" className="px-4 py-3">Patient</th>
+                  <th scope="col" className="px-4 py-3">Diagnosis</th>
+                  <th scope="col" className="px-4 py-3">Prescription</th>
+                  <th scope="col" className="px-4 py-3">Status</th>
+                  <th scope="col" className="px-4 py-3 text-right">Action</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {followUps.map((item) => {
+                  const date = item.follow_up_date || ''
+                  const overdue = date < today
+                  const dueToday = date === today
+                  const status = overdue ? 'Overdue' : dueToday ? 'Due today' : 'Upcoming'
+                  const statusClass = overdue
+                    ? 'bg-rose-50 text-rose-800 ring-rose-200'
+                    : dueToday
+                      ? 'bg-amber-50 text-amber-800 ring-amber-200'
+                      : 'bg-emerald-50 text-emerald-800 ring-emerald-200'
+                  return (
+                    <tr key={item.id} className="hover:bg-slate-50/80">
+                      <td className="whitespace-nowrap px-4 py-3 font-semibold text-slate-800">
+                        {date ? new Date(`${date}T00:00:00`).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'}
+                      </td>
+                      <td className="px-4 py-3">
+                        <Link to={`/reception/patients/${item.patient_id}`} className="font-semibold text-[#5D0B26] hover:underline">
+                          {item.patient_name}
+                        </Link>
+                        <span className="mt-0.5 block font-mono text-xs text-slate-500">{item.patient_urn}</span>
+                      </td>
+                      <td className="max-w-sm px-4 py-3 text-slate-700">{item.diagnosis}</td>
+                      <td className="whitespace-nowrap px-4 py-3 text-slate-600">
+                        Rx #{item.id}<span className="ml-2 text-xs text-slate-400">· {item.items_count} item{item.items_count === 1 ? '' : 's'}</span>
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className={`inline-flex min-h-7 items-center rounded-full px-2.5 text-xs font-semibold ring-1 ring-inset ${statusClass}`}>
+                          {status}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        <Link
+                          to={`/reception/patients/${item.patient_id}`}
+                          className="inline-flex min-h-10 items-center rounded-lg border border-slate-300 px-3 text-xs font-semibold text-slate-700 hover:border-[#8E1C3D] hover:text-[#5D0B26] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#8E1C3D]"
+                        >
+                          Open patient
+                        </Link>
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+    </section>
+  )
+}
+
 export function AppointmentsReception() {
   const { data: me } = useMe()
+  const [searchParams, setSearchParams] = useSearchParams()
+  const requestedTab = searchParams.get('tab')
+  const activeTab = requestedTab === 'followup' && me?.role === 'DOCTOR' ? 'followup' : 'today'
+  const canManageAppointments = me?.role !== 'ADMIN'
+  const canViewFollowUps = me?.role === 'DOCTOR'
+  const selectTab = (tab: 'today' | 'followup') => setSearchParams({ tab })
   const [selectedDate, setSelectedDate] = useState(
     new Date().toISOString().split('T')[0],
   )
@@ -102,8 +269,37 @@ export function AppointmentsReception() {
   }
 
   return (
-    <AppShell name={me?.full_name || 'Reception Staff'} role="RECEPTION">
+    <AppShell name={me?.full_name || 'Staff'} role={me?.role || 'RECEPTION'}>
       <div className="space-y-6">
+        <div role="tablist" aria-label="Appointment workspace" className="flex flex-wrap gap-2 border-b border-slate-200 pb-2">
+          <button
+            type="button"
+            role="tab"
+            id="appointments-tab-today"
+            aria-controls="appointments-panel-today"
+            aria-selected={activeTab === 'today'}
+            onClick={() => selectTab('today')}
+            className={`min-h-11 rounded-lg border-b-2 px-4 text-sm font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#8E1C3D] ${activeTab === 'today' ? 'border-[#C39A35] bg-white text-[#5D0B26]' : 'border-transparent text-slate-600 hover:bg-white hover:text-[#5D0B26]'}`}
+          >
+            Today's Token Queue
+          </button>
+          {canViewFollowUps && (
+            <button
+              type="button"
+              role="tab"
+              id="appointments-tab-followup"
+              aria-controls="appointments-panel-followup"
+              aria-selected={activeTab === 'followup'}
+              onClick={() => selectTab('followup')}
+              className={`min-h-11 rounded-lg border-b-2 px-4 text-sm font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#8E1C3D] ${activeTab === 'followup' ? 'border-[#C39A35] bg-white text-[#5D0B26]' : 'border-transparent text-slate-600 hover:bg-white hover:text-[#5D0B26]'}`}
+            >
+              Follow-up Visits
+            </button>
+          )}
+        </div>
+
+        {activeTab === 'today' ? (
+          <div id="appointments-panel-today" role="tabpanel" aria-labelledby="appointments-tab-today" className="space-y-6">
         {conflictError && (
           <ConflictBanner
             onReload={() => {
@@ -123,15 +319,20 @@ export function AppointmentsReception() {
               Book daily tokens, track arrival in waiting hall, and coordinate with doctors.
             </p>
           </div>
-          <button
-            onClick={() => setIsBookingOpen(true)}
-            className="px-4 py-2 bg-red-900 text-white rounded font-medium hover:bg-red-800 text-sm shadow-xs flex items-center gap-1.5"
-          >
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-            </svg>
-            Book New Appointment
-          </button>
+          {canManageAppointments ? (
+            <button
+              type="button"
+              onClick={() => setIsBookingOpen(true)}
+              className="inline-flex min-h-11 items-center gap-2 rounded-lg bg-[#5D0B26] px-4 text-sm font-semibold text-white shadow-xs hover:bg-[#4A081E] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#8E1C3D]"
+            >
+              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+              </svg>
+              Book New Appointment
+            </button>
+          ) : (
+            <span className="rounded-lg bg-slate-100 px-3 py-2 text-xs font-semibold text-slate-600">Read-only schedule</span>
+          )}
         </div>
 
         {/* Date Filter & Metrics */}
@@ -232,12 +433,15 @@ export function AppointmentsReception() {
           ) : appointments.length === 0 ? (
             <div className="p-12 text-center text-neutral-500 space-y-3">
               <p>No appointments booked for this date and filter.</p>
-              <button
-                onClick={() => setIsBookingOpen(true)}
-                className="px-4 py-1.5 bg-neutral-100 hover:bg-neutral-200 text-neutral-800 text-xs font-semibold rounded"
-              >
-                Book First Appointment
-              </button>
+              {canManageAppointments && (
+                <button
+                  type="button"
+                  onClick={() => setIsBookingOpen(true)}
+                  className="min-h-11 rounded-lg bg-slate-100 px-4 text-xs font-semibold text-slate-800 hover:bg-slate-200"
+                >
+                  Book First Appointment
+                </button>
+              )}
             </div>
           ) : (
             <div className="overflow-x-auto">
@@ -288,6 +492,8 @@ export function AppointmentsReception() {
                         {appt.notes || (appt.cancellation_reason ? `Reason: ${appt.cancellation_reason}` : '-')}
                       </td>
                       <td className="py-3 px-4 text-right space-x-2">
+                        {canManageAppointments ? (
+                          <>
                         {appt.status === 'BOOKED' && (
                           <button
                             onClick={() => handleUpdateStatus(appt, 'ARRIVED')}
@@ -318,6 +524,10 @@ export function AppointmentsReception() {
                         )}
                         {appt.status === 'DONE' && (
                           <span className="text-xs text-green-700 font-semibold">&check; Done</span>
+                        )}
+                          </>
+                        ) : (
+                          <span className="text-xs font-medium text-slate-500">View only</span>
                         )}
                       </td>
                     </tr>
@@ -373,6 +583,21 @@ export function AppointmentsReception() {
               </div>
             </div>
           </div>
+        )}
+          </div>
+        ) : (
+          canViewFollowUps ? (
+            <div id="appointments-panel-followup" role="tabpanel" aria-labelledby="appointments-tab-followup">
+              <FollowUpVisits />
+            </div>
+          ) : (
+            <div role="alert" className="rounded-xl border border-amber-200 bg-amber-50 p-5 text-sm text-amber-900">
+              Prescription follow-up information is available to the treating doctor only. Return to the token queue to continue.
+              <button type="button" onClick={() => selectTab('today')} className="ml-2 font-semibold underline">
+                Open today's queue
+              </button>
+            </div>
+          )
         )}
       </div>
     </AppShell>
