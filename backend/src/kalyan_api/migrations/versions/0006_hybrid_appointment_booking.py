@@ -42,7 +42,14 @@ def upgrade() -> None:
         """
     )
 
-    # Existing appointments retain their token and are classified as legacy walk-ins.
+    # Existing appointments retain their token. New scheduled visits remain
+    # tokenless until reception checks the patient in on the booked clinic date.
+    op.alter_column(
+        "appointments",
+        "token_number",
+        existing_type=sa.Integer(),
+        nullable=True,
+    )
     op.add_column(
         "appointments",
         sa.Column(
@@ -93,6 +100,29 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
+    # Refuse to discard scheduled reservations that have not yet received a token.
+    # An operator must first resolve these records explicitly before downgrading.
+    op.execute(
+        """
+        DO $
+        BEGIN
+            IF EXISTS (
+                SELECT 1 FROM appointments
+                WHERE booking_mode = 'SCHEDULED' AND token_number IS NULL
+            ) THEN
+                RAISE EXCEPTION
+                    'Cannot downgrade 0006 while tokenless scheduled appointments exist';
+            END IF;
+        END
+        $;
+        """
+    )
+    op.alter_column(
+        "appointments",
+        "token_number",
+        existing_type=sa.Integer(),
+        nullable=False,
+    )
     op.drop_index("ix_appointments_booking_date_mode", table_name="appointments")
     op.drop_index("ix_appointments_patient_doctor_date_type_status", table_name="appointments")
     op.drop_constraint("ck_appointments_visit_type", "appointments", type_="check")
