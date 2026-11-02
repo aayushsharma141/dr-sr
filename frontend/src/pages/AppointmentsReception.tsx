@@ -48,20 +48,17 @@ function visitTypeLabel(value: Appointment['visit_type']) {
 
 function FollowUpVisits() {
   const [selectedWindow, setSelectedWindow] = useState<FollowUpWindow>('all')
-  const today = localDateValue(new Date())
-  const weekEnd = new Date()
-  weekEnd.setDate(weekEnd.getDate() + 6)
+  const today = clinicToday()
+  const weekEnd = clinicDateAfter(6)
 
   const dateRange =
     selectedWindow === 'today'
       ? { date_from: today, date_to: today }
       : selectedWindow === 'week'
-        ? { date_from: today, date_to: localDateValue(weekEnd) }
+        ? { date_from: today, date_to: weekEnd }
         : selectedWindow === 'overdue'
           ? (() => {
-              const yesterday = new Date()
-              yesterday.setDate(yesterday.getDate() - 1)
-              return { date_to: localDateValue(yesterday) }
+              return { date_to: clinicDateAfter(-1) }
             })()
           : undefined
 
