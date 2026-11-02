@@ -376,16 +376,34 @@ export function AppointmentsReception() {
             </p>
           </div>
           {canManageAppointments ? (
-            <button
-              type="button"
-              onClick={() => setIsBookingOpen(true)}
-              className="inline-flex min-h-11 items-center gap-2 rounded-lg bg-[#5D0B26] px-4 text-sm font-semibold text-white shadow-xs hover:bg-[#4A081E] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#8E1C3D]"
-            >
-              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-              </svg>
-              Book New Appointment
-            </button>
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setBookingMode('WALK_IN')
+                  setIsBookingOpen(true)
+                }}
+                className="inline-flex min-h-11 items-center gap-2 rounded-lg bg-[#5D0B26] px-4 text-sm font-semibold text-white shadow-xs hover:bg-[#4A081E] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#8E1C3D]"
+              >
+                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                </svg>
+                Add Walk-in Token
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setBookingMode('SCHEDULED')
+                  setIsBookingOpen(true)
+                }}
+                className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-[#5D0B26] bg-white px-4 text-sm font-semibold text-[#5D0B26] hover:bg-rose-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#8E1C3D]"
+              >
+                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 3v3m10-3v3M4 9h16M5 5h14a1 1 0 0 1 1 1v13H4V6a1 1 0 0 1 1-1Z" />
+                </svg>
+                Schedule Future Visit
+              </button>
+            </div>
           ) : (
             <span className="rounded-lg bg-slate-100 px-3 py-2 text-xs font-semibold text-slate-600">Read-only schedule</span>
           )}
@@ -492,10 +510,13 @@ export function AppointmentsReception() {
               {canManageAppointments && (
                 <button
                   type="button"
-                  onClick={() => setIsBookingOpen(true)}
+                  onClick={() => {
+                    setBookingMode('WALK_IN')
+                    setIsBookingOpen(true)
+                  }}
                   className="min-h-11 rounded-lg bg-slate-100 px-4 text-xs font-semibold text-slate-800 hover:bg-slate-200"
                 >
-                  Book First Appointment
+                  Add First Walk-in Token
                 </button>
               )}
             </div>
@@ -598,6 +619,9 @@ export function AppointmentsReception() {
         <AppointmentBookingModal
           isOpen={isBookingOpen}
           onClose={() => setIsBookingOpen(false)}
+          initialDoctorId={selectedDoctorId}
+          initialDate={selectedDate}
+          initialMode={bookingMode}
           onSuccess={() => refetch()}
         />
 
