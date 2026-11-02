@@ -27,6 +27,14 @@ from typing import Any
 from kalyan_api.config import Settings, get_settings
 
 
+class BackupCorruptedError(Exception):
+    """Raised when a backup archive fails cryptographic integrity verification."""
+
+
+class RestoreError(Exception):
+    """Raised when restoration encounters an execution error."""
+
+
 @dataclass(frozen=True)
 class BackupManifest:
     """Manifest describing backup bundle contents and checksums."""
@@ -114,6 +122,110 @@ def dump_database(destination_file: Path, settings: Settings | None = None) -> N
     if result.returncode != 0:
         err = result.stderr.strip() or result.stdout.strip()
         raise RuntimeError(f"Database dump failed: {err}")
+
+
+def restore_database_sql(sql_file: Path, settings: Settings | None = None) -> None:
+    """Wipe schema public and execute SQL dump using psql with owner credentials."""
+    cfg = settings or get_settings()
+    psql_bin = find_pg_tool("psql")
+
+    env = os.environ.copy()
+    env["PGPASSWORD"] = cfg.db_owner_password
+
+    # Step 1: Drop and recreate clean public schema to ensure clean slate
+    reset_sql = f"""
+    DROP SCHEMA IF EXISTS public CASCADE;
+    CREATE SCHEMA public;
+    GRANT ALL ON SCHEMA public TO {cfg.db_owner_user};
+    GRANT ALL ON SCHEMA public TO {cfg.db_app_user};
+    ALTER DEFAULT PRIVILEGES FOR ROLE {cfg.db_owner_user} IN SCHEMA public
+        GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO {cfg.db_app_user};
+    ALTER DEFAULT PRIVILEGES FOR ROLE {cfg.db_owner_user} IN SCHEMA public
+        GRANT USAGE, SELECT ON SEQUENCES TO {cfg.db_app_user};
+    """
+    reset_cmd = [
+        psql_bin,
+        "-v",
+        "ON_ERROR_STOP=1",
+        "-h",
+        cfg.db_host,
+        "-p",
+        str(cfg.db_port),
+        "-U",
+        cfg.db_owner_user,
+        "-d",
+        cfg.db_name,
+        "-c",
+        reset_sql,
+    ]
+    reset_res = subprocess.run(  # noqa: S603
+        reset_cmd,
+        env=env,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if reset_res.returncode != 0:
+        err = reset_res.stderr.strip() or reset_res.stdout.strip()
+        raise RestoreError(f"Database schema reset failed: {err}")
+
+    # Step 2: Execute dump SQL
+    apply_cmd = [
+        psql_bin,
+        "-v",
+        "ON_ERROR_STOP=1",
+        "-h",
+        cfg.db_host,
+        "-p",
+        str(cfg.db_port),
+        "-U",
+        cfg.db_owner_user,
+        "-d",
+        cfg.db_name,
+        "-f",
+        str(sql_file),
+    ]
+    apply_res = subprocess.run(  # noqa: S603
+        apply_cmd,
+        env=env,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if apply_res.returncode != 0:
+        err = apply_res.stderr.strip() or apply_res.stdout.strip()
+        raise RestoreError(f"Restoring SQL dump failed: {err}")
+
+    # Step 3: Re-grant table privileges to application role
+    regrant_sql = f"""
+    GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO {cfg.db_app_user};
+    GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO {cfg.db_app_user};
+    """
+    regrant_cmd = [
+        psql_bin,
+        "-v",
+        "ON_ERROR_STOP=1",
+        "-h",
+        cfg.db_host,
+        "-p",
+        str(cfg.db_port),
+        "-U",
+        cfg.db_owner_user,
+        "-d",
+        cfg.db_name,
+        "-c",
+        regrant_sql,
+    ]
+    regrant_res = subprocess.run(  # noqa: S603
+        regrant_cmd,
+        env=env,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if regrant_res.returncode != 0:
+        err = regrant_res.stderr.strip() or regrant_res.stdout.strip()
+        raise RestoreError(f"Re-granting schema permissions failed: {err}")
 
 
 def create_backup(
@@ -264,3 +376,67 @@ def verify_backup_bundle(archive_path: Path) -> tuple[bool, str, dict[str, Any] 
 
     except Exception as e:
         return False, f"Archive verification encountered error: {e}", None
+
+
+def restore_backup(
+    archive_path: Path,
+    settings: Settings | None = None,
+    create_prerestore_snapshot: bool = True,
+) -> dict[str, Any]:
+    """Restore database and photos from a verified backup archive (BAK-02).
+
+    Steps:
+    1. Cryptographically verify the archive. If corrupted or missing, abort before any changes.
+    2. Automatically take a pre-restore backup snapshot of the active system state.
+    3. Wipe database schema and apply SQL dump from archive.
+    4. Synchronize patient photos into settings.photos_dir.
+    5. Return restoration execution summary.
+    """
+    cfg = settings or get_settings()
+    path = Path(archive_path)
+
+    # 1. Cryptographic pre-flight verification
+    is_valid, err_msg, manifest_data = verify_backup_bundle(path)
+    if not is_valid or not manifest_data:
+        raise BackupCorruptedError(f"Restore rejected: archive failed integrity checks: {err_msg}")
+
+    # 2. Capture automatic pre-restore safety snapshot
+    prerestore_path: Path | None = None
+    if create_prerestore_snapshot:
+        prerestore_path = create_backup(
+            destination_dir=cfg.backup_dir,
+            label="prerestore",
+            settings=cfg,
+        )
+
+    # 3. Extract and restore
+    with tempfile.TemporaryDirectory() as extract_dir_str:
+        extract_dir = Path(extract_dir_str)
+        with tarfile.open(path, "r:gz") as tar:
+            tar.extractall(path=extract_dir, filter="data")
+
+        sql_file = extract_dir / "db.sql"
+        if not sql_file.exists():
+            raise RestoreError("db.sql not found in extracted archive")
+
+        # Restore database
+        restore_database_sql(sql_file, cfg)
+
+        # Restore photos
+        photos_src_dir = extract_dir / "photos"
+        cfg.photos_dir.mkdir(parents=True, exist_ok=True)
+        photos_restored = 0
+        if photos_src_dir.exists() and photos_src_dir.is_dir():
+            for photo_file in photos_src_dir.glob("*"):
+                if photo_file.is_file():
+                    shutil.copy2(photo_file, cfg.photos_dir / photo_file.name)
+                    photos_restored += 1
+
+    return {
+        "status": "SUCCESS",
+        "archive_restored": str(path.resolve()),
+        "prerestore_snapshot": str(prerestore_path.resolve()) if prerestore_path else None,
+        "database_restored": True,
+        "photos_restored_count": photos_restored,
+        "manifest": manifest_data,
+    }
