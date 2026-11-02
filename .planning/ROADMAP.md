@@ -125,9 +125,9 @@ Plans:
 - [x] 14-02-PLAN.md - Prescriptions REST API (RX-01)
 - [x] 14-03-PLAN.md - Treatment Plans & Packages REST API (TRT-01)
 - [x] 14-04-PLAN.md - Physiotherapy Sessions & Addenda REST API (TRT-02, TRT-03)
-- [ ] 14-05-PLAN.md - Frontend Prescriptions Workspace & Print Slip (RX-01)
-- [ ] 14-06-PLAN.md - Frontend Treatment Plan & Session Logger UI (TRT-01, TRT-02, TRT-03)
-- [ ] 14-07-PLAN.md - Phase 14 Integration Gate & Quality Verification
+- [x] 14-05-PLAN.md - Frontend Prescriptions Workspace & Print Slip (RX-01)
+- [x] 14-06-PLAN.md - Frontend Treatment Plan & Session Logger UI (TRT-01, TRT-02, TRT-03)
+- [x] 14-07-PLAN.md - Phase 14 Integration Gate & Quality Verification
 
 ### Phase 15: Billing, Receipts & Reversals
 
