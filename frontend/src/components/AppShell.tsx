@@ -259,7 +259,8 @@ export function AppShell({ name, role, children }: AppShellProps) {
           const href = navigationHref(item, role)
           const active = isNavigationItemActive(item, location.pathname, location.search, role)
           const sectionLabel =
-            index === 1 ? 'CLINICAL WORKFLOW'
+            index === 1
+              ? role === 'RECEPTION' ? 'RECEPTION DESK' : 'PATIENT & CLINICAL WORKFLOW'
               : role === 'ADMIN' && item.key === 'reports' ? 'ADMINISTRATION & SAFETY'
                 : null
           return (
