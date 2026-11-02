@@ -3,12 +3,12 @@ gsd_state_version: '1.0'
 milestone: 'v3.0'
 milestone_name: 'Centralized LAN Web Platform'
 status: in_progress
-current_phase: 15
+current_phase: 16
 progress:
   total_phases: 7
-  completed_phases: 4
-  active_phase: 15
-  percent: 71
+  completed_phases: 5
+  active_phase: 16
+  percent: 86
 ---
 
 # Project State: Kalyan Hospital Patient & Physiotherapy Management
@@ -22,10 +22,10 @@ See: `.planning/PROJECT.md` (updated 2026-10-31) and root `PRD.md` (v3.0 baselin
 
 ## Current Position
 
-Phase: 14 (Prescriptions, Treatment Plans & Sessions) — COMPLETE (7/7 plans complete)
-Next Phase: 15 (Billing, Receipts & Reversals)
-Status: Phase 14 Complete & Verified
-Last activity: 2026-11-02 — Phase 14 complete (Structured prescriptions with A4 bilingual print slip, multi-session rehab packages, session logger with VAS 0–10 scale, row-locked contiguous session numbers, database trigger immutability with dated addenda, 93.07% backend coverage across 505 tests, 62 frontend tests passing, 0 lint/typecheck errors, legacy v2.0 untouched).
+Phase: 15 (Billing, Receipts & Reversals) — COMPLETE (7/7 plans complete)
+Next Phase: 16 (Audit Viewer, Backup/Restore & Integrity)
+Status: Phase 15 Complete & Verified
+Last activity: 2026-11-02 — Phase 15 complete (Consultation fee and package instalment collection, integer paise math, database trigger overpayment rejection, atomic sequential receipt numbering with 20-thread concurrency proof, dual 80mm thermal and A5 receipt printing with DUPLICATE watermark, dynamic pending dues ledger, admin-only reversal with mandatory justification, unified chronological patient timeline, 93.39% backend coverage across 555 tests, 314-cell RBAC matrix, 70 frontend tests passing, 0 lint/typecheck errors, legacy v2.0 untouched).
 
 ## Phase Overview
 
@@ -37,7 +37,8 @@ Phases 11-17 (continuing from v2.0, which ended at Phase 10). See `.planning/ROA
 | 12 | Clinic Settings & Patient Registration | Complete (8/8 plans) |
 | 13 | Appointments & Clinical Encounters | Complete (7/7 plans) |
 | 14 | Prescriptions, Treatment Plans & Sessions | Complete (7/7 plans) |
-| 15 | Billing, Receipts & Reversals | Next up |
+| 15 | Billing, Receipts & Reversals | Complete (7/7 plans) |
+| 16 | Audit Viewer, Backup/Restore & Integrity | Next up |
 | 16 | Audit Viewer, Backup/Restore & Integrity | Not started |
 | 17 | LAN Deployment, Printer & Acceptance | Not started |
 

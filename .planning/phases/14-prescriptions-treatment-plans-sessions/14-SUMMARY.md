@@ -72,3 +72,4 @@ Strict doctor silo isolation (`D-03`), reception default-deny policy, and optimi
 - **Plan 14-05:** Frontend Prescriptions Workspace and Bilingual Print Slip (`5007e78`).
 - **Plan 14-06:** Frontend Treatment Plan Workspace, Session Logger Modal, and VAS Trend Chart (`29a9c3c`).
 - **Plan 14-07:** Integration Gate, RBAC Matrix completeness, and Phase 14 Quality Certification.
+

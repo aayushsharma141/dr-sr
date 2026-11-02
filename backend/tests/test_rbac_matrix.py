@@ -34,6 +34,7 @@ from kalyan_api.models import (
     ConsultationFee,
     Doctor,
     Patient,
+    Payment,
     Prescription,
     SystemSetup,
     TreatmentPlan,
@@ -362,6 +363,39 @@ def test_rbac_matrix_cell(
         target_entity = sess
         if "{id}" in row.path:
             resolved_path = row.path.replace("{id}", str(sess.id))
+
+    elif "/api/payments" in row.path:
+        pat = Patient(
+            urn=f"KH-2026-{uuid.uuid4().hex[:4]}",
+            full_name="Matrix Patient",
+            guardian_name="Guardian",
+            gender="M",
+            age_years=30,
+            mobile="9876543210",
+            address="Ara",
+            district="Bhojpur",
+            state="Bihar",
+        )
+        db_session.add(pat)
+        db_session.flush()
+
+        admin_u = make_user(db_session, test_settings, "ADMIN", f"adm_{uuid.uuid4().hex[:6]}")
+        payment = Payment(
+            receipt_number=f"RCP-2026-{uuid.uuid4().hex[:6].upper()}",
+            patient_id=pat.id,
+            amount_paise=50000,
+            payment_method="CASH",
+            is_reversed=False,
+            created_by_user_id=admin_u.id,
+        )
+        db_session.add(payment)
+        db_session.flush()
+
+        target_entity = payment
+        if "{id}" in row.path:
+            resolved_path = row.path.replace("{id}", str(payment.id))
+        else:
+            target_entity = type("TargetPayment", (), {"patient_id": pat.id})()
 
     elif "/api/encounters" in row.path:
         # Encounters are owned by doctor_a to test cross-doctor silo (doctor_b receives 404)

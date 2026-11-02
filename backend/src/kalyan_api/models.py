@@ -774,3 +774,88 @@ class PrescriptionItem(Base):
     instructions: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     prescription = relationship("Prescription", back_populates="items")
+
+
+class PaymentMethod(StrEnum):
+    """Payment methods supported at Reception desk (BIL-01)."""
+
+    CASH = "CASH"
+    UPI = "UPI"
+    CARD = "CARD"
+
+
+class ReceiptSequence(Base):
+    """Atomic sequence counter for sequential receipt numbering (BIL-04)."""
+
+    __tablename__ = "receipt_sequences"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    cycle_key: Mapped[str] = mapped_column(String(32), unique=True, nullable=False)
+    last_number: Mapped[int] = mapped_column(Integer, default=0, server_default="0", nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
+
+
+class Payment(Base):
+    """Financial transaction ledger for fees and package instalments (BIL-01, BIL-02, BIL-05)."""
+
+    __tablename__ = "payments"
+    __table_args__ = (
+        Index("ix_payments_receipt_number", "receipt_number"),
+        Index("ix_payments_patient_id", "patient_id"),
+        Index("ix_payments_treatment_plan_id", "treatment_plan_id"),
+        Index("ix_payments_appointment_id", "appointment_id"),
+        Index("ix_payments_is_reversed", "is_reversed"),
+        CheckConstraint("amount_paise > 0", name="ck_payments_amount_positive"),
+        CheckConstraint(
+            "payment_method IN ('CASH', 'UPI', 'CARD')",
+            name="ck_payments_payment_method",
+        ),
+        CheckConstraint(
+            "(is_reversed = FALSE AND reversal_reason IS NULL AND "
+            "reversed_by_user_id IS NULL AND reversed_at IS NULL) "
+            "OR (is_reversed = TRUE AND reversal_reason IS NOT NULL AND "
+            "length(trim(reversal_reason)) >= 5 AND "
+            "reversed_by_user_id IS NOT NULL AND reversed_at IS NOT NULL)",
+            name="ck_payments_reversal_integrity",
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    receipt_number: Mapped[str] = mapped_column(String(32), unique=True, nullable=False)
+    patient_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("patients.id", ondelete="RESTRICT"), nullable=False
+    )
+    treatment_plan_id: Mapped[int | None] = mapped_column(
+        BigInteger, ForeignKey("treatment_plans.id", ondelete="RESTRICT"), nullable=True
+    )
+    appointment_id: Mapped[int | None] = mapped_column(
+        BigInteger, ForeignKey("appointments.id", ondelete="SET NULL"), nullable=True
+    )
+    amount_paise: Mapped[int] = mapped_column(Integer, nullable=False)
+    payment_method: Mapped[str] = mapped_column(String(16), nullable=False)
+    notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    is_reversed: Mapped[bool] = mapped_column(
+        Boolean, default=False, server_default=text("false"), nullable=False
+    )
+    reversal_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+    reversed_by_user_id: Mapped[int | None] = mapped_column(
+        BigInteger, ForeignKey("users.id", ondelete="RESTRICT"), nullable=True
+    )
+    reversed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_by_user_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("users.id", ondelete="RESTRICT"), nullable=False
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    patient = relationship("Patient", lazy="joined")
+    treatment_plan = relationship("TreatmentPlan", lazy="joined")
+    appointment = relationship("Appointment", lazy="select")
+    created_by_user = relationship("User", foreign_keys=[created_by_user_id], lazy="joined")
+    reversed_by_user = relationship("User", foreign_keys=[reversed_by_user_id], lazy="joined")

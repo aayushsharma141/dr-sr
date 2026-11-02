@@ -137,7 +137,7 @@ def test_cli_commands_migrate_and_check_db(
         assert (
             "synchronous_commit: on" in captured_check.out or "remote_apply" in captured_check.out
         )
-        assert "0004" in captured_check.out
+        assert "0005" in captured_check.out
         assert "Database health check: OK" in captured_check.out
 
         # migrate runs idempotently

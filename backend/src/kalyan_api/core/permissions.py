@@ -65,6 +65,7 @@ class Permission(StrEnum):
     PAYMENT_CREATE = "payment:create"
     RECEIPT_REPRINT = "receipt:reprint"
     PAYMENT_REVERSE = "payment:reverse"  # D-06: Admin only
+    TIMELINE_READ = "timeline:read"
 
     # Phase 16: Audit Viewer, Backup/Restore & Integrity (Reserved)
     AUDIT_READ = "audit:read"
@@ -93,8 +94,10 @@ ROLE_PERMISSIONS: dict[Role, frozenset[Permission]] = {
             Permission.PATIENT_READ,
             Permission.APPOINTMENT_READ,
             Permission.PAYMENT_READ,
+            Permission.PAYMENT_CREATE,
             Permission.RECEIPT_REPRINT,
             Permission.PAYMENT_REVERSE,
+            Permission.TIMELINE_READ,
             Permission.AUDIT_READ,
             Permission.BACKUP_RUN,
             Permission.BACKUP_RESTORE,
@@ -117,6 +120,7 @@ ROLE_PERMISSIONS: dict[Role, frozenset[Permission]] = {
             Permission.PAYMENT_READ,
             Permission.PAYMENT_CREATE,
             Permission.RECEIPT_REPRINT,
+            Permission.TIMELINE_READ,
         }
     ),
     Role.DOCTOR: frozenset(
@@ -136,16 +140,13 @@ ROLE_PERMISSIONS: dict[Role, frozenset[Permission]] = {
             Permission.PLAN_WRITE,
             Permission.SESSION_LOG_READ,
             Permission.SESSION_LOG_WRITE,
+            Permission.TIMELINE_READ,
         }
     ),
 }
 
 # Mapping of future permissions reserved for upcoming phases
 RESERVED: dict[Permission, str] = {
-    Permission.PAYMENT_READ: "phase-15",
-    Permission.PAYMENT_CREATE: "phase-15",
-    Permission.RECEIPT_REPRINT: "phase-15",
-    Permission.PAYMENT_REVERSE: "phase-15",
     Permission.AUDIT_READ: "phase-16",
     Permission.BACKUP_RUN: "phase-16",
     Permission.BACKUP_RESTORE: "phase-16",

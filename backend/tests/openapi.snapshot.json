@@ -1919,6 +1919,300 @@
         "title": "PatientUpdate",
         "type": "object"
       },
+      "PaymentCreate": {
+        "additionalProperties": false,
+        "description": "Schema for recording a payment at Reception desk (BIL-01, BIL-02).",
+        "properties": {
+          "amount_paise": {
+            "description": "Payment amount in integer paise",
+            "exclusiveMinimum": 0.0,
+            "title": "Amount Paise",
+            "type": "integer"
+          },
+          "appointment_id": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Optional linked appointment ID",
+            "title": "Appointment Id"
+          },
+          "notes": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Optional payment remarks",
+            "title": "Notes"
+          },
+          "patient_id": {
+            "description": "Patient database ID",
+            "exclusiveMinimum": 0.0,
+            "title": "Patient Id",
+            "type": "integer"
+          },
+          "payment_method": {
+            "description": "Payment mode used (CASH, UPI, CARD)",
+            "enum": [
+              "CASH",
+              "UPI",
+              "CARD"
+            ],
+            "title": "Payment Method",
+            "type": "string"
+          },
+          "treatment_plan_id": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Optional linked treatment package ID",
+            "title": "Treatment Plan Id"
+          }
+        },
+        "required": [
+          "patient_id",
+          "amount_paise",
+          "payment_method"
+        ],
+        "title": "PaymentCreate",
+        "type": "object"
+      },
+      "PaymentOut": {
+        "description": "Schema for reading a recorded payment transaction (BIL-01, BIL-04).",
+        "properties": {
+          "amount_paise": {
+            "title": "Amount Paise",
+            "type": "integer"
+          },
+          "appointment_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Appointment Id"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "created_by_username": {
+            "title": "Created By Username",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "is_reversed": {
+            "title": "Is Reversed",
+            "type": "boolean"
+          },
+          "notes": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notes"
+          },
+          "patient_id": {
+            "title": "Patient Id",
+            "type": "integer"
+          },
+          "patient_name": {
+            "title": "Patient Name",
+            "type": "string"
+          },
+          "patient_urn": {
+            "title": "Patient Urn",
+            "type": "string"
+          },
+          "payment_method": {
+            "title": "Payment Method",
+            "type": "string"
+          },
+          "receipt_number": {
+            "title": "Receipt Number",
+            "type": "string"
+          },
+          "reversal_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reversal Reason"
+          },
+          "reversed_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reversed At"
+          },
+          "reversed_by_username": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reversed By Username"
+          },
+          "treatment_plan_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Treatment Plan Id"
+          },
+          "treatment_plan_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Treatment Plan Name"
+          }
+        },
+        "required": [
+          "id",
+          "receipt_number",
+          "patient_id",
+          "patient_urn",
+          "patient_name",
+          "amount_paise",
+          "payment_method",
+          "is_reversed",
+          "created_by_username",
+          "created_at"
+        ],
+        "title": "PaymentOut",
+        "type": "object"
+      },
+      "PaymentReversalCreate": {
+        "additionalProperties": false,
+        "description": "Schema for Admin reversing a posted payment with mandatory justification (BIL-05).",
+        "properties": {
+          "reversal_reason": {
+            "description": "Mandatory reason justifying the administrative payment reversal",
+            "maxLength": 1000,
+            "minLength": 5,
+            "title": "Reversal Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "reversal_reason"
+        ],
+        "title": "PaymentReversalCreate",
+        "type": "object"
+      },
+      "PendingDueOut": {
+        "description": "Schema for reporting active treatment package pending dues (BIL-03).",
+        "properties": {
+          "agreed_price_paise": {
+            "title": "Agreed Price Paise",
+            "type": "integer"
+          },
+          "balance_paise": {
+            "title": "Balance Paise",
+            "type": "integer"
+          },
+          "completed_sessions": {
+            "title": "Completed Sessions",
+            "type": "integer"
+          },
+          "condition_diagnosis": {
+            "title": "Condition Diagnosis",
+            "type": "string"
+          },
+          "paid_paise": {
+            "title": "Paid Paise",
+            "type": "integer"
+          },
+          "patient_id": {
+            "title": "Patient Id",
+            "type": "integer"
+          },
+          "patient_name": {
+            "title": "Patient Name",
+            "type": "string"
+          },
+          "patient_urn": {
+            "title": "Patient Urn",
+            "type": "string"
+          },
+          "plan_name": {
+            "title": "Plan Name",
+            "type": "string"
+          },
+          "total_sessions": {
+            "title": "Total Sessions",
+            "type": "integer"
+          },
+          "treatment_plan_id": {
+            "title": "Treatment Plan Id",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "treatment_plan_id",
+          "patient_id",
+          "patient_urn",
+          "patient_name",
+          "plan_name",
+          "condition_diagnosis",
+          "agreed_price_paise",
+          "paid_paise",
+          "balance_paise",
+          "total_sessions",
+          "completed_sessions"
+        ],
+        "title": "PendingDueOut",
+        "type": "object"
+      },
       "PrescriptionCreate": {
         "additionalProperties": false,
         "description": "Schema for doctor creating a prescription.",
@@ -2402,6 +2696,86 @@
           "password"
         ],
         "title": "SetupAdminRequest",
+        "type": "object"
+      },
+      "TimelineItemOut": {
+        "description": "Normalized timeline item for patient chronological history.",
+        "properties": {
+          "badge": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Badge"
+          },
+          "badge_variant": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Badge Variant"
+          },
+          "event_date": {
+            "format": "date-time",
+            "title": "Event Date",
+            "type": "string"
+          },
+          "event_type": {
+            "title": "Event Type",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "metadata": {
+            "additionalProperties": true,
+            "default": {},
+            "title": "Metadata",
+            "type": "object"
+          },
+          "subtitle": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Subtitle"
+          },
+          "summary": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Summary"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "event_type",
+          "event_date",
+          "title"
+        ],
+        "title": "TimelineItemOut",
         "type": "object"
       },
       "TreatmentPlanCreate": {
@@ -3607,6 +3981,32 @@
         ]
       }
     },
+    "/api/billing/pending-dues": {
+      "get": {
+        "description": "List active treatment packages with outstanding pending balances (BIL-03).",
+        "operationId": "list_pending_dues_api_billing_pending_dues_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/PendingDueOut"
+                  },
+                  "title": "Response List Pending Dues Api Billing Pending Dues Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "List Pending Dues",
+        "tags": [
+          "billing"
+        ]
+      }
+    },
     "/api/doctor/overview": {
       "get": {
         "description": "Return doctor overview with doctor_id and linked doctor profile.",
@@ -4569,6 +4969,53 @@
         ]
       }
     },
+    "/api/patients/{patient_id}/payments": {
+      "get": {
+        "description": "Retrieve full payment history for a patient (BIL-01).",
+        "operationId": "list_patient_payments_api_patients__patient_id__payments_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "patient_id",
+            "required": true,
+            "schema": {
+              "title": "Patient Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/PaymentOut"
+                  },
+                  "title": "Response List Patient Payments Api Patients  Patient Id  Payments Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Patient Payments",
+        "tags": [
+          "billing"
+        ]
+      }
+    },
     "/api/patients/{patient_id}/prescriptions": {
       "get": {
         "description": "List historical prescriptions for a given patient.",
@@ -4616,6 +5063,53 @@
         ]
       }
     },
+    "/api/patients/{patient_id}/timeline": {
+      "get": {
+        "description": "Retrieve unified chronological timeline for a patient (CLN-03).",
+        "operationId": "get_patient_timeline_api_patients__patient_id__timeline_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "patient_id",
+            "required": true,
+            "schema": {
+              "title": "Patient Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/TimelineItemOut"
+                  },
+                  "title": "Response Get Patient Timeline Api Patients  Patient Id  Timeline Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Patient Timeline",
+        "tags": [
+          "timeline"
+        ]
+      }
+    },
     "/api/patients/{patient_id}/treatment-plans": {
       "get": {
         "description": "List historical and active treatment plans for a patient.",
@@ -4660,6 +5154,187 @@
         "summary": "List Patient Treatment Plans",
         "tags": [
           "treatment-plans"
+        ]
+      }
+    },
+    "/api/payments": {
+      "post": {
+        "description": "Record a consultation or treatment package instalment payment (BIL-01, BIL-02).",
+        "operationId": "record_payment_api_payments_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PaymentCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaymentOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Record Payment",
+        "tags": [
+          "billing"
+        ]
+      }
+    },
+    "/api/payments/{id}": {
+      "get": {
+        "description": "Fetch payment details and receipt metadata (BIL-04).",
+        "operationId": "get_payment_api_payments__id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "title": "Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaymentOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Payment",
+        "tags": [
+          "billing"
+        ]
+      }
+    },
+    "/api/payments/{id}/receipt": {
+      "get": {
+        "description": "Fetch payment receipt specifically for reprint with audit check (BIL-04).",
+        "operationId": "reprint_receipt_api_payments__id__receipt_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "title": "Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaymentOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Reprint Receipt",
+        "tags": [
+          "billing"
+        ]
+      }
+    },
+    "/api/payments/{id}/reverse": {
+      "post": {
+        "description": "Admin-only payment reversal with mandatory reason tracking (BIL-05).",
+        "operationId": "reverse_payment_api_payments__id__reverse_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "title": "Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PaymentReversalCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaymentOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Reverse Payment",
+        "tags": [
+          "billing"
         ]
       }
     },

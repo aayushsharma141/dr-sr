@@ -39,3 +39,4 @@ Verification:
 - Retrospective corrections are appended as dated addenda and displayed in chronological sequence with author and timestamp.
 - Doctor silo isolation prevents Doctor B from querying or reading Doctor A's treatment sessions and prescriptions (404 Not Found / 403 Forbidden).
 Result: PASS
+

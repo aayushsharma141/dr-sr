@@ -23,3 +23,4 @@
 - **M-14-02 (Multi-Session Treatment Package):** Doctor creates treatment package with target session count, diagnosis, and agreed package fee. Progress gauge updates dynamically.
 - **M-14-03 (Physiotherapy Session Logger & VAS Scoring):** Doctor logs session with interactive VAS pain slider (0–10 scale) and modality checkboxes. Session numbers sequence monotonically (Session #1, #2...).
 - **M-14-04 (Finalised Session Immutability & Addenda):** Logged sessions cannot be edited or deleted (400 Bad Request / PostgreSQL trigger block). Post-session observations are appended as dated addenda.
+
