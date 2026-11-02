@@ -289,8 +289,11 @@
             "type": "string"
           },
           "token_number": {
-            "title": "Token Number",
-            "type": "integer"
+            "anyOf": [
+              { "type": "integer" },
+              { "type": "null" }
+            ],
+            "title": "Token Number"
           },
           "updated_at": {
             "format": "date-time",
