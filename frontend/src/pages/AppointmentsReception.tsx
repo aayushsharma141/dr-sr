@@ -231,7 +231,11 @@ function ScheduledVisits({
     booking_mode: 'SCHEDULED',
     doctor_id: doctorId,
   })
-  const appointments = data?.appointments ?? []
+  const appointments = [...(data?.appointments ?? [])].sort(
+    (left, right) =>
+      left.appointment_date.localeCompare(right.appointment_date) ||
+      left.token_number - right.token_number,
+  )
 
   return (
     <section className="space-y-5" aria-labelledby="scheduled-visits-heading">
