@@ -393,6 +393,7 @@ function getStatusBadgeForScheduled(status: AppointmentStatus) {
 
 export function AppointmentsReception() {
   const { data: me } = useMe()
+  const { data: doctors } = useDoctors(false)
   const [searchParams, setSearchParams] = useSearchParams()
   const requestedTab = searchParams.get('tab')
   const canManageAppointments = me?.permissions.includes('appointment:write') === true
@@ -417,7 +418,6 @@ export function AppointmentsReception() {
   const [cancellingAppt, setCancellingAppt] = useState<Appointment | null>(null)
   const [cancelReason, setCancelReason] = useState('')
 
-  const { data: doctors } = useDoctors(false)
   const {
     data: appointmentsData,
     isPending,
