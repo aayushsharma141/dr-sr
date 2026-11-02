@@ -209,6 +209,9 @@ function ScheduledVisits({
   doctorId,
   canManage,
   onCancel,
+  onNoShow,
+  conflictError,
+  onClearConflict,
   onBook,
   onStartDateChange,
 }: {
@@ -216,6 +219,9 @@ function ScheduledVisits({
   doctorId?: number
   canManage: boolean
   onCancel: (appointment: Appointment) => void
+  onNoShow: (appointment: Appointment) => void
+  conflictError: string | null
+  onClearConflict: () => void
   onBook: () => void
   onStartDateChange: (date: string) => void
 }) {
@@ -233,6 +239,12 @@ function ScheduledVisits({
     booking_mode: 'SCHEDULED',
     doctor_id: doctorId,
   })
+  const overdueQuery = useAppointments({
+    date_to: addCalendarDays(localDateValue(new Date()), -1),
+    booking_mode: 'SCHEDULED',
+    status: 'BOOKED',
+  })
+  const overdueAppointments = overdueQuery.data?.appointments ?? []
   const appointments = [...(data?.appointments ?? [])].sort(
     (left, right) =>
       left.appointment_date.localeCompare(right.appointment_date) ||
@@ -285,6 +297,87 @@ function ScheduledVisits({
         </div>
       </div>
 
+      {conflictError && (
+        <div role="alert" className="rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-900">
+          {conflictError}
+          <button
+            type="button"
+            className="ml-2 font-semibold underline"
+            onClick={() => {
+              onClearConflict()
+              refetch()
+              overdueQuery.refetch()
+            }}
+          >
+            Reload appointments
+          </button>
+        </div>
+      )}
+      {overdueQuery.isError && (
+        <div role="alert" className="rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-900">
+          Unable to load missed scheduled visits: {overdueQuery.error.message}
+        </div>
+      )}
+      {overdueAppointments.length > 0 && (
+        <section className="overflow-hidden rounded-xl border border-amber-300 bg-amber-50/60" aria-labelledby="missed-scheduled-heading">
+          <div className="border-b border-amber-200 px-4 py-3 sm:px-5">
+            <h3 id="missed-scheduled-heading" className="text-sm font-bold text-amber-950">
+              Missed check-in · {overdueAppointments.length} visit(s)
+            </h3>
+            <p className="mt-1 text-xs text-amber-900">
+              These booked dates have passed without check-in. Mark a visit as No-show or cancel it; it will not receive a queue token.
+            </p>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[760px] text-left text-sm">
+              <thead className="bg-amber-100/70 text-[11px] font-bold uppercase tracking-wide text-amber-950">
+                <tr>
+                  <th scope="col" className="px-4 py-3">Booked date</th>
+                  <th scope="col" className="px-4 py-3">Patient</th>
+                  <th scope="col" className="px-4 py-3">Doctor</th>
+                  <th scope="col" className="px-4 py-3">Visit</th>
+                  <th scope="col" className="px-4 py-3 text-right">Action</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-amber-100">
+                {overdueAppointments.map((appointment) => (
+                  <tr key={appointment.id}>
+                    <td className="whitespace-nowrap px-4 py-3 font-semibold text-amber-950">{appointment.appointment_date}</td>
+                    <td className="px-4 py-3">
+                      <Link to={`/reception/patients/${appointment.patient_id}`} className="font-semibold text-[#5D0B26] hover:underline">
+                        {appointment.patient_name}
+                      </Link>
+                      <span className="mt-0.5 block font-mono text-xs text-slate-500">{appointment.patient_urn}</span>
+                    </td>
+                    <td className="px-4 py-3 text-slate-700">{appointment.doctor_name_en}</td>
+                    <td className="px-4 py-3 text-slate-700">{visitTypeLabel(appointment.visit_type)}</td>
+                    <td className="px-4 py-3 text-right">
+                      {canManage && (
+                        <div className="flex justify-end gap-2">
+                          <button
+                            type="button"
+                            onClick={() => onNoShow(appointment)}
+                            className="min-h-9 rounded-lg border border-amber-400 px-3 text-xs font-semibold text-amber-950 hover:bg-amber-100"
+                          >
+                            Mark No-show
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => onCancel(appointment)}
+                            className="min-h-9 rounded-lg border border-slate-300 px-3 text-xs font-semibold text-slate-700 hover:bg-white"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      )}
       {isPending ? (
         <div className="rounded-xl border border-slate-200 bg-white p-12 text-center text-sm text-slate-500" role="status">
           Loading scheduled visits…
@@ -799,6 +892,9 @@ export function AppointmentsReception() {
               doctorId={doctorFilterId}
               canManage={canManageAppointments}
               onCancel={(appointment) => setCancellingAppt(appointment)}
+              onNoShow={(appointment) => handleUpdateStatus(appointment, 'NO_SHOW')}
+              conflictError={!cancellingAppt ? conflictError : null}
+              onClearConflict={() => setConflictError(null)}
               onStartDateChange={setSelectedDate}
               onBook={() => {
                 const today = localDateValue(new Date())
