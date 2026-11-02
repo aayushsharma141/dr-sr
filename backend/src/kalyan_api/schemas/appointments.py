@@ -56,7 +56,7 @@ class AppointmentRead(BaseModel):
     booking_mode: AppointmentBookingMode
     visit_type: AppointmentVisitType
     treatment_plan_id: int | None = None
-    token_number: int
+    token_number: int | None = None
     status: str
     status_updated_at: datetime
     cancellation_reason: str | None = None
