@@ -38,6 +38,7 @@ export function AdminNavTabs() {
               key={tab.path}
               to={tab.path}
               aria-current={active ? 'page' : undefined}
+              aria-label={tab.label}
               className={[
                 'inline-flex min-h-11 shrink-0 items-center justify-center rounded-lg border-b-2 px-3 text-xs font-semibold transition-colors sm:px-4',
                 'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#8E1C3D]',
