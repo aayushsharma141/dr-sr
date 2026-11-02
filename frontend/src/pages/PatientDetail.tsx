@@ -285,7 +285,7 @@ export function PatientDetail() {
             <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-8">
               {/* Personal & Biological Details */}
               <div className="space-y-4">
-                <h4 className="text-xs font-bold text-neutral-400 uppercase tracking-wider">
+                <h4 className="text-xs font-bold text-neutral-600 uppercase tracking-wider">
                   Demographic Details
                 </h4>
                 <dl className="grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
@@ -312,7 +312,7 @@ export function PatientDetail() {
 
               {/* Contact Information */}
               <div className="space-y-4">
-                <h4 className="text-xs font-bold text-neutral-400 uppercase tracking-wider">
+                <h4 className="text-xs font-bold text-neutral-600 uppercase tracking-wider">
                   Contact Information
                 </h4>
                 <dl className="grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
@@ -351,7 +351,7 @@ export function PatientDetail() {
 
               {/* Medical Alerts & Allergies */}
               <div className="md:col-span-2 border-t border-neutral-100 pt-6">
-                <h4 className="text-xs font-bold text-neutral-400 uppercase tracking-wider mb-3">
+                <h4 className="text-xs font-bold text-neutral-600 uppercase tracking-wider mb-3">
                   Clinical & Medical Alerts
                 </h4>
                 <div className="p-4 rounded-lg bg-amber-50 border border-amber-200">
@@ -367,7 +367,7 @@ export function PatientDetail() {
               {/* Clinical & Administrative Notes */}
               {patient.notes && (
                 <div className="md:col-span-2">
-                  <h4 className="text-xs font-bold text-neutral-400 uppercase tracking-wider mb-2">
+                  <h4 className="text-xs font-bold text-neutral-600 uppercase tracking-wider mb-2">
                     Administrative & Background Notes
                   </h4>
                   <div className="p-4 rounded-lg bg-neutral-50 border border-neutral-200 text-sm text-neutral-800 whitespace-pre-wrap">
