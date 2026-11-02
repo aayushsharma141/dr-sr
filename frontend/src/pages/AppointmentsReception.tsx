@@ -234,7 +234,8 @@ function ScheduledVisits({
   const appointments = [...(data?.appointments ?? [])].sort(
     (left, right) =>
       left.appointment_date.localeCompare(right.appointment_date) ||
-      left.token_number - right.token_number,
+      (left.token_number ?? Number.MAX_SAFE_INTEGER) -
+        (right.token_number ?? Number.MAX_SAFE_INTEGER),
   )
 
   return (
@@ -330,9 +331,15 @@ function ScheduledVisits({
                       {new Date(`${appointment.appointment_date}T00:00:00`).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
                     </td>
                     <td className="px-4 py-3">
-                      <span className="inline-flex rounded-md bg-blue-50 px-2.5 py-1 font-mono text-sm font-bold text-blue-900">
-                        #{appointment.token_number}
-                      </span>
+                      {appointment.token_number == null ? (
+                        <span className="inline-flex rounded-md bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">
+                          Assigned at check-in
+                        </span>
+                      ) : (
+                        <span className="inline-flex rounded-md bg-blue-50 px-2.5 py-1 font-mono text-sm font-bold text-blue-900">
+                          #{appointment.token_number}
+                        </span>
+                      )}
                     </td>
                     <td className="px-4 py-3">
                       <Link to={`/reception/patients/${appointment.patient_id}`} className="font-semibold text-[#5D0B26] hover:underline">
