@@ -289,3 +289,62 @@ def test_doctor_silo_cross_isolation_on_prescriptions(
     doc_b_client = login_client(doctor_b_user)
     resp = doc_b_client.get(f"/api/prescriptions/{rx_id}")
     assert resp.status_code == 404
+
+
+def test_prescription_follow_ups_are_date_filtered_and_doctor_scoped(
+    login_client, doctor_a_user, doctor_b_user, db_session
+):
+    """Follow-up list contains only dated prescriptions issued by the signed-in doctor."""
+    patient_a = _create_test_patient(db_session, "21")
+    patient_b = _create_test_patient(db_session, "22")
+    doctor_a = login_client(doctor_a_user)
+    doctor_b = login_client(doctor_b_user)
+
+    def create_follow_up(client, patient_id: int, follow_up_date: str | None):
+        response = client.post(
+            "/api/prescriptions",
+            json={
+                "patient_id": patient_id,
+                "diagnosis": "Follow-up test diagnosis",
+                "follow_up_date": follow_up_date,
+                "items": [
+                    {
+                        "item_order": 1,
+                        "medicine_name": "Test medicine",
+                        "dosage": "1 unit",
+                        "frequency": "OD",
+                        "duration_days": 3,
+                    }
+                ],
+            },
+        )
+        assert response.status_code == 201, response.text
+        return response.json()
+
+    old_follow_up = create_follow_up(doctor_a, patient_a.id, "2026-10-30")
+    future_follow_up = create_follow_up(doctor_a, patient_a.id, "2026-11-12")
+    no_follow_up = create_follow_up(doctor_a, patient_a.id, None)
+    other_doctor_follow_up = create_follow_up(doctor_b, patient_b.id, "2026-11-10")
+
+    response = doctor_a.get("/api/prescriptions/follow-ups")
+    assert response.status_code == 200
+    results = response.json()
+    result_ids = [row["id"] for row in results]
+    assert future_follow_up["id"] in result_ids
+    assert old_follow_up["id"] in result_ids
+    assert no_follow_up["id"] not in result_ids
+    assert other_doctor_follow_up["id"] not in result_ids
+    assert [row["follow_up_date"] for row in results] == ["2026-10-30", "2026-11-12"]
+
+    filtered = doctor_a.get(
+        "/api/prescriptions/follow-ups",
+        params={"date_from": "2026-11-01", "date_to": "2026-11-30"},
+    )
+    assert filtered.status_code == 200
+    assert [row["id"] for row in filtered.json()] == [future_follow_up["id"]]
+
+    invalid_range = doctor_a.get(
+        "/api/prescriptions/follow-ups",
+        params={"date_from": "2026-11-30", "date_to": "2026-11-01"},
+    )
+    assert invalid_range.status_code == 422
