@@ -412,7 +412,7 @@ def get_doctor_queue(
     if not doctor:
         raise ApiError(status_code=404, code="doctor_not_found", message="Doctor not found.")
 
-    today = clock.utcnow().date()
+    today = clock.ist_today()
 
     # Query today's appointments for this doctor
     stmt = (
