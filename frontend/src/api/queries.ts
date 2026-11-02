@@ -542,7 +542,7 @@ export function useAppointments(params?: {
   status?: string
   booking_mode?: 'WALK_IN' | 'SCHEDULED'
   has_token?: boolean
-}) {
+}, enabled = true) {
   const q = new URLSearchParams()
   if (params?.appointment_date) q.set('appointment_date', params.appointment_date)
   if (params?.date_from) q.set('date_from', params.date_from)
@@ -557,6 +557,7 @@ export function useAppointments(params?: {
   return useQuery({
     queryKey: ['appointments', params],
     queryFn: () => apiFetch<AppointmentListResponse>(`/appointments${qs}`),
+    enabled,
   })
 }
 
