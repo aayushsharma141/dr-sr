@@ -146,8 +146,6 @@ def test_hybrid_booking_modes_allocate_scheduled_token_at_check_in_and_reject_du
     """Walk-ins are same-day only; future bookings reserve a future-date token."""
     from datetime import timedelta
 
-    from kalyan_api import clock
-
     patient = Patient(
         urn="KH-2026-8890",
         full_name="Hybrid Booking Patient",
@@ -163,7 +161,7 @@ def test_hybrid_booking_modes_allocate_scheduled_token_at_check_in_and_reject_du
     client = login_client(reception_user)
     doctor_id = doctor_a_user.doctor_id
     assert doctor_id is not None
-    today = clock.ist_today()
+    today = clock["t"].astimezone(IST).date()
 
     walk_in = client.post(
         "/api/appointments",
