@@ -3,6 +3,7 @@ import { Link, useParams } from 'react-router'
 import { usePatient, useMe } from '../api/queries'
 import { AppShell } from '../components/AppShell'
 import { PatientEditModal } from '../components/PatientEditModal'
+import { PatientTimeline } from '../components/PatientTimeline'
 import type { PatientOut } from '../api/types'
 
 export function PatientDetail() {
@@ -16,6 +17,7 @@ export function PatientDetail() {
 
   const [isEditModalOpen, setIsEditModalOpen] = useState(false)
   const [successBanner, setSuccessBanner] = useState<string | null>(null)
+  const [activeTab, setActiveTab] = useState<'profile' | 'visits' | 'clinical' | 'therapy' | 'billing'>('profile')
 
   if (isNaN(patientId) || patientId <= 0) {
     return (
@@ -106,7 +108,42 @@ export function PatientDetail() {
             <p className="text-neutral-700 font-medium">Patient not found.</p>
           </div>
         ) : (
-          <div className="bg-white rounded-lg border border-neutral-200 overflow-hidden shadow-xs">
+          <div className="space-y-4">
+            <nav
+              role="tablist"
+              aria-label="Patient record sections"
+              className="flex flex-wrap gap-1 border-b border-slate-200"
+            >
+              {([
+                { key: 'profile', label: 'Demographic Profile' },
+                { key: 'visits', label: 'Visits & Appointments' },
+                ...(me?.role === 'RECEPTION' ? [] : [{ key: 'clinical' as const, label: 'Clinical Records' }]),
+                { key: 'therapy', label: 'Physiotherapy' },
+                { key: 'billing', label: 'Financial Ledger' },
+              ] as const).map((tab) => (
+                <button
+                  key={tab.key}
+                  type="button"
+                  role="tab"
+                  id={`patient-tab-${tab.key}`}
+                  aria-controls={`patient-panel-${tab.key}`}
+                  aria-selected={activeTab === tab.key}
+                  onClick={() => setActiveTab(tab.key)}
+                  className={[
+                    'min-h-11 rounded-t-lg border-b-2 px-3 text-xs font-semibold transition-colors sm:px-4 sm:text-sm',
+                    'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-[#8E1C3D]',
+                    activeTab === tab.key
+                      ? 'border-[#C39A35] bg-white text-[#5D0B26]'
+                      : 'border-transparent text-slate-600 hover:bg-white hover:text-[#5D0B26]',
+                  ].join(' ')}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </nav>
+
+            {activeTab === 'profile' ? (
+          <div id="patient-panel-profile" role="tabpanel" aria-labelledby="patient-tab-profile" className="bg-white rounded-lg border border-neutral-200 overflow-hidden shadow-xs">
             {/* Top Identity Banner */}
             <div className="p-6 bg-neutral-50 border-b border-neutral-200 flex flex-col md:flex-row md:items-center justify-between gap-6">
               <div className="flex items-center gap-5">
@@ -256,6 +293,44 @@ export function PatientDetail() {
                 </div>
               )}
             </div>
+          </div>
+            ) : (
+              <section
+                id={`patient-panel-${activeTab}`}
+                role="tabpanel"
+                aria-labelledby={`patient-tab-${activeTab}`}
+                className="rounded-xl border border-slate-200 bg-white p-4 shadow-xs sm:p-5"
+              >
+                {activeTab === 'visits' && (
+                  <PatientTimeline
+                    patientId={patient.id}
+                    eventTypes={['APPOINTMENT']}
+                    heading="Appointment & visit history"
+                  />
+                )}
+                {activeTab === 'clinical' && (
+                  <PatientTimeline
+                    patientId={patient.id}
+                    eventTypes={['ENCOUNTER', 'PRESCRIPTION']}
+                    heading="Clinical encounters & prescriptions"
+                  />
+                )}
+                {activeTab === 'therapy' && (
+                  <PatientTimeline
+                    patientId={patient.id}
+                    eventTypes={['TREATMENT_PLAN', 'TREATMENT_SESSION']}
+                    heading="Physiotherapy plans & sessions"
+                  />
+                )}
+                {activeTab === 'billing' && (
+                  <PatientTimeline
+                    patientId={patient.id}
+                    eventTypes={['PAYMENT']}
+                    heading="Financial ledger & receipts"
+                  />
+                )}
+              </section>
+            )}
           </div>
         )}
       </div>
