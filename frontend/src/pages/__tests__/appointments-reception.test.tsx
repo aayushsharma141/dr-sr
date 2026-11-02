@@ -264,9 +264,7 @@ describe('AppointmentsReception Component', () => {
       })
     })
   })
-})
 
- 
   it('opens the doctor-only prescription follow-up tab from its deep link', async () => {
     const doctorMe: Me = {
       ...mockMe,
@@ -405,3 +403,4 @@ describe('AppointmentsReception Component', () => {
     expect(screen.queryByRole('button', { name: /book new appointment/i })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /mark arrived/i })).not.toBeInTheDocument()
   })
+})
