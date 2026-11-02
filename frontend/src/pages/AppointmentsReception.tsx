@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, useSearchParams } from 'react-router'
 import { AppShell } from '../components/AppShell'
 import { ConflictBanner } from '../components/ConflictBanner'
@@ -215,6 +215,15 @@ export function AppointmentsReception() {
   const selectTab = (tab: AppointmentTab) => setSearchParams({ tab })
   const [selectedDate, setSelectedDate] = useState(clinicToday)
   const [selectedDoctorId, setSelectedDoctorId] = useState<number | undefined>(undefined)
+  const isDoctorAccount = me?.role === 'DOCTOR'
+  const ownDoctorId = me?.doctor_id ?? undefined
+
+  useEffect(() => {
+    if (isDoctorAccount && ownDoctorId) {
+      setSelectedDoctorId(ownDoctorId)
+    }
+  }, [isDoctorAccount, ownDoctorId])
+
   const [isBookingOpen, setIsBookingOpen] = useState(false)
   const [bookingMode, setBookingMode] = useState<'WALK_IN' | 'SCHEDULED'>('WALK_IN')
   const [conflictError, setConflictError] = useState<string | null>(null)
@@ -456,10 +465,11 @@ export function AppointmentsReception() {
                 id="doctor-filter"
                 value={selectedDoctorId ?? ''}
                 onChange={(e) => setSelectedDoctorId(e.target.value ? Number(e.target.value) : undefined)}
-                className="w-full p-2 border border-neutral-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-red-800"
+                disabled={isDoctorAccount}
+                className="w-full p-2 border border-neutral-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-red-800 disabled:bg-slate-100"
               >
-                <option value="">All Consulting Doctors</option>
-                {doctors?.map((d: DoctorOut) => (
+                {!isDoctorAccount && <option value="">All Consulting Doctors</option>}
+                {doctors?.filter((doctor) => !isDoctorAccount || doctor.id === ownDoctorId).map((d: DoctorOut) => (
                   <option key={d.id} value={d.id}>
                     {d.name_en}
                   </option>
@@ -619,7 +629,8 @@ export function AppointmentsReception() {
         <AppointmentBookingModal
           isOpen={isBookingOpen}
           onClose={() => setIsBookingOpen(false)}
-          initialDoctorId={selectedDoctorId}
+          initialDoctorId={isDoctorAccount ? ownDoctorId : selectedDoctorId}
+          lockDoctorSelection={isDoctorAccount}
           initialDate={selectedDate}
           initialMode={bookingMode}
           onSuccess={() => refetch()}
@@ -810,7 +821,8 @@ export function AppointmentsReception() {
             <AppointmentBookingModal
               isOpen={isBookingOpen}
               onClose={() => setIsBookingOpen(false)}
-              initialDoctorId={selectedDoctorId}
+              initialDoctorId={isDoctorAccount ? ownDoctorId : selectedDoctorId}
+              lockDoctorSelection={isDoctorAccount}
               initialMode="SCHEDULED"
               onSuccess={() => refetch()}
             />
