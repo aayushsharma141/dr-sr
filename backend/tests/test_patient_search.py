@@ -60,6 +60,7 @@ def test_patient_multimodal_search(
         age_years=82,
         mobile="9431055555",
         address="Mumbai / Ara",
+        is_active=False,
     )
     db_session.add_all([p1, p2, p3])
     db_session.flush()
@@ -91,6 +92,19 @@ def test_patient_multimodal_search(
     results = resp.json()
     assert len(results) >= 1
     assert any(p["full_name"] == "Amitabh Bachchan" for p in results)
+
+    # 4a. Appointment pickers do not preload the registry or return inactive patients.
+    empty_active_search = rec_c.get("/api/patients?active_only=true")
+    assert empty_active_search.status_code == 200
+    assert empty_active_search.json() == []
+
+    active_only_match = rec_c.get("/api/patients?q=Amitabh&active_only=true")
+    assert active_only_match.status_code == 200
+    assert active_only_match.json() == []
+
+    all_records_match = rec_c.get("/api/patients?q=Amitabh")
+    assert all_records_match.status_code == 200
+    assert any(p["full_name"] == "Amitabh Bachchan" for p in all_records_match.json())
 
     # 5. Detail retrieval
     detail_resp = rec_c.get(f"/api/patients/{p1.id}")
