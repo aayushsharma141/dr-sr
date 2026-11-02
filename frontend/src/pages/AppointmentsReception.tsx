@@ -406,6 +406,10 @@ export function AppointmentsReception() {
   const selectTab = (tab: 'today' | 'scheduled' | 'followup') => setSearchParams({ tab })
   const [selectedDate, setSelectedDate] = useState(() => localDateValue(new Date()))
   const [selectedDoctorId, setSelectedDoctorId] = useState<number | undefined>(undefined)
+  const doctorFilterId = me?.role === 'DOCTOR' ? (me.doctor_id ?? undefined) : selectedDoctorId
+  const visibleDoctors = (doctors ?? []).filter(
+    (doctor) => me?.role !== 'DOCTOR' || doctor.id === me.doctor_id,
+  )
   const [isBookingOpen, setIsBookingOpen] = useState(false)
   const [conflictError, setConflictError] = useState<string | null>(null)
 
@@ -422,7 +426,7 @@ export function AppointmentsReception() {
     refetch,
   } = useAppointments({
     appointment_date: selectedDate,
-    doctor_id: selectedDoctorId,
+    doctor_id: doctorFilterId,
   })
 
   const updateStatusMutation = useUpdateAppointmentStatus()
@@ -611,12 +615,13 @@ export function AppointmentsReception() {
               </label>
               <select
                 id="doctor-filter"
-                value={selectedDoctorId ?? ''}
+                value={doctorFilterId ?? ''}
+                disabled={me?.role === 'DOCTOR'}
                 onChange={(e) => setSelectedDoctorId(e.target.value ? Number(e.target.value) : undefined)}
-                className="w-full p-2 border border-neutral-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-red-800"
+                className="w-full p-2 border border-neutral-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-red-800 disabled:bg-slate-50 disabled:text-slate-500"
               >
-                <option value="">All Consulting Doctors</option>
-                {doctors?.map((d: DoctorOut) => (
+                {me?.role !== 'DOCTOR' && <option value="">All Consulting Doctors</option>}
+                {visibleDoctors.map((d: DoctorOut) => (
                   <option key={d.id} value={d.id}>
                     {d.name_en}
                   </option>
@@ -782,7 +787,7 @@ export function AppointmentsReception() {
           <div id="appointments-panel-scheduled" role="tabpanel" aria-labelledby="appointments-tab-scheduled">
             <ScheduledVisits
               startDate={selectedDate}
-              doctorId={selectedDoctorId}
+              doctorId={doctorFilterId}
               canManage={canManageAppointments}
               onCancel={(appointment) => setCancellingAppt(appointment)}
               onStartDateChange={setSelectedDate}
@@ -811,7 +816,7 @@ export function AppointmentsReception() {
         <AppointmentBookingModal
           isOpen={isBookingOpen}
           onClose={() => setIsBookingOpen(false)}
-          initialDoctorId={selectedDoctorId}
+          initialDoctorId={doctorFilterId}
           initialDate={activeTab === 'scheduled'
             ? (selectedDate > localDateValue(new Date()) ? selectedDate : addCalendarDays(localDateValue(new Date()), 1))
             : selectedDate}
