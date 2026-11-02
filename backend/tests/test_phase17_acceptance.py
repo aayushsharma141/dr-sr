@@ -161,6 +161,7 @@ def test_disaster_recovery_rehearsal(
                 age_years=50,
                 mobile="9899999999",
                 address="Disaster Recovery Avenue",
+                is_test_data=True,
                 district="Bhojpur",
                 state="Bihar",
             )
