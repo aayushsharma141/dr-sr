@@ -30,6 +30,16 @@ jobs:
           sudo apt-get install --yes libegl1 libgl1 libpulse0 libxkbcommon0 libdbus-1-3 libxcb-cursor0 libxkbcommon-x11-0
       - name: Install development dependencies
         run: python -m pip install --upgrade pip && pip install -r requirements-dev.txt
+      - name: Export OpenAPI snapshot for contract update
+        run: |
+          export PYTHONPATH=backend/src
+          python -m kalyan_api.cli export-openapi --out /tmp/openapi.snapshot.json
+      - name: Upload generated OpenAPI snapshot
+        uses: actions/upload-artifact@v4
+        with:
+          name: hybrid-appointment-openapi-snapshot
+          path: /tmp/openapi.snapshot.json
+          retention-days: 1
       - name: Verify local image assets
         run: |
           python - <<'PY'
