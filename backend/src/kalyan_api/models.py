@@ -433,7 +433,7 @@ class Appointment(Base):
             name="ck_appointments_booking_mode",
         ),
         CheckConstraint(
-            "visit_type IN ('NEW_CONSULTATION', 'FOLLOW_UP', 'PHYSIOTHERAPY_SESSION')",
+            "visit_type IN ('UNSPECIFIED', 'NEW_CONSULTATION', 'FOLLOW_UP', 'PHYSIOTHERAPY_SESSION')",
             name="ck_appointments_visit_type",
         ),
         Index(
