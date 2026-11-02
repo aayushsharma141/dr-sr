@@ -592,4 +592,93 @@ describe('AppointmentsReception Component', () => {
     expect(mockFetch.mock.calls.some(([url]) => String(url).includes('/api/patients'))).toBe(false)
   })
 
+  it('shows scheduled cancellation conflicts inside the open cancellation dialog', async () => {
+    const scheduledAppointment: Appointment = {
+      ...mockAppointments[0],
+      appointment_date: clinicDateAfter(3),
+      booking_mode: 'SCHEDULED',
+      visit_type: 'FOLLOW_UP',
+      token_number: null,
+    }
+    const mockFetch = vi.fn().mockImplementation((url: string, init?: RequestInit) => {
+      if (url.includes('/api/auth/me')) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          headers: new Headers({ 'content-type': 'application/json' }),
+          text: () => Promise.resolve(JSON.stringify(mockMe)),
+        })
+      }
+      if (url.includes('/api/doctors')) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          headers: new Headers({ 'content-type': 'application/json' }),
+          text: () => Promise.resolve(JSON.stringify(mockDoctors)),
+        })
+      }
+      if (url.includes('/api/appointments/10/status') && init?.method === 'PATCH') {
+        return Promise.resolve({
+          ok: false,
+          status: 409,
+          statusText: 'Conflict',
+          headers: new Headers({ 'content-type': 'application/json' }),
+          text: () => Promise.resolve(JSON.stringify({
+            code: 'version_conflict',
+            message: 'This scheduled visit was changed by another staff member. Reload before retrying.',
+          })),
+        })
+      }
+      if (url.includes('/api/appointments?date_from=')) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          headers: new Headers({ 'content-type': 'application/json' }),
+          text: () => Promise.resolve(JSON.stringify({ total: 1, appointments: [scheduledAppointment] })),
+        })
+      }
+      if (url.includes('/api/appointments')) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          headers: new Headers({ 'content-type': 'application/json' }),
+          text: () => Promise.resolve(JSON.stringify({ total: 0, appointments: [] })),
+        })
+      }
+      return Promise.reject(new Error(`Unhandled: ${url}`))
+    })
+    vi.stubGlobal('fetch', mockFetch)
+
+    const user = userEvent.setup()
+    render(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter initialEntries={['/reception/appointments?tab=scheduled']}>
+          <AppointmentsReception />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    )
+
+    await waitFor(() => {
+      expect(screen.getByText('Upcoming reservations')).toBeInTheDocument()
+      expect(screen.getByText('Assigned at check-in')).toBeInTheDocument()
+    })
+
+    await user.click(screen.getByRole('button', { name: 'Cancel' }))
+    const dialog = screen.getByRole('heading', { name: 'Cancel Appointment' }).parentElement
+    expect(dialog).not.toBeNull()
+    expect(within(dialog as HTMLElement).getByText(/scheduled visit on/)).toBeInTheDocument()
+
+    await user.type(
+      screen.getByPlaceholderText(/reason for cancellation/i),
+      'Patient requested a different date',
+    )
+    await user.click(screen.getByRole('button', { name: 'Confirm Cancellation' }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'This scheduled visit was changed by another staff member. Reload before retrying.',
+    )
+    expect(screen.getByRole('button', { name: 'Reload appointments' })).toBeInTheDocument()
+  })
+
+
 })
