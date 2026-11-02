@@ -14,7 +14,7 @@ const mockMe: Me = {
   doctor_id: null,
   csrf_token: 'test-csrf-token',
   must_change_password: false,
-  permissions: ['appointments:read', 'appointments:write'],
+  permissions: ['appointment:read', 'appointment:write'],
   version_id: 1,
 }
 
