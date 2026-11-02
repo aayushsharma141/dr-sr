@@ -180,7 +180,11 @@ def book_appointment(
             Appointment.appointment_date == payload.appointment_date,
             Appointment.visit_type == payload.visit_type.value,
             Appointment.status.not_in(
-                [AppointmentStatus.CANCELLED.value, AppointmentStatus.NO_SHOW.value]
+                [
+                    AppointmentStatus.CANCELLED.value,
+                    AppointmentStatus.NO_SHOW.value,
+                    AppointmentStatus.DONE.value,
+                ]
             ),
         )
         .limit(1)
@@ -193,10 +197,15 @@ def book_appointment(
             details={"appointment_id": duplicate_id},
         )
 
-    # Both modes reserve a token in the selected doctor's queue for that date.
-    # SCHEDULED is date-based in this release: no clock time is promised or reserved.
-    token_num = token_service.generate_next_daily_token(
-        session, payload.doctor_id, payload.appointment_date
+    # Walk-ins receive a token immediately. A scheduled visit reserves only a
+    # clinic date; its token is allocated transactionally when reception checks
+    # the patient in on that date.
+    token_num = (
+        token_service.generate_next_daily_token(
+            session, payload.doctor_id, payload.appointment_date
+        )
+        if booking_mode == AppointmentBookingMode.WALK_IN
+        else None
     )
 
     appt = Appointment(
@@ -374,6 +383,17 @@ def update_appointment_status(
     validate_status_transition(appt, payload.status, principal, payload.cancellation_reason)
 
     old_status = appt.status
+    # A date-based reservation consumes no token until the booked-day check-in.
+    # Keeping allocation in this transaction prevents a token being consumed if
+    # the status transition or audit write rolls back.
+    if (
+        payload.status == AppointmentStatus.ARRIVED
+        and appt.booking_mode == AppointmentBookingMode.SCHEDULED.value
+        and appt.token_number is None
+    ):
+        appt.token_number = token_service.generate_next_daily_token(
+            session, appt.doctor_id, appt.appointment_date
+        )
     appt.status = payload.status.value
     appt.status_updated_at = clock.utcnow()
     if payload.cancellation_reason is not None:
@@ -389,7 +409,11 @@ def update_appointment_status(
         entity_type="appointment",
         entity_id=appt.id,
         before={"status": old_status, "version_id": payload.version_id},
-        after={"status": appt.status, "version_id": appt.version_id},
+        after={
+            "status": appt.status,
+            "version_id": appt.version_id,
+            "token_number": appt.token_number,
+        },
         reason=payload.cancellation_reason,
     )
 
@@ -422,7 +446,7 @@ def get_doctor_queue(
     if not doctor:
         raise ApiError(status_code=404, code="doctor_not_found", message="Doctor not found.")
 
-    today = clock.utcnow().date()
+    today = clock.ist_today()
 
     # Query today's appointments for this doctor
     stmt = (
