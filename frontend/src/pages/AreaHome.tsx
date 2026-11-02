@@ -119,6 +119,33 @@ export function AreaHome({ area }: AreaHomeProps) {
                       User accounts, roles, locks & passwords
                     </p>
                   </Link>
+                  <Link
+                    to="/admin/audit"
+                    className="p-4 bg-white rounded border border-neutral-300 hover:border-red-800 hover:shadow-xs transition-all block"
+                  >
+                    <p className="font-bold text-neutral-900">Audit Log Viewer</p>
+                    <p className="text-xs text-neutral-500 mt-1">
+                      Filter immutable security and operational event trail
+                    </p>
+                  </Link>
+                  <Link
+                    to="/admin/backups"
+                    className="p-4 bg-white rounded border border-neutral-300 hover:border-red-800 hover:shadow-xs transition-all block"
+                  >
+                    <p className="font-bold text-neutral-900">Backup & Restore</p>
+                    <p className="text-xs text-neutral-500 mt-1">
+                      Checksummed database & patient photo archives
+                    </p>
+                  </Link>
+                  <Link
+                    to="/admin/integrity"
+                    className="p-4 bg-white rounded border border-neutral-300 hover:border-red-800 hover:shadow-xs transition-all block"
+                  >
+                    <p className="font-bold text-neutral-900">Integrity Diagnostic</p>
+                    <p className="text-xs text-neutral-500 mt-1">
+                      5-pillar clinical, financial & storage invariant checks
+                    </p>
+                  </Link>
                 </div>
               </div>
             </div>

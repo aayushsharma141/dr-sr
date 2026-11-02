@@ -95,6 +95,33 @@ export const router = createBrowserRouter([
               }
             },
           },
+          {
+            path: '/admin/audit',
+            lazy: async () => {
+              const { AuditViewerPage } = await import('./pages/admin/AuditViewerPage')
+              return {
+                Component: AuditViewerPage,
+              }
+            },
+          },
+          {
+            path: '/admin/backups',
+            lazy: async () => {
+              const { BackupManagerPage } = await import('./pages/admin/BackupManagerPage')
+              return {
+                Component: BackupManagerPage,
+              }
+            },
+          },
+          {
+            path: '/admin/integrity',
+            lazy: async () => {
+              const { IntegrityDashboard } = await import('./pages/admin/IntegrityDashboard')
+              return {
+                Component: IntegrityDashboard,
+              }
+            },
+          },
         ],
       },
       {

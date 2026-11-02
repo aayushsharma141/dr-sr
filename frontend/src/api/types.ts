@@ -608,3 +608,81 @@ export interface TimelineItemOut {
   badge_variant?: 'default' | 'secondary' | 'destructive' | 'outline' | null
   metadata: Record<string, unknown>
 }
+
+// Phase 16: Audit Viewer, Backup/Restore & Integrity Contracts
+export interface AuditLogOut {
+  id: number
+  occurred_at: string
+  actor_user_id: string | null
+  actor_username: string
+  actor_role: Role
+  action: string
+  outcome: string
+  entity_type: string
+  entity_id: string | null
+  before_data: Record<string, unknown> | null
+  after_data: Record<string, unknown> | null
+  reason: string | null
+  request_id: string | null
+  ip: string | null
+  user_agent: string | null
+}
+
+export interface AuditLogListResponse {
+  items: AuditLogOut[]
+  total: number
+  page: number
+  page_size: number
+  pages: number
+}
+
+export interface BackupArchiveInfo {
+  filename: string
+  filepath: string
+  size_bytes: number
+  created_at: string
+  label?: string | null
+  is_valid: boolean
+  manifest?: Record<string, unknown> | null
+}
+
+export interface BackupArchiveListResponse {
+  backups: BackupArchiveInfo[]
+  total_count: number
+  backup_dir: string
+}
+
+export interface BackupCreateRequest {
+  label?: string | null
+  destination_dir?: string | null
+}
+
+export interface RestoreRequest {
+  archive_filename: string
+  create_prerestore_snapshot?: boolean
+}
+
+export interface RestoreResultOut {
+  status: string
+  archive_restored: string
+  prerestore_snapshot?: string | null
+  database_restored: boolean
+  photos_restored_count: number
+  manifest?: Record<string, unknown> | null
+}
+
+export interface IntegrityCheckItemOut {
+  name: string
+  passed: boolean
+  details: string
+  discrepancies: Record<string, unknown>[]
+}
+
+export interface IntegrityReportOut {
+  generated_at: string
+  is_healthy: boolean
+  total_checks: number
+  passed_checks: number
+  failed_checks: number
+  checks: IntegrityCheckItemOut[]
+}

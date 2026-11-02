@@ -1,4 +1,13 @@
 import type {
+  AuditLogListResponse,
+  BackupArchiveInfo,
+  BackupArchiveListResponse,
+  BackupCreateRequest,
+  IntegrityReportOut,
+  RestoreRequest,
+  RestoreResultOut,
+} from './types'
+import type {
   PaymentCreate,
   PaymentOut,
   PaymentReversalCreate,
@@ -844,5 +853,79 @@ export function usePatientTimeline(patientId: number | null | undefined) {
     queryFn: () =>
       apiFetch<TimelineItemOut[]>('/api/patients/' + patientId + '/timeline'),
     enabled: typeof patientId === 'number' && patientId > 0,
+  })
+}
+
+// Phase 16: Audit Viewer, Backup/Restore & Integrity Queries & Mutations
+export function useAuditLogs(params?: {
+  actor_username?: string
+  action?: string
+  entity_type?: string
+  entity_id?: string
+  outcome?: string
+  date_from?: string
+  date_to?: string
+  page?: number
+  page_size?: number
+}) {
+  const searchParams = new URLSearchParams()
+  if (params?.actor_username) searchParams.set('actor_username', params.actor_username)
+  if (params?.action) searchParams.set('action', params.action)
+  if (params?.entity_type) searchParams.set('entity_type', params.entity_type)
+  if (params?.entity_id) searchParams.set('entity_id', params.entity_id)
+  if (params?.outcome) searchParams.set('outcome', params.outcome)
+  if (params?.date_from) searchParams.set('date_from', params.date_from)
+  if (params?.date_to) searchParams.set('date_to', params.date_to)
+  if (params?.page) searchParams.set('page', params.page.toString())
+  if (params?.page_size) searchParams.set('page_size', params.page_size.toString())
+
+  const queryString = searchParams.toString()
+  const endpoint = queryString ? `/api/audit-logs?${queryString}` : '/api/audit-logs'
+
+  return useQuery({
+    queryKey: ['audit-logs', params],
+    queryFn: () => apiFetch<AuditLogListResponse>(endpoint),
+  })
+}
+
+export function useBackups() {
+  return useQuery({
+    queryKey: ['operations', 'backups'],
+    queryFn: () => apiFetch<BackupArchiveListResponse>('/api/operations/backups'),
+  })
+}
+
+export function useCreateBackup() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (payload: BackupCreateRequest) =>
+      apiFetch<BackupArchiveInfo>('/api/operations/backups', {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['operations', 'backups'] })
+    },
+  })
+}
+
+export function useRestoreBackup() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (payload: RestoreRequest) =>
+      apiFetch<RestoreResultOut>('/api/operations/restore', {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries()
+    },
+  })
+}
+
+export function useIntegrityCheck() {
+  return useQuery({
+    queryKey: ['operations', 'integrity'],
+    queryFn: () => apiFetch<IntegrityReportOut>('/api/operations/integrity'),
   })
 }
