@@ -176,7 +176,7 @@ export function AppointmentsReception() {
   const { data: me } = useMe()
   const [searchParams, setSearchParams] = useSearchParams()
   const requestedTab = searchParams.get('tab')
-  const activeTab = requestedTab === 'followup' && me?.role === 'DOCTOR' ? 'followup' : 'today'
+  const activeTab = requestedTab === 'followup' && me?.permissions.includes('prescription:read') ? 'followup' : 'today'
   const canManageAppointments = me?.permissions.includes('appointment:write') === true
   const canViewFollowUps = me?.permissions.includes('prescription:read') === true
   const selectTab = (tab: 'today' | 'followup') => setSearchParams({ tab })
