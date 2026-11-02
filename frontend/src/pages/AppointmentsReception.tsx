@@ -665,6 +665,185 @@ export function AppointmentsReception() {
           </div>
         )}
           </div>
+        ) : activeTab === 'scheduled' ? (
+          <div id="appointments-panel-scheduled" role="tabpanel" aria-labelledby="appointments-tab-scheduled" className="space-y-5">
+            {conflictError && (
+              <ConflictBanner
+                onReload={() => {
+                  setConflictError(null)
+                  refetch()
+                }}
+              />
+            )}
+
+            <section className="flex flex-col gap-4 rounded-xl border border-slate-200 bg-white p-5 shadow-xs sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <p className="text-[11px] font-bold uppercase tracking-[0.13em] text-[#8E1C3D]">Future bookings</p>
+                <h2 className="mt-1 text-xl font-bold text-slate-900">Scheduled Visits</h2>
+                <p className="mt-1 max-w-2xl text-sm text-slate-600">
+                  Date-based bookings for the next 30 clinic days. No fixed time is promised; the daily token is allocated when reception checks the patient in.
+                </p>
+              </div>
+              {canManageAppointments && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setBookingMode('SCHEDULED')
+                    setIsBookingOpen(true)
+                  }}
+                  className="inline-flex min-h-11 shrink-0 items-center justify-center rounded-lg bg-[#5D0B26] px-4 text-sm font-semibold text-white hover:bg-[#4A081E] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#8E1C3D]"
+                >
+                  Schedule Future Visit
+                </button>
+              )}
+            </section>
+
+            <section className="flex flex-col gap-3 rounded-xl border border-slate-200 bg-white p-4 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <label htmlFor="scheduled-doctor-filter" className="block text-xs font-bold uppercase tracking-wide text-slate-600">Filter by doctor</label>
+                <select
+                  id="scheduled-doctor-filter"
+                  value={selectedDoctorId ?? ''}
+                  onChange={(event) => setSelectedDoctorId(event.target.value ? Number(event.target.value) : undefined)}
+                  className="mt-1 min-h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm focus:border-[#8E1C3D] focus:outline-none focus:ring-2 focus:ring-[#8E1C3D]/15 sm:min-w-64"
+                >
+                  <option value="">All consulting doctors</option>
+                  {doctors?.map((doctor) => <option key={doctor.id} value={doctor.id}>{doctor.name_en}</option>)}
+                </select>
+              </div>
+              <div className="text-sm text-slate-600">
+                <span className="font-semibold text-slate-900">{appointments.length}</span> pending scheduled visit{appointments.length === 1 ? '' : 's'}
+                <span className="ml-2 text-xs text-slate-500">· {clinicRangeStart} to {clinicRangeEnd}</span>
+              </div>
+            </section>
+
+            <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xs">
+              <div className="border-b border-slate-200 px-5 py-4">
+                <h3 className="font-bold text-slate-900">Upcoming scheduled visits</h3>
+                <p className="mt-1 text-xs text-slate-500">Token numbers are intentionally blank until the patient arrives on the booked clinic date.</p>
+              </div>
+              {isPending ? (
+                <div role="status" className="p-12 text-center text-sm text-slate-500">Loading scheduled visits…</div>
+              ) : isError ? (
+                <div role="alert" className="p-8 text-center text-sm text-rose-800">Unable to load scheduled visits: {error.message}</div>
+              ) : appointments.length === 0 ? (
+                <div className="space-y-3 p-12 text-center">
+                  <p className="font-semibold text-slate-800">No pending scheduled visits in this date range.</p>
+                  <p className="text-sm text-slate-500">Walk-in tokens and prescription reminders are managed in their separate workflows.</p>
+                  {canManageAppointments && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setBookingMode('SCHEDULED')
+                        setIsBookingOpen(true)
+                      }}
+                      className="inline-flex min-h-11 items-center rounded-lg border border-[#5D0B26] px-4 text-sm font-semibold text-[#5D0B26] hover:bg-rose-50"
+                    >
+                      Create scheduled visit
+                    </button>
+                  )}
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full min-w-[880px] text-left text-sm">
+                    <thead className="border-b border-slate-200 bg-slate-50 text-[11px] font-bold uppercase tracking-wide text-slate-600">
+                      <tr>
+                        <th scope="col" className="px-4 py-3">Clinic date</th>
+                        <th scope="col" className="px-4 py-3">Patient</th>
+                        <th scope="col" className="px-4 py-3">Visit category</th>
+                        <th scope="col" className="px-4 py-3">Doctor</th>
+                        <th scope="col" className="px-4 py-3">Token</th>
+                        <th scope="col" className="px-4 py-3">Status</th>
+                        <th scope="col" className="px-4 py-3 text-right">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {appointments.map((appt) => {
+                        const dueToday = appt.appointment_date === clinicToday()
+                        return (
+                          <tr key={appt.id} className="hover:bg-slate-50/80">
+                            <td className="whitespace-nowrap px-4 py-3 font-semibold text-slate-800">{appt.appointment_date}</td>
+                            <td className="px-4 py-3">
+                              <Link to={`/reception/patients/${appt.patient_id}`} className="font-semibold text-[#5D0B26] hover:underline">{appt.patient_name}</Link>
+                              <span className="mt-0.5 block font-mono text-xs text-slate-500">{appt.patient_urn} · {appt.patient_mobile}</span>
+                            </td>
+                            <td className="px-4 py-3 text-slate-700">{visitTypeLabel(appt.visit_type)}</td>
+                            <td className="px-4 py-3 text-slate-700">{appt.doctor_name_en}</td>
+                            <td className="px-4 py-3">
+                              <span className="inline-flex rounded-full bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-800">At check-in</span>
+                            </td>
+                            <td className="px-4 py-3">{getStatusBadge(appt.status)}</td>
+                            <td className="px-4 py-3 text-right">
+                              <div className="flex justify-end gap-2">
+                                {canManageAppointments && dueToday && appt.status === 'BOOKED' && (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleUpdateStatus(appt, 'ARRIVED')}
+                                    disabled={updateStatusMutation.isPending}
+                                    className="min-h-10 rounded-lg bg-amber-600 px-3 text-xs font-semibold text-white hover:bg-amber-700 disabled:opacity-50"
+                                  >
+                                    Mark Arrived · Allocate token
+                                  </button>
+                                )}
+                                {canManageAppointments && appt.status === 'BOOKED' && (
+                                  <button
+                                    type="button"
+                                    onClick={() => setCancellingAppt(appt)}
+                                    className="min-h-10 rounded-lg border border-slate-300 px-3 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                                  >
+                                    Cancel
+                                  </button>
+                                )}
+                                {!canManageAppointments && <span className="text-xs text-slate-500">View only</span>}
+                                {canManageAppointments && !dueToday && <span className="self-center text-xs text-slate-500">Check-in opens on visit date</span>}
+                              </div>
+                            </td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </section>
+
+            <AppointmentBookingModal
+              isOpen={isBookingOpen}
+              onClose={() => setIsBookingOpen(false)}
+              initialDoctorId={selectedDoctorId}
+              initialMode="SCHEDULED"
+              onSuccess={() => refetch()}
+            />
+
+            {cancellingAppt && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+                <div role="dialog" aria-modal="true" aria-labelledby="scheduled-cancel-title" className="w-full max-w-md space-y-4 rounded-xl bg-white p-6 shadow-xl">
+                  <h3 id="scheduled-cancel-title" className="text-lg font-bold text-slate-900">Cancel scheduled visit</h3>
+                  <p className="text-sm text-slate-600">
+                    Cancel booking #{cancellingAppt.id} for {cancellingAppt.patient_name} on {cancellingAppt.appointment_date}?
+                  </p>
+                  <textarea
+                    value={cancelReason}
+                    onChange={(event) => setCancelReason(event.target.value)}
+                    placeholder="Reason for cancellation (required)…"
+                    rows={3}
+                    className="w-full rounded-lg border border-slate-300 p-3 text-sm focus:border-[#8E1C3D] focus:outline-none focus:ring-2 focus:ring-[#8E1C3D]/15"
+                  />
+                  <div className="flex justify-end gap-2">
+                    <button type="button" onClick={() => { setCancellingAppt(null); setCancelReason('') }} className="min-h-11 rounded-lg border border-slate-300 px-4 text-sm font-semibold text-slate-700">Keep booking</button>
+                    <button
+                      type="button"
+                      disabled={!cancelReason.trim() || updateStatusMutation.isPending}
+                      onClick={() => handleUpdateStatus(cancellingAppt, 'CANCELLED', cancelReason.trim())}
+                      className="min-h-11 rounded-lg bg-rose-700 px-4 text-sm font-semibold text-white disabled:opacity-50"
+                    >
+                      Confirm cancellation
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
         ) : (
           canViewFollowUps ? (
             <div id="appointments-panel-followup" role="tabpanel" aria-labelledby="appointments-tab-followup">
