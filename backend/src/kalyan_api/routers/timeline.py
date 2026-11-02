@@ -67,14 +67,25 @@ def get_patient_timeline(
                 id=f"APPOINTMENT-{appt.id}",
                 event_type="APPOINTMENT",
                 event_date=appt.created_at,
-                title=f"Token #{appt.token_number}: Appointment with Dr. {doc_name}",
-                subtitle=f"Status: {appt.status}",
+                title=(
+                    f"Token #{appt.token_number}: Appointment with Dr. {doc_name}"
+                    if appt.token_number is not None
+                    else f"Scheduled {appt.visit_type.lower().replace('_', ' ')} with Dr. {doc_name}"
+                ),
+                subtitle=(
+                    f"Status: {appt.status} · {appt.appointment_date.isoformat()}"
+                    if appt.token_number is None
+                    else f"Status: {appt.status}"
+                ),
                 summary=appt.notes,
                 badge=appt.status,
                 badge_variant="outline",
                 metadata={
                     "appointment_id": appt.id,
                     "token_number": appt.token_number,
+                    "booking_mode": appt.booking_mode,
+                    "visit_type": appt.visit_type,
+                    "appointment_date": appt.appointment_date.isoformat(),
                     "status": appt.status,
                     "doctor_name": doc_name,
                 },
