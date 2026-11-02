@@ -35,3 +35,4 @@
 - `frontend/src/pages/__tests__/treatment-plan-workspace.test.tsx`: 2 passed.
 - Full frontend test suite (15 files, 62 tests): 100% passed.
 - Vite build: completed in 397ms.
+

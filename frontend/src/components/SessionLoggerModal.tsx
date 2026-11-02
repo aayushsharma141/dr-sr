@@ -208,3 +208,4 @@ export function SessionLoggerModal({ plan, onClose, onSuccess }: SessionLoggerMo
     </div>
   )
 }
+

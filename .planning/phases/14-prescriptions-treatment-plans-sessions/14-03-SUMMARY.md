@@ -37,3 +37,4 @@
 - `backend/tests/test_openapi_snapshot.py`: 2 passed.
 - All 20 tests passed in 6.65s.
 - Ruff linter & formatter: 100% clean, 0 errors.
+

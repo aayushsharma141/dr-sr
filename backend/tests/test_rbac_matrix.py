@@ -34,7 +34,10 @@ from kalyan_api.models import (
     ConsultationFee,
     Doctor,
     Patient,
+    Prescription,
     SystemSetup,
+    TreatmentPlan,
+    TreatmentSession,
     User,
 )
 
@@ -213,7 +216,7 @@ def test_rbac_matrix_cell(
         else:
             target_entity = type("TargetAppt", (), {"patient_id": pat.id, "doctor_id": doc_a_id})()
 
-    elif "/api/patients/{patient_id}/encounters" in row.path:
+    elif "/api/patients/{patient_id}/" in row.path:
         pat = Patient(
             urn=f"KH-2026-{uuid.uuid4().hex[:4]}",
             full_name="Matrix Patient",
@@ -229,6 +232,136 @@ def test_rbac_matrix_cell(
         db_session.flush()
         target_entity = pat
         resolved_path = row.path.replace("{patient_id}", str(pat.id))
+
+    elif "/api/prescriptions" in row.path:
+        doc_a_user = db_session.scalar(select(User).where(User.username.like("mat_doc_a%")))
+        doc_a_id = doc_a_user.doctor_id if doc_a_user else None
+        if not doc_a_id:
+            doc = Doctor(name_en=f"Dr. Rx {uuid.uuid4().hex[:6]}")
+            db_session.add(doc)
+            db_session.flush()
+            doc_a_id = doc.id
+
+        pat = Patient(
+            urn=f"KH-2026-{uuid.uuid4().hex[:4]}",
+            full_name="Matrix Patient",
+            guardian_name="Guardian",
+            gender="M",
+            age_years=30,
+            mobile="9876543210",
+            address="Ara",
+            district="Bhojpur",
+            state="Bihar",
+        )
+        db_session.add(pat)
+        db_session.flush()
+
+        if "{id}" in row.path:
+            rx = Prescription(
+                patient_id=pat.id,
+                doctor_id=doc_a_id,
+                diagnosis="Matrix Diagnosis",
+            )
+            db_session.add(rx)
+            db_session.flush()
+            target_entity = rx
+            resolved_path = row.path.replace("{id}", str(rx.id))
+        else:
+            target_entity = type("TargetRx", (), {"patient_id": pat.id})()
+
+    elif "/api/treatment-plans" in row.path:
+        doc_a_user = db_session.scalar(select(User).where(User.username.like("mat_doc_a%")))
+        doc_a_id = doc_a_user.doctor_id if doc_a_user else None
+        if not doc_a_id:
+            doc = Doctor(name_en=f"Dr. TP {uuid.uuid4().hex[:6]}")
+            db_session.add(doc)
+            db_session.flush()
+            doc_a_id = doc.id
+
+        pat = Patient(
+            urn=f"KH-2026-{uuid.uuid4().hex[:4]}",
+            full_name="Matrix Patient",
+            guardian_name="Guardian",
+            gender="M",
+            age_years=30,
+            mobile="9876543210",
+            address="Ara",
+            district="Bhojpur",
+            state="Bihar",
+        )
+        db_session.add(pat)
+        db_session.flush()
+
+        plan = TreatmentPlan(
+            patient_id=pat.id,
+            doctor_id=doc_a_id,
+            plan_name="Matrix Plan",
+            condition_diagnosis="Low back pain",
+            total_sessions=10,
+            agreed_price_paise=500000,
+        )
+        db_session.add(plan)
+        db_session.flush()
+        target_entity = plan
+        if "{id}" in row.path:
+            resolved_path = row.path.replace("{id}", str(plan.id))
+        elif "{plan_id}" in row.path:
+            resolved_path = row.path.replace("{plan_id}", str(plan.id))
+        else:
+            target_entity = type(
+                "TargetPlan", (), {"patient_id": pat.id, "version_id": plan.version_id}
+            )()
+
+    elif "/api/treatment-sessions" in row.path:
+        doc_a_user = db_session.scalar(select(User).where(User.username.like("mat_doc_a%")))
+        doc_a_id = doc_a_user.doctor_id if doc_a_user else None
+        if not doc_a_id:
+            doc = Doctor(name_en=f"Dr. TS {uuid.uuid4().hex[:6]}")
+            db_session.add(doc)
+            db_session.flush()
+            doc_a_id = doc.id
+
+        pat = Patient(
+            urn=f"KH-2026-{uuid.uuid4().hex[:4]}",
+            full_name="Matrix Patient",
+            guardian_name="Guardian",
+            gender="M",
+            age_years=30,
+            mobile="9876543210",
+            address="Ara",
+            district="Bhojpur",
+            state="Bihar",
+        )
+        db_session.add(pat)
+        db_session.flush()
+
+        plan = TreatmentPlan(
+            patient_id=pat.id,
+            doctor_id=doc_a_id,
+            plan_name="Matrix Plan",
+            condition_diagnosis="Low back pain",
+            total_sessions=10,
+            agreed_price_paise=500000,
+        )
+        db_session.add(plan)
+        db_session.flush()
+
+        admin_u = make_user(db_session, test_settings, "ADMIN", f"adm_{uuid.uuid4().hex[:6]}")
+        sess = TreatmentSession(
+            treatment_plan_id=plan.id,
+            patient_id=pat.id,
+            doctor_id=doc_a_id,
+            session_number=1,
+            vas_score=7,
+            clinical_notes="Matrix session notes",
+            is_finalised=True,
+            created_by_user_id=admin_u.id,
+        )
+        db_session.add(sess)
+        db_session.flush()
+        target_entity = sess
+        if "{id}" in row.path:
+            resolved_path = row.path.replace("{id}", str(sess.id))
 
     elif "/api/encounters" in row.path:
         # Encounters are owned by doctor_a to test cross-doctor silo (doctor_b receives 404)

@@ -111,3 +111,4 @@ export function SessionAddendumModal({ session, onClose, onSuccess }: SessionAdd
     </div>
   )
 }
+

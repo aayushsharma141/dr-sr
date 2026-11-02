@@ -38,9 +38,10 @@ def test_parallel_session_allocation_no_duplicates_or_gaps(
 
         user_id = conn.execute(
             text(
-                "INSERT INTO users "
-                "(username, full_name, role, doctor_id, password_hash, is_active) "
-                "VALUES ('doc_thread', 'Doc Thread', 'DOCTOR', :did, 'argon2id$fake', true) "
+                "INSERT INTO users (username, full_name, role, doctor_id, "
+                "password_hash, is_active) "
+                "VALUES ('doc_thread', 'Doc Thread', 'DOCTOR', :did, "
+                "'argon2id$fake', true) "
                 "RETURNING id"
             ),
             {"did": doc_id},

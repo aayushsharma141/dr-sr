@@ -255,7 +255,6 @@ def create_session_addendum(
     )
     session.add(addendum)
     session.flush()
-    session.refresh(addendum)
 
     ctx = build_audit_context(request, principal)
     audit_service.record(

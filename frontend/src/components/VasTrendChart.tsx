@@ -113,3 +113,4 @@ export function VasTrendChart({ sessions }: VasTrendChartProps) {
     </div>
   )
 }
+
