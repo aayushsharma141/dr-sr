@@ -405,4 +405,181 @@ describe('AppointmentsReception Component', () => {
     expect(screen.queryByRole('button', { name: /book new appointment/i })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /mark arrived/i })).not.toBeInTheDocument()
   })
+
+
+  it('shows date-based scheduled visits without token numbers in their own workspace', async () => {
+    const scheduledAppointment: Appointment = {
+      ...mockAppointments[0],
+      id: 88,
+      appointment_date: '2099-01-02',
+      booking_mode: 'SCHEDULED',
+      visit_type: 'PHYSIOTHERAPY_SESSION',
+      token_number: null,
+      notes: 'Reception reminder',
+    }
+    const mockFetch = vi.fn().mockImplementation((url: string) => {
+      if (url.includes('/api/auth/me')) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          headers: new Headers({ 'content-type': 'application/json' }),
+          text: () => Promise.resolve(JSON.stringify(mockMe)),
+        })
+      }
+      if (url.includes('/api/doctors')) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          headers: new Headers({ 'content-type': 'application/json' }),
+          text: () => Promise.resolve(JSON.stringify(mockDoctors)),
+        })
+      }
+      if (url.includes('/api/appointments')) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          headers: new Headers({ 'content-type': 'application/json' }),
+          text: () => Promise.resolve(JSON.stringify({ total: 1, appointments: [scheduledAppointment] })),
+        })
+      }
+      return Promise.reject(new Error(`Unhandled: ${url}`))
+    })
+    vi.stubGlobal('fetch', mockFetch)
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter initialEntries={['/reception/appointments?tab=scheduled']}>
+          <AppointmentsReception />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    )
+
+    await waitFor(() => {
+      expect(screen.getByText('Upcoming scheduled visits')).toBeInTheDocument()
+      expect(screen.getByText('Aarav Kumar')).toBeInTheDocument()
+    })
+
+    expect(screen.getByRole('tab', { name: 'Scheduled Visits' })).toHaveAttribute('aria-selected', 'true')
+    expect(screen.getByText('Physiotherapy visit')).toBeInTheDocument()
+    expect(screen.getByText('At check-in')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /mark arrived/i })).not.toBeInTheDocument()
+    expect(mockFetch.mock.calls.some(([url]) =>
+      typeof url === 'string' && url.includes('booking_mode=SCHEDULED') && url.includes('has_token=false'),
+    )).toBe(true)
+  })
+
+  it('searches only after two characters and submits a scheduled visit without a token', async () => {
+    let createdBody: Record<string, unknown> | null = null
+    const activePatient = {
+      id: 101,
+      urn: 'KH-2026-0001',
+      full_name: 'Aarav Kumar',
+      guardian_name: 'Suresh Kumar',
+      gender: 'M',
+      dob: null,
+      age_years: 30,
+      mobile: '9876543210',
+      address: 'Ara',
+      district: 'Bhojpur',
+      state: 'Bihar',
+      emergency_contact: null,
+      allergies: 'None reported',
+      notes: null,
+      photo_path: null,
+      is_active: true,
+      version_id: 1,
+      created_at: '2026-01-01T10:00:00Z',
+      updated_at: '2026-01-01T10:00:00Z',
+    }
+    const createdAppointment: Appointment = {
+      ...mockAppointments[0],
+      id: 88,
+      booking_mode: 'SCHEDULED',
+      visit_type: 'NEW_CONSULTATION',
+      appointment_date: '2099-01-02',
+      token_number: null,
+    }
+
+    const mockFetch = vi.fn().mockImplementation((url: string, init?: RequestInit) => {
+      if (url.includes('/api/auth/me')) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          headers: new Headers({ 'content-type': 'application/json' }),
+          text: () => Promise.resolve(JSON.stringify(mockMe)),
+        })
+      }
+      if (url.includes('/api/doctors')) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          headers: new Headers({ 'content-type': 'application/json' }),
+          text: () => Promise.resolve(JSON.stringify(mockDoctors)),
+        })
+      }
+      if (url.includes('/api/patients?')) {
+        expect(url).toContain('active_only=true')
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          headers: new Headers({ 'content-type': 'application/json' }),
+          text: () => Promise.resolve(JSON.stringify([activePatient])),
+        })
+      }
+      if (url.includes('/api/appointments') && init?.method === 'POST') {
+        createdBody = JSON.parse(init.body as string) as Record<string, unknown>
+        return Promise.resolve({
+          ok: true,
+          status: 201,
+          headers: new Headers({ 'content-type': 'application/json' }),
+          text: () => Promise.resolve(JSON.stringify(createdAppointment)),
+        })
+      }
+      if (url.includes('/api/appointments')) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          headers: new Headers({ 'content-type': 'application/json' }),
+          text: () => Promise.resolve(JSON.stringify({ total: 0, appointments: [] })),
+        })
+      }
+      return Promise.reject(new Error(`Unhandled: ${url}`))
+    })
+    vi.stubGlobal('fetch', mockFetch)
+
+    const user = userEvent.setup()
+    render(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter>
+          <AppointmentsReception />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    )
+
+    await user.click(await screen.findByRole('button', { name: 'Schedule Future Visit' }))
+    const patientSearch = screen.getByRole('searchbox', { name: 'Search active patients' })
+    expect(mockFetch.mock.calls.some(([url]) => typeof url === 'string' && url.includes('/api/patients?'))).toBe(false)
+
+    await user.type(patientSearch, 'Aarav')
+    const patientOption = await screen.findByRole('option', { name: /Aarav Kumar/ })
+    await user.click(patientOption)
+
+    await user.selectOptions(screen.getByLabelText('4. Consulting doctor'), '1')
+    expect(screen.getByText('Date-based booking · no fixed time')).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Confirm scheduled visit' }))
+
+    await waitFor(() => {
+      expect(createdBody).not.toBeNull()
+    })
+    expect(createdBody).toMatchObject({
+      patient_id: 101,
+      doctor_id: 1,
+      booking_mode: 'SCHEDULED',
+      visit_type: 'NEW_CONSULTATION',
+    })
+    expect(typeof createdBody?.appointment_date).toBe('string')
+    expect(screen.getByText('No token allocated yet')).toBeInTheDocument()
+  })
+
 })
