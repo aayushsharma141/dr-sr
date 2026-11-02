@@ -427,6 +427,14 @@ class Appointment(Base):
         ),
         Index("ix_appointments_doctor_date_status", "doctor_id", "appointment_date", "status"),
         Index("ix_appointments_patient_date", "patient_id", "appointment_date"),
+        CheckConstraint(
+            "booking_mode IN ('WALK_IN', 'SCHEDULED')",
+            name="ck_appointments_booking_mode",
+        ),
+        CheckConstraint(
+            "visit_type IN ('NEW_CONSULTATION', 'FOLLOW_UP', 'PHYSIOTHERAPY_SESSION')",
+            name="ck_appointments_visit_type",
+        ),
         Index(
             "ix_appointments_patient_doctor_date_type_status",
             "patient_id",
