@@ -4,7 +4,7 @@ from datetime import date, datetime
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from kalyan_api.models import AppointmentStatus
+from kalyan_api.models import AppointmentBookingMode, AppointmentStatus, AppointmentVisitType
 
 
 class AppointmentCreate(BaseModel):
@@ -12,8 +12,20 @@ class AppointmentCreate(BaseModel):
 
     patient_id: int = Field(..., gt=0, description="Target patient ID")
     doctor_id: int = Field(..., gt=0, description="Target doctor ID")
-    appointment_date: date = Field(..., description="Scheduled appointment date")
-    notes: str | None = Field(default=None, max_length=1000, description="Reception notes")
+    appointment_date: date = Field(..., description="Clinic-local booking date")
+    # Default SCHEDULED preserves old API clients that submit a future date without a mode.
+    booking_mode: AppointmentBookingMode = Field(
+        default=AppointmentBookingMode.SCHEDULED,
+        description="WALK_IN allocates a same-day token; SCHEDULED reserves a future queue date",
+    )
+    visit_type: AppointmentVisitType = Field(
+        default=AppointmentVisitType.NEW_CONSULTATION,
+        description="Operational visit category",
+    )
+    treatment_plan_id: int | None = Field(
+        default=None, gt=0, description="Optional plan link, supplied by an authorized doctor"
+    )
+    notes: str | None = Field(default=None, max_length=1000, description="Reception remarks")
 
 
 class AppointmentStatusUpdate(BaseModel):
@@ -40,6 +52,9 @@ class AppointmentRead(BaseModel):
     doctor_name_en: str
     doctor_name_hi: str | None = None
     appointment_date: date
+    booking_mode: AppointmentBookingMode
+    visit_type: AppointmentVisitType
+    treatment_plan_id: int | None = None
     token_number: int
     status: str
     status_updated_at: datetime
@@ -69,6 +84,8 @@ class DoctorQueueItem(BaseModel):
     patient_mobile: str
     patient_allergies: str
     token_number: int
+    booking_mode: AppointmentBookingMode
+    visit_type: AppointmentVisitType
     status: str
     status_updated_at: datetime
     notes: str | None = None
