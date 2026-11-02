@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { cleanup, render, screen, waitFor } from '@testing-library/react'
+import { cleanup, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -411,7 +411,10 @@ describe('AppointmentsReception Component', () => {
     const scheduledDate = (() => {
       const date = new Date()
       date.setDate(date.getDate() + 3)
-      return date.toLocaleDateString('en-CA')
+      const year = date.getFullYear()
+      const month = String(date.getMonth() + 1).padStart(2, '0')
+      const day = String(date.getDate()).padStart(2, '0')
+      return `${year}-${month}-${day}`
     })()
     const scheduledAppointment: Appointment = {
       ...mockAppointments[0],
