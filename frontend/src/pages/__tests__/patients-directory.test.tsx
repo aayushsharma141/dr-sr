@@ -292,7 +292,43 @@ describe('Patients Directory and Profile Screens', () => {
     expect(screen.queryByText('Record was modified by another user')).not.toBeInTheDocument()
   })
 
-  it('renders patient detail view with demographics and medical alerts', async () => {
+  it('renders patient record tabs and filters the role-scoped visit, therapy and billing timeline', async () => {
+    const timeline = [
+      {
+        id: 'APPOINTMENT-10',
+        event_type: 'APPOINTMENT',
+        event_date: '2026-11-01T10:00:00Z',
+        title: 'Token #1: Appointment with Dr. Madan Mohan Dwivedi',
+        subtitle: 'Status: BOOKED',
+        summary: 'Knee rehabilitation',
+        badge: 'BOOKED',
+        badge_variant: 'outline',
+        metadata: { appointment_id: 10 },
+      },
+      {
+        id: 'TREATMENT_PLAN-20',
+        event_type: 'TREATMENT_PLAN',
+        event_date: '2026-11-01T11:00:00Z',
+        title: 'Package: Knee Rehabilitation',
+        subtitle: 'Dr. Madan Mohan Dwivedi · ₹4,000.00',
+        summary: 'Diagnosis: Knee pain | Sessions: 1/8',
+        badge: 'ACTIVE',
+        badge_variant: 'default',
+        metadata: { treatment_plan_id: 20 },
+      },
+      {
+        id: 'PAYMENT-30',
+        event_type: 'PAYMENT',
+        event_date: '2026-11-01T12:00:00Z',
+        title: 'Payment Received: ₹500.00',
+        subtitle: 'Receipt: KH-RCPT-0030 · Method: CASH',
+        summary: 'Collected by @reception',
+        badge: 'PAID',
+        badge_variant: 'default',
+        metadata: { payment_id: 30 },
+      },
+    ]
+
     const mockFetch = vi.fn().mockImplementation((url: string) => {
       if (url.includes('/api/auth/me')) {
         return Promise.resolve({
@@ -300,6 +336,14 @@ describe('Patients Directory and Profile Screens', () => {
           status: 200,
           headers: new Headers({ 'content-type': 'application/json' }),
           text: () => Promise.resolve(JSON.stringify(mockMe)),
+        })
+      }
+      if (url.includes('/api/patients/101/timeline')) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          headers: new Headers({ 'content-type': 'application/json' }),
+          text: () => Promise.resolve(JSON.stringify(timeline)),
         })
       }
       if (url.includes('/api/patients/101')) {
@@ -314,6 +358,7 @@ describe('Patients Directory and Profile Screens', () => {
     })
     vi.stubGlobal('fetch', mockFetch)
 
+    const user = userEvent.setup()
     render(
       <QueryClientProvider client={queryClient}>
         <MemoryRouter initialEntries={['/reception/patients/101']}>
@@ -334,5 +379,26 @@ describe('Patients Directory and Profile Screens', () => {
     expect(screen.getByText('30 Years')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /edit demographics/i })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: /print card/i })).toBeInTheDocument()
+
+    expect(screen.getByRole('tab', { name: 'Demographic Profile' })).toHaveAttribute('aria-selected', 'true')
+    expect(screen.queryByRole('tab', { name: 'Clinical Records' })).not.toBeInTheDocument()
+
+    await user.click(screen.getByRole('tab', { name: 'Visits & Appointments' }))
+    await waitFor(() => {
+      expect(screen.getByText('Appointment & visit history')).toBeInTheDocument()
+      expect(screen.getByText(/Token #1: Appointment/)).toBeInTheDocument()
+    })
+
+    await user.click(screen.getByRole('tab', { name: 'Physiotherapy' }))
+    await waitFor(() => {
+      expect(screen.getByText('Package: Knee Rehabilitation')).toBeInTheDocument()
+    })
+    expect(screen.queryByText(/Payment Received/)).not.toBeInTheDocument()
+
+    await user.click(screen.getByRole('tab', { name: 'Financial Ledger' }))
+    await waitFor(() => {
+      expect(screen.getByText('Payment Received: ₹500.00')).toBeInTheDocument()
+    })
+    expect(screen.queryByText(/Package: Knee Rehabilitation/)).not.toBeInTheDocument()
   })
 })
