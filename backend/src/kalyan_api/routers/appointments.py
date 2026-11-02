@@ -16,7 +16,14 @@ from kalyan_api.core.principal import (
     get_current_settings,
 )
 from kalyan_api.db.session import SessionDep
-from kalyan_api.models import Appointment, AppointmentStatus, Doctor, Patient
+from kalyan_api.models import (
+    Appointment,
+    AppointmentBookingMode,
+    AppointmentStatus,
+    AppointmentVisitType,
+    Doctor,
+    Patient,
+)
 from kalyan_api.schemas.appointments import (
     AppointmentCreate,
     AppointmentListResponse,
@@ -45,6 +52,8 @@ def _to_read_schema(appt: Appointment) -> AppointmentRead:
         doctor_name_en=appt.doctor.name_en,
         doctor_name_hi=appt.doctor.name_hi,
         appointment_date=appt.appointment_date,
+        booking_mode=appt.booking_mode,
+        visit_type=appt.visit_type,
         token_number=appt.token_number,
         status=appt.status,
         status_updated_at=appt.status_updated_at,
@@ -69,17 +78,21 @@ def book_appointment(
     principal: Principal = Depends(current_principal),
     settings=Depends(get_current_settings),
 ) -> AppointmentRead:
-    """Book a per-doctor daily appointment with atomic token generation (APT-01)."""
-    # 1. Validate active patient exists
-    patient = session.get(Patient, payload.patient_id)
-    if not patient or not patient.is_active:
+    """Create a walk-in token or a date-based scheduled visit (APT-01)."""
+    # Lock the active patient row. Concurrent booking requests for the same patient
+    # serialize here so the duplicate check below cannot race.
+    patient = session.scalar(
+        select(Patient)
+        .where(Patient.id == payload.patient_id, Patient.is_active.is_(True))
+        .with_for_update()
+    )
+    if not patient:
         raise ApiError(
             status_code=404,
             code="patient_not_found",
             message="Patient not found or inactive.",
         )
 
-    # 2. Validate active doctor exists
     doctor = session.get(Doctor, payload.doctor_id)
     if not doctor or not doctor.is_active:
         raise ApiError(
@@ -88,16 +101,63 @@ def book_appointment(
             message="Doctor not found or inactive.",
         )
 
-    # 3. Generate sequential token for (doctor_id, appointment_date)
-    token_num = token_service.generate_next_daily_token(
-        session, payload.doctor_id, payload.appointment_date
+    clinic_today = clock.ist_today()
+    if payload.appointment_date < clinic_today:
+        raise ApiError(
+            status_code=422,
+            code="appointment_date_in_past",
+            message="Appointments cannot be created for a past clinic date.",
+        )
+    if (
+        payload.booking_mode == AppointmentBookingMode.WALK_IN
+        and payload.appointment_date != clinic_today
+    ):
+        raise ApiError(
+            status_code=422,
+            code="walk_in_must_be_today",
+            message="Walk-in tokens can only be allocated for today's clinic queue.",
+        )
+
+    duplicate_id = session.scalar(
+        select(Appointment.id)
+        .where(
+            Appointment.patient_id == payload.patient_id,
+            Appointment.doctor_id == payload.doctor_id,
+            Appointment.appointment_date == payload.appointment_date,
+            Appointment.status.not_in(
+                [AppointmentStatus.CANCELLED.value, AppointmentStatus.NO_SHOW.value,
+                 AppointmentStatus.DONE.value]
+            ),
+        )
+        .limit(1)
+    )
+    if duplicate_id is not None:
+        raise ApiError(
+            status_code=409,
+            code="appointment_already_exists",
+            message=(
+                "This patient already has an active booking with this doctor on that date. "
+                "Open the existing booking instead of creating a duplicate."
+            ),
+            details={"appointment_id": duplicate_id},
+        )
+
+    # Walk-ins retain the existing atomic token behavior. Scheduled visits are
+    # intentionally tokenless until reception checks the patient in on the booked date.
+    token_num = (
+        token_service.generate_next_daily_token(
+            session, payload.doctor_id, payload.appointment_date
+        )
+        if payload.booking_mode == AppointmentBookingMode.WALK_IN
+        else None
     )
 
-    # 4. Create appointment
     appt = Appointment(
         patient_id=payload.patient_id,
         doctor_id=payload.doctor_id,
         appointment_date=payload.appointment_date,
+        booking_mode=payload.booking_mode.value,
+        visit_type=payload.visit_type.value,
         token_number=token_num,
         status=AppointmentStatus.BOOKED.value,
         notes=payload.notes,
@@ -106,7 +166,6 @@ def book_appointment(
     session.add(appt)
     session.flush()
 
-    # 5. Audit creation
     ctx = build_audit_context(request, principal)
     audit_service.record(
         session,
@@ -119,13 +178,14 @@ def book_appointment(
             "patient_urn": patient.urn,
             "doctor_id": appt.doctor_id,
             "appointment_date": appt.appointment_date.isoformat(),
+            "booking_mode": appt.booking_mode,
+            "visit_type": appt.visit_type,
             "token_number": appt.token_number,
             "status": appt.status,
         },
     )
 
     return _to_read_schema(appt)
-
 
 @router.get(
     "",
@@ -134,13 +194,23 @@ def book_appointment(
 )
 def list_appointments(
     session: SessionDep,
-    appointment_date: date | None = Query(None, description="Filter by appointment date"),
+    appointment_date: date | None = Query(None, description="Filter by exact clinic date"),
+    date_from: date | None = Query(None, description="Include appointments on or after this date"),
+    date_to: date | None = Query(None, description="Include appointments on or before this date"),
     doctor_id: int | None = Query(None, description="Filter by doctor ID"),
     patient_id: int | None = Query(None, description="Filter by patient ID"),
     status: AppointmentStatus | None = Query(None, description="Filter by status"),
+    booking_mode: AppointmentBookingMode | None = Query(None, description="WALK_IN or SCHEDULED"),
+    has_token: bool | None = Query(None, description="Filter token-allocated or tokenless bookings"),
     principal: Principal = Depends(current_principal),
 ) -> AppointmentListResponse:
-    """List appointments filtered by date, doctor, patient or status (APT-02)."""
+    """List appointments using exact-date, date-range, mode and queue filters."""
+    if date_from is not None and date_to is not None and date_from > date_to:
+        raise ApiError(
+            status_code=422,
+            code="invalid_date_range",
+            message="The appointment start date must be on or before the end date.",
+        )
     stmt = select(Appointment)
 
     # Scoping: if logged-in user is DOCTOR and hasn't explicitly filtered, scope to their doctor_id
@@ -163,8 +233,22 @@ def list_appointments(
         stmt = stmt.where(Appointment.patient_id == patient_id)
     if status is not None:
         stmt = stmt.where(Appointment.status == status.value)
+    if date_from is not None:
+        stmt = stmt.where(Appointment.appointment_date >= date_from)
+    if date_to is not None:
+        stmt = stmt.where(Appointment.appointment_date <= date_to)
+    if booking_mode is not None:
+        stmt = stmt.where(Appointment.booking_mode == booking_mode.value)
+    if has_token is True:
+        stmt = stmt.where(Appointment.token_number.is_not(None))
+    elif has_token is False:
+        stmt = stmt.where(Appointment.token_number.is_(None))
 
-    stmt = stmt.order_by(Appointment.appointment_date.desc(), Appointment.token_number.asc())
+    stmt = stmt.order_by(
+        Appointment.appointment_date.asc(),
+        Appointment.token_number.asc().nulls_last(),
+        Appointment.id.asc(),
+    )
     results = session.execute(stmt).scalars().all()
 
     return AppointmentListResponse(
@@ -244,6 +328,28 @@ def update_appointment_status(
     validate_status_transition(appt, payload.status, principal, payload.cancellation_reason)
 
     old_status = appt.status
+    old_token_number = appt.token_number
+
+    if (
+        payload.status == AppointmentStatus.ARRIVED
+        and appt.booking_mode == AppointmentBookingMode.SCHEDULED.value
+        and appt.token_number is None
+    ):
+        clinic_today = clock.ist_today()
+        if appt.appointment_date != clinic_today:
+            raise ApiError(
+                status_code=409,
+                code="scheduled_visit_not_due",
+                message=(
+                    "This scheduled visit can receive a queue token only on its booked clinic date. "
+                    "Use the scheduled visit workflow if the patient needs a different date."
+                ),
+                details={"appointment_date": appt.appointment_date.isoformat()},
+            )
+        appt.token_number = token_service.generate_next_daily_token(
+            session, appt.doctor_id, clinic_today
+        )
+
     appt.status = payload.status.value
     appt.status_updated_at = clock.utcnow()
     if payload.cancellation_reason is not None:
@@ -258,8 +364,16 @@ def update_appointment_status(
         action=AuditAction.APPOINTMENT_STATUS_UPDATED,
         entity_type="appointment",
         entity_id=appt.id,
-        before={"status": old_status, "version_id": payload.version_id},
-        after={"status": appt.status, "version_id": appt.version_id},
+        before={
+            "status": old_status,
+            "version_id": payload.version_id,
+            "token_number": old_token_number,
+        },
+        after={
+            "status": appt.status,
+            "version_id": appt.version_id,
+            "token_number": appt.token_number,
+        },
         reason=payload.cancellation_reason,
     )
 
