@@ -471,7 +471,7 @@ class Appointment(Base):
         ForeignKey("treatment_plans.id", ondelete="RESTRICT"),
         nullable=True,
     )
-    token_number: Mapped[int] = mapped_column(Integer, nullable=False)
+    token_number: Mapped[int | None] = mapped_column(Integer, nullable=True)
     status: Mapped[str] = mapped_column(
         String(32),
         default=AppointmentStatus.BOOKED.value,
