@@ -4110,6 +4110,7 @@
       "AppointmentVisitType": {
         "description": "Operational visit category; not a clinical diagnosis.",
         "enum": [
+          "UNSPECIFIED",
           "NEW_CONSULTATION",
           "FOLLOW_UP",
           "PHYSIOTHERAPY_SESSION"
