@@ -16,9 +16,16 @@ import type { Appointment, AppointmentStatus, DoctorOut } from '../api/types'
 type FollowUpWindow = 'all' | 'today' | 'week' | 'overdue'
 
 function localDateValue(date: Date) {
-  const year = date.getFullYear()
-  const month = String(date.getMonth() + 1).padStart(2, '0')
-  const day = String(date.getDate()).padStart(2, '0')
+  const parts = new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'Asia/Kolkata',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(date)
+  const year = parts.find((part) => part.type === 'year')?.value
+  const month = parts.find((part) => part.type === 'month')?.value
+  const day = parts.find((part) => part.type === 'day')?.value
+  if (!year || !month || !day) throw new Error('Unable to determine clinic-local date')
   return `${year}-${month}-${day}`
 }
 
@@ -176,18 +183,337 @@ function FollowUpVisits() {
   )
 }
 
+
+function addCalendarDays(value: string, days: number) {
+  const [year, month, day] = value.split('-').map(Number)
+  if (!year || !month || !day) throw new Error(`Invalid clinic date: ${value}`)
+  const date = new Date(Date.UTC(year, month - 1, day + days))
+  return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, '0')}-${String(date.getUTCDate()).padStart(2, '0')}`
+}
+
+function visitTypeLabel(value: Appointment['visit_type']) {
+  switch (value) {
+    case 'UNSPECIFIED':
+      return 'Legacy visit'
+    case 'FOLLOW_UP':
+      return 'Follow-up review'
+    case 'PHYSIOTHERAPY_SESSION':
+      return 'Physiotherapy session'
+    default:
+      return 'New consultation'
+  }
+}
+
+function ScheduledVisits({
+  startDate,
+  doctorId,
+  canManage,
+  onCancel,
+  onNoShow,
+  conflictError,
+  onClearConflict,
+  onBook,
+  onStartDateChange,
+}: {
+  startDate: string
+  doctorId?: number
+  canManage: boolean
+  onCancel: (appointment: Appointment) => void
+  onNoShow: (appointment: Appointment) => void
+  conflictError: string | null
+  onClearConflict: () => void
+  onBook: () => void
+  onStartDateChange: (date: string) => void
+}) {
+  const start = startDate < localDateValue(new Date()) ? localDateValue(new Date()) : startDate
+  const end = addCalendarDays(start, 13)
+  const {
+    data,
+    isPending,
+    isError,
+    error,
+    refetch,
+  } = useAppointments({
+    date_from: start,
+    date_to: end,
+    booking_mode: 'SCHEDULED',
+    doctor_id: doctorId,
+  })
+  const overdueQuery = useAppointments({
+    date_to: addCalendarDays(localDateValue(new Date()), -1),
+    booking_mode: 'SCHEDULED',
+    status: 'BOOKED',
+    doctor_id: doctorId,
+  })
+  const overdueAppointments = overdueQuery.data?.appointments ?? []
+  const appointments = [...(data?.appointments ?? [])].sort(
+    (left, right) =>
+      left.appointment_date.localeCompare(right.appointment_date) ||
+      (left.token_number ?? Number.MAX_SAFE_INTEGER) -
+        (right.token_number ?? Number.MAX_SAFE_INTEGER),
+  )
+
+  return (
+    <section className="space-y-5" aria-labelledby="scheduled-visits-heading">
+      <div className="flex flex-col gap-3 rounded-xl border border-slate-200 bg-white p-5 shadow-xs sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h2 id="scheduled-visits-heading" className="text-lg font-bold text-slate-900">
+            Scheduled visits
+          </h2>
+          <p className="mt-1 max-w-2xl text-sm text-slate-600">
+            Future date reservations for the next 14 days. A queue token is assigned at check-in on the booked date; this is a date reservation, not an exact consultation time.
+          </p>
+          <p className="mt-2 text-xs font-semibold text-slate-500">{start} — {end}</p>
+        </div>
+        <div className="flex flex-wrap items-end gap-2">
+          <div className="space-y-1">
+            <label htmlFor="scheduled-start-date" className="block text-[11px] font-semibold text-slate-600">
+              Starting date
+            </label>
+            <input
+              id="scheduled-start-date"
+              type="date"
+              min={localDateValue(new Date())}
+              value={start}
+              onChange={(event) => onStartDateChange(event.target.value)}
+              className="min-h-11 rounded-lg border border-slate-300 px-3 text-sm focus:border-[#8E1C3D] focus:outline-none focus:ring-2 focus:ring-rose-100"
+            />
+          </div>
+          <button
+            type="button"
+            onClick={() => refetch()}
+            className="min-h-11 rounded-lg border border-slate-300 px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#8E1C3D]"
+          >
+            Refresh
+          </button>
+          {canManage && (
+            <button
+              type="button"
+              onClick={onBook}
+              className="min-h-11 rounded-lg bg-[#5D0B26] px-4 text-sm font-semibold text-white hover:bg-[#4A081E] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#8E1C3D]"
+            >
+              Book future visit
+            </button>
+          )}
+        </div>
+      </div>
+
+      {conflictError && (
+        <div role="alert" className="rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-900">
+          {conflictError}
+          <button
+            type="button"
+            className="ml-2 font-semibold underline"
+            onClick={() => {
+              onClearConflict()
+              refetch()
+              overdueQuery.refetch()
+            }}
+          >
+            Reload appointments
+          </button>
+        </div>
+      )}
+      {overdueQuery.isError && (
+        <div role="alert" className="rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-900">
+          Unable to load missed scheduled visits: {overdueQuery.error.message}
+        </div>
+      )}
+      {overdueAppointments.length > 0 && (
+        <section className="overflow-hidden rounded-xl border border-amber-300 bg-amber-50/60" aria-labelledby="missed-scheduled-heading">
+          <div className="border-b border-amber-200 px-4 py-3 sm:px-5">
+            <h3 id="missed-scheduled-heading" className="text-sm font-bold text-amber-950">
+              Missed check-in · {overdueAppointments.length} visit(s)
+            </h3>
+            <p className="mt-1 text-xs text-amber-900">
+              These booked dates have passed without check-in. Mark a visit as No-show or cancel it; it will not receive a queue token.
+            </p>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[760px] text-left text-sm">
+              <thead className="bg-amber-100/70 text-[11px] font-bold uppercase tracking-wide text-amber-950">
+                <tr>
+                  <th scope="col" className="px-4 py-3">Booked date</th>
+                  <th scope="col" className="px-4 py-3">Patient</th>
+                  <th scope="col" className="px-4 py-3">Doctor</th>
+                  <th scope="col" className="px-4 py-3">Visit</th>
+                  <th scope="col" className="px-4 py-3 text-right">Action</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-amber-100">
+                {overdueAppointments.map((appointment) => (
+                  <tr key={appointment.id}>
+                    <td className="whitespace-nowrap px-4 py-3 font-semibold text-amber-950">{appointment.appointment_date}</td>
+                    <td className="px-4 py-3">
+                      <Link to={`/reception/patients/${appointment.patient_id}`} className="font-semibold text-[#5D0B26] hover:underline">
+                        {appointment.patient_name}
+                      </Link>
+                      <span className="mt-0.5 block font-mono text-xs text-slate-500">{appointment.patient_urn}</span>
+                    </td>
+                    <td className="px-4 py-3 text-slate-700">{appointment.doctor_name_en}</td>
+                    <td className="px-4 py-3 text-slate-700">{visitTypeLabel(appointment.visit_type)}</td>
+                    <td className="px-4 py-3 text-right">
+                      {canManage && (
+                        <div className="flex justify-end gap-2">
+                          <button
+                            type="button"
+                            onClick={() => onNoShow(appointment)}
+                            className="min-h-9 rounded-lg border border-amber-400 px-3 text-xs font-semibold text-amber-950 hover:bg-amber-100"
+                          >
+                            Mark No-show
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => onCancel(appointment)}
+                            className="min-h-9 rounded-lg border border-slate-300 px-3 text-xs font-semibold text-slate-700 hover:bg-white"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      )}
+      {isPending ? (
+        <div className="rounded-xl border border-slate-200 bg-white p-12 text-center text-sm text-slate-500" role="status">
+          Loading scheduled visits…
+        </div>
+      ) : isError ? (
+        <div className="rounded-xl border border-rose-200 bg-rose-50 p-5 text-sm text-rose-900" role="alert">
+          Unable to load scheduled visits: {error.message}
+        </div>
+      ) : appointments.length === 0 ? (
+        <div className="rounded-xl border border-dashed border-slate-300 bg-white p-12 text-center">
+          <p className="font-semibold text-slate-800">No future visits in this date range</p>
+          <p className="mt-2 text-sm text-slate-500">Future bookings will appear here, separate from today’s token queue.</p>
+          {canManage && (
+            <button
+              type="button"
+              onClick={onBook}
+              className="mt-4 min-h-11 rounded-lg bg-[#5D0B26] px-4 text-sm font-semibold text-white hover:bg-[#4A081E]"
+            >
+              Schedule a visit
+            </button>
+          )}
+        </div>
+      ) : (
+        <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xs">
+          <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3 sm:px-5">
+            <h3 className="text-sm font-bold text-slate-900">Upcoming reservations</h3>
+            <span className="text-xs font-medium text-slate-500">{data?.total ?? appointments.length} visit(s)</span>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[900px] text-left text-sm">
+              <thead className="border-b border-slate-200 bg-slate-50 text-[11px] font-bold uppercase tracking-wide text-slate-600">
+                <tr>
+                  <th scope="col" className="px-4 py-3">Visit date</th>
+                  <th scope="col" className="px-4 py-3">Queue token</th>
+                  <th scope="col" className="px-4 py-3">Patient</th>
+                  <th scope="col" className="px-4 py-3">Doctor</th>
+                  <th scope="col" className="px-4 py-3">Visit category</th>
+                  <th scope="col" className="px-4 py-3">Status</th>
+                  <th scope="col" className="px-4 py-3 text-right">Action</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {appointments.map((appointment) => (
+                  <tr key={appointment.id} className="hover:bg-slate-50/80">
+                    <td className="whitespace-nowrap px-4 py-3 font-semibold text-slate-800">
+                      {new Date(`${appointment.appointment_date}T00:00:00`).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
+                    </td>
+                    <td className="px-4 py-3">
+                      {appointment.token_number == null ? (
+                        <span className="inline-flex rounded-md bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">
+                          Assigned at check-in
+                        </span>
+                      ) : (
+                        <span className="inline-flex rounded-md bg-blue-50 px-2.5 py-1 font-mono text-sm font-bold text-blue-900">
+                          #{appointment.token_number}
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3">
+                      <Link to={`/reception/patients/${appointment.patient_id}`} className="font-semibold text-[#5D0B26] hover:underline">
+                        {appointment.patient_name}
+                      </Link>
+                      <span className="mt-0.5 block font-mono text-xs text-slate-500">{appointment.patient_urn}</span>
+                    </td>
+                    <td className="px-4 py-3 text-slate-700">{appointment.doctor_name_en}</td>
+                    <td className="px-4 py-3 text-slate-700">{visitTypeLabel(appointment.visit_type)}</td>
+                    <td className="px-4 py-3">{getStatusBadgeForScheduled(appointment.status)}</td>
+                    <td className="px-4 py-3 text-right">
+                      {canManage && (appointment.status === 'BOOKED' || appointment.status === 'ARRIVED') ? (
+                        <button
+                          type="button"
+                          onClick={() => onCancel(appointment)}
+                          className="min-h-10 rounded-lg border border-slate-300 px-3 text-xs font-semibold text-slate-700 hover:border-rose-300 hover:text-rose-800"
+                        >
+                          Cancel
+                        </button>
+                      ) : (
+                        <span className="text-xs text-slate-500">—</span>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+    </section>
+  )
+}
+
+function getStatusBadgeForScheduled(status: AppointmentStatus) {
+  const styles: Record<AppointmentStatus, string> = {
+    BOOKED: 'bg-blue-50 text-blue-800 ring-blue-200',
+    ARRIVED: 'bg-amber-50 text-amber-800 ring-amber-200',
+    IN_CONSULTATION: 'bg-violet-50 text-violet-800 ring-violet-200',
+    DONE: 'bg-emerald-50 text-emerald-800 ring-emerald-200',
+    CANCELLED: 'bg-rose-50 text-rose-800 ring-rose-200',
+    NO_SHOW: 'bg-slate-100 text-slate-700 ring-slate-200',
+  }
+  const labels: Record<AppointmentStatus, string> = {
+    BOOKED: 'Booked',
+    ARRIVED: 'Arrived',
+    IN_CONSULTATION: 'In consultation',
+    DONE: 'Completed',
+    CANCELLED: 'Cancelled',
+    NO_SHOW: 'No-show',
+  }
+  return (
+    <span className={`inline-flex min-h-7 items-center rounded-full px-2.5 text-xs font-semibold ring-1 ring-inset ${styles[status]}`}>
+      {labels[status]}
+    </span>
+  )
+}
+
 export function AppointmentsReception() {
   const { data: me } = useMe()
+  const { data: doctors } = useDoctors(false)
   const [searchParams, setSearchParams] = useSearchParams()
   const requestedTab = searchParams.get('tab')
-  const activeTab = requestedTab === 'followup' && me?.permissions.includes('prescription:read') ? 'followup' : 'today'
   const canManageAppointments = me?.permissions.includes('appointment:write') === true
   const canViewFollowUps = me?.permissions.includes('prescription:read') === true
-  const selectTab = (tab: 'today' | 'followup') => setSearchParams({ tab })
-  const [selectedDate, setSelectedDate] = useState(
-    new Date().toISOString().split('T')[0],
-  )
+  const activeTab =
+    requestedTab === 'followup' && canViewFollowUps
+      ? 'followup'
+      : requestedTab === 'scheduled'
+        ? 'scheduled'
+        : 'today'
+  const selectTab = (tab: 'today' | 'scheduled' | 'followup') => setSearchParams({ tab })
+  const [selectedDate, setSelectedDate] = useState(() => localDateValue(new Date()))
   const [selectedDoctorId, setSelectedDoctorId] = useState<number | undefined>(undefined)
+  const doctorFilterId = me?.role === 'DOCTOR' ? (me.doctor_id ?? undefined) : selectedDoctorId
+  const visibleDoctors = (doctors ?? []).filter(
+    (doctor) => me?.role !== 'DOCTOR' || doctor.id === me.doctor_id,
+  )
   const [isBookingOpen, setIsBookingOpen] = useState(false)
   const [conflictError, setConflictError] = useState<string | null>(null)
 
@@ -195,7 +521,6 @@ export function AppointmentsReception() {
   const [cancellingAppt, setCancellingAppt] = useState<Appointment | null>(null)
   const [cancelReason, setCancelReason] = useState('')
 
-  const { data: doctors } = useDoctors(false)
   const {
     data: appointmentsData,
     isPending,
@@ -204,19 +529,17 @@ export function AppointmentsReception() {
     refetch,
   } = useAppointments({
     appointment_date: selectedDate,
-    doctor_id: selectedDoctorId,
+    doctor_id: doctorFilterId,
   })
 
   const updateStatusMutation = useUpdateAppointmentStatus()
 
   const handleDateShift = (days: number) => {
-    const d = new Date(selectedDate)
-    d.setDate(d.getDate() + days)
-    setSelectedDate(d.toISOString().split('T')[0])
+    setSelectedDate(addCalendarDays(selectedDate, days))
   }
 
   const handleSetToday = () => {
-    setSelectedDate(new Date().toISOString().split('T')[0])
+    setSelectedDate(localDateValue(new Date()))
   }
 
   const handleUpdateStatus = async (
@@ -286,6 +609,17 @@ export function AppointmentsReception() {
             className={`min-h-11 rounded-lg border-b-2 px-4 text-sm font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#8E1C3D] ${activeTab === 'today' ? 'border-[#C39A35] bg-white text-[#5D0B26]' : 'border-transparent text-slate-600 hover:bg-white hover:text-[#5D0B26]'}`}
           >
             Today's Token Queue
+          </button>
+          <button
+            type="button"
+            role="tab"
+            id="appointments-tab-scheduled"
+            aria-controls="appointments-panel-scheduled"
+            aria-selected={activeTab === 'scheduled'}
+            onClick={() => selectTab('scheduled')}
+            className={`min-h-11 rounded-lg border-b-2 px-4 text-sm font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#8E1C3D] ${activeTab === 'scheduled' ? 'border-[#C39A35] bg-white text-[#5D0B26]' : 'border-transparent text-slate-600 hover:bg-white hover:text-[#5D0B26]'}`}
+          >
+            Scheduled Visits
           </button>
           {canViewFollowUps && (
             <button
@@ -384,12 +718,13 @@ export function AppointmentsReception() {
               </label>
               <select
                 id="doctor-filter"
-                value={selectedDoctorId ?? ''}
+                value={doctorFilterId ?? ''}
+                disabled={me?.role === 'DOCTOR'}
                 onChange={(e) => setSelectedDoctorId(e.target.value ? Number(e.target.value) : undefined)}
-                className="w-full p-2 border border-neutral-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-red-800"
+                className="w-full p-2 border border-neutral-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-red-800 disabled:bg-slate-50 disabled:text-slate-500"
               >
-                <option value="">All Consulting Doctors</option>
-                {doctors?.map((d: DoctorOut) => (
+                {me?.role !== 'DOCTOR' && <option value="">All Consulting Doctors</option>}
+                {visibleDoctors.map((d: DoctorOut) => (
                   <option key={d.id} value={d.id}>
                     {d.name_en}
                   </option>
@@ -455,6 +790,7 @@ export function AppointmentsReception() {
                     <th className="py-3 px-4">Token #</th>
                     <th className="py-3 px-4">Patient</th>
                     <th className="py-3 px-4">Doctor</th>
+                    <th className="py-3 px-4">Visit category</th>
                     <th className="py-3 px-4">Status</th>
                     <th className="py-3 px-4">Remarks</th>
                     <th className="py-3 px-4 text-right">Actions</th>
@@ -488,6 +824,12 @@ export function AppointmentsReception() {
                             {appt.doctor_name_hi}
                           </span>
                         )}
+                      </td>
+                      <td className="py-3 px-4">
+                        <span className="block text-xs font-semibold text-slate-800">{visitTypeLabel(appt.visit_type)}</span>
+                        <span className="mt-0.5 block text-[11px] text-slate-500">
+                          {appt.booking_mode === 'WALK_IN' ? 'Walk-in' : 'Scheduled'}
+                        </span>
                       </td>
                       <td className="py-3 px-4">
                         {getStatusBadge(appt.status)}
@@ -542,11 +884,51 @@ export function AppointmentsReception() {
           )}
         </div>
 
+
+          </div>
+        ) : activeTab === 'scheduled' ? (
+          <div id="appointments-panel-scheduled" role="tabpanel" aria-labelledby="appointments-tab-scheduled">
+            <ScheduledVisits
+              startDate={selectedDate}
+              doctorId={doctorFilterId}
+              canManage={canManageAppointments}
+              onCancel={(appointment) => setCancellingAppt(appointment)}
+              onNoShow={(appointment) => handleUpdateStatus(appointment, 'NO_SHOW')}
+              conflictError={!cancellingAppt ? conflictError : null}
+              onClearConflict={() => setConflictError(null)}
+              onStartDateChange={setSelectedDate}
+              onBook={() => {
+                const today = localDateValue(new Date())
+                setSelectedDate(selectedDate > today ? selectedDate : addCalendarDays(today, 1))
+                setIsBookingOpen(true)
+              }}
+            />
+          </div>
+        ) : (
+          canViewFollowUps ? (
+            <div id="appointments-panel-followup" role="tabpanel" aria-labelledby="appointments-tab-followup">
+              <FollowUpVisits />
+            </div>
+          ) : (
+            <div role="alert" className="rounded-xl border border-amber-200 bg-amber-50 p-5 text-sm text-amber-900">
+              Prescription follow-up information is available to the treating doctor only. Return to the token queue to continue.
+              <button type="button" onClick={() => selectTab('today')} className="ml-2 font-semibold underline">
+                Open today's queue
+              </button>
+            </div>
+          )
+        )}
         {/* Booking Modal */}
         <AppointmentBookingModal
           isOpen={isBookingOpen}
           onClose={() => setIsBookingOpen(false)}
-          onSuccess={() => refetch()}
+          initialDoctorId={doctorFilterId}
+          initialDate={activeTab === 'scheduled'
+            ? (selectedDate > localDateValue(new Date()) ? selectedDate : addCalendarDays(localDateValue(new Date()), 1))
+            : selectedDate}
+          onSuccess={() => {
+            refetch()
+          }}
         />
 
         {/* Cancellation Reason Dialog */}
@@ -555,8 +937,27 @@ export function AppointmentsReception() {
             <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6 space-y-4">
               <h3 className="text-lg font-bold text-neutral-900">Cancel Appointment</h3>
               <p className="text-xs text-neutral-600">
-                Provide a cancellation reason for Token #{cancellingAppt.token_number} ({cancellingAppt.patient_name}).
+                Provide a cancellation reason for{' '}
+                {cancellingAppt.token_number != null
+                  ? `Token #${cancellingAppt.token_number}`
+                  : `the scheduled visit on ${cancellingAppt.appointment_date}`}{' '}
+                ({cancellingAppt.patient_name}).
               </p>
+              {conflictError && (
+                <div role="alert" className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
+                  {conflictError}
+                  <button
+                    type="button"
+                    className="ml-2 font-semibold underline"
+                    onClick={() => {
+                      setConflictError(null)
+                      refetch()
+                    }}
+                  >
+                    Reload appointments
+                  </button>
+                </div>
+              )}
               <textarea
                 value={cancelReason}
                 onChange={(e) => setCancelReason(e.target.value)}
@@ -587,21 +988,6 @@ export function AppointmentsReception() {
               </div>
             </div>
           </div>
-        )}
-          </div>
-        ) : (
-          canViewFollowUps ? (
-            <div id="appointments-panel-followup" role="tabpanel" aria-labelledby="appointments-tab-followup">
-              <FollowUpVisits />
-            </div>
-          ) : (
-            <div role="alert" className="rounded-xl border border-amber-200 bg-amber-50 p-5 text-sm text-amber-900">
-              Prescription follow-up information is available to the treating doctor only. Return to the token queue to continue.
-              <button type="button" onClick={() => selectTab('today')} className="ml-2 font-semibold underline">
-                Open today's queue
-              </button>
-            </div>
-          )
         )}
       </div>
     </AppShell>

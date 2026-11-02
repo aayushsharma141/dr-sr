@@ -1,5 +1,7 @@
 """Unit and integration tests for appointment status workflow and doctor queue (APT-02)."""
 
+from datetime import UTC, datetime
+
 from kalyan_api import clock
 from kalyan_api.models import Appointment, AppointmentStatus, Patient
 
@@ -21,7 +23,7 @@ def test_appointment_status_lifecycle(login_client, reception_user, doctor_a_use
 
     doctor_id = doctor_a_user.doctor_id
     assert doctor_id is not None
-    today = clock.utcnow().date()
+    today = clock.ist_today()
 
     # 2. Reception logs in and books appointment
     reception_client = login_client(reception_user)
@@ -31,6 +33,7 @@ def test_appointment_status_lifecycle(login_client, reception_user, doctor_a_use
             "patient_id": patient.id,
             "doctor_id": doctor_id,
             "appointment_date": today.isoformat(),
+            "booking_mode": "WALK_IN",
         },
     )
     assert book_resp.status_code == 201
@@ -93,7 +96,7 @@ def test_invalid_status_transitions_rejected(
     db_session.add(patient)
     db_session.flush()
 
-    today = clock.utcnow().date()
+    today = clock.ist_today()
     reception_client = login_client(reception_user)
     book_resp = reception_client.post(
         "/api/appointments",
@@ -131,7 +134,7 @@ def test_cancellation_requires_reason(login_client, reception_user, doctor_a_use
     db_session.add(patient)
     db_session.flush()
 
-    today = clock.utcnow().date()
+    today = clock.ist_today()
     reception_client = login_client(reception_user)
     book_resp = reception_client.post(
         "/api/appointments",
@@ -183,7 +186,7 @@ def test_status_update_conflict(login_client, reception_user, doctor_a_user, db_
     db_session.add(patient)
     db_session.flush()
 
-    today = clock.utcnow().date()
+    today = clock.ist_today()
     reception_client = login_client(reception_user)
     book_resp = reception_client.post(
         "/api/appointments",
@@ -213,7 +216,7 @@ def test_status_update_conflict(login_client, reception_user, doctor_a_user, db_
 
 def test_doctor_queue_retrieval(login_client, reception_user, doctor_a_user, db_session):
     """Doctor retrieves today's consultation queue segmented by status."""
-    today = clock.utcnow().date()
+    today = clock.ist_today()
     doc_id = doctor_a_user.doctor_id
 
     # Create 3 patients and appointments
@@ -272,3 +275,199 @@ def test_doctor_queue_retrieval(login_client, reception_user, doctor_a_user, db_
     rec_client = login_client(reception_user)
     rec_queue_resp = rec_client.get("/api/doctor/queue")
     assert rec_queue_resp.status_code == 403
+
+
+def test_future_scheduled_visit_cannot_be_checked_in_early(
+    login_client, reception_user, doctor_a_user, db_session
+):
+    """A future reservation cannot move into arrival, no-show or consultation states early."""
+    from datetime import timedelta
+
+    today = clock.ist_today()
+    patient = Patient(
+        urn="KH-2026-7799",
+        full_name="Future Scheduled Patient",
+        guardian_name="Guardian",
+        gender="F",
+        age_years=31,
+        mobile="9876543399",
+        address="Ara",
+    )
+    db_session.add(patient)
+    db_session.flush()
+
+    reception_client = login_client(reception_user)
+    booking = reception_client.post(
+        "/api/appointments",
+        json={
+            "patient_id": patient.id,
+            "doctor_id": doctor_a_user.doctor_id,
+            "appointment_date": (today + timedelta(days=2)).isoformat(),
+            "booking_mode": "SCHEDULED",
+            "visit_type": "FOLLOW_UP",
+        },
+    )
+    assert booking.status_code == 201, booking.text
+
+    response = reception_client.patch(
+        f"/api/appointments/{booking.json()['id']}/status",
+        json={"status": "ARRIVED", "version_id": 1},
+    )
+    assert response.status_code == 422
+    assert response.json()["code"] == "appointment_not_due"
+
+
+
+def test_scheduled_visit_can_be_marked_no_show_only_after_its_clinic_date(
+    login_client, reception_user, doctor_a_user, db_session, clock
+):
+    """Overdue scheduled reservations stay tokenless and can transition to NO_SHOW."""
+    from datetime import timedelta
+
+    from kalyan_api.clock import IST
+
+    patient = Patient(
+        urn="KH-2026-7798",
+        full_name="Missed Scheduled Patient",
+        guardian_name="Guardian",
+        gender="M",
+        age_years=36,
+        mobile="9876543398",
+        address="Ara",
+    )
+    db_session.add(patient)
+    db_session.flush()
+
+    reception = login_client(reception_user)
+    clinic_today = clock["t"].astimezone(IST).date()
+    booked = reception.post(
+        "/api/appointments",
+        json={
+            "patient_id": patient.id,
+            "doctor_id": doctor_a_user.doctor_id,
+            "appointment_date": (clinic_today + timedelta(days=2)).isoformat(),
+            "booking_mode": "SCHEDULED",
+            "visit_type": "FOLLOW_UP",
+        },
+    )
+    assert booked.status_code == 201, booked.text
+    appt = booked.json()
+    assert appt["token_number"] is None
+
+    early = reception.patch(
+        f"/api/appointments/{appt['id']}/status",
+        json={"status": "NO_SHOW", "version_id": 1},
+    )
+    assert early.status_code == 422
+    assert early.json()["code"] == "appointment_not_due"
+
+    clock["t"] = clock["t"] + timedelta(days=2)
+    late_check_in = reception.patch(
+        f"/api/appointments/{appt['id']}/status",
+        json={"status": "ARRIVED", "version_id": 1},
+    )
+    assert late_check_in.status_code == 422
+    assert late_check_in.json()["code"] == "appointment_date_elapsed"
+
+    overdue = reception.patch(
+        f"/api/appointments/{appt['id']}/status",
+        json={"status": "NO_SHOW", "version_id": 1},
+    )
+    assert overdue.status_code == 200, overdue.text
+    assert overdue.json()["status"] == "NO_SHOW"
+    assert overdue.json()["token_number"] is None
+
+
+def test_tokenless_scheduled_reservation_is_excluded_until_check_in(
+    login_client, reception_user, doctor_a_user, db_session, clock
+):
+    """A scheduled reservation enters the doctor queue only after check-in allocates a token."""
+    from datetime import timedelta
+
+    from kalyan_api.clock import IST
+
+    patient = Patient(
+        urn="KH-2026-7797",
+        full_name="Tokenless Queue Patient",
+        guardian_name="Guardian",
+        gender="F",
+        age_years=42,
+        mobile="9876543397",
+        address="Ara",
+    )
+    db_session.add(patient)
+    db_session.flush()
+
+    reception = login_client(reception_user)
+    today = clock["t"].astimezone(IST).date()
+    booked = reception.post(
+        "/api/appointments",
+        json={
+            "patient_id": patient.id,
+            "doctor_id": doctor_a_user.doctor_id,
+            "appointment_date": (today + timedelta(days=1)).isoformat(),
+            "booking_mode": "SCHEDULED",
+            "visit_type": "FOLLOW_UP",
+        },
+    )
+    assert booked.status_code == 201, booked.text
+    appointment_id = booked.json()["id"]
+
+    clock["t"] = clock["t"] + timedelta(days=1)
+    doctor = login_client(doctor_a_user)
+    before_check_in = doctor.get("/api/doctor/queue")
+    assert before_check_in.status_code == 200, before_check_in.text
+    assert all(item["id"] != appointment_id for item in before_check_in.json()["booked"])
+
+    checked_in = reception.patch(
+        f"/api/appointments/{appointment_id}/status",
+        json={"status": "ARRIVED", "version_id": 1},
+    )
+    assert checked_in.status_code == 200, checked_in.text
+    assert checked_in.json()["token_number"] == 1
+
+    after_check_in = doctor.get("/api/doctor/queue")
+    assert after_check_in.status_code == 200, after_check_in.text
+    assert any(item["id"] == appointment_id for item in after_check_in.json()["waiting"])
+
+
+def test_doctor_queue_uses_ist_clinic_date_before_utc_midnight(
+    login_client, reception_user, doctor_a_user, db_session, clock
+):
+    """A walk-in booked after IST midnight appears in the same IST-day doctor queue."""
+    patient = Patient(
+        urn="KH-2026-7799",
+        full_name="IST Boundary Patient",
+        guardian_name="Guardian",
+        gender="F",
+        age_years=28,
+        mobile="9876543399",
+        address="Ara",
+    )
+    db_session.add(patient)
+    db_session.flush()
+
+    from kalyan_api.clock import IST
+
+    # 20:30 UTC on Nov 1 is 02:00 on Nov 2 in Asia/Kolkata.
+    clock["t"] = datetime(2026, 11, 1, 20, 30, tzinfo=UTC)
+    clinic_today = clock["t"].astimezone(IST).date()
+    reception = login_client(reception_user)
+    booked = reception.post(
+        "/api/appointments",
+        json={
+            "patient_id": patient.id,
+            "doctor_id": doctor_a_user.doctor_id,
+            "appointment_date": clinic_today.isoformat(),
+            "booking_mode": "WALK_IN",
+            "visit_type": "NEW_CONSULTATION",
+        },
+    )
+    assert booked.status_code == 201, booked.text
+
+    doctor = login_client(doctor_a_user)
+    queue = doctor.get("/api/doctor/queue")
+    assert queue.status_code == 200, queue.text
+    data = queue.json()
+    assert data["queue_date"] == clinic_today.isoformat()
+    assert any(item["id"] == booked.json()["id"] for item in data["booked"])

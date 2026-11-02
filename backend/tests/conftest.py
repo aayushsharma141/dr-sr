@@ -11,6 +11,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy import Engine, create_engine, text
 from sqlalchemy.orm import Session
 
+from kalyan_api import clock as app_clock
 from kalyan_api.config import Settings
 from kalyan_api.core.security import build_hasher, hash_password
 from kalyan_api.core.setup_code import issue_setup_code
@@ -159,6 +160,10 @@ def clock(monkeypatch: pytest.MonkeyPatch) -> dict[str, datetime]:
     """Time seam freezing utcnow for deterministic testing."""
     now = {"t": datetime(2026, 11, 2, 4, 30, tzinfo=UTC)}
     monkeypatch.setattr("kalyan_api.clock.utcnow", lambda: now["t"])
+    monkeypatch.setattr(
+        "kalyan_api.clock.ist_now",
+        lambda: now["t"].astimezone(app_clock.IST),
+    )
     return now
 
 

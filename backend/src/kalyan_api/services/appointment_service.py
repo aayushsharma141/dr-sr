@@ -1,9 +1,10 @@
 """Appointment workflow state machine and validation service (APT-02)."""
 
+from kalyan_api import clock
 from kalyan_api.core.errors import ApiError
 from kalyan_api.core.permissions import Role
 from kalyan_api.core.principal import Principal
-from kalyan_api.models import Appointment, AppointmentStatus
+from kalyan_api.models import Appointment, AppointmentBookingMode, AppointmentStatus
 
 # Valid status transitions
 ALLOWED_TRANSITIONS: dict[AppointmentStatus, set[AppointmentStatus]] = {
@@ -38,6 +39,32 @@ def validate_status_transition(
 
     if target_status == current:
         return
+
+    if (
+        appt.booking_mode == AppointmentBookingMode.SCHEDULED.value
+        and target_status == AppointmentStatus.ARRIVED
+        and appt.appointment_date < clock.ist_today()
+    ):
+        raise ApiError(
+            status_code=422,
+            code="appointment_date_elapsed",
+            message="This scheduled visit date has passed. Mark it as No-show or create a new booking.",
+        )
+
+    if (
+        target_status in {
+            AppointmentStatus.ARRIVED,
+            AppointmentStatus.IN_CONSULTATION,
+            AppointmentStatus.DONE,
+            AppointmentStatus.NO_SHOW,
+        }
+        and appt.appointment_date > clock.ist_today()
+    ):
+        raise ApiError(
+            status_code=422,
+            code="appointment_not_due",
+            message="A future scheduled visit cannot be checked in or completed before its clinic date.",
+        )
 
     allowed = ALLOWED_TRANSITIONS.get(current, set())
     if target_status not in allowed:

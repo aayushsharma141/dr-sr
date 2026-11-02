@@ -114,6 +114,7 @@ def test_phase16_complete_gate(
                 age_years=35,
                 mobile="9800000000",
                 address="Road 77",
+                is_test_data=True,
                 district="Kangra",
                 state="Himachal Pradesh",
             )

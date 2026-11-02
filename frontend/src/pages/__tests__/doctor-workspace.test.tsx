@@ -62,6 +62,8 @@ const mockQueue: DoctorQueueResponse = {
       patient_mobile: '9876543210',
       patient_allergies: 'Penicillin allergy',
       token_number: 1,
+      booking_mode: 'WALK_IN',
+      visit_type: 'NEW_CONSULTATION',
       status: 'ARRIVED',
       status_updated_at: '2026-11-01T10:00:00Z',
       notes: 'Severe shoulder pain',

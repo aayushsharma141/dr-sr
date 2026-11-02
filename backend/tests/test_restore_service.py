@@ -39,6 +39,7 @@ def test_restore_database_and_photos(tmp_path: Path):
                 gender="O",
                 age_years=40,
                 address="Original Address 101",
+                is_test_data=True,
                 district="Kangra",
                 state="Himachal Pradesh",
             )

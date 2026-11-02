@@ -99,3 +99,57 @@ def test_patient_multimodal_search(
 
     # 6. Detail retrieval for non-existent id
     assert rec_c.get("/api/patients/999999").status_code == 404
+
+
+def test_patient_picker_hides_test_and_inactive_records_by_default(
+    login_client: Any,
+    reception_user: User,
+    db_session: Session,
+) -> None:
+    """Operational picker can explicitly ask for active records and never returns test data."""
+    active = Patient(
+        urn="KH-2026-0191",
+        full_name="Active Picker Patient",
+        guardian_name="Guardian",
+        gender="F",
+        age_years=31,
+        mobile="9876500191",
+        address="Ara",
+    )
+    inactive = Patient(
+        urn="KH-2026-0192",
+        full_name="Inactive Picker Patient",
+        guardian_name="Guardian",
+        gender="M",
+        age_years=42,
+        mobile="9876500192",
+        address="Ara",
+        is_active=False,
+    )
+    test_record = Patient(
+        urn="KHM-2026-0193",
+        full_name="Synthetic Test Picker Patient",
+        guardian_name="Test Guardian",
+        gender="O",
+        age_years=0,
+        mobile="9876500193",
+        address="Test environment",
+        is_test_data=True,
+    )
+    db_session.add_all([active, inactive, test_record])
+    db_session.flush()
+    client = login_client(reception_user)
+
+    picker = client.get("/api/patients?q=Picker&active_only=true")
+    assert picker.status_code == 200
+    urns = {item["urn"] for item in picker.json()}
+    assert active.urn in urns
+    assert inactive.urn not in urns
+    assert test_record.urn not in urns
+
+    directory = client.get("/api/patients?q=Picker")
+    assert directory.status_code == 200
+    directory_urns = {item["urn"] for item in directory.json()}
+    assert active.urn in directory_urns
+    assert inactive.urn in directory_urns
+    assert test_record.urn not in directory_urns
