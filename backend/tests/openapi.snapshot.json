@@ -6,7 +6,7 @@
         "description": "Payload for lifecycle actions requiring optimistic concurrency validation.",
         "properties": {
           "version_id": {
-            "minimum": 1.0,
+            "minimum": 1,
             "title": "Version Id",
             "type": "integer"
           }
@@ -111,14 +111,14 @@
         "description": "Payload to book an appointment (APT-01).",
         "properties": {
           "appointment_date": {
-            "description": "Scheduled appointment date",
+            "description": "Clinic-local booking date",
             "format": "date",
             "title": "Appointment Date",
             "type": "string"
           },
           "doctor_id": {
             "description": "Target doctor ID",
-            "exclusiveMinimum": 0.0,
+            "exclusiveMinimum": 0,
             "title": "Doctor Id",
             "type": "integer"
           },
@@ -137,9 +137,42 @@
           },
           "patient_id": {
             "description": "Target patient ID",
-            "exclusiveMinimum": 0.0,
+            "exclusiveMinimum": 0,
             "title": "Patient Id",
             "type": "integer"
+          },
+          "booking_mode": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AppointmentBookingMode"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "WALK_IN allocates a same-day token; SCHEDULED reserves a future queue date",
+            "title": "Booking Mode",
+            "default": null
+          },
+          "visit_type": {
+            "$ref": "#/components/schemas/AppointmentVisitType",
+            "description": "Operational visit category",
+            "title": "Visit Type",
+            "default": "NEW_CONSULTATION"
+          },
+          "treatment_plan_id": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Optional plan link, supplied by an authorized doctor",
+            "title": "Treatment Plan Id"
           }
         },
         "required": [
@@ -267,6 +300,28 @@
           "version_id": {
             "title": "Version Id",
             "type": "integer"
+          },
+          "booking_mode": {
+            "$ref": "#/components/schemas/AppointmentBookingMode",
+            "description": "Booking Mode",
+            "title": "Booking Mode"
+          },
+          "visit_type": {
+            "$ref": "#/components/schemas/AppointmentVisitType",
+            "description": "Visit Type",
+            "title": "Visit Type"
+          },
+          "treatment_plan_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Treatment Plan Id"
           }
         },
         "required": [
@@ -278,6 +333,8 @@
           "doctor_id",
           "doctor_name_en",
           "appointment_date",
+          "booking_mode",
+          "visit_type",
           "token_number",
           "status",
           "status_updated_at",
@@ -323,7 +380,7 @@
           },
           "version_id": {
             "description": "Optimistic locking version ID",
-            "exclusiveMinimum": 0.0,
+            "exclusiveMinimum": 0,
             "title": "Version Id",
             "type": "integer"
           }
@@ -346,13 +403,13 @@
             "type": "array"
           },
           "page": {
-            "minimum": 1.0,
+            "minimum": 1,
             "title": "Page",
             "type": "integer"
           },
           "page_size": {
-            "maximum": 200.0,
-            "minimum": 1.0,
+            "maximum": 200,
+            "minimum": 1,
             "title": "Page Size",
             "type": "integer"
           },
@@ -819,8 +876,8 @@
             "title": "Address 2"
           },
           "consultation_validity_days": {
-            "maximum": 365.0,
-            "minimum": 1.0,
+            "maximum": 365,
+            "minimum": 1,
             "title": "Consultation Validity Days",
             "type": "integer"
           },
@@ -908,7 +965,7 @@
             "type": "string"
           },
           "version_id": {
-            "minimum": 1.0,
+            "minimum": 1,
             "title": "Version Id",
             "type": "integer"
           }
@@ -931,7 +988,7 @@
         "properties": {
           "default_fee_paise": {
             "default": 0,
-            "minimum": 0.0,
+            "minimum": 0,
             "title": "Default Fee Paise",
             "type": "integer"
           },
@@ -1160,6 +1217,16 @@
           "version_id": {
             "title": "Version Id",
             "type": "integer"
+          },
+          "booking_mode": {
+            "$ref": "#/components/schemas/AppointmentBookingMode",
+            "description": "Booking Mode",
+            "title": "Booking Mode"
+          },
+          "visit_type": {
+            "$ref": "#/components/schemas/AppointmentVisitType",
+            "description": "Visit Type",
+            "title": "Visit Type"
           }
         },
         "required": [
@@ -1172,6 +1239,8 @@
           "patient_mobile",
           "patient_allergies",
           "token_number",
+          "booking_mode",
+          "visit_type",
           "status",
           "status_updated_at",
           "version_id"
@@ -1246,7 +1315,7 @@
         "description": "Payload for updating a doctor profile with optimistic concurrency.",
         "properties": {
           "default_fee_paise": {
-            "minimum": 0.0,
+            "minimum": 0,
             "title": "Default Fee Paise",
             "type": "integer"
           },
@@ -1298,7 +1367,7 @@
             "title": "Registration Number"
           },
           "version_id": {
-            "minimum": 1.0,
+            "minimum": 1,
             "title": "Version Id",
             "type": "integer"
           }
@@ -1341,7 +1410,7 @@
           "appointment_id": {
             "anyOf": [
               {
-                "exclusiveMinimum": 0.0,
+                "exclusiveMinimum": 0,
                 "type": "integer"
               },
               {
@@ -1367,7 +1436,7 @@
           },
           "patient_id": {
             "description": "Target patient ID",
-            "exclusiveMinimum": 0.0,
+            "exclusiveMinimum": 0,
             "title": "Patient Id",
             "type": "integer"
           },
@@ -1606,7 +1675,7 @@
           },
           "version_id": {
             "description": "Optimistic locking version ID",
-            "exclusiveMinimum": 0.0,
+            "exclusiveMinimum": 0,
             "title": "Version Id",
             "type": "integer"
           }
@@ -1622,7 +1691,7 @@
         "description": "Payload for creating a consultation fee schedule.",
         "properties": {
           "fee_paise": {
-            "minimum": 0.0,
+            "minimum": 0,
             "title": "Fee Paise",
             "type": "integer"
           },
@@ -1686,7 +1755,7 @@
         "description": "Payload for modifying a consultation fee schedule.",
         "properties": {
           "fee_paise": {
-            "minimum": 0.0,
+            "minimum": 0,
             "title": "Fee Paise",
             "type": "integer"
           },
@@ -1895,8 +1964,8 @@
             "type": "string"
           },
           "age_years": {
-            "maximum": 150.0,
-            "minimum": 0.0,
+            "maximum": 150,
+            "minimum": 0,
             "title": "Age Years",
             "type": "integer"
           },
@@ -2143,8 +2212,8 @@
           "age_years": {
             "anyOf": [
               {
-                "maximum": 150.0,
-                "minimum": 0.0,
+                "maximum": 150,
+                "minimum": 0,
                 "type": "integer"
               },
               {
@@ -2292,7 +2361,7 @@
           },
           "version_id": {
             "description": "Optimistic concurrency control version.",
-            "minimum": 1.0,
+            "minimum": 1,
             "title": "Version Id",
             "type": "integer"
           }
@@ -2309,14 +2378,14 @@
         "properties": {
           "amount_paise": {
             "description": "Payment amount in integer paise",
-            "exclusiveMinimum": 0.0,
+            "exclusiveMinimum": 0,
             "title": "Amount Paise",
             "type": "integer"
           },
           "appointment_id": {
             "anyOf": [
               {
-                "exclusiveMinimum": 0.0,
+                "exclusiveMinimum": 0,
                 "type": "integer"
               },
               {
@@ -2341,7 +2410,7 @@
           },
           "patient_id": {
             "description": "Patient database ID",
-            "exclusiveMinimum": 0.0,
+            "exclusiveMinimum": 0,
             "title": "Patient Id",
             "type": "integer"
           },
@@ -2358,7 +2427,7 @@
           "treatment_plan_id": {
             "anyOf": [
               {
-                "exclusiveMinimum": 0.0,
+                "exclusiveMinimum": 0,
                 "type": "integer"
               },
               {
@@ -2623,7 +2692,7 @@
           "encounter_id": {
             "anyOf": [
               {
-                "exclusiveMinimum": 0.0,
+                "exclusiveMinimum": 0,
                 "type": "integer"
               },
               {
@@ -2668,7 +2737,7 @@
           },
           "patient_id": {
             "description": "Patient ID",
-            "exclusiveMinimum": 0.0,
+            "exclusiveMinimum": 0,
             "title": "Patient Id",
             "type": "integer"
           }
@@ -2694,8 +2763,8 @@
           },
           "duration_days": {
             "description": "Treatment duration in days",
-            "maximum": 365.0,
-            "minimum": 1.0,
+            "maximum": 365,
+            "minimum": 1,
             "title": "Duration Days",
             "type": "integer"
           },
@@ -2721,7 +2790,7 @@
           },
           "item_order": {
             "description": "1-based sequence order of medication item",
-            "minimum": 1.0,
+            "minimum": 1,
             "title": "Item Order",
             "type": "integer"
           },
@@ -3241,7 +3310,7 @@
         "properties": {
           "agreed_price_paise": {
             "description": "Total agreed fee in integer paise (INR x 100)",
-            "minimum": 0.0,
+            "minimum": 0,
             "title": "Agreed Price Paise",
             "type": "integer"
           },
@@ -3255,7 +3324,7 @@
           "encounter_id": {
             "anyOf": [
               {
-                "exclusiveMinimum": 0.0,
+                "exclusiveMinimum": 0,
                 "type": "integer"
               },
               {
@@ -3267,7 +3336,7 @@
           },
           "patient_id": {
             "description": "Patient ID",
-            "exclusiveMinimum": 0.0,
+            "exclusiveMinimum": 0,
             "title": "Patient Id",
             "type": "integer"
           },
@@ -3293,8 +3362,8 @@
           },
           "total_sessions": {
             "description": "Total planned physiotherapy sessions (1-200)",
-            "maximum": 200.0,
-            "minimum": 1.0,
+            "maximum": 200,
+            "minimum": 1,
             "title": "Total Sessions",
             "type": "integer"
           }
@@ -3508,8 +3577,8 @@
           "total_sessions": {
             "anyOf": [
               {
-                "maximum": 200.0,
-                "minimum": 1.0,
+                "maximum": 200,
+                "minimum": 1,
                 "type": "integer"
               },
               {
@@ -3520,7 +3589,7 @@
           },
           "version_id": {
             "description": "Version ID for optimistic concurrency control",
-            "minimum": 1.0,
+            "minimum": 1,
             "title": "Version Id",
             "type": "integer"
           }
@@ -3623,8 +3692,8 @@
           },
           "vas_score": {
             "description": "Visual Analog Scale pain rating (0-10)",
-            "maximum": 10.0,
-            "minimum": 0.0,
+            "maximum": 10,
+            "minimum": 0,
             "title": "Vas Score",
             "type": "integer"
           }
@@ -3975,7 +4044,7 @@
             ]
           },
           "version_id": {
-            "minimum": 1.0,
+            "minimum": 1,
             "title": "Version Id",
             "type": "integer"
           }
@@ -4025,6 +4094,25 @@
         ],
         "title": "ValidationError",
         "type": "object"
+      },
+      "AppointmentBookingMode": {
+        "description": "Whether a visit enters today's queue or reserves a future queue date.",
+        "enum": [
+          "WALK_IN",
+          "SCHEDULED"
+        ],
+        "title": "AppointmentBookingMode",
+        "type": "string"
+      },
+      "AppointmentVisitType": {
+        "description": "Operational visit category; not a clinical diagnosis.",
+        "enum": [
+          "NEW_CONSULTATION",
+          "FOLLOW_UP",
+          "PHYSIOTHERAPY_SESSION"
+        ],
+        "title": "AppointmentVisitType",
+        "type": "string"
       }
     }
   },
@@ -4078,6 +4166,80 @@
               ],
               "description": "Filter by appointment date",
               "title": "Appointment Date"
+            }
+          },
+          {
+            "description": "Include appointments on or after this date",
+            "in": "query",
+            "name": "date_from",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Include appointments on or after this date",
+              "title": "Date From"
+            }
+          },
+          {
+            "description": "Include appointments on or before this date",
+            "in": "query",
+            "name": "date_to",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Include appointments on or before this date",
+              "title": "Date To"
+            }
+          },
+          {
+            "description": "WALK_IN or SCHEDULED",
+            "in": "query",
+            "name": "booking_mode",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/AppointmentBookingMode"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "WALK_IN or SCHEDULED",
+              "title": "Booking Mode"
+            }
+          },
+          {
+            "description": "Filter by visit category",
+            "in": "query",
+            "name": "visit_type",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/AppointmentVisitType"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by visit category",
+              "title": "Visit Type"
             }
           },
           {
@@ -5347,7 +5509,7 @@
     },
     "/api/patients": {
       "get": {
-        "description": "Search patients across URN, 10-digit mobile, and English/Devanagari full name.",
+        "description": "Search patients without exposing synthetic test records in operational lists.",
         "operationId": "list_or_search_patients_api_patients_get",
         "parameters": [
           {
@@ -5389,6 +5551,18 @@
               "minimum": 0,
               "title": "Offset",
               "type": "integer"
+            }
+          },
+          {
+            "description": "Limit results to active patients.",
+            "in": "query",
+            "name": "active_only",
+            "required": false,
+            "schema": {
+              "default": false,
+              "description": "Limit results to active patients.",
+              "title": "Active Only",
+              "type": "boolean"
             }
           }
         ],
