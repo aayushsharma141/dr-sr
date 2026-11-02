@@ -274,6 +274,7 @@ export type AppointmentStatus =
 
 export type AppointmentBookingMode = 'WALK_IN' | 'SCHEDULED'
 export type AppointmentVisitType =
+  | 'UNSPECIFIED'
   | 'NEW_CONSULTATION'
   | 'FOLLOW_UP'
   | 'PHYSIOTHERAPY_SESSION'
