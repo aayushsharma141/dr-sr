@@ -253,9 +253,11 @@ def test_reception_and_admin_cannot_create_or_read_prescription(
     )
     assert adm_post.status_code == 403
 
-    # Reception and Admin cannot read prescription (CLINICAL_PERMISSIONS restricted to Doctor)
+    # Reception and Admin cannot read prescription or doctor-scoped follow-up data.
     assert rec_client.get(f"/api/prescriptions/{rx_id}").status_code == 403
     assert adm_client.get(f"/api/prescriptions/{rx_id}").status_code == 403
+    assert rec_client.get("/api/prescriptions/follow-ups").status_code == 403
+    assert adm_client.get("/api/prescriptions/follow-ups").status_code == 403
 
 
 def test_doctor_silo_cross_isolation_on_prescriptions(
