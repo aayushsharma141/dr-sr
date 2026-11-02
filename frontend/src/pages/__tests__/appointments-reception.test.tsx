@@ -33,6 +33,20 @@ const mockDoctors: DoctorOut[] = [
   },
 ]
 
+function clinicDateAfter(days: number) {
+  const parts = new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'Asia/Kolkata',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(new Date())
+  const year = Number(parts.find((part) => part.type === 'year')?.value)
+  const month = Number(parts.find((part) => part.type === 'month')?.value)
+  const day = Number(parts.find((part) => part.type === 'day')?.value)
+  const date = new Date(Date.UTC(year, month - 1, day + days))
+  return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, '0')}-${String(date.getUTCDate()).padStart(2, '0')}`
+}
+
 const mockAppointments: Appointment[] = [
   {
     id: 10,
@@ -43,7 +57,7 @@ const mockAppointments: Appointment[] = [
     doctor_id: 1,
     doctor_name_en: 'Dr. Madan Mohan Dwivedi',
     doctor_name_hi: 'डॉ मदन मोहन द्विवेदी',
-    appointment_date: new Date().toISOString().split('T')[0],
+    appointment_date: clinicDateAfter(0),
     booking_mode: 'WALK_IN',
     visit_type: 'NEW_CONSULTATION',
     treatment_plan_id: null,
@@ -408,14 +422,7 @@ describe('AppointmentsReception Component', () => {
   })
 
   it('keeps scheduled booking available on the Scheduled Visits tab and searches patients only after typing', async () => {
-    const scheduledDate = (() => {
-      const date = new Date()
-      date.setDate(date.getDate() + 3)
-      const year = date.getFullYear()
-      const month = String(date.getMonth() + 1).padStart(2, '0')
-      const day = String(date.getDate()).padStart(2, '0')
-      return `${year}-${month}-${day}`
-    })()
+    const scheduledDate = clinicDateAfter(3)
     const scheduledAppointment: Appointment = {
       ...mockAppointments[0],
       appointment_date: scheduledDate,
@@ -512,7 +519,7 @@ describe('AppointmentsReception Component', () => {
     await user.click(screen.getByRole('button', { name: 'Book future visit' }))
     const dialog = screen.getByRole('dialog', { name: 'Book a patient visit' })
     expect(dialog).toBeInTheDocument()
-    expect(within(dialog).getByRole('button', { name: 'Scheduled Visit' })).toHaveAttribute('aria-pressed', 'true')
+    expect(within(dialog).getByRole('button', { name: /Scheduled Visit/ })).toHaveAttribute('aria-pressed', 'true')
     expect(within(dialog).getByLabelText('Future visit date')).toHaveValue(
       expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/),
     )
