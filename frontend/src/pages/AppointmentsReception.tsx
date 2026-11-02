@@ -34,7 +34,11 @@ function FollowUpVisits() {
       : selectedWindow === 'week'
         ? { date_from: today, date_to: localDateValue(weekEnd) }
         : selectedWindow === 'overdue'
-          ? { date_to: today }
+          ? (() => {
+              const yesterday = new Date()
+              yesterday.setDate(yesterday.getDate() - 1)
+              return { date_to: localDateValue(yesterday) }
+            })()
           : undefined
 
   const { data, isPending, isError, error, refetch } = usePrescriptionFollowUps(dateRange)
