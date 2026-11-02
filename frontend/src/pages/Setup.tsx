@@ -24,10 +24,11 @@ export function Setup() {
   const confirmInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
+    if (setupAdminMutation.isSuccess || setupAdminMutation.isPending) return
     if (!isCheckingStatus && setupStatus && !setupStatus.setup_required) {
       navigate('/login?notice=closed', { replace: true })
     }
-  }, [setupStatus, isCheckingStatus, navigate])
+  }, [setupStatus, isCheckingStatus, navigate, setupAdminMutation.isSuccess, setupAdminMutation.isPending])
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault()
