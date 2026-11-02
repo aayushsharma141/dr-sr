@@ -155,9 +155,15 @@ def list_or_search_patients(
     q: str | None = Query(default=None, description="Search query matching URN, mobile, or name."),
     limit: int = Query(default=50, ge=1, le=100),
     offset: int = Query(default=0, ge=0),
+    active_only: bool = Query(default=False, description="Exclude inactive patient records"),
 ) -> list[PatientOut]:
-    """Search patients across URN, 10-digit mobile, and English/Devanagari full name."""
+    """Search patients by URN, 10-digit mobile, and name; optionally restrict to active records."""
     stmt = select(Patient)
+    if active_only:
+        stmt = stmt.where(Patient.is_active.is_(True))
+        # Booking pickers must never load the entire registry on an empty search.
+        if not q or len(q.strip()) < 2:
+            return []
 
     if q and q.strip():
         search_term = q.strip()
