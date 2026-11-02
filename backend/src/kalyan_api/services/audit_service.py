@@ -63,6 +63,10 @@ class AuditAction(StrEnum):
     # Phase 15 actions
     PAYMENT_RECORDED = "PAYMENT_RECORDED"
     PAYMENT_REVERSED = "PAYMENT_REVERSED"
+    # Phase 16 actions
+    BACKUP_CREATED = "BACKUP_CREATED"
+    BACKUP_RESTORED = "BACKUP_RESTORED"
+    INTEGRITY_CHECK_RUN = "INTEGRITY_CHECK_RUN"
 
 
 class Outcome(StrEnum):

@@ -64,6 +64,9 @@ class Settings(BaseSettings):
     # Patient photos storage location (PAT-05)
     photos_dir: Path = BACKEND_DIR / "var" / "photos"
 
+    # Backup storage location (BAK-01)
+    backup_dir: Path = BACKEND_DIR / "var" / "backups"
+
     model_config = SettingsConfigDict(
         env_prefix="KALYAN_",
         env_file=str(ENV_FILE_PATH) if ENV_FILE_PATH.exists() else None,
