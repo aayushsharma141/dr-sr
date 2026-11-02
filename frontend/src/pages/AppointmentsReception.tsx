@@ -246,7 +246,7 @@ function ScheduledVisits({
             Scheduled visits
           </h2>
           <p className="mt-1 max-w-2xl text-sm text-slate-600">
-            Future date reservations for the next 14 days. Each booking reserves a doctor-wise daily queue token, not an exact consultation time.
+            Future date reservations for the next 14 days. A queue token is assigned at check-in on the booked date; no exact consultation time is reserved.
           </p>
           <p className="mt-2 text-xs font-semibold text-slate-500">{start} — {end}</p>
         </div>
