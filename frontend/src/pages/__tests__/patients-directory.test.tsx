@@ -402,8 +402,6 @@ describe('Patients Directory and Profile Screens', () => {
     })
     expect(screen.queryByText(/Package: Knee Rehabilitation/)).not.toBeInTheDocument()
   })
-})
-
 
   it('exposes clinical record tabs to the treating doctor and filters encounter data', async () => {
     const doctorMe: Me = {
@@ -578,3 +576,4 @@ describe('Patients Directory and Profile Screens', () => {
     })
     expect(screen.getByText('admin')).toBeInTheDocument()
   })
+})
