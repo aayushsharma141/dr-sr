@@ -16,6 +16,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 from test_route_policies import _policies, walk_routes
 
+from kalyan_api import clock
 from kalyan_api.config import Settings
 from kalyan_api.models import User
 
@@ -146,7 +147,7 @@ def _create_appointment_payload(target: Any = None) -> dict[str, Any]:
     return {
         "patient_id": getattr(target, "patient_id", 1),
         "doctor_id": getattr(target, "doctor_id", 1),
-        "appointment_date": "2026-11-01",
+        "appointment_date": clock.ist_today().isoformat(),
         "notes": "Matrix appointment notes",
     }
 
@@ -733,7 +734,7 @@ MATRIX: list[MatrixRow] = [
             "admin": 403,
             "reception": 201,
             "doctor_a": 201,
-            "doctor_b": 201,
+            "doctor_b": 403,
         },
     ),
     MatrixRow(
