@@ -362,6 +362,13 @@ def test_scheduled_visit_can_be_marked_no_show_only_after_its_clinic_date(
     assert early.json()["code"] == "appointment_not_due"
 
     clock["t"] = clock["t"] + timedelta(days=2)
+    late_check_in = reception.patch(
+        f"/api/appointments/{appt['id']}/status",
+        json={"status": "ARRIVED", "version_id": 1},
+    )
+    assert late_check_in.status_code == 422
+    assert late_check_in.json()["code"] == "appointment_date_elapsed"
+
     overdue = reception.patch(
         f"/api/appointments/{appt['id']}/status",
         json={"status": "NO_SHOW", "version_id": 1},
