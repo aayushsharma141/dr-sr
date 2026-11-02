@@ -69,6 +69,14 @@ def upgrade() -> None:
             nullable=False,
         ),
     )
+    # Historical rows are now UNSPECIFIED; new API-created rows default to
+    # NEW_CONSULTATION after the backfill has completed.
+    op.alter_column(
+        "appointments",
+        "visit_type",
+        existing_type=sa.String(length=32),
+        server_default=sa.text("'NEW_CONSULTATION'"),
+    )
     op.add_column(
         "appointments",
         sa.Column(
