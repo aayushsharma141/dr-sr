@@ -273,3 +273,43 @@ def test_doctor_queue_retrieval(login_client, reception_user, doctor_a_user, db_
     rec_client = login_client(reception_user)
     rec_queue_resp = rec_client.get("/api/doctor/queue")
     assert rec_queue_resp.status_code == 403
+
+
+def test_future_scheduled_visit_cannot_be_checked_in_early(
+    login_client, reception_user, doctor_a_user, db_session
+):
+    """A future reservation cannot move into arrival, no-show or consultation states early."""
+    from datetime import timedelta
+
+    today = clock.ist_today()
+    patient = Patient(
+        urn="KH-2026-7799",
+        full_name="Future Scheduled Patient",
+        guardian_name="Guardian",
+        gender="F",
+        age_years=31,
+        mobile="9876543399",
+        address="Ara",
+    )
+    db_session.add(patient)
+    db_session.flush()
+
+    reception_client = login_client(reception_user)
+    booking = reception_client.post(
+        "/api/appointments",
+        json={
+            "patient_id": patient.id,
+            "doctor_id": doctor_a_user.doctor_id,
+            "appointment_date": (today + timedelta(days=2)).isoformat(),
+            "booking_mode": "SCHEDULED",
+            "visit_type": "FOLLOW_UP",
+        },
+    )
+    assert booking.status_code == 201, booking.text
+
+    response = reception_client.patch(
+        f"/api/appointments/{booking.json()['id']}/status",
+        json={"status": "ARRIVED", "version_id": 1},
+    )
+    assert response.status_code == 422
+    assert response.json()["code"] == "appointment_not_due"
