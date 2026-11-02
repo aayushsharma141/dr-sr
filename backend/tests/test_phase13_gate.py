@@ -24,6 +24,7 @@ from sqlalchemy import Engine, create_engine, select, text
 from sqlalchemy.exc import DBAPIError
 from sqlalchemy.orm import Session
 
+from kalyan_api import clock
 from kalyan_api.config import Settings
 from kalyan_api.models import AuditLog, Patient, User
 from kalyan_api.services.token_service import generate_next_daily_token
@@ -107,7 +108,7 @@ def test_phase13_full_lifecycle_and_security_gate(
     doc_b_id = doctor_b_user.doctor_id
     assert doc_b_id is not None
 
-    today_str = datetime.now(UTC).date().isoformat()
+    today_str = clock.ist_today().isoformat()
 
     # 1. Reception books appointment (APT-01)
     book_res = rec_c.post(
@@ -116,6 +117,7 @@ def test_phase13_full_lifecycle_and_security_gate(
             "patient_id": patient_id,
             "doctor_id": doc_a_id,
             "appointment_date": today_str,
+            "booking_mode": "WALK_IN",
             "notes": "Gate test routine checkup",
         },
     )
