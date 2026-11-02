@@ -346,6 +346,14 @@ describe('Patients Directory and Profile Screens', () => {
           text: () => Promise.resolve(JSON.stringify(timeline)),
         })
       }
+      if (url.includes('/api/patients/101/payments')) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          headers: new Headers({ 'content-type': 'application/json' }),
+          text: () => Promise.resolve(JSON.stringify([])),
+        })
+      }
       if (url.includes('/api/patients/101')) {
         return Promise.resolve({
           ok: true,

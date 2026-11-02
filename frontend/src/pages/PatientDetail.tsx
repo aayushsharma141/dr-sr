@@ -4,6 +4,7 @@ import { useAuditLogs, usePatient, useMe } from '../api/queries'
 import { AppShell } from '../components/AppShell'
 import { PatientEditModal } from '../components/PatientEditModal'
 import { PatientTimeline } from '../components/PatientTimeline'
+import { PaymentHistory } from '../components/PaymentHistory'
 import type { PatientOut } from '../api/types'
 
 type PatientDetailTab = 'profile' | 'visits' | 'clinical' | 'therapy' | 'billing' | 'audit'
@@ -419,6 +420,8 @@ export function PatientDetail() {
           </div>
         )}
       </div>
+
+      {patient && <PaymentHistory patientId={patient.id} />}
 
       {/* Demographic Edit Modal */}
       {patient && (

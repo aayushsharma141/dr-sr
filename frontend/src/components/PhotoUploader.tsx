@@ -245,7 +245,7 @@ export function PhotoUploader({ onPhotoSelected, disabled = false }: PhotoUpload
               className="w-full h-full object-cover"
             />
           ) : (
-            <span className="text-xs text-neutral-400 text-center px-1">
+            <span className="text-xs text-neutral-600 text-center px-1">
               No photo
             </span>
           )}

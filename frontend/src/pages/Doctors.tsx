@@ -11,6 +11,7 @@ import {
 import { ApiError } from '../api/client'
 import { AppShell } from '../components/AppShell'
 import { ConflictBanner } from '../components/ConflictBanner'
+import { Modal } from '../components/Modal'
 import type { DoctorOut, DoctorCreate, DoctorUpdate, FeeOut } from '../api/types'
 
 export function Doctors() {
@@ -334,16 +335,7 @@ export function Doctors() {
 
         {/* Doctor Modal */}
         {doctorModalOpen && (
-          <div
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="doctor-modal-title"
-            className="fixed inset-0 bg-neutral-900/50 backdrop-blur-xs flex items-center justify-center p-4 z-50"
-          >
-            <div className="bg-white rounded-lg border border-neutral-200 max-w-lg w-full p-6 shadow-xl space-y-4">
-              <h3 id="doctor-modal-title" className="text-xl font-bold text-neutral-900">
-                {editingDoctor ? 'Edit Doctor Profile' : 'Add Doctor Profile'}
-              </h3>
+          <Modal open title={editingDoctor ? 'Edit Doctor Profile' : 'Add Doctor Profile'} onClose={() => setDoctorModalOpen(false)} busy={createDoctorMutation.isPending || updateDoctorMutation.isPending} className="max-w-lg">
 
               {docConflict && (
                 <ConflictBanner onReload={handleReloadDoctor} isReloading={docReloading} />
@@ -362,6 +354,7 @@ export function Doctors() {
                   </label>
                   <input
                     id="doc-name-en"
+                    data-autofocus
                     type="text"
                     required
                     value={docNameEn}
@@ -457,22 +450,12 @@ export function Doctors() {
                   </button>
                 </div>
               </form>
-            </div>
-          </div>
+        </Modal>
         )}
 
         {/* Fee Modal */}
         {feeModalOpen && (
-          <div
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="fee-modal-title"
-            className="fixed inset-0 bg-neutral-900/50 backdrop-blur-xs flex items-center justify-center p-4 z-50"
-          >
-            <div className="bg-white rounded-lg border border-neutral-200 max-w-md w-full p-6 shadow-xl space-y-4">
-              <h3 id="fee-modal-title" className="text-xl font-bold text-neutral-900">
-                {editingFee ? 'Edit Fee Rate' : 'Add Fee Rate'}
-              </h3>
+          <Modal open title={editingFee ? 'Edit Fee Rate' : 'Add Fee Rate'} onClose={() => setFeeModalOpen(false)} busy={createFeeMutation.isPending || updateFeeMutation.isPending} className="max-w-md">
 
               {feeError && (
                 <div role="alert" className="p-3 bg-red-50 border border-red-200 rounded text-sm text-red-900">
@@ -487,6 +470,7 @@ export function Doctors() {
                   </label>
                   <input
                     id="fee-name"
+                    data-autofocus
                     type="text"
                     required
                     value={feeName}
@@ -543,8 +527,7 @@ export function Doctors() {
                   </button>
                 </div>
               </form>
-            </div>
-          </div>
+        </Modal>
         )}
       </div>
     </AppShell>

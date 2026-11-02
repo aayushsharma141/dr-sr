@@ -172,7 +172,7 @@ export function DoctorDashboard() {
                       <div className="flex items-center gap-3">
                         <span className="font-mono font-semibold text-neutral-700">#{item.token_number}</span>
                         <span className="font-medium text-neutral-900">{item.patient_name}</span>
-                        <span className="text-xs font-mono text-neutral-400">({item.patient_urn})</span>
+                        <span className="text-xs font-mono text-neutral-600">({item.patient_urn})</span>
                       </div>
                       <span className="text-xs px-2 py-0.5 rounded bg-blue-50 text-blue-700 font-semibold">
                         Booked
@@ -197,7 +197,7 @@ export function DoctorDashboard() {
                       <div className="flex items-center gap-3">
                         <span className="font-mono text-neutral-500">#{item.token_number}</span>
                         <span className="font-medium text-neutral-800">{item.patient_name}</span>
-                        <span className="text-xs font-mono text-neutral-400">({item.patient_urn})</span>
+                        <span className="text-xs font-mono text-neutral-600">({item.patient_urn})</span>
                       </div>
                       <span className="text-xs px-2 py-0.5 rounded bg-green-50 text-green-700 font-semibold">
                         &check; {item.status}

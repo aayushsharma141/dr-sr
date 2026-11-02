@@ -1,6 +1,7 @@
 import { render, screen } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import '../../test/dialog-shim'
 import { PrescriptionPrint } from '../PrescriptionPrint'
 import type { PrescriptionOut } from '../../api/types'
 

@@ -3,6 +3,7 @@ import { useParams, useSearchParams, Link } from 'react-router'
 import { AppShell } from '../components/AppShell'
 import { SessionLoggerModal } from '../components/SessionLoggerModal'
 import { SessionAddendumModal } from '../components/SessionAddendumModal'
+import { Modal } from '../components/Modal'
 import { VasTrendChart } from '../components/VasTrendChart'
 import {
   usePatient,
@@ -156,9 +157,15 @@ export function TreatmentPlanWorkspace() {
 
       {/* Cancel Plan Modal */}
       {showCancelPlanModal && activePlan && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-          <div className="bg-white rounded-xl shadow-2xl max-w-md w-full p-6 space-y-4">
-            <h3 className="text-lg font-bold text-gray-900">Cancel Treatment Package?</h3>
+        <Modal
+          open
+          variant="destructive"
+          title="Cancel Treatment Package?"
+          onClose={() => setShowCancelPlanModal(false)}
+          busy={updatePlanMutation.isPending}
+          className="max-w-md"
+        >
+          <div className="space-y-4">
             <p className="text-xs text-gray-600">
               Please state the clinical or administrative reason for discontinuing this package early.
             </p>
@@ -180,6 +187,7 @@ export function TreatmentPlanWorkspace() {
               <div className="flex justify-end gap-3 pt-2">
                 <button
                   type="button"
+                  data-autofocus
                   onClick={() => setShowCancelPlanModal(false)}
                   className="px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-100 rounded-lg transition"
                 >
@@ -195,26 +203,19 @@ export function TreatmentPlanWorkspace() {
               </div>
             </form>
           </div>
-        </div>
+        </Modal>
       )}
 
       {/* Create New Plan Modal */}
       {showNewPlanModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 overflow-y-auto">
-          <div className="bg-white rounded-xl shadow-2xl max-w-lg w-full p-6 space-y-4 my-8">
-            <div className="border-b border-gray-200 pb-3 flex justify-between items-start">
-              <div>
-                <h3 className="text-lg font-bold text-gray-900">New Physiotherapy Treatment Package</h3>
-                <p className="text-xs text-gray-500">Define multi-session package terms and agreed fee</p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setShowNewPlanModal(false)}
-                className="text-gray-400 hover:text-gray-600 text-lg"
-              >
-                ✕
-              </button>
-            </div>
+        <Modal
+          open
+          onClose={() => setShowNewPlanModal(false)}
+          title="New Physiotherapy Treatment Package"
+          description="Define multi-session package terms and agreed fee"
+          className="max-w-lg"
+        >
+          <div className="space-y-4">
 
             <form onSubmit={handleCreatePlan} className="space-y-4">
               <div>
@@ -223,6 +224,7 @@ export function TreatmentPlanWorkspace() {
                 </label>
                 <input
                   id="plan-name"
+                  data-autofocus
                   type="text"
                   required
                   value={newPlanName}
@@ -311,7 +313,7 @@ export function TreatmentPlanWorkspace() {
               </div>
             </form>
           </div>
-        </div>
+        </Modal>
       )}
 
       <div className="space-y-6 max-w-5xl mx-auto">
@@ -324,7 +326,7 @@ export function TreatmentPlanWorkspace() {
             >
               ← Back to Queue
             </Link>
-            <span className="text-gray-300">|</span>
+            <span className="text-gray-600">|</span>
             <span className="text-sm font-semibold text-gray-700">Patient:</span>
             {patient ? (
               <span className="font-bold text-gray-900">
@@ -350,12 +352,12 @@ export function TreatmentPlanWorkspace() {
 
         {/* Notifications */}
         {errorMessage && (
-          <div className="p-4 rounded-lg bg-red-50 border border-red-200 text-sm text-red-800">
+          <div role="alert" className="p-4 rounded-lg bg-red-50 border border-red-200 text-sm text-red-800">
             {errorMessage}
           </div>
         )}
         {successMessage && (
-          <div className="p-4 rounded-lg bg-emerald-50 border border-emerald-200 text-sm text-emerald-800">
+          <div role="status" className="p-4 rounded-lg bg-emerald-50 border border-emerald-200 text-sm text-emerald-800">
             {successMessage}
           </div>
         )}
@@ -497,7 +499,7 @@ export function TreatmentPlanWorkspace() {
                       <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-amber-50 text-amber-800 border border-amber-200">
                         VAS: {sess.vas_score}/10
                       </span>
-                      <span className="text-[11px] font-medium text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+                      <span className="text-sm font-medium text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
                         🔒 Finalised
                       </span>
                       <button
@@ -516,7 +518,7 @@ export function TreatmentPlanWorkspace() {
                       {sess.modalities.map((mod) => (
                         <span
                           key={mod}
-                          className="text-[11px] font-medium bg-teal-50 text-teal-800 px-2 py-0.5 rounded border border-teal-200"
+                          className="text-sm font-medium bg-teal-50 text-teal-800 px-2 py-0.5 rounded border border-teal-200"
                         >
                           {mod}
                         </span>
@@ -530,7 +532,7 @@ export function TreatmentPlanWorkspace() {
                   {/* Addenda Section */}
                   {sess.addenda && sess.addenda.length > 0 && (
                     <div className="space-y-2 pt-2 border-t border-gray-200">
-                      <span className="text-[11px] font-bold uppercase tracking-wider text-amber-800 block">
+                      <span className="text-sm font-bold uppercase tracking-wider text-amber-800 block">
                         Addenda ({sess.addenda.length})
                       </span>
                       {sess.addenda.map((ad, idx) => (

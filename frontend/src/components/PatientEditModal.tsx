@@ -2,6 +2,7 @@ import { useState, useEffect, type FormEvent } from 'react'
 import { useUpdatePatient } from '../api/queries'
 import { ApiError, apiFetch } from '../api/client'
 import { ConflictBanner } from './ConflictBanner'
+import { Modal } from './Modal'
 import type { PatientOut, PatientUpdate } from '../api/types'
 
 interface PatientEditModalProps {
@@ -128,31 +129,15 @@ export function PatientEditModal({
   }
 
   return (
-    <div
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="patient-edit-modal-title"
-      className="fixed inset-0 z-50 bg-neutral-900/50 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto"
+    <Modal
+      open={isOpen}
+      onClose={onClose}
+      title="Edit Patient Demographics"
+      description={`URN: ${patient.urn}`}
+      busy={updateMutation.isPending}
+      className="max-w-2xl"
     >
-      <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full p-6 space-y-4 my-8">
-        <div className="flex items-center justify-between pb-3 border-b border-neutral-200">
-          <div>
-            <h3 id="patient-edit-modal-title" className="text-xl font-bold text-neutral-900">
-              Edit Patient Demographics
-            </h3>
-            <p className="text-xs text-neutral-500 font-mono mt-0.5">
-              URN: {patient.urn}
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="text-neutral-500 hover:text-neutral-800 font-bold text-xl px-2 cursor-pointer"
-          >
-            &times;
-          </button>
-        </div>
-
+      <div className="space-y-4">
         {isConflict && (
           <ConflictBanner onReload={handleReload} isReloading={isReloading} />
         )}
@@ -171,6 +156,7 @@ export function PatientEditModal({
               </label>
               <input
                 id="edit-full-name"
+                data-autofocus
                 type="text"
                 required
                 value={fullName}
@@ -353,6 +339,6 @@ export function PatientEditModal({
           </div>
         </form>
       </div>
-    </div>
+    </Modal>
   )
 }

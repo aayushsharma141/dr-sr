@@ -1,0 +1,59 @@
+/*
+ * Phase 18 dialog and print rules. Imported from main.tsx after index.css.
+ * Why a separate file: the other agent's uncommitted edits to index.css were
+ * declined (18-DECISIONS.md, B-1 H2), so the existing print block stays as it is.
+ * Those old rules still apply: body:has(.print-portal) > #root hides the app
+ * while a print portal exists, and Modal mounts a print dialog only while open,
+ * so a closed one never blanks other prints.
+ */
+
+/* Keep page scroll from chaining through an open modal (guide prevent-page-scroll-under-modal-dialog). */
+dialog:modal {
+  overscroll-behavior: contain;
+}
+dialog::backdrop {
+  overflow: hidden;
+  overscroll-behavior: contain;
+}
+
+@media print {
+  /*
+   * Named page for the payment receipt. A4 is the approved paper (user, 2026-11-02).
+   * Distinct from the default A4 page used by the registration card and the
+   * prescription slip: the receipt has its own margin and its own layout (plan 04).
+   * Never use `size: 80mm auto`: Edge ignores it and prints on Letter.
+   */
+  @page receipt {
+    size: A4;
+    margin: 12mm;
+  }
+
+  /* `page` is ignored on a top-layer <dialog>, so it is applied to <html> instead. */
+  html:has(dialog[open][data-print-page="receipt"]) {
+    page: receipt;
+  }
+
+  /*
+   * A print dialog is printed as plain page content: no box, no backdrop, no fixed
+   * position. Without these overrides the UA dialog styles clip long output.
+   */
+  dialog.print-portal[open] {
+    position: static;
+    inset: auto;
+    width: auto;
+    max-width: none;
+    height: auto;
+    max-height: none;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+    overflow: visible;
+    background: transparent;
+    color: inherit;
+  }
+  dialog.print-portal::backdrop {
+    display: none !important;
+  }
+}

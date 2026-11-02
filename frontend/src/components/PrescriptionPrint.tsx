@@ -1,5 +1,5 @@
-import { createPortal } from 'react-dom'
 import type { PrescriptionOut } from '../api/types'
+import { Modal } from './Modal'
 import { useClinicSettings } from '../api/queries'
 import {
   LetterheadBanner,
@@ -24,16 +24,23 @@ export function PrescriptionPrint({ prescription, onClose }: PrescriptionPrintPr
       : undefined
   const issuedOn = new Date(prescription.created_at).toLocaleDateString('en-IN')
 
-  // Rendered in a portal on <body> so printing can hide the rest of the app (see index.css),
-  // instead of printing the workspace page behind the slip.
-  return createPortal(
-    <div className="print-portal prescription-print-modal fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/60 p-4 print:static print:block print:overflow-visible print:bg-transparent print:p-0">
+  // Shared Modal renders this as a print portal on <body>, so printing hides the rest of the
+  // app (print.css and index.css) instead of printing the workspace page behind the slip.
+  return (
+    <Modal
+      open
+      print="a4"
+      title="Prescription slip"
+      onClose={onClose ?? (() => {})}
+      dismiss="any"
+      className="max-w-4xl"
+    >
       {/* Screen action controls - hidden during printing */}
-      <div className="fixed right-4 top-4 z-50 flex gap-3 print:hidden">
+      <div className="flex flex-wrap justify-end gap-3 print:hidden">
         <button
           type="button"
           onClick={() => window.print()}
-          className="cursor-pointer rounded-lg bg-red-900 px-5 py-2.5 text-sm font-semibold text-white shadow-lg transition hover:bg-red-800"
+          className="cursor-pointer rounded-lg bg-red-900 px-5 py-2.5 text-sm font-semibold text-white shadow transition hover:bg-red-800"
         >
           Print Prescription Slip (प्रिंट करें)
         </button>
@@ -41,7 +48,7 @@ export function PrescriptionPrint({ prescription, onClose }: PrescriptionPrintPr
           <button
             type="button"
             onClick={onClose}
-            className="cursor-pointer rounded-lg bg-gray-700 px-4 py-2.5 text-sm font-semibold text-white shadow-lg transition hover:bg-gray-800"
+            className="cursor-pointer rounded-lg bg-gray-700 px-4 py-2.5 text-sm font-semibold text-white shadow transition hover:bg-gray-800"
           >
             Close (बंद करें)
           </button>
@@ -50,7 +57,7 @@ export function PrescriptionPrint({ prescription, onClose }: PrescriptionPrintPr
 
       {/* Printable A4 sheet */}
       <div
-        className="printable-sheet mx-auto mt-12 w-[198mm] max-w-full bg-white p-3 text-slate-900 shadow-2xl print:mt-0 print:w-full print:p-0 print:shadow-none"
+        className="printable-sheet mx-auto mt-4 w-[198mm] max-w-full bg-white p-3 text-slate-900 print:mt-0 print:w-full print:p-0 print:shadow-none"
         data-testid="prescription-sheet"
       >
         <LetterheadBanner clinicName={clinicNameEn} />
@@ -167,7 +174,6 @@ export function PrescriptionPrint({ prescription, onClose }: PrescriptionPrintPr
           <LetterheadFooter addresses={addresses} />
         </div>
       </div>
-    </div>,
-    document.body,
+    </Modal>
   )
 }

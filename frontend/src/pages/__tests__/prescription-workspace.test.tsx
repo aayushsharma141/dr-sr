@@ -3,6 +3,7 @@ import { cleanup, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes } from 'react-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import '../../test/dialog-shim'
 import { PrescriptionWorkspace } from '../PrescriptionWorkspace'
 import type { Me, PatientOut, PrescriptionOut } from '../../api/types'
 

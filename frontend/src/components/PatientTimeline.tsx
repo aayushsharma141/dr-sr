@@ -41,7 +41,7 @@ export const PatientTimeline: React.FC<PatientTimelineProps> = ({
   }
 
   if (error) {
-    return <div className="p-6 text-center text-sm text-red-500">Failed to load patient history.</div>
+    return <div className="p-6 text-center text-sm text-red-600">Failed to load patient history.</div>
   }
 
   if (!visibleTimeline || visibleTimeline.length === 0) {
@@ -58,7 +58,7 @@ export const PatientTimeline: React.FC<PatientTimelineProps> = ({
         <h3 className="text-base font-bold text-slate-900 dark:text-white">
           {heading}
         </h3>
-        <span className="text-xs text-slate-400">
+        <span className="text-xs text-slate-600">
           {visibleTimeline.length} interaction(s) recorded
         </span>
       </div>
@@ -88,12 +88,12 @@ export const PatientTimeline: React.FC<PatientTimelineProps> = ({
                       {item.title}
                     </span>
                     {item.badge && (
-                      <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${badgeClass}`}>
+                      <span className={`rounded-full px-2 py-0.5 text-sm font-bold uppercase tracking-wider ${badgeClass}`}>
                         {item.badge}
                       </span>
                     )}
                   </div>
-                  <span className="text-xs text-slate-400">{formattedDate}</span>
+                  <span className="text-xs text-slate-600">{formattedDate}</span>
                 </div>
 
                 {item.subtitle && (

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useParams, useSearchParams, useNavigate, Link } from 'react-router'
 import { AppShell } from '../components/AppShell'
 import { ConflictBanner } from '../components/ConflictBanner'
+import { Modal } from '../components/Modal'
 import {
   usePatient,
   usePatientEncounters,
@@ -189,7 +190,7 @@ export function ClinicalEncounterWorkspace() {
   if (encounterId > 0 && isEncounterError) {
     return (
       <AppShell name={me?.full_name || 'Doctor'} role="DOCTOR">
-        <div className="p-6 bg-red-50 text-red-700 rounded border border-red-200">
+        <div role="alert" className="p-6 bg-red-50 text-red-700 rounded border border-red-200">
           Encounter access restricted or not found: {encounterError.message}
         </div>
       </AppShell>
@@ -255,7 +256,7 @@ export function ClinicalEncounterWorkspace() {
 
             {/* Allergies Alert */}
             {patient.allergies && patient.allergies !== 'None reported' ? (
-              <div className="p-3 bg-red-50 border border-red-200 rounded text-red-800 text-xs font-semibold flex items-center gap-2">
+              <div role="alert" className="p-3 bg-red-50 border border-red-200 rounded text-red-800 text-xs font-semibold flex items-center gap-2">
                 <span>⚠️ Clinical Alert - Reported Allergies:</span>
                 <span className="font-bold underline">{patient.allergies}</span>
               </div>
@@ -459,20 +460,27 @@ export function ClinicalEncounterWorkspace() {
 
         {/* Finalisation Confirmation Modal */}
         {showFinaliseConfirm && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-            <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6 space-y-4">
+          <Modal
+            open
+            variant="destructive"
+            title="Finalise Consultation?"
+            onClose={() => setShowFinaliseConfirm(false)}
+            busy={finaliseMutation.isPending}
+            className="max-w-md"
+          >
+            <div className="space-y-4">
               <div className="w-12 h-12 rounded-full bg-red-100 text-red-900 flex items-center justify-center mx-auto">
                 <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                 </svg>
               </div>
-              <h4 className="text-lg font-bold text-center text-neutral-900">Finalise Consultation?</h4>
               <p className="text-xs text-neutral-600 text-center leading-relaxed">
                 Once finalised, this clinical encounter will be permanently locked against modifications or deletions. Any subsequent changes can only be added as dated addenda.
               </p>
               <div className="flex justify-end gap-3 pt-3">
                 <button
                   type="button"
+                  data-autofocus
                   onClick={() => setShowFinaliseConfirm(false)}
                   className="px-4 py-2 border border-neutral-300 rounded text-sm font-medium hover:bg-neutral-50"
                 >
@@ -488,7 +496,7 @@ export function ClinicalEncounterWorkspace() {
                 </button>
               </div>
             </div>
-          </div>
+          </Modal>
         )}
       </div>
     </AppShell>

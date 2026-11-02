@@ -193,7 +193,7 @@ export function PrescriptionWorkspace() {
             >
               ← Back to Queue
             </Link>
-            <span className="text-gray-300">|</span>
+            <span className="text-gray-600">|</span>
             <span className="text-sm font-semibold text-gray-700">Patient:</span>
             {patient ? (
               <span className="font-bold text-gray-900">
@@ -213,12 +213,12 @@ export function PrescriptionWorkspace() {
 
         {/* Notifications */}
         {errorBanner && (
-          <div className="p-4 rounded-lg bg-red-50 border border-red-200 text-sm text-red-800">
+          <div role="alert" className="p-4 rounded-lg bg-red-50 border border-red-200 text-sm text-red-800">
             {errorBanner}
           </div>
         )}
         {successBanner && (
-          <div className="p-4 rounded-lg bg-emerald-50 border border-emerald-200 text-sm text-emerald-800 flex justify-between items-center">
+          <div role="status" className="p-4 rounded-lg bg-emerald-50 border border-emerald-200 text-sm text-emerald-800 flex justify-between items-center">
             <span>{successBanner}</span>
             <button
               type="button"
@@ -347,7 +347,7 @@ export function PrescriptionWorkspace() {
                           type="button"
                           onClick={() => handleRemoveItem(index)}
                           disabled={items.length <= 1}
-                          className="text-red-500 hover:text-red-700 disabled:opacity-30 text-base"
+                          className="text-red-600 hover:text-red-700 disabled:opacity-30 text-base"
                           title="Remove item"
                         >
                           ✕

@@ -322,7 +322,7 @@ export function PatientRegister() {
                   className="w-full px-3 py-2 border border-neutral-300 rounded min-h-[44px] text-neutral-900 focus-visible:outline-2 focus-visible:outline-red-800"
                 />
                 {duplicateChecking && (
-                  <span className="absolute right-3 top-3 text-xs text-neutral-400">
+                  <span className="absolute right-3 top-3 text-xs text-neutral-600">
                     Checking...
                   </span>
                 )}
