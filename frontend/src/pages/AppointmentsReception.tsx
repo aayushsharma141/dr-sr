@@ -193,6 +193,8 @@ function addCalendarDays(value: string, days: number) {
 
 function visitTypeLabel(value: Appointment['visit_type']) {
   switch (value) {
+    case 'UNSPECIFIED':
+      return 'Legacy visit'
     case 'FOLLOW_UP':
       return 'Follow-up review'
     case 'PHYSIOTHERAPY_SESSION':
