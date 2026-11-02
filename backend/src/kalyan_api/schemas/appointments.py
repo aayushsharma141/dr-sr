@@ -13,9 +13,10 @@ class AppointmentCreate(BaseModel):
     patient_id: int = Field(..., gt=0, description="Target patient ID")
     doctor_id: int = Field(..., gt=0, description="Target doctor ID")
     appointment_date: date = Field(..., description="Clinic-local booking date")
-    # Default SCHEDULED preserves old API clients that submit a future date without a mode.
-    booking_mode: AppointmentBookingMode = Field(
-        default=AppointmentBookingMode.SCHEDULED,
+    # None lets the API infer WALK_IN for today and SCHEDULED for a future date
+    # for older clients that have not yet sent an explicit booking_mode.
+    booking_mode: AppointmentBookingMode | None = Field(
+        default=None,
         description="WALK_IN allocates a same-day token; SCHEDULED reserves a future queue date",
     )
     visit_type: AppointmentVisitType = Field(
