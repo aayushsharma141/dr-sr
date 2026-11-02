@@ -21,3 +21,18 @@
     scroll-behavior: auto !important;
   }
 }
+
+/* A4 documents: millimetre page box and exact colours, so the printed letterhead matches the approved sample. */
+@media print {
+  @page {
+    size: A4;
+    margin: 6mm;
+  }
+
+  html,
+  body {
+    background: #ffffff !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+}
