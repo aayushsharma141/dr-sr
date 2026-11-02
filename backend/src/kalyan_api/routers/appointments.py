@@ -100,6 +100,12 @@ def book_appointment(
             code="doctor_not_found",
             message="Doctor not found or inactive.",
         )
+    if principal.role == Role.DOCTOR and principal.doctor_id != payload.doctor_id:
+        raise ApiError(
+            status_code=403,
+            code="scope_forbidden",
+            message="Doctors can only create bookings for their own appointment queue.",
+        )
 
     clinic_today = clock.ist_today()
     if payload.appointment_date < clinic_today:
