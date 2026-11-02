@@ -65,6 +65,9 @@ class Doctor(Base):
     is_active: Mapped[bool] = mapped_column(
         Boolean, default=True, server_default=text("true"), nullable=False
     )
+    is_test_data: Mapped[bool] = mapped_column(
+        Boolean, default=False, server_default=text("false"), nullable=False
+    )
     version_id: Mapped[int] = mapped_column(Integer, default=1, server_default="1", nullable=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
@@ -365,6 +368,21 @@ class Patient(Base):
     __mapper_args__ = {"version_id_col": version_id}
 
 
+class AppointmentBookingMode(StrEnum):
+    """Whether a visit enters today's queue or reserves a future queue date."""
+
+    WALK_IN = "WALK_IN"
+    SCHEDULED = "SCHEDULED"
+
+
+class AppointmentVisitType(StrEnum):
+    """Operational visit category; not a clinical diagnosis."""
+
+    NEW_CONSULTATION = "NEW_CONSULTATION"
+    FOLLOW_UP = "FOLLOW_UP"
+    PHYSIOTHERAPY_SESSION = "PHYSIOTHERAPY_SESSION"
+
+
 class AppointmentStatus(StrEnum):
     """Appointment workflow status (APT-02)."""
 
@@ -410,6 +428,14 @@ class Appointment(Base):
         ),
         Index("ix_appointments_doctor_date_status", "doctor_id", "appointment_date", "status"),
         Index("ix_appointments_patient_date", "patient_id", "appointment_date"),
+        Index(
+            "ix_appointments_patient_doctor_date_type_status",
+            "patient_id",
+            "doctor_id",
+            "appointment_date",
+            "visit_type",
+            "status",
+        ),
     )
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
@@ -420,6 +446,23 @@ class Appointment(Base):
         BigInteger, ForeignKey("doctors.id", ondelete="RESTRICT"), nullable=False, index=True
     )
     appointment_date: Mapped[date] = mapped_column(Date, nullable=False, index=True)
+    booking_mode: Mapped[str] = mapped_column(
+        String(16),
+        default=AppointmentBookingMode.WALK_IN.value,
+        server_default=text(f"'{AppointmentBookingMode.WALK_IN.value}'"),
+        nullable=False,
+    )
+    visit_type: Mapped[str] = mapped_column(
+        String(32),
+        default=AppointmentVisitType.NEW_CONSULTATION.value,
+        server_default=text(f"'{AppointmentVisitType.NEW_CONSULTATION.value}'"),
+        nullable=False,
+    )
+    treatment_plan_id: Mapped[int | None] = mapped_column(
+        BigInteger,
+        ForeignKey("treatment_plans.id", ondelete="RESTRICT"),
+        nullable=True,
+    )
     token_number: Mapped[int] = mapped_column(Integer, nullable=False)
     status: Mapped[str] = mapped_column(
         String(32),
@@ -451,6 +494,7 @@ class Appointment(Base):
     patient = relationship("Patient", lazy="joined")
     doctor = relationship("Doctor", lazy="joined")
     created_by_user = relationship("User", lazy="joined")
+    treatment_plan = relationship("TreatmentPlan", lazy="select")
 
 
 class ClinicalEncounter(Base):
