@@ -266,7 +266,7 @@ export function AppShell({ name, role, children }: AppShellProps) {
           return (
             <div key={item.key}>
               {sectionLabel && (
-                <div className={`pb-2 pt-4 text-[10px] font-bold tracking-[0.12em] text-rose-100/65 ${compact ? 'px-0 text-center xl:px-3 xl:text-left' : 'px-3'}`}>
+                <div className={`pb-2 pt-4 text-[10px] font-bold tracking-[0.12em] text-rose-100/65 ${compact ? 'hidden xl:block xl:px-3 xl:text-left' : 'px-3'}`}>
                   {sectionLabel}
                 </div>
               )}
