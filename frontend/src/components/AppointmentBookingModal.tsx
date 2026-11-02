@@ -12,6 +12,7 @@ interface AppointmentBookingModalProps {
   onClose: () => void
   initialPatient?: PatientOut | null
   initialDoctorId?: number
+  lockDoctorSelection?: boolean
   initialDate?: string
   initialMode?: AppointmentBookingMode
   onSuccess?: () => void
@@ -69,6 +70,7 @@ export function AppointmentBookingModal({
   onClose,
   initialPatient,
   initialDoctorId,
+  lockDoctorSelection = false,
   initialDate,
   initialMode = 'WALK_IN',
   onSuccess,
@@ -396,7 +398,8 @@ export function AppointmentBookingModal({
                     value={selectedDoctorId}
                     onChange={(event) => setSelectedDoctorId(event.target.value ? Number(event.target.value) : '')}
                     required
-                    className="min-h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm outline-none focus:border-[#8E1C3D] focus:ring-2 focus:ring-[#8E1C3D]/15"
+                    disabled={lockDoctorSelection}
+                    className="min-h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm outline-none focus:border-[#8E1C3D] focus:ring-2 focus:ring-[#8E1C3D]/15 disabled:bg-slate-100 disabled:text-slate-600"
                   >
                     <option value="">{doctorsPending ? 'Loading doctors…' : '-- Select doctor --'}</option>
                     {doctors?.map((doctor) => (
