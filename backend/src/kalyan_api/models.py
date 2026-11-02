@@ -376,6 +376,23 @@ class AppointmentStatus(StrEnum):
     NO_SHOW = "NO_SHOW"
 
 
+class AppointmentBookingMode(StrEnum):
+    """How a patient enters the clinic appointment workflow."""
+
+    WALK_IN = "WALK_IN"
+    SCHEDULED = "SCHEDULED"
+
+
+class AppointmentVisitType(StrEnum):
+    """Administrative visit category; does not itself create a clinical encounter."""
+
+    UNSPECIFIED = "UNSPECIFIED"
+    NEW_CONSULTATION = "NEW_CONSULTATION"
+    FOLLOW_UP = "FOLLOW_UP"
+    PHYSIOTHERAPY_SESSION = "PHYSIOTHERAPY_SESSION"
+    REVIEW = "REVIEW"
+
+
 class DailyTokenSequence(Base):
     """Per-doctor daily sequential token counter for gap-free appointment allocation (APT-01)."""
 
@@ -408,8 +425,22 @@ class Appointment(Base):
             "token_number",
             name="uq_appointments_doctor_date_token",
         ),
+        CheckConstraint(
+            "booking_mode IN ('WALK_IN', 'SCHEDULED')",
+            name="appointments_booking_mode_valid",
+        ),
+        CheckConstraint(
+            "visit_type IN ('UNSPECIFIED', 'NEW_CONSULTATION', 'FOLLOW_UP', "
+            "'PHYSIOTHERAPY_SESSION', 'REVIEW')",
+            name="appointments_visit_type_valid",
+        ),
+        CheckConstraint(
+            "token_number IS NULL OR token_number > 0",
+            name="appointments_token_positive",
+        ),
         Index("ix_appointments_doctor_date_status", "doctor_id", "appointment_date", "status"),
         Index("ix_appointments_patient_date", "patient_id", "appointment_date"),
+        Index("ix_appointments_mode_date", "booking_mode", "appointment_date"),
     )
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
@@ -420,7 +451,19 @@ class Appointment(Base):
         BigInteger, ForeignKey("doctors.id", ondelete="RESTRICT"), nullable=False, index=True
     )
     appointment_date: Mapped[date] = mapped_column(Date, nullable=False, index=True)
-    token_number: Mapped[int] = mapped_column(Integer, nullable=False)
+    booking_mode: Mapped[str] = mapped_column(
+        String(16),
+        default=AppointmentBookingMode.WALK_IN.value,
+        server_default=text(f"'{AppointmentBookingMode.WALK_IN.value}'"),
+        nullable=False,
+    )
+    visit_type: Mapped[str] = mapped_column(
+        String(32),
+        default=AppointmentVisitType.UNSPECIFIED.value,
+        server_default=text(f"'{AppointmentVisitType.UNSPECIFIED.value}'"),
+        nullable=False,
+    )
+    token_number: Mapped[int | None] = mapped_column(Integer, nullable=True)
     status: Mapped[str] = mapped_column(
         String(32),
         default=AppointmentStatus.BOOKED.value,
