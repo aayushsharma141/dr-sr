@@ -243,6 +243,7 @@ function ScheduledVisits({
     date_to: addCalendarDays(localDateValue(new Date()), -1),
     booking_mode: 'SCHEDULED',
     status: 'BOOKED',
+    doctor_id: doctorId,
   })
   const overdueAppointments = overdueQuery.data?.appointments ?? []
   const appointments = [...(data?.appointments ?? [])].sort(
