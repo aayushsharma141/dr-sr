@@ -72,4 +72,5 @@ def test_security_objects_present(app_engine: Engine) -> None:
         assert table_privileges.get("consultation_fees") == {"SELECT", "INSERT", "UPDATE"}
         assert table_privileges.get("urn_sequences") == {"SELECT", "INSERT", "UPDATE"}
         assert table_privileges.get("patients") == {"SELECT", "INSERT", "UPDATE"}
+        assert table_privileges.get("appointments") == {"SELECT", "INSERT", "UPDATE", "DELETE"}
         assert table_privileges.get("alembic_version") == {"SELECT"}
