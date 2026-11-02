@@ -196,7 +196,9 @@ export function PatientDetail() {
               {([
                 { key: 'profile', label: 'Demographic Profile' },
                 { key: 'visits', label: 'Visits & Appointments' },
-                ...(me?.role === 'RECEPTION' ? [] : [{ key: 'clinical' as const, label: 'Clinical Records' }]),
+                ...(me?.permissions.includes('encounter:read') && me.permissions.includes('prescription:read')
+                  ? [{ key: 'clinical' as const, label: 'Clinical Records' }]
+                  : []),
                 { key: 'therapy', label: 'Physiotherapy' },
                 { key: 'billing', label: 'Financial Ledger' },
                 ...(me?.role === 'ADMIN' && me.permissions.includes('audit:read') ? [{ key: 'audit' as const, label: 'Audit History' }] : []),
