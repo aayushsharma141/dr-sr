@@ -387,9 +387,11 @@ def test_doctor_queue_uses_ist_clinic_date_before_utc_midnight(
     db_session.add(patient)
     db_session.flush()
 
+    from kalyan_api.clock import IST
+
     # 20:30 UTC on Nov 1 is 02:00 on Nov 2 in Asia/Kolkata.
     clock["t"] = datetime(2026, 11, 1, 20, 30, tzinfo=UTC)
-    clinic_today = clock.ist_today()
+    clinic_today = clock["t"].astimezone(IST).date()
     reception = login_client(reception_user)
     booked = reception.post(
         "/api/appointments",
