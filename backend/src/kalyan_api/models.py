@@ -377,6 +377,7 @@ class AppointmentBookingMode(StrEnum):
 class AppointmentVisitType(StrEnum):
     """Operational visit category; not a clinical diagnosis."""
 
+    UNSPECIFIED = "UNSPECIFIED"
     NEW_CONSULTATION = "NEW_CONSULTATION"
     FOLLOW_UP = "FOLLOW_UP"
     PHYSIOTHERAPY_SESSION = "PHYSIOTHERAPY_SESSION"
