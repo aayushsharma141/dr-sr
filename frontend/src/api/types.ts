@@ -272,6 +272,12 @@ export type AppointmentStatus =
   | 'CANCELLED'
   | 'NO_SHOW'
 
+export type AppointmentBookingMode = 'WALK_IN' | 'SCHEDULED'
+export type AppointmentVisitType =
+  | 'NEW_CONSULTATION'
+  | 'FOLLOW_UP'
+  | 'PHYSIOTHERAPY_SESSION'
+
 export interface Appointment {
   id: number
   patient_id: number
@@ -282,6 +288,9 @@ export interface Appointment {
   doctor_name_en: string
   doctor_name_hi: string | null
   appointment_date: string
+  booking_mode: AppointmentBookingMode
+  visit_type: AppointmentVisitType
+  treatment_plan_id: number | null
   token_number: number
   status: AppointmentStatus
   status_updated_at: string
@@ -296,6 +305,9 @@ export interface AppointmentCreate {
   patient_id: number
   doctor_id: number
   appointment_date: string
+  booking_mode: AppointmentBookingMode
+  visit_type: AppointmentVisitType
+  treatment_plan_id?: number | null
   notes?: string | null
 }
 
@@ -320,6 +332,8 @@ export interface DoctorQueueItem {
   patient_mobile: string
   patient_allergies: string
   token_number: number
+  booking_mode: AppointmentBookingMode
+  visit_type: AppointmentVisitType
   status: AppointmentStatus
   status_updated_at: string
   notes: string | null
