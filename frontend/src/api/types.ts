@@ -291,7 +291,7 @@ export interface Appointment {
   booking_mode: AppointmentBookingMode
   visit_type: AppointmentVisitType
   treatment_plan_id: number | null
-  token_number: number
+  token_number: number | null
   status: AppointmentStatus
   status_updated_at: string
   cancellation_reason: string | null
