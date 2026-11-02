@@ -681,4 +681,96 @@ describe('AppointmentsReception Component', () => {
   })
 
 
+  it('keeps missed scheduled visits visible and lets reception mark them no-show', async () => {
+    const overdueAppointment: Appointment = {
+      ...mockAppointments[0],
+      appointment_date: clinicDateAfter(-2),
+      booking_mode: 'SCHEDULED',
+      visit_type: 'FOLLOW_UP',
+      token_number: null,
+    }
+    let markedNoShow = false
+    let statusBody: unknown = null
+    const mockFetch = vi.fn().mockImplementation((url: string, init?: RequestInit) => {
+      if (url.includes('/api/auth/me')) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          headers: new Headers({ 'content-type': 'application/json' }),
+          text: () => Promise.resolve(JSON.stringify(mockMe)),
+        })
+      }
+      if (url.includes('/api/doctors')) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          headers: new Headers({ 'content-type': 'application/json' }),
+          text: () => Promise.resolve(JSON.stringify(mockDoctors)),
+        })
+      }
+      if (url.includes('/api/appointments/10/status') && init?.method === 'PATCH') {
+        statusBody = JSON.parse(init.body as string)
+        markedNoShow = true
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          headers: new Headers({ 'content-type': 'application/json' }),
+          text: () => Promise.resolve(JSON.stringify({
+            ...overdueAppointment,
+            status: 'NO_SHOW',
+            version_id: 2,
+          })),
+        })
+      }
+      if (url.includes('/api/appointments?date_to=')) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          headers: new Headers({ 'content-type': 'application/json' }),
+          text: () => Promise.resolve(JSON.stringify({
+            total: markedNoShow ? 0 : 1,
+            appointments: markedNoShow ? [] : [overdueAppointment],
+          })),
+        })
+      }
+      if (url.includes('/api/appointments')) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          headers: new Headers({ 'content-type': 'application/json' }),
+          text: () => Promise.resolve(JSON.stringify({ total: 0, appointments: [] })),
+        })
+      }
+      return Promise.reject(new Error(`Unhandled: ${url}`))
+    })
+    vi.stubGlobal('fetch', mockFetch)
+
+    const user = userEvent.setup()
+    render(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter initialEntries={['/reception/appointments?tab=scheduled']}>
+          <AppointmentsReception />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    )
+
+    await waitFor(() => {
+      expect(screen.getByText('Missed check-in · 1 visit(s)')).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Mark No-show' })).toBeInTheDocument()
+    })
+
+    await user.click(screen.getByRole('button', { name: 'Mark No-show' }))
+    await waitFor(() => {
+      expect(statusBody).toEqual({
+        status: 'NO_SHOW',
+        version_id: 1,
+        cancellation_reason: null,
+      })
+    })
+    await waitFor(() => {
+      expect(screen.queryByRole('button', { name: 'Mark No-show' })).not.toBeInTheDocument()
+    })
+  })
+
+
 })
