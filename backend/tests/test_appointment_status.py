@@ -1,5 +1,7 @@
 """Unit and integration tests for appointment status workflow and doctor queue (APT-02)."""
 
+from datetime import UTC, datetime
+
 from kalyan_api import clock
 from kalyan_api.models import Appointment, AppointmentStatus, Patient
 
@@ -313,3 +315,44 @@ def test_future_scheduled_visit_cannot_be_checked_in_early(
     )
     assert response.status_code == 422
     assert response.json()["code"] == "appointment_not_due"
+
+
+
+def test_doctor_queue_uses_ist_clinic_date_before_utc_midnight(
+    login_client, reception_user, doctor_a_user, db_session, clock
+):
+    """A walk-in booked after IST midnight appears in the same IST-day doctor queue."""
+    patient = Patient(
+        urn="KH-2026-7799",
+        full_name="IST Boundary Patient",
+        guardian_name="Guardian",
+        gender="F",
+        age_years=28,
+        mobile="9876543399",
+        address="Ara",
+    )
+    db_session.add(patient)
+    db_session.flush()
+
+    # 20:30 UTC on Nov 1 is 02:00 on Nov 2 in Asia/Kolkata.
+    clock["t"] = datetime(2026, 11, 1, 20, 30, tzinfo=UTC)
+    clinic_today = clock.ist_today()
+    reception = login_client(reception_user)
+    booked = reception.post(
+        "/api/appointments",
+        json={
+            "patient_id": patient.id,
+            "doctor_id": doctor_a_user.doctor_id,
+            "appointment_date": clinic_today.isoformat(),
+            "booking_mode": "WALK_IN",
+            "visit_type": "NEW_CONSULTATION",
+        },
+    )
+    assert booked.status_code == 201, booked.text
+
+    doctor = login_client(doctor_a_user)
+    queue = doctor.get("/api/doctor/queue")
+    assert queue.status_code == 200, queue.text
+    data = queue.json()
+    assert data["queue_date"] == clinic_today.isoformat()
+    assert any(item["id"] == booked.json()["id"] for item in data["booked"])
