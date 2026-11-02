@@ -125,6 +125,16 @@ export const router = createBrowserRouter([
         ],
       },
       {
+        element: <RequireRole role={['ADMIN', 'RECEPTION']} />,
+        children: [
+        ],
+      },
+      {
+        element: <RequireRole role="RECEPTION" />,
+        children: [
+        ],
+      },
+      {
         element: <RequireRole role={['ADMIN', 'RECEPTION', 'DOCTOR']} />,
         children: [
           {
