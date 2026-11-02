@@ -1,0 +1,95 @@
+"""Pydantic schemas for structured doctor prescriptions and medication lines (RX-01)."""
+
+from datetime import date, datetime
+
+from pydantic import BaseModel, ConfigDict, Field
+
+
+class PrescriptionItemCreate(BaseModel):
+    """Schema for itemized medication line creation."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    item_order: int = Field(ge=1, description="1-based sequence order of medication item")
+    medicine_name: str = Field(min_length=1, max_length=128, description="Brand or generic name")
+    dosage: str = Field(min_length=1, max_length=64, description="Dosage (e.g. 500mg, 10ml)")
+    frequency: str = Field(
+        min_length=1, max_length=64, description="Frequency (e.g. 1-0-1, OD, BD, TDS)"
+    )
+    duration_days: int = Field(ge=1, le=365, description="Treatment duration in days")
+    instructions: str | None = Field(
+        default=None, max_length=500, description="Specific instructions (e.g. After food)"
+    )
+
+
+class PrescriptionItemOut(BaseModel):
+    """Schema for reading a medication item."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    prescription_id: int
+    item_order: int
+    medicine_name: str
+    dosage: str
+    frequency: str
+    duration_days: int
+    instructions: str | None = None
+
+
+class PrescriptionCreate(BaseModel):
+    """Schema for doctor creating a prescription."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    patient_id: int = Field(gt=0, description="Patient ID")
+    encounter_id: int | None = Field(
+        default=None, gt=0, description="Optional linked clinical encounter ID"
+    )
+    diagnosis: str = Field(min_length=2, max_length=1000, description="Clinical diagnosis")
+    dietary_advice: str | None = Field(default=None, max_length=1000)
+    general_advice: str | None = Field(default=None, max_length=1000)
+    follow_up_date: date | None = Field(default=None)
+    items: list[PrescriptionItemCreate] = Field(
+        min_length=1, description="At least one prescribed medicine item required"
+    )
+
+
+class PrescriptionOut(BaseModel):
+    """Schema for full prescription reading including items."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    patient_id: int
+    patient_urn: str
+    patient_name: str
+    doctor_id: int
+    doctor_name: str
+    encounter_id: int | None = None
+    diagnosis: str
+    dietary_advice: str | None = None
+    general_advice: str | None = None
+    follow_up_date: date | None = None
+    version_id: int
+    created_at: datetime
+    updated_at: datetime
+    items: list[PrescriptionItemOut]
+
+
+class PrescriptionSummary(BaseModel):
+    """Schema for prescription summary in patient prescription lists."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    patient_id: int
+    patient_urn: str
+    patient_name: str
+    doctor_id: int
+    doctor_name: str
+    encounter_id: int | None = None
+    diagnosis: str
+    items_count: int
+    follow_up_date: date | None = None
+    created_at: datetime

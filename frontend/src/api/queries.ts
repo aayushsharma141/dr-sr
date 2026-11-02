@@ -10,6 +10,16 @@ import type {
   EncounterRead,
   EncounterSummary,
   EncounterUpdate,
+  PrescriptionCreate,
+  PrescriptionOut,
+  PrescriptionSummary,
+  TreatmentPlanCreate,
+  TreatmentPlanOut,
+  TreatmentPlanUpdate,
+  TreatmentSessionAddendumCreate,
+  TreatmentSessionAddendumOut,
+  TreatmentSessionCreate,
+  TreatmentSessionOut,
 } from './types'
 import type {
   DuplicateCheckResponse,
@@ -638,6 +648,124 @@ export function useAddAddendum() {
       }),
     onSuccess: (_, variables) => {
       qc.invalidateQueries({ queryKey: ['encounter', variables.id] })
+    },
+  })
+}
+
+// ==========================================
+// Phase 14: Prescriptions & Treatment Hooks
+// ==========================================
+
+export function usePatientPrescriptions(patientId: number) {
+  return useQuery({
+    queryKey: ['patient-prescriptions', patientId],
+    queryFn: () => apiFetch<PrescriptionSummary[]>(`/patients/${patientId}/prescriptions`),
+    enabled: patientId > 0,
+  })
+}
+
+export function usePrescription(id: number) {
+  return useQuery({
+    queryKey: ['prescription', id],
+    queryFn: () => apiFetch<PrescriptionOut>(`/prescriptions/${id}`),
+    enabled: id > 0,
+  })
+}
+
+export function useCreatePrescription() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (body: PrescriptionCreate) =>
+      apiFetch<PrescriptionOut>('/prescriptions', {
+        method: 'POST',
+        body,
+      }),
+    onSuccess: (data) => {
+      qc.invalidateQueries({ queryKey: ['patient-prescriptions', data.patient_id] })
+      qc.invalidateQueries({ queryKey: ['doctor-queue'] })
+    },
+  })
+}
+
+export function usePatientTreatmentPlans(patientId: number) {
+  return useQuery({
+    queryKey: ['patient-treatment-plans', patientId],
+    queryFn: () => apiFetch<TreatmentPlanOut[]>(`/patients/${patientId}/treatment-plans`),
+    enabled: patientId > 0,
+  })
+}
+
+export function useTreatmentPlan(id: number) {
+  return useQuery({
+    queryKey: ['treatment-plan', id],
+    queryFn: () => apiFetch<TreatmentPlanOut>(`/treatment-plans/${id}`),
+    enabled: id > 0,
+  })
+}
+
+export function useCreateTreatmentPlan() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (body: TreatmentPlanCreate) =>
+      apiFetch<TreatmentPlanOut>('/treatment-plans', {
+        method: 'POST',
+        body,
+      }),
+    onSuccess: (data) => {
+      qc.invalidateQueries({ queryKey: ['patient-treatment-plans', data.patient_id] })
+    },
+  })
+}
+
+export function useUpdateTreatmentPlan() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, body }: { id: number; body: TreatmentPlanUpdate }) =>
+      apiFetch<TreatmentPlanOut>(`/treatment-plans/${id}`, {
+        method: 'PATCH',
+        body,
+      }),
+    onSuccess: (data) => {
+      qc.setQueryData(['treatment-plan', data.id], data)
+      qc.invalidateQueries({ queryKey: ['patient-treatment-plans', data.patient_id] })
+    },
+  })
+}
+
+export function useTreatmentSessions(planId: number) {
+  return useQuery({
+    queryKey: ['treatment-sessions', planId],
+    queryFn: () => apiFetch<TreatmentSessionOut[]>(`/treatment-plans/${planId}/sessions`),
+    enabled: planId > 0,
+  })
+}
+
+export function useLogTreatmentSession() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ planId, body }: { planId: number; body: TreatmentSessionCreate }) =>
+      apiFetch<TreatmentSessionOut>(`/treatment-plans/${planId}/sessions`, {
+        method: 'POST',
+        body,
+      }),
+    onSuccess: (data) => {
+      qc.invalidateQueries({ queryKey: ['treatment-sessions', data.treatment_plan_id] })
+      qc.invalidateQueries({ queryKey: ['treatment-plan', data.treatment_plan_id] })
+      qc.invalidateQueries({ queryKey: ['patient-treatment-plans', data.patient_id] })
+    },
+  })
+}
+
+export function useAddSessionAddendum() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, body }: { id: number; body: TreatmentSessionAddendumCreate }) =>
+      apiFetch<TreatmentSessionAddendumOut>(`/treatment-sessions/${id}/addenda`, {
+        method: 'POST',
+        body,
+      }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['treatment-sessions'] })
     },
   })
 }

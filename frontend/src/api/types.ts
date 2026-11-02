@@ -396,3 +396,152 @@ export interface EncounterSummary {
   finalised_at: string | null
   addenda_count: number
 }
+
+// ==========================================
+// Phase 14: Prescriptions & Treatment Types
+// ==========================================
+
+export interface PrescriptionItemCreate {
+  item_order: number
+  medicine_name: string
+  dosage: string
+  frequency: string
+  duration_days: number
+  instructions?: string | null
+}
+
+export interface PrescriptionItemOut {
+  id: number
+  prescription_id: number
+  item_order: number
+  medicine_name: string
+  dosage: string
+  frequency: string
+  duration_days: number
+  instructions: string | null
+}
+
+export interface PrescriptionCreate {
+  patient_id: number
+  encounter_id?: number | null
+  diagnosis: string
+  dietary_advice?: string | null
+  general_advice?: string | null
+  follow_up_date?: string | null
+  items: PrescriptionItemCreate[]
+}
+
+export interface PrescriptionOut {
+  id: number
+  patient_id: number
+  patient_urn: string
+  patient_name: string
+  doctor_id: number
+  doctor_name: string
+  encounter_id: number | null
+  diagnosis: string
+  dietary_advice: string | null
+  general_advice: string | null
+  follow_up_date: string | null
+  version_id: number
+  created_at: string
+  updated_at: string
+  items: PrescriptionItemOut[]
+}
+
+export interface PrescriptionSummary {
+  id: number
+  patient_id: number
+  patient_urn: string
+  patient_name: string
+  doctor_id: number
+  doctor_name: string
+  encounter_id: number | null
+  diagnosis: string
+  items_count: number
+  follow_up_date: string | null
+  created_at: string
+}
+
+export type TreatmentPlanStatus = 'ACTIVE' | 'COMPLETED' | 'CANCELLED'
+
+export interface TreatmentPlanCreate {
+  patient_id: number
+  encounter_id?: number | null
+  plan_name: string
+  condition_diagnosis: string
+  referred_by?: string | null
+  total_sessions: number
+  agreed_price_paise: number
+}
+
+export interface TreatmentPlanUpdate {
+  version_id: number
+  plan_name?: string
+  condition_diagnosis?: string
+  referred_by?: string
+  total_sessions?: number
+  status?: TreatmentPlanStatus
+  cancellation_reason?: string
+}
+
+export interface TreatmentPlanOut {
+  id: number
+  patient_id: number
+  patient_urn: string
+  patient_name: string
+  doctor_id: number
+  doctor_name: string
+  encounter_id: number | null
+  plan_name: string
+  condition_diagnosis: string
+  referred_by: string | null
+  total_sessions: number
+  completed_sessions: number
+  agreed_price_paise: number
+  status: string
+  cancellation_reason: string | null
+  version_id: number
+  created_at: string
+  updated_at: string
+}
+
+export interface TreatmentSessionAddendumCreate {
+  note: string
+}
+
+export interface TreatmentSessionAddendumOut {
+  id: number
+  session_id: number
+  author_user_id: number
+  author_name: string
+  note: string
+  created_at: string
+}
+
+export interface TreatmentSessionCreate {
+  session_date?: string | null
+  vas_score: number
+  modalities?: string[]
+  clinical_notes: string
+}
+
+export interface TreatmentSessionOut {
+  id: number
+  treatment_plan_id: number
+  patient_id: number
+  patient_urn: string
+  patient_name: string
+  doctor_id: number
+  doctor_name: string
+  session_number: number
+  session_date: string
+  vas_score: number
+  modalities: string[]
+  clinical_notes: string
+  is_finalised: boolean
+  created_by_user_id: number
+  created_by_username: string
+  created_at: string
+  addenda: TreatmentSessionAddendumOut[]
+}

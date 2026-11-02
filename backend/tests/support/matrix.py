@@ -185,6 +185,61 @@ def _create_addendum_payload(_target: Any = None) -> dict[str, Any]:
     }
 
 
+def _create_prescription_payload(target: Any = None) -> dict[str, Any]:
+    return {
+        "patient_id": getattr(target, "patient_id", 1),
+        "diagnosis": "Matrix prescription diagnosis",
+        "items": [
+            {
+                "item_order": 1,
+                "medicine_name": "Tab Paracetamol",
+                "dosage": "500 mg",
+                "frequency": "1-0-1",
+                "duration_days": 5,
+            }
+        ],
+    }
+
+
+def _create_treatment_plan_payload(target: Any = None) -> dict[str, Any]:
+    return {
+        "patient_id": getattr(target, "patient_id", 1),
+        "plan_name": "Matrix Treatment Package",
+        "condition_diagnosis": "Lumbar Spondylosis",
+        "total_sessions": 5,
+        "agreed_price_paise": 250000,
+    }
+
+
+def _patch_treatment_plan_payload(target: Any = None) -> dict[str, Any]:
+    ver = target.version_id if target and hasattr(target, "version_id") else 1
+    return {
+        "plan_name": "Updated Matrix Plan",
+        "version_id": ver,
+    }
+
+
+def _create_treatment_session_payload(_target: Any = None) -> dict[str, Any]:
+    return {
+        "session_date": "2026-11-02",
+        "vas_score": 6,
+        "modalities": ["IFT", "Hot Pack"],
+        "clinical_notes": "Matrix session logged.",
+    }
+
+
+def _patch_treatment_session_payload(_target: Any = None) -> dict[str, Any]:
+    return {
+        "vas_score": 4,
+    }
+
+
+def _create_session_addendum_payload(_target: Any = None) -> dict[str, Any]:
+    return {
+        "note": "Matrix session addendum note.",
+    }
+
+
 MATRIX: list[MatrixRow] = [
     MatrixRow(
         method="GET",
@@ -694,6 +749,150 @@ MATRIX: list[MatrixRow] = [
         method="POST",
         path="/api/encounters/{id}/addenda",
         body_factory=_create_addendum_payload,
+        expected={
+            "anonymous": 401,
+            "admin": 403,
+            "reception": 403,
+            "doctor_a": 201,
+            "doctor_b": 404,
+        },
+    ),
+    MatrixRow(
+        method="POST",
+        path="/api/prescriptions",
+        body_factory=_create_prescription_payload,
+        expected={
+            "anonymous": 401,
+            "admin": 403,
+            "reception": 403,
+            "doctor_a": 201,
+            "doctor_b": 201,
+        },
+    ),
+    MatrixRow(
+        method="GET",
+        path="/api/prescriptions/{id}",
+        body_factory=None,
+        expected={
+            "anonymous": 401,
+            "admin": 403,
+            "reception": 403,
+            "doctor_a": 200,
+            "doctor_b": 404,
+        },
+    ),
+    MatrixRow(
+        method="GET",
+        path="/api/patients/{patient_id}/prescriptions",
+        body_factory=None,
+        expected={
+            "anonymous": 401,
+            "admin": 403,
+            "reception": 403,
+            "doctor_a": 200,
+            "doctor_b": 200,
+        },
+    ),
+    MatrixRow(
+        method="POST",
+        path="/api/treatment-plans",
+        body_factory=_create_treatment_plan_payload,
+        expected={
+            "anonymous": 401,
+            "admin": 403,
+            "reception": 403,
+            "doctor_a": 201,
+            "doctor_b": 201,
+        },
+    ),
+    MatrixRow(
+        method="GET",
+        path="/api/treatment-plans/{id}",
+        body_factory=None,
+        expected={
+            "anonymous": 401,
+            "admin": 403,
+            "reception": 403,
+            "doctor_a": 200,
+            "doctor_b": 404,
+        },
+    ),
+    MatrixRow(
+        method="GET",
+        path="/api/patients/{patient_id}/treatment-plans",
+        body_factory=None,
+        expected={
+            "anonymous": 401,
+            "admin": 403,
+            "reception": 403,
+            "doctor_a": 200,
+            "doctor_b": 200,
+        },
+    ),
+    MatrixRow(
+        method="PATCH",
+        path="/api/treatment-plans/{id}",
+        body_factory=_patch_treatment_plan_payload,
+        expected={
+            "anonymous": 401,
+            "admin": 403,
+            "reception": 403,
+            "doctor_a": 200,
+            "doctor_b": 404,
+        },
+    ),
+    MatrixRow(
+        method="POST",
+        path="/api/treatment-plans/{plan_id}/sessions",
+        body_factory=_create_treatment_session_payload,
+        expected={
+            "anonymous": 401,
+            "admin": 403,
+            "reception": 403,
+            "doctor_a": 201,
+            "doctor_b": 404,
+        },
+    ),
+    MatrixRow(
+        method="GET",
+        path="/api/treatment-plans/{plan_id}/sessions",
+        body_factory=None,
+        expected={
+            "anonymous": 401,
+            "admin": 403,
+            "reception": 403,
+            "doctor_a": 200,
+            "doctor_b": 404,
+        },
+    ),
+    MatrixRow(
+        method="PATCH",
+        path="/api/treatment-sessions/{id}",
+        body_factory=_patch_treatment_session_payload,
+        expected={
+            "anonymous": 401,
+            "admin": 403,
+            "reception": 403,
+            "doctor_a": 400,
+            "doctor_b": 400,
+        },
+    ),
+    MatrixRow(
+        method="DELETE",
+        path="/api/treatment-sessions/{id}",
+        body_factory=None,
+        expected={
+            "anonymous": 401,
+            "admin": 403,
+            "reception": 403,
+            "doctor_a": 400,
+            "doctor_b": 400,
+        },
+    ),
+    MatrixRow(
+        method="POST",
+        path="/api/treatment-sessions/{id}/addenda",
+        body_factory=_create_session_addendum_payload,
         expected={
             "anonymous": 401,
             "admin": 403,

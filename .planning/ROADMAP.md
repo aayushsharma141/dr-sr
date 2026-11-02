@@ -117,11 +117,17 @@ Plans:
   2. A doctor creates a treatment plan/package for a patient (sessions, price) that billing can reference later.
   3. Sessions are logged with VAS pain score in chronological order; an attempt to edit or delete a session fails at the API and the database, and corrections are recorded only as addenda.
   4. Two simultaneous session entries for the same plan receive distinct, ordered session numbers.
-**Plans**: TBD
+**Plans**: 7 plans
 
 Plans:
 
-- [ ] TBD (created by plan-phase)
+- [x] 14-01-PLAN.md - Schema Migration & Core Models (0004 Prescriptions, Plans, Sessions, Addenda)
+- [x] 14-02-PLAN.md - Prescriptions REST API (RX-01)
+- [x] 14-03-PLAN.md - Treatment Plans & Packages REST API (TRT-01)
+- [x] 14-04-PLAN.md - Physiotherapy Sessions & Addenda REST API (TRT-02, TRT-03)
+- [ ] 14-05-PLAN.md - Frontend Prescriptions Workspace & Print Slip (RX-01)
+- [ ] 14-06-PLAN.md - Frontend Treatment Plan & Session Logger UI (TRT-01, TRT-02, TRT-03)
+- [ ] 14-07-PLAN.md - Phase 14 Integration Gate & Quality Verification
 
 ### Phase 15: Billing, Receipts & Reversals
 

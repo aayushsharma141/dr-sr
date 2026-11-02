@@ -9,11 +9,11 @@ from kalyan_api.db.migrate import alembic_config
 
 
 def test_single_head(test_settings: Settings) -> None:
-    """ScriptDirectory has exactly one linear head revision: 0002."""
+    """ScriptDirectory has exactly one linear head revision: 0004."""
     cfg = alembic_config(test_settings.owner_url)
     script = ScriptDirectory.from_config(cfg)
     heads = script.get_heads()
-    assert heads == ["0003"]
+    assert heads == ["0004"]
 
 
 def test_migrations_match_models(migrated_db: dict[str, int], test_settings: Settings) -> None:

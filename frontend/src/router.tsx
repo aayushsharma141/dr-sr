@@ -193,6 +193,33 @@ export const router = createBrowserRouter([
               }
             },
           },
+          {
+            path: '/doctor/prescriptions/new',
+            lazy: async () => {
+              const { PrescriptionWorkspace } = await import('./pages/PrescriptionWorkspace')
+              return {
+                Component: PrescriptionWorkspace,
+              }
+            },
+          },
+          {
+            path: '/doctor/treatment-plans',
+            lazy: async () => {
+              const { TreatmentPlanWorkspace } = await import('./pages/TreatmentPlanWorkspace')
+              return {
+                Component: TreatmentPlanWorkspace,
+              }
+            },
+          },
+          {
+            path: '/doctor/treatment-plans/:id',
+            lazy: async () => {
+              const { TreatmentPlanWorkspace } = await import('./pages/TreatmentPlanWorkspace')
+              return {
+                Component: TreatmentPlanWorkspace,
+              }
+            },
+          },
         ],
       },
     ],
