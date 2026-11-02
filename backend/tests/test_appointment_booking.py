@@ -68,7 +68,7 @@ def test_book_appointment_lifecycle(login_client, reception_user, doctor_a_user,
         json={
             "patient_id": patient2.id,
             "doctor_id": doctor_id,
-            "appointment_date": "2026-11-05",
+            "appointment_date": target_date,
             "notes": "Followup",
         },
     )
@@ -77,7 +77,7 @@ def test_book_appointment_lifecycle(login_client, reception_user, doctor_a_user,
     assert data2["token_number"] == 2
 
     # 5. List appointments
-    list_resp = client.get("/api/appointments?appointment_date=2026-11-05")
+    list_resp = client.get(f"/api/appointments?appointment_date={target_date}")
     assert list_resp.status_code == 200
     list_data = list_resp.json()
     assert list_data["total"] >= 2
@@ -99,7 +99,7 @@ def test_book_appointment_validations(login_client, reception_user, db_session, 
         json={
             "patient_id": 999999,
             "doctor_id": 1,
-            "appointment_date": "2026-11-05",
+            "appointment_date": target_date,
         },
     )
     assert resp.status_code == 404
@@ -123,7 +123,7 @@ def test_book_appointment_validations(login_client, reception_user, db_session, 
         json={
             "patient_id": patient.id,
             "doctor_id": 999999,
-            "appointment_date": "2026-11-05",
+            "appointment_date": target_date,
         },
     )
     assert resp2.status_code == 404
