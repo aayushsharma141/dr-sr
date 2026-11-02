@@ -44,3 +44,4 @@ Immutable financial ledger of collections and receipts (`BIL-01`, `BIL-02`, `BIL
 - `Permission.BILLING_WRITE` (`billing:write`): Granted to `ADMIN` and `RECEPTION`.
 - `Permission.BILLING_REVERSE` (`billing:reverse`): Granted strictly to `ADMIN`.
 - `Permission.TIMELINE_READ` (`timeline:read`): Granted to `ADMIN`, `RECEPTION`, `DOCTOR`.
+

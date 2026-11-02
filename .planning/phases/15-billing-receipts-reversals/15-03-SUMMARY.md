@@ -21,3 +21,4 @@
   - Doctor role cannot record or reverse payments (403 Forbidden).
   - Dynamic pending dues ledger accurately reflects partial payments, remaining balances, and zero-balance completions.
   - Admin payment reversal restores pending package balance, marks transaction reversed with reason and timestamp, and blocks non-admin callers.
+

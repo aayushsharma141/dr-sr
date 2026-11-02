@@ -18,3 +18,4 @@
   - Displays prominent `DUPLICATE` watermark and copy banner when `isReprint=true` (BIL-04).
   - Displays reversal banner and reason if transaction has been reversed (BIL-05).
 - Automated tests in `frontend/src/components/__tests__/payment-modal.test.tsx` and `receipt-print.test.tsx` (5 passed).
+

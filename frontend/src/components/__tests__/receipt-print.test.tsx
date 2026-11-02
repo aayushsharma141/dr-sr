@@ -62,3 +62,4 @@ describe('ReceiptPrint', () => {
     expect(screen.getByText(/Authorized by @admin/i)).toBeInTheDocument()
   })
 })
+

@@ -784,7 +784,7 @@ export function usePatientPayments(patientId: number | null | undefined) {
   return useQuery({
     queryKey: ['payments', 'patient', patientId],
     queryFn: () =>
-      apiFetch<PaymentOut[]>(/api/patients//payments),
+      apiFetch<PaymentOut[]>('/api/patients/' + patientId + '/payments'),
     enabled: typeof patientId === 'number' && patientId > 0,
   })
 }
@@ -792,7 +792,7 @@ export function usePatientPayments(patientId: number | null | undefined) {
 export function usePayment(id: number | null | undefined) {
   return useQuery({
     queryKey: ['payments', id],
-    queryFn: () => apiFetch<PaymentOut>(/api/payments/),
+    queryFn: () => apiFetch<PaymentOut>('/api/payments/' + id),
     enabled: typeof id === 'number' && id > 0,
   })
 }
@@ -825,7 +825,7 @@ export function useReversePayment() {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: ({ id, payload }: { id: number; payload: PaymentReversalCreate }) =>
-      apiFetch<PaymentOut>(/api/payments//reverse, {
+      apiFetch<PaymentOut>('/api/payments/' + id + '/reverse', {
         method: 'POST',
         body: JSON.stringify(payload),
       }),
@@ -842,7 +842,7 @@ export function usePatientTimeline(patientId: number | null | undefined) {
   return useQuery({
     queryKey: ['timeline', patientId],
     queryFn: () =>
-      apiFetch<TimelineItemOut[]>(/api/patients//timeline),
+      apiFetch<TimelineItemOut[]>('/api/patients/' + patientId + '/timeline'),
     enabled: typeof patientId === 'number' && patientId > 0,
   })
 }

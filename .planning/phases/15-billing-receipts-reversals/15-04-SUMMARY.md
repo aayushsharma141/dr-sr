@@ -12,3 +12,4 @@
   - Admin views complete unified timeline with all 6 event categories strictly ordered.
   - Doctor silo filtering ensures cross-doctor confidential notes/prescriptions are never leaked.
   - Reception view allows front-desk operational tracking while protecting clinical privacy.
+

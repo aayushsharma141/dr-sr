@@ -152,3 +152,4 @@ export const ReceiptPrint: React.FC<ReceiptPrintProps> = ({
     </div>
   )
 }
+

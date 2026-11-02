@@ -41,3 +41,4 @@
 - `backend/tests/test_billing_models.py`: 3 passed.
 - `backend/tests/test_migrations.py`: 3 passed.
 - Total: 6 passed in 1.64s.
+

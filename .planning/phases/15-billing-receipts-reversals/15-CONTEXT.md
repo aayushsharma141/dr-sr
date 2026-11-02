@@ -21,3 +21,4 @@ It fulfills requirements:
    Receipt numbers are generated via row-level locking (`SELECT ... FOR UPDATE`) on the `receipt_sequences` table, guaranteeing 0 gaps and 0 duplicates across concurrent reception desks.
 5. **Unified Patient Timeline (`CLN-03`):**
    An aggregated view combining encounters, prescriptions, treatment plans, sessions, and payments sorted chronologically by timestamp.
+
