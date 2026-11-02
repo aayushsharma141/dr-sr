@@ -14,12 +14,36 @@ import type { Appointment, AppointmentStatus, DoctorOut } from '../api/types'
 
 
 type FollowUpWindow = 'all' | 'today' | 'week' | 'overdue'
+type AppointmentTab = 'today' | 'scheduled' | 'followup'
 
-function localDateValue(date: Date) {
-  const year = date.getFullYear()
-  const month = String(date.getMonth() + 1).padStart(2, '0')
-  const day = String(date.getDate()).padStart(2, '0')
-  return `${year}-${month}-${day}`
+function clinicDateValue(date: Date) {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Kolkata',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(date)
+  const part = (type: string) => parts.find((item) => item.type === type)?.value ?? ''
+  return `${part('year')}-${part('month')}-${part('day')}`
+}
+
+function clinicToday() {
+  return clinicDateValue(new Date())
+}
+
+function clinicDateAfter(days: number) {
+  const [year, month, day] = clinicToday().split('-').map(Number)
+  return clinicDateValue(new Date(Date.UTC(year, month - 1, day + days, 12)))
+}
+
+function visitTypeLabel(value: Appointment['visit_type']) {
+  switch (value) {
+    case 'NEW_CONSULTATION': return 'New consultation'
+    case 'FOLLOW_UP': return 'Follow-up review'
+    case 'PHYSIOTHERAPY_SESSION': return 'Physiotherapy visit'
+    case 'REVIEW': return 'Progress review'
+    default: return 'Visit'
+  }
 }
 
 function FollowUpVisits() {
@@ -180,43 +204,60 @@ export function AppointmentsReception() {
   const { data: me } = useMe()
   const [searchParams, setSearchParams] = useSearchParams()
   const requestedTab = searchParams.get('tab')
-  const activeTab = requestedTab === 'followup' && me?.permissions.includes('prescription:read') ? 'followup' : 'today'
   const canManageAppointments = me?.permissions.includes('appointment:write') === true
   const canViewFollowUps = me?.permissions.includes('prescription:read') === true
-  const selectTab = (tab: 'today' | 'followup') => setSearchParams({ tab })
-  const [selectedDate, setSelectedDate] = useState(
-    new Date().toISOString().split('T')[0],
-  )
+  const activeTab: AppointmentTab =
+    requestedTab === 'scheduled'
+      ? 'scheduled'
+      : requestedTab === 'followup' && canViewFollowUps
+        ? 'followup'
+        : 'today'
+  const selectTab = (tab: AppointmentTab) => setSearchParams({ tab })
+  const [selectedDate, setSelectedDate] = useState(clinicToday)
   const [selectedDoctorId, setSelectedDoctorId] = useState<number | undefined>(undefined)
   const [isBookingOpen, setIsBookingOpen] = useState(false)
+  const [bookingMode, setBookingMode] = useState<'WALK_IN' | 'SCHEDULED'>('WALK_IN')
   const [conflictError, setConflictError] = useState<string | null>(null)
 
   // Cancel dialog state
   const [cancellingAppt, setCancellingAppt] = useState<Appointment | null>(null)
   const [cancelReason, setCancelReason] = useState('')
 
-  const { data: doctors } = useDoctors(false)
+  const { data: doctors } = useDoctors(true)
+  const clinicRangeStart = clinicToday()
+  const clinicRangeEnd = clinicDateAfter(30)
+  const appointmentFilters =
+    activeTab === 'scheduled'
+      ? {
+          date_from: clinicRangeStart,
+          date_to: clinicRangeEnd,
+          doctor_id: selectedDoctorId,
+          booking_mode: 'SCHEDULED' as const,
+          has_token: false,
+          status: 'BOOKED',
+        }
+      : {
+          appointment_date: selectedDate,
+          doctor_id: selectedDoctorId,
+          has_token: true,
+        }
   const {
     data: appointmentsData,
     isPending,
     isError,
     error,
     refetch,
-  } = useAppointments({
-    appointment_date: selectedDate,
-    doctor_id: selectedDoctorId,
-  })
+  } = useAppointments(appointmentFilters, activeTab !== 'followup')
 
   const updateStatusMutation = useUpdateAppointmentStatus()
 
   const handleDateShift = (days: number) => {
-    const d = new Date(selectedDate)
-    d.setDate(d.getDate() + days)
-    setSelectedDate(d.toISOString().split('T')[0])
+    const [year, month, day] = selectedDate.split('-').map(Number)
+    setSelectedDate(clinicDateValue(new Date(Date.UTC(year, month - 1, day + days, 12))))
   }
 
   const handleSetToday = () => {
-    setSelectedDate(new Date().toISOString().split('T')[0])
+    setSelectedDate(clinicToday())
   }
 
   const handleUpdateStatus = async (
