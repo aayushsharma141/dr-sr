@@ -309,9 +309,13 @@ export function AppShell({ name, role, children }: AppShellProps) {
       aria-label="Hospital workspace navigation"
     >
       <div className={`flex min-h-[82px] items-center border-b border-white/15 ${mobile ? 'gap-3 px-4' : 'justify-center px-2 xl:justify-start xl:gap-3 xl:px-4'}`}>
-        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border-2 border-[#C39A35] bg-white text-sm font-black tracking-tight text-[#5D0B26] shadow-sm">
-          KH
-        </div>
+        <img
+          src="/kalyan-hospital-crest.webp"
+          alt="Sri Vashishtha Kalyan Trust crest"
+          className="h-11 w-11 shrink-0 rounded-full border-2 border-[#C39A35] bg-white object-contain shadow-sm"
+          width={44}
+          height={44}
+        />
         <div className={mobile ? 'min-w-0' : 'hidden min-w-0 xl:block'}>
           <p className="truncate text-sm font-extrabold leading-tight">कल्याण हॉस्पीटल</p>
           <p className="mt-0.5 truncate text-[11px] font-bold tracking-wide text-white">KALYAN HOSPITAL</p>
@@ -354,9 +358,14 @@ export function AppShell({ name, role, children }: AppShellProps) {
                 <path d="M4 6h16M4 12h16M4 18h16" />
               </svg>
             </button>
-            <div className="hidden h-11 w-11 shrink-0 items-center justify-center rounded-full border-2 border-[#C39A35] bg-[#5D0B26] text-xs font-black text-white sm:flex">
-              KH
-            </div>
+            <img
+              src="/kalyan-hospital-crest.webp"
+              alt=""
+              aria-hidden="true"
+              className="hidden h-11 w-11 shrink-0 rounded-full border-2 border-[#C39A35] bg-white object-contain shadow-sm sm:block"
+              width={44}
+              height={44}
+            />
             <div className="min-w-0">
               <p className="truncate text-base font-extrabold leading-tight text-[#5D0B26] sm:text-lg">Sri Vashishtha Kalyan Trust</p>
               <p className="truncate text-xs font-semibold text-slate-700">श्री वशिष्ठ कल्याण ट्रस्ट · KALYAN HOSPITAL</p>
