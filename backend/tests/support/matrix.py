@@ -240,7 +240,110 @@ def _create_session_addendum_payload(_target: Any = None) -> dict[str, Any]:
     }
 
 
+def _create_payment_payload(target: Any = None) -> dict[str, Any]:
+    pat_id = getattr(target, "patient_id", 1) if target else 1
+    return {
+        "patient_id": pat_id,
+        "treatment_plan_id": None,
+        "appointment_id": None,
+        "amount_paise": 50000,
+        "payment_method": "CASH",
+        "notes": "Matrix fee",
+    }
+
+
+def _reverse_payment_payload(_target: Any = None) -> dict[str, Any]:
+    return {
+        "reversal_reason": "Matrix payment refund requested",
+    }
+
+
 MATRIX: list[MatrixRow] = [
+    # Billing and Timeline (Phase 15)
+    MatrixRow(
+        method="POST",
+        path="/api/payments",
+        body_factory=_create_payment_payload,
+        expected={
+            "anonymous": 401,
+            "admin": 201,
+            "reception": 201,
+            "doctor_a": 403,
+            "doctor_b": 403,
+        },
+    ),
+    MatrixRow(
+        method="GET",
+        path="/api/payments/{id}/receipt",
+        body_factory=None,
+        expected={
+            "anonymous": 401,
+            "admin": 200,
+            "reception": 200,
+            "doctor_a": 403,
+            "doctor_b": 403,
+        },
+    ),
+    MatrixRow(
+        method="GET",
+        path="/api/payments/{id}",
+        body_factory=None,
+        expected={
+            "anonymous": 401,
+            "admin": 200,
+            "reception": 200,
+            "doctor_a": 403,
+            "doctor_b": 403,
+        },
+    ),
+    MatrixRow(
+        method="GET",
+        path="/api/patients/{patient_id}/payments",
+        body_factory=None,
+        expected={
+            "anonymous": 401,
+            "admin": 200,
+            "reception": 200,
+            "doctor_a": 403,
+            "doctor_b": 403,
+        },
+    ),
+    MatrixRow(
+        method="GET",
+        path="/api/billing/pending-dues",
+        body_factory=None,
+        expected={
+            "anonymous": 401,
+            "admin": 200,
+            "reception": 200,
+            "doctor_a": 403,
+            "doctor_b": 403,
+        },
+    ),
+    MatrixRow(
+        method="POST",
+        path="/api/payments/{id}/reverse",
+        body_factory=_reverse_payment_payload,
+        expected={
+            "anonymous": 401,
+            "admin": 200,
+            "reception": 403,
+            "doctor_a": 403,
+            "doctor_b": 403,
+        },
+    ),
+    MatrixRow(
+        method="GET",
+        path="/api/patients/{patient_id}/timeline",
+        body_factory=None,
+        expected={
+            "anonymous": 401,
+            "admin": 200,
+            "reception": 200,
+            "doctor_a": 200,
+            "doctor_b": 200,
+        },
+    ),
     MatrixRow(
         method="GET",
         path="/api/auth/me",

@@ -185,6 +185,16 @@ def record_payment(
 
 
 @router.get(
+    "/payments/{id}/receipt",
+    response_model=PaymentOut,
+    dependencies=[Depends(require(Permission.RECEIPT_REPRINT))],
+)
+def reprint_receipt(id: int, session: SessionDep) -> PaymentOut:
+    """Fetch payment receipt specifically for reprint with audit check (BIL-04)."""
+    return get_payment(id=id, session=session)
+
+
+@router.get(
     "/payments/{id}",
     response_model=PaymentOut,
     dependencies=[Depends(require(Permission.PAYMENT_READ))],
@@ -337,6 +347,20 @@ def reverse_payment(
     payment.reversed_by_user_id = principal.user_id
     payment.reversed_at = clock.utcnow()
     session.flush()
+    session.expire(payment, ["reversed_by_user"])
+
+    # Re-query with loaded relationships for response
+    refreshed_stmt = (
+        select(Payment)
+        .where(Payment.id == payment.id)
+        .options(
+            selectinload(Payment.patient),
+            selectinload(Payment.treatment_plan),
+            selectinload(Payment.created_by_user),
+            selectinload(Payment.reversed_by_user),
+        )
+    )
+    refreshed_payment = session.execute(refreshed_stmt).scalar_one()
 
     # Audit Trail
     ctx = build_audit_context(request, principal)
@@ -356,4 +380,4 @@ def reverse_payment(
         reason=payload.reversal_reason.strip(),
     )
 
-    return _to_payment_out(payment)
+    return _to_payment_out(refreshed_payment)

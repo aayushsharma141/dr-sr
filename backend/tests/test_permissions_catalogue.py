@@ -94,8 +94,10 @@ def test_golden_role_permissions_snapshot() -> None:
                 Permission.PATIENT_READ,
                 Permission.APPOINTMENT_READ,
                 Permission.PAYMENT_READ,
+                Permission.PAYMENT_CREATE,
                 Permission.RECEIPT_REPRINT,
                 Permission.PAYMENT_REVERSE,
+                Permission.TIMELINE_READ,
                 Permission.AUDIT_READ,
                 Permission.BACKUP_RUN,
                 Permission.BACKUP_RESTORE,
@@ -118,6 +120,7 @@ def test_golden_role_permissions_snapshot() -> None:
                 Permission.PAYMENT_READ,
                 Permission.PAYMENT_CREATE,
                 Permission.RECEIPT_REPRINT,
+                Permission.TIMELINE_READ,
             }
         ),
         Role.DOCTOR: frozenset(
@@ -137,6 +140,7 @@ def test_golden_role_permissions_snapshot() -> None:
                 Permission.PLAN_WRITE,
                 Permission.SESSION_LOG_READ,
                 Permission.SESSION_LOG_WRITE,
+                Permission.TIMELINE_READ,
             }
         ),
     }
