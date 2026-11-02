@@ -83,6 +83,12 @@ def book_appointment(
 ) -> AppointmentRead:
     """Book a per-doctor daily appointment with atomic token generation (APT-01)."""
     clinic_today = clock.ist_today()
+    if payload.visit_type == AppointmentVisitType.UNSPECIFIED:
+        raise ApiError(
+            status_code=422,
+            code="visit_type_required",
+            message="Choose a visit category for a new appointment.",
+        )
     booking_mode = payload.booking_mode or (
         AppointmentBookingMode.WALK_IN
         if payload.appointment_date == clinic_today
