@@ -831,8 +831,27 @@ export function AppointmentsReception() {
             <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6 space-y-4">
               <h3 className="text-lg font-bold text-neutral-900">Cancel Appointment</h3>
               <p className="text-xs text-neutral-600">
-                Provide a cancellation reason for Token #{cancellingAppt.token_number} ({cancellingAppt.patient_name}).
+                Provide a cancellation reason for{' '}
+                {cancellingAppt.token_number != null
+                  ? `Token #${cancellingAppt.token_number}`
+                  : `the scheduled visit on ${cancellingAppt.appointment_date}`}{' '}
+                ({cancellingAppt.patient_name}).
               </p>
+              {conflictError && (
+                <div role="alert" className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
+                  {conflictError}
+                  <button
+                    type="button"
+                    className="ml-2 font-semibold underline"
+                    onClick={() => {
+                      setConflictError(null)
+                      refetch()
+                    }}
+                  >
+                    Reload appointments
+                  </button>
+                </div>
+              )}
               <textarea
                 value={cancelReason}
                 onChange={(e) => setCancelReason(e.target.value)}
