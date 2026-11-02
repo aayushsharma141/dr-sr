@@ -145,6 +145,15 @@ export const router = createBrowserRouter([
               }
             },
           },
+          {
+            path: '/reception/dues',
+            lazy: async () => {
+              const { PendingDuesPage } = await import('./pages/PendingDuesPage')
+              return {
+                Component: PendingDuesPage,
+              }
+            },
+          },
         ],
       },
       {
