@@ -158,7 +158,8 @@ function isNavigationItemActive(
   if (item.key === 'appointments' || item.key === 'followups') {
     if (pathname !== '/reception/appointments') return false
     const tab = new URLSearchParams(search).get('tab') || 'today'
-    return item.key === 'followups' ? tab === 'followup' : tab !== 'followup'
+    if (item.key === 'followups') return role === 'DOCTOR' && tab === 'followup'
+    return tab !== 'followup' || role !== 'DOCTOR'
   }
 
   if (item.key === 'patient-registration') {
