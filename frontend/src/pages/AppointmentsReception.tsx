@@ -208,12 +208,14 @@ function ScheduledVisits({
   canManage,
   onCancel,
   onBook,
+  onStartDateChange,
 }: {
   startDate: string
   doctorId?: number
   canManage: boolean
   onCancel: (appointment: Appointment) => void
   onBook: () => void
+  onStartDateChange: (date: string) => void
 }) {
   const start = startDate < localDateValue(new Date()) ? localDateValue(new Date()) : startDate
   const end = addCalendarDays(start, 13)
@@ -243,7 +245,20 @@ function ScheduledVisits({
           </p>
           <p className="mt-2 text-xs font-semibold text-slate-500">{start} — {end}</p>
         </div>
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap items-end gap-2">
+          <div className="space-y-1">
+            <label htmlFor="scheduled-start-date" className="block text-[11px] font-semibold text-slate-600">
+              Starting date
+            </label>
+            <input
+              id="scheduled-start-date"
+              type="date"
+              min={localDateValue(new Date())}
+              value={start}
+              onChange={(event) => onStartDateChange(event.target.value)}
+              className="min-h-11 rounded-lg border border-slate-300 px-3 text-sm focus:border-[#8E1C3D] focus:outline-none focus:ring-2 focus:ring-rose-100"
+            />
+          </div>
           <button
             type="button"
             onClick={() => refetch()}
@@ -766,6 +781,7 @@ export function AppointmentsReception() {
               doctorId={selectedDoctorId}
               canManage={canManageAppointments}
               onCancel={(appointment) => setCancellingAppt(appointment)}
+              onStartDateChange={setSelectedDate}
               onBook={() => {
                 const today = localDateValue(new Date())
                 setSelectedDate(selectedDate > today ? selectedDate : addCalendarDays(today, 1))
