@@ -1,9 +1,12 @@
 """Functional tests for appointment booking REST API endpoints (APT-01)."""
 
+from datetime import timedelta
+
+from kalyan_api.clock import IST
 from kalyan_api.models import Patient
 
 
-def test_book_appointment_lifecycle(login_client, reception_user, doctor_a_user, db_session):
+def test_book_appointment_lifecycle(login_client, reception_user, doctor_a_user, db_session, clock):
     """Reception books appointment for patient with doctor, receiving sequential tokens."""
     # 1. Create a patient
     patient = Patient(
@@ -23,6 +26,7 @@ def test_book_appointment_lifecycle(login_client, reception_user, doctor_a_user,
 
     # 2. Log in as reception
     client = login_client(reception_user)
+    target_date = (clock["t"].astimezone(IST).date() + timedelta(days=3)).isoformat()
 
     # 3. Book first appointment
     resp1 = client.post(
@@ -30,7 +34,7 @@ def test_book_appointment_lifecycle(login_client, reception_user, doctor_a_user,
         json={
             "patient_id": patient.id,
             "doctor_id": doctor_id,
-            "appointment_date": "2026-11-05",
+            "appointment_date": target_date,
             "booking_mode": "SCHEDULED",
             "visit_type": "NEW_CONSULTATION",
             "notes": "First checkup",
@@ -84,9 +88,10 @@ def test_book_appointment_lifecycle(login_client, reception_user, doctor_a_user,
     assert get_resp.json()["token_number"] == 1
 
 
-def test_book_appointment_validations(login_client, reception_user, db_session):
+def test_book_appointment_validations(login_client, reception_user, db_session, clock):
     """Validation gates: nonexistent patient and inactive doctor."""
     client = login_client(reception_user)
+    target_date = (clock["t"].astimezone(IST).date() + timedelta(days=3)).isoformat()
 
     # Nonexistent patient
     resp = client.post(
