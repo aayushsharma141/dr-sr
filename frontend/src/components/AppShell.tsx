@@ -264,7 +264,7 @@ export function AppShell({ name, role, children }: AppShellProps) {
           return (
             <div key={item.key}>
               {sectionLabel && (
-                <div className={`pb-2 pt-4 text-[10px] font-bold tracking-[0.12em] text-rose-100/65 ${compact ? 'sr-only' : 'px-3'}`}>
+                <div className={`pb-2 pt-4 text-[10px] font-bold tracking-[0.12em] text-rose-100/65 ${compact ? 'px-0 text-center xl:px-3 xl:text-left' : 'px-3'}`}>
                   {sectionLabel}
                 </div>
               )}
@@ -283,13 +283,13 @@ export function AppShell({ name, role, children }: AppShellProps) {
                   active
                     ? 'bg-[#8E1C3D] text-white shadow-sm'
                     : 'text-rose-50/90 hover:bg-white/10 hover:text-white',
-                  compact ? 'justify-center px-0' : '',
+                  compact ? 'justify-center px-0 xl:justify-start xl:px-3' : '',
                 ].join(' ')}
               >
                 {active && <span className="absolute inset-y-2 left-0 w-1 rounded-r bg-[#C39A35]" />}
                 <NavIcon name={item.icon} />
-                <span className={compact ? 'sr-only' : 'min-w-0 flex-1 truncate'}>{item.label}</span>
-                {active && !compact && <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-[#E8C76A]" />}
+                <span className={compact ? 'hidden min-w-0 flex-1 truncate xl:inline' : 'min-w-0 flex-1 truncate'}>{item.label}</span>
+                {active && <span className={`h-1.5 w-1.5 shrink-0 rounded-full bg-[#E8C76A] ${compact ? 'hidden xl:block' : ''}`} />}
               </Link>
             </div>
           )
@@ -318,7 +318,7 @@ export function AppShell({ name, role, children }: AppShellProps) {
         </div>
       </div>
 
-      {renderNavigation(!mobile && false, mobile ? () => setMobileOpen(false) : undefined)}
+      {renderNavigation(!mobile, mobile ? () => setMobileOpen(false) : undefined)}
 
       <div className={`border-t border-white/15 p-3 ${mobile ? 'px-4' : ''}`}>
         <div className={`flex items-center gap-2 rounded-lg bg-white/8 px-2 py-2 ${!mobile ? 'justify-center xl:justify-start' : ''}`}>
