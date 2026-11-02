@@ -21,7 +21,7 @@ def test_appointment_status_lifecycle(login_client, reception_user, doctor_a_use
 
     doctor_id = doctor_a_user.doctor_id
     assert doctor_id is not None
-    today = clock.utcnow().date()
+    today = clock.ist_today()
 
     # 2. Reception logs in and books appointment
     reception_client = login_client(reception_user)
@@ -31,6 +31,7 @@ def test_appointment_status_lifecycle(login_client, reception_user, doctor_a_use
             "patient_id": patient.id,
             "doctor_id": doctor_id,
             "appointment_date": today.isoformat(),
+            "booking_mode": "WALK_IN",
         },
     )
     assert book_resp.status_code == 201
@@ -93,7 +94,7 @@ def test_invalid_status_transitions_rejected(
     db_session.add(patient)
     db_session.flush()
 
-    today = clock.utcnow().date()
+    today = clock.ist_today()
     reception_client = login_client(reception_user)
     book_resp = reception_client.post(
         "/api/appointments",
@@ -131,7 +132,7 @@ def test_cancellation_requires_reason(login_client, reception_user, doctor_a_use
     db_session.add(patient)
     db_session.flush()
 
-    today = clock.utcnow().date()
+    today = clock.ist_today()
     reception_client = login_client(reception_user)
     book_resp = reception_client.post(
         "/api/appointments",
@@ -183,7 +184,7 @@ def test_status_update_conflict(login_client, reception_user, doctor_a_user, db_
     db_session.add(patient)
     db_session.flush()
 
-    today = clock.utcnow().date()
+    today = clock.ist_today()
     reception_client = login_client(reception_user)
     book_resp = reception_client.post(
         "/api/appointments",
@@ -213,7 +214,7 @@ def test_status_update_conflict(login_client, reception_user, doctor_a_user, db_
 
 def test_doctor_queue_retrieval(login_client, reception_user, doctor_a_user, db_session):
     """Doctor retrieves today's consultation queue segmented by status."""
-    today = clock.utcnow().date()
+    today = clock.ist_today()
     doc_id = doctor_a_user.doctor_id
 
     # Create 3 patients and appointments
