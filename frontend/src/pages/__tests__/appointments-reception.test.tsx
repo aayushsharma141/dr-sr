@@ -44,6 +44,8 @@ const mockAppointments: Appointment[] = [
     doctor_name_en: 'Dr. Madan Mohan Dwivedi',
     doctor_name_hi: 'डॉ मदन मोहन द्विवेदी',
     appointment_date: new Date().toISOString().split('T')[0],
+    booking_mode: 'WALK_IN',
+    visit_type: 'NEW_CONSULTATION',
     token_number: 1,
     status: 'BOOKED',
     status_updated_at: '2026-01-01T10:00:00Z',
