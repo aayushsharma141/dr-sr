@@ -467,13 +467,23 @@ export function useCheckDuplicate(name: string, mobile: string, enabled: boolean
   })
 }
 
-export function usePatients(q: string = '', limit: number = 20, offset: number = 0) {
+export function usePatients(
+  q: string = '',
+  limit: number = 20,
+  offset: number = 0,
+  options: { activeOnly?: boolean; enabled?: boolean } = {},
+) {
+  const params = new URLSearchParams({
+    q,
+    limit: String(limit),
+    offset: String(offset),
+  })
+  if (options.activeOnly) params.set('active_only', 'true')
+
   return useQuery({
-    queryKey: ['patients', { q, limit, offset }],
-    queryFn: () =>
-      apiFetch<PatientOut[]>(
-        `/patients?q=${encodeURIComponent(q)}&limit=${limit}&offset=${offset}`,
-      ),
+    queryKey: ['patients', { q, limit, offset, activeOnly: options.activeOnly ?? false }],
+    queryFn: () => apiFetch<PatientOut[]>(`/patients?${params.toString()}`),
+    enabled: options.enabled ?? true,
   })
 }
 
@@ -525,15 +535,23 @@ export function useUploadPatientPhoto() {
 
 export function useAppointments(params?: {
   appointment_date?: string
+  date_from?: string
+  date_to?: string
   doctor_id?: number
   patient_id?: number
   status?: string
+  booking_mode?: 'WALK_IN' | 'SCHEDULED'
+  has_token?: boolean
 }) {
   const q = new URLSearchParams()
   if (params?.appointment_date) q.set('appointment_date', params.appointment_date)
+  if (params?.date_from) q.set('date_from', params.date_from)
+  if (params?.date_to) q.set('date_to', params.date_to)
   if (params?.doctor_id) q.set('doctor_id', String(params.doctor_id))
   if (params?.patient_id) q.set('patient_id', String(params.patient_id))
   if (params?.status) q.set('status', params.status)
+  if (params?.booking_mode) q.set('booking_mode', params.booking_mode)
+  if (params?.has_token !== undefined) q.set('has_token', String(params.has_token))
   const qs = q.toString() ? `?${q.toString()}` : ''
 
   return useQuery({
