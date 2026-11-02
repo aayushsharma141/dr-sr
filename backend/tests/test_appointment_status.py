@@ -318,6 +318,59 @@ def test_future_scheduled_visit_cannot_be_checked_in_early(
 
 
 
+def test_scheduled_visit_can_be_marked_no_show_only_after_its_clinic_date(
+    login_client, reception_user, doctor_a_user, db_session, clock
+):
+    """Overdue scheduled reservations stay tokenless and can transition to NO_SHOW."""
+    from datetime import timedelta
+
+    from kalyan_api.clock import IST
+
+    patient = Patient(
+        urn="KH-2026-7798",
+        full_name="Missed Scheduled Patient",
+        guardian_name="Guardian",
+        gender="M",
+        age_years=36,
+        mobile="9876543398",
+        address="Ara",
+    )
+    db_session.add(patient)
+    db_session.flush()
+
+    reception = login_client(reception_user)
+    clinic_today = clock["t"].astimezone(IST).date()
+    booked = reception.post(
+        "/api/appointments",
+        json={
+            "patient_id": patient.id,
+            "doctor_id": doctor_a_user.doctor_id,
+            "appointment_date": (clinic_today + timedelta(days=2)).isoformat(),
+            "booking_mode": "SCHEDULED",
+            "visit_type": "FOLLOW_UP",
+        },
+    )
+    assert booked.status_code == 201, booked.text
+    appt = booked.json()
+    assert appt["token_number"] is None
+
+    early = reception.patch(
+        f"/api/appointments/{appt['id']}/status",
+        json={"status": "NO_SHOW", "version_id": 1},
+    )
+    assert early.status_code == 422
+    assert early.json()["code"] == "appointment_not_due"
+
+    clock["t"] = clock["t"] + timedelta(days=2)
+    overdue = reception.patch(
+        f"/api/appointments/{appt['id']}/status",
+        json={"status": "NO_SHOW", "version_id": 1},
+    )
+    assert overdue.status_code == 200, overdue.text
+    assert overdue.json()["status"] == "NO_SHOW"
+    assert overdue.json()["token_number"] is None
+
+
 def test_doctor_queue_uses_ist_clinic_date_before_utc_midnight(
     login_client, reception_user, doctor_a_user, db_session, clock
 ):
