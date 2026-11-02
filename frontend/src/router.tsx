@@ -202,6 +202,24 @@ export const router = createBrowserRouter([
               }
             },
           },
+          {
+            path: '/doctor/treatment-plans',
+            lazy: async () => {
+              const { TreatmentPlanWorkspace } = await import('./pages/TreatmentPlanWorkspace')
+              return {
+                Component: TreatmentPlanWorkspace,
+              }
+            },
+          },
+          {
+            path: '/doctor/treatment-plans/:id',
+            lazy: async () => {
+              const { TreatmentPlanWorkspace } = await import('./pages/TreatmentPlanWorkspace')
+              return {
+                Component: TreatmentPlanWorkspace,
+              }
+            },
+          },
         ],
       },
     ],
