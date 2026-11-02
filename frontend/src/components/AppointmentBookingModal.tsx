@@ -28,6 +28,19 @@ function clinicToday() {
   return `${part('year')}-${part('month')}-${part('day')}`
 }
 
+function clinicDateAfter(days: number) {
+  const [year, month, day] = clinicToday().split('-').map(Number)
+  const date = new Date(Date.UTC(year, month - 1, day + days, 12))
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Kolkata',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(date)
+  const part = (type: string) => parts.find((item) => item.type === type)?.value ?? ''
+  return `${part('year')}-${part('month')}-${part('day')}`
+}
+
 const VISIT_TYPES: { value: AppointmentVisitType; label: string; description: string }[] = [
   {
     value: 'NEW_CONSULTATION',
@@ -91,8 +104,10 @@ export function AppointmentBookingModal({
     setSelectedPatient(initialPatient ?? null)
     setSelectedDoctorId(initialDoctorId ?? '')
     setAppointmentDate(
-      mode === 'SCHEDULED' && initialDate && initialDate >= currentClinicDate
-        ? initialDate
+      mode === 'SCHEDULED'
+        ? initialDate && initialDate >= currentClinicDate
+          ? initialDate
+          : clinicDateAfter(1)
         : currentClinicDate,
     )
     setVisitType('NEW_CONSULTATION')
@@ -273,7 +288,7 @@ export function AppointmentBookingModal({
                     aria-pressed={!modeIsWalkIn}
                     onClick={() => {
                       setBookingMode('SCHEDULED')
-                      setAppointmentDate((current) => current > today ? current : today)
+                      setAppointmentDate((current) => current > today ? current : clinicDateAfter(1))
                       setErrorMsg(null)
                     }}
                     className={[
