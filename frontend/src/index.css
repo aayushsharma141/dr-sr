@@ -29,6 +29,11 @@
     margin: 6mm;
   }
 
+  /* When a print portal (prescription slip) is open, print only it, not the app page behind it. */
+  body:has(.print-portal) > #root {
+    display: none !important;
+  }
+
   html,
   body {
     background: #ffffff !important;
