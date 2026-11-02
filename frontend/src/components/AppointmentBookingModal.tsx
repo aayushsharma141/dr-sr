@@ -163,7 +163,6 @@ export function AppointmentBookingModal({
     }
   }
 
-  const selectedDoctor = doctors?.find((doctor) => doctor.id === Number(selectedDoctorId))
   const modeIsWalkIn = bookingMode === 'WALK_IN'
 
   return (
