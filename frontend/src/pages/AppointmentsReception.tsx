@@ -326,7 +326,18 @@ export function AppointmentsReception() {
             onClick={() => selectTab('today')}
             className={`min-h-11 rounded-lg border-b-2 px-4 text-sm font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#8E1C3D] ${activeTab === 'today' ? 'border-[#C39A35] bg-white text-[#5D0B26]' : 'border-transparent text-slate-600 hover:bg-white hover:text-[#5D0B26]'}`}
           >
-            Today's Token Queue
+            Today's Queue
+          </button>
+          <button
+            type="button"
+            role="tab"
+            id="appointments-tab-scheduled"
+            aria-controls="appointments-panel-scheduled"
+            aria-selected={activeTab === 'scheduled'}
+            onClick={() => selectTab('scheduled')}
+            className={`min-h-11 rounded-lg border-b-2 px-4 text-sm font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#8E1C3D] ${activeTab === 'scheduled' ? 'border-[#C39A35] bg-white text-[#5D0B26]' : 'border-transparent text-slate-600 hover:bg-white hover:text-[#5D0B26]'}`}
+          >
+            Scheduled Visits
           </button>
           {canViewFollowUps && (
             <button
@@ -338,7 +349,7 @@ export function AppointmentsReception() {
               onClick={() => selectTab('followup')}
               className={`min-h-11 rounded-lg border-b-2 px-4 text-sm font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#8E1C3D] ${activeTab === 'followup' ? 'border-[#C39A35] bg-white text-[#5D0B26]' : 'border-transparent text-slate-600 hover:bg-white hover:text-[#5D0B26]'}`}
             >
-              Follow-up Visits
+              Prescription Follow-up Reminders
             </button>
           )}
         </div>
