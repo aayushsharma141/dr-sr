@@ -83,6 +83,11 @@ def book_appointment(
 ) -> AppointmentRead:
     """Book a per-doctor daily appointment with atomic token generation (APT-01)."""
     clinic_today = clock.ist_today()
+    booking_mode = payload.booking_mode or (
+        AppointmentBookingMode.WALK_IN
+        if payload.appointment_date == clinic_today
+        else AppointmentBookingMode.SCHEDULED
+    )
     if payload.appointment_date < clinic_today:
         raise ApiError(
             status_code=422,
@@ -90,7 +95,7 @@ def book_appointment(
             message="Appointments cannot be booked for a past clinic date.",
         )
     if (
-        payload.booking_mode == AppointmentBookingMode.WALK_IN
+        booking_mode == AppointmentBookingMode.WALK_IN
         and payload.appointment_date != clinic_today
     ):
         raise ApiError(
@@ -99,7 +104,7 @@ def book_appointment(
             message="Walk-in bookings can only be added to today's token queue.",
         )
     if (
-        payload.booking_mode == AppointmentBookingMode.SCHEDULED
+        booking_mode == AppointmentBookingMode.SCHEDULED
         and payload.appointment_date <= clinic_today
     ):
         raise ApiError(
@@ -198,7 +203,7 @@ def book_appointment(
         patient_id=payload.patient_id,
         doctor_id=payload.doctor_id,
         appointment_date=payload.appointment_date,
-        booking_mode=payload.booking_mode.value,
+        booking_mode=booking_mode.value,
         visit_type=payload.visit_type.value,
         treatment_plan_id=payload.treatment_plan_id,
         token_number=token_num,
