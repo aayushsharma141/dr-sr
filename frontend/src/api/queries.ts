@@ -467,13 +467,23 @@ export function useCheckDuplicate(name: string, mobile: string, enabled: boolean
   })
 }
 
-export function usePatients(q: string = '', limit: number = 20, offset: number = 0) {
+export function usePatients(
+  q: string = '',
+  limit: number = 20,
+  offset: number = 0,
+  activeOnly = false,
+  enabled = true,
+) {
+  const params = new URLSearchParams({
+    q,
+    limit: String(limit),
+    offset: String(offset),
+    active_only: String(activeOnly),
+  })
   return useQuery({
-    queryKey: ['patients', { q, limit, offset }],
-    queryFn: () =>
-      apiFetch<PatientOut[]>(
-        `/patients?q=${encodeURIComponent(q)}&limit=${limit}&offset=${offset}`,
-      ),
+    queryKey: ['patients', { q, limit, offset, activeOnly }],
+    queryFn: () => apiFetch<PatientOut[]>(`/patients?${params.toString()}`),
+    enabled,
   })
 }
 
@@ -525,12 +535,20 @@ export function useUploadPatientPhoto() {
 
 export function useAppointments(params?: {
   appointment_date?: string
+  date_from?: string
+  date_to?: string
+  booking_mode?: 'WALK_IN' | 'SCHEDULED'
+  visit_type?: 'NEW_CONSULTATION' | 'FOLLOW_UP' | 'PHYSIOTHERAPY_SESSION'
   doctor_id?: number
   patient_id?: number
   status?: string
 }) {
   const q = new URLSearchParams()
   if (params?.appointment_date) q.set('appointment_date', params.appointment_date)
+  if (params?.date_from) q.set('date_from', params.date_from)
+  if (params?.date_to) q.set('date_to', params.date_to)
+  if (params?.booking_mode) q.set('booking_mode', params.booking_mode)
+  if (params?.visit_type) q.set('visit_type', params.visit_type)
   if (params?.doctor_id) q.set('doctor_id', String(params.doctor_id))
   if (params?.patient_id) q.set('patient_id', String(params.patient_id))
   if (params?.status) q.set('status', params.status)
@@ -720,11 +738,11 @@ export function useCreatePrescription() {
   })
 }
 
-export function usePatientTreatmentPlans(patientId: number) {
+export function usePatientTreatmentPlans(patientId: number, enabled = true) {
   return useQuery({
     queryKey: ['patient-treatment-plans', patientId],
     queryFn: () => apiFetch<TreatmentPlanOut[]>(`/patients/${patientId}/treatment-plans`),
-    enabled: patientId > 0,
+    enabled: patientId > 0 && enabled,
   })
 }
 
