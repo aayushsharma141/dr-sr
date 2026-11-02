@@ -288,7 +288,7 @@ function ScheduledVisits({
               <thead className="border-b border-slate-200 bg-slate-50 text-[11px] font-bold uppercase tracking-wide text-slate-600">
                 <tr>
                   <th scope="col" className="px-4 py-3">Visit date</th>
-                  <th scope="col" className="px-4 py-3">Day token</th>
+                  <th scope="col" className="px-4 py-3">Queue token</th>
                   <th scope="col" className="px-4 py-3">Patient</th>
                   <th scope="col" className="px-4 py-3">Doctor</th>
                   <th scope="col" className="px-4 py-3">Visit category</th>
@@ -657,6 +657,7 @@ export function AppointmentsReception() {
                     <th className="py-3 px-4">Token #</th>
                     <th className="py-3 px-4">Patient</th>
                     <th className="py-3 px-4">Doctor</th>
+                    <th className="py-3 px-4">Visit category</th>
                     <th className="py-3 px-4">Status</th>
                     <th className="py-3 px-4">Remarks</th>
                     <th className="py-3 px-4 text-right">Actions</th>
@@ -690,6 +691,12 @@ export function AppointmentsReception() {
                             {appt.doctor_name_hi}
                           </span>
                         )}
+                      </td>
+                      <td className="py-3 px-4">
+                        <span className="block text-xs font-semibold text-slate-800">{visitTypeLabel(appt.visit_type)}</span>
+                        <span className="mt-0.5 block text-[11px] text-slate-500">
+                          {appt.booking_mode === 'WALK_IN' ? 'Walk-in' : 'Scheduled'}
+                        </span>
                       </td>
                       <td className="py-3 px-4">
                         {getStatusBadge(appt.status)}
