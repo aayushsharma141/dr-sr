@@ -58,6 +58,8 @@ def test_appointment_and_encounter_models(db_session, doctor_a_user, admin_user)
     db_session.flush()
     assert appt.id is not None
     assert appt.status == "BOOKED"
+    assert appt.booking_mode == "WALK_IN"
+    assert appt.visit_type == "UNSPECIFIED"
     assert appt.token_number == 1
 
     # 4. Create Clinical Encounter
