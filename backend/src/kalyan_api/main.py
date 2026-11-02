@@ -21,6 +21,7 @@ from kalyan_api.routers.appointments import doctor_router
 from kalyan_api.routers.appointments import router as appointments_router
 from kalyan_api.routers.areas import router as areas_router
 from kalyan_api.routers.audit import router as audit_router
+from kalyan_api.routers.operations import router as operations_router
 from kalyan_api.routers.auth import router as auth_router
 from kalyan_api.routers.billing import router as billing_router
 from kalyan_api.routers.doctors import router as doctors_router
@@ -151,6 +152,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(billing_router, prefix="/api")
     app.include_router(timeline_router, prefix="/api")
     app.include_router(audit_router, prefix="/api")
+    app.include_router(operations_router, prefix="/api")
 
     # SPA frontend distribution serving (app.frontend)
     dist_dir = resolved_settings.frontend_dist

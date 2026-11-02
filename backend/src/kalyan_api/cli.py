@@ -17,6 +17,7 @@ import getpass
 import secrets
 import sys
 from collections.abc import Sequence
+from pathlib import Path
 
 from alembic.runtime.migration import MigrationContext
 from alembic.script import ScriptDirectory
@@ -222,6 +223,83 @@ def cmd_export_openapi(out_path: str) -> int:
     return 0
 
 
+def cmd_backup_create(destination: str | None = None, label: str | None = None) -> int:
+    """Create a backup bundle from the command line."""
+    from kalyan_api.services.backup_service import create_backup
+
+    dest_path = Path(destination) if destination else None
+    print(f"Creating backup bundle (label={label}, destination={destination or 'default'})...")
+    try:
+        archive_path = create_backup(destination_dir=dest_path, label=label)
+        print(f"SUCCESS: Backup bundle created at {archive_path}")
+        return 0
+    except Exception as exc:
+        print(f"ERROR: Backup creation failed: {exc}", file=sys.stderr)
+        return 1
+
+
+def cmd_backup_restore(archive_path_str: str, force: bool = False) -> int:
+    """Restore from a backup bundle with pre-flight verification and pre-snapshot."""
+    from kalyan_api.services.backup_service import restore_backup
+
+    archive_path = Path(archive_path_str)
+    if not archive_path.exists():
+        print(f"ERROR: Backup archive not found: {archive_path_str}", file=sys.stderr)
+        return 1
+
+    print(f"Restoring system from backup bundle {archive_path_str}...")
+    try:
+        result = restore_backup(archive_path=archive_path, create_prerestore_snapshot=True)
+        snap = result.get("prerestore_snapshot")
+        print(f"SUCCESS: System restored. Pre-restore snapshot: {snap}")
+        return 0
+    except Exception as exc:
+        print(f"ERROR: Restoration failed: {exc}", file=sys.stderr)
+        return 1
+
+
+def cmd_backup_verify(archive_path_str: str) -> int:
+    """Inspect and cryptographically verify a backup archive without touching the database."""
+    from kalyan_api.services.backup_service import verify_backup_bundle
+
+    archive_path = Path(archive_path_str)
+    if not archive_path.exists():
+        print(f"ERROR: Archive does not exist: {archive_path_str}", file=sys.stderr)
+        return 1
+
+    is_valid, msg, manifest = verify_backup_bundle(archive_path)
+    if is_valid:
+        print(f"SUCCESS: {msg}")
+        if manifest:
+            v = manifest.get("version")
+            c_at = manifest.get("created_at")
+            print(f"Manifest Version: {v}, Created: {c_at}")
+            sha = manifest.get("database_dump_sha256")
+            pc = manifest.get("photos_count")
+            print(f"DB Dump SHA: {sha}, Photos: {pc}")
+        return 0
+    else:
+        print(f"VERIFICATION FAILED: {msg}", file=sys.stderr)
+        return 1
+
+
+def cmd_integrity_check() -> int:
+    """Execute complete suite of clinical and financial integrity checks."""
+    from kalyan_api.services.integrity_service import run_integrity_audit
+
+    with session_scope() as session:
+        report = run_integrity_audit(session=session)
+        print(f"System Integrity Report ({report.generated_at})")
+        print(f"Overall Status: {'HEALTHY' if report.is_healthy else 'DISCREPANCIES DETECTED'}")
+        print(f"Checks Passed: {report.passed_checks}/{report.total_checks}")
+        for c in report.checks:
+            status_str = "PASS" if c.passed else "FAIL"
+            print(f"  [{status_str}] {c.name}: {c.details}")
+            for d in c.discrepancies:
+                print(f"        -> {d}")
+        return 0 if report.is_healthy else 1
+
+
 def build_parser() -> argparse.ArgumentParser:
     """Build top-level argument parser with extensible subcommands."""
     parser = argparse.ArgumentParser(
@@ -275,6 +353,29 @@ def build_parser() -> argparse.ArgumentParser:
         help="Target file path for the exported JSON schema",
     )
 
+    # Subcommand: backup-create
+    b_create = subparsers.add_parser("backup-create", help="Create full backup bundle (.tar.gz)")
+    b_create.add_argument("--destination", help="Optional target directory")
+    b_create.add_argument("--label", help="Optional backup label")
+
+    # Subcommand: backup-restore
+    b_restore = subparsers.add_parser(
+        "backup-restore", help="Restore system from verified backup bundle"
+    )
+    b_restore.add_argument("archive", help="Path to backup .tar.gz bundle")
+    b_restore.add_argument("--force", action="store_true", help="Force restore")
+
+    # Subcommand: backup-verify
+    b_verify = subparsers.add_parser(
+        "backup-verify", help="Inspect and cryptographically verify backup bundle"
+    )
+    b_verify.add_argument("archive", help="Path to backup .tar.gz bundle")
+
+    # Subcommand: integrity-check
+    subparsers.add_parser(
+        "integrity-check", help="Run comprehensive clinical and financial integrity audit"
+    )
+
     return parser
 
 
@@ -293,6 +394,14 @@ def main(argv: Sequence[str] | None = None) -> int:
             password_stdin=args.password_stdin,
             generate_password=args.generate_password,
         )
+    if args.command == "backup-create":
+        return cmd_backup_create(destination=args.destination, label=args.label)
+    if args.command == "backup-restore":
+        return cmd_backup_restore(archive_path_str=args.archive, force=args.force)
+    if args.command == "backup-verify":
+        return cmd_backup_verify(archive_path_str=args.archive)
+    if args.command == "integrity-check":
+        return cmd_integrity_check()
     if args.command == "export-openapi":
         return cmd_export_openapi(out_path=args.out)
 
