@@ -42,8 +42,9 @@ def upgrade() -> None:
         """
     )
 
-    # Existing appointments retain their token. New scheduled visits remain
-    # tokenless until reception checks the patient in on the booked clinic date.
+    # Existing appointments retain their token and their visit intent remains
+    # UNSPECIFIED because historical records do not establish a visit category.
+    # New scheduled visits remain tokenless until booked-day check-in.
     op.alter_column(
         "appointments",
         "token_number",
@@ -64,7 +65,7 @@ def upgrade() -> None:
         sa.Column(
             "visit_type",
             sa.String(length=32),
-            server_default=sa.text("'NEW_CONSULTATION'"),
+            server_default=sa.text("'UNSPECIFIED'"),
             nullable=False,
         ),
     )
@@ -85,7 +86,7 @@ def upgrade() -> None:
     op.create_check_constraint(
         "ck_appointments_visit_type",
         "appointments",
-        "visit_type IN ('NEW_CONSULTATION', 'FOLLOW_UP', 'PHYSIOTHERAPY_SESSION')",
+        "visit_type IN ('UNSPECIFIED', 'NEW_CONSULTATION', 'FOLLOW_UP', 'PHYSIOTHERAPY_SESSION')",
     )
     op.create_index(
         "ix_appointments_patient_doctor_date_type_status",
@@ -104,7 +105,7 @@ def downgrade() -> None:
     # An operator must first resolve these records explicitly before downgrading.
     op.execute(
         """
-        DO $
+        DO $guard$
         BEGIN
             IF EXISTS (
                 SELECT 1 FROM appointments
@@ -114,7 +115,7 @@ def downgrade() -> None:
                     'Cannot downgrade 0006 while tokenless scheduled appointments exist';
             END IF;
         END
-        $;
+        $guard$;
         """
     )
     op.alter_column(
