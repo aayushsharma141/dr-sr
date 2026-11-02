@@ -520,9 +520,8 @@ describe('AppointmentsReception Component', () => {
     const dialog = screen.getByRole('dialog', { name: 'Book a patient visit' })
     expect(dialog).toBeInTheDocument()
     expect(within(dialog).getByRole('button', { name: /Scheduled Visit/ })).toHaveAttribute('aria-pressed', 'true')
-    expect(within(dialog).getByLabelText('Future visit date')).toHaveValue(
-      expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/),
-    )
+    expect((within(dialog).getByLabelText('Future visit date') as HTMLInputElement).value)
+      .toMatch(/^\d{4}-\d{2}-\d{2}$/)
     expect(mockFetch.mock.calls.some(([url]) => String(url).includes('/api/patients'))).toBe(false)
 
     await user.type(
@@ -539,6 +538,58 @@ describe('AppointmentsReception Component', () => {
 
     await user.click(within(dialog).getByRole('option', { name: /Aarav Kumar/ }))
     expect(within(dialog).getByText('KH-2026-0001')).toBeInTheDocument()
+  })
+
+
+  it('preselects the doctor and clinic date from the active queue filters', async () => {
+    const mockFetch = vi.fn().mockImplementation((url: string) => {
+      if (url.includes('/api/auth/me')) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          headers: new Headers({ 'content-type': 'application/json' }),
+          text: () => Promise.resolve(JSON.stringify(mockMe)),
+        })
+      }
+      if (url.includes('/api/doctors')) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          headers: new Headers({ 'content-type': 'application/json' }),
+          text: () => Promise.resolve(JSON.stringify(mockDoctors)),
+        })
+      }
+      if (url.includes('/api/appointments')) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          headers: new Headers({ 'content-type': 'application/json' }),
+          text: () => Promise.resolve(JSON.stringify({ total: 0, appointments: [] })),
+        })
+      }
+      return Promise.reject(new Error(`Unhandled: ${url}`))
+    })
+    vi.stubGlobal('fetch', mockFetch)
+
+    const user = userEvent.setup()
+    render(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter>
+          <AppointmentsReception />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    )
+
+    await waitFor(() => {
+      expect(screen.getByLabelText('Filter by Doctor')).toBeInTheDocument()
+    })
+    await user.selectOptions(screen.getByLabelText('Filter by Doctor'), '1')
+    await user.click(screen.getByRole('button', { name: 'Book First Appointment' }))
+
+    const dialog = screen.getByRole('dialog', { name: 'Book a patient visit' })
+    expect(within(dialog).getByLabelText('Consulting doctor')).toHaveValue('1')
+    expect(within(dialog).getByLabelText('Today’s queue date')).toHaveValue(clinicDateAfter(0))
+    expect(mockFetch.mock.calls.some(([url]) => String(url).includes('/api/patients'))).toBe(false)
   })
 
 })
