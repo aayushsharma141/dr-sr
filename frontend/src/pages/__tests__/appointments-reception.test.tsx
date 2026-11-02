@@ -406,4 +406,129 @@ describe('AppointmentsReception Component', () => {
     expect(screen.queryByRole('button', { name: /book new appointment/i })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /mark arrived/i })).not.toBeInTheDocument()
   })
+
+  it('keeps scheduled booking available on the Scheduled Visits tab and searches patients only after typing', async () => {
+    const scheduledDate = (() => {
+      const date = new Date()
+      date.setDate(date.getDate() + 3)
+      return date.toLocaleDateString('en-CA')
+    })()
+    const scheduledAppointment: Appointment = {
+      ...mockAppointments[0],
+      appointment_date: scheduledDate,
+      booking_mode: 'SCHEDULED',
+      visit_type: 'FOLLOW_UP',
+      token_number: 1,
+    }
+    const activePatient = {
+      id: 101,
+      urn: 'KH-2026-0001',
+      full_name: 'Aarav Kumar',
+      guardian_name: 'Suresh Kumar',
+      gender: 'M',
+      dob: null,
+      age_years: 30,
+      mobile: '9876543210',
+      address: 'Station Road, Ara',
+      district: 'Bhojpur',
+      state: 'Bihar',
+      emergency_contact: null,
+      allergies: 'None reported',
+      notes: null,
+      photo_path: null,
+      is_active: true,
+      version_id: 1,
+      created_at: '2026-01-01T10:00:00Z',
+      updated_at: '2026-01-01T10:00:00Z',
+    }
+
+    const mockFetch = vi.fn().mockImplementation((url: string) => {
+      if (url.includes('/api/auth/me')) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          headers: new Headers({ 'content-type': 'application/json' }),
+          text: () => Promise.resolve(JSON.stringify(mockMe)),
+        })
+      }
+      if (url.includes('/api/doctors')) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          headers: new Headers({ 'content-type': 'application/json' }),
+          text: () => Promise.resolve(JSON.stringify(mockDoctors)),
+        })
+      }
+      if (url.includes('/api/patients')) {
+        expect(url).toContain('active_only=true')
+        expect(url).toContain('q=Aar')
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          headers: new Headers({ 'content-type': 'application/json' }),
+          text: () => Promise.resolve(JSON.stringify([activePatient])),
+        })
+      }
+      if (url.includes('/api/appointments?date_from=')) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          headers: new Headers({ 'content-type': 'application/json' }),
+          text: () => Promise.resolve(JSON.stringify({ total: 1, appointments: [scheduledAppointment] })),
+        })
+      }
+      if (url.includes('/api/appointments')) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          headers: new Headers({ 'content-type': 'application/json' }),
+          text: () => Promise.resolve(JSON.stringify({ total: 0, appointments: [] })),
+        })
+      }
+      return Promise.reject(new Error(`Unhandled: ${url}`))
+    })
+    vi.stubGlobal('fetch', mockFetch)
+
+    const user = userEvent.setup()
+    render(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter initialEntries={['/reception/appointments?tab=scheduled']}>
+          <AppointmentsReception />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    )
+
+    await waitFor(() => {
+      expect(screen.getByText('Upcoming reservations')).toBeInTheDocument()
+      expect(screen.getByText('Aarav Kumar')).toBeInTheDocument()
+    })
+
+    expect(screen.getByText('Follow-up review')).toBeInTheDocument()
+    expect(screen.getByText(/not an exact consultation time/i)).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Book future visit' }))
+    const dialog = screen.getByRole('dialog', { name: 'Book a patient visit' })
+    expect(dialog).toBeInTheDocument()
+    expect(within(dialog).getByRole('button', { name: 'Scheduled Visit' })).toHaveAttribute('aria-pressed', 'true')
+    expect(within(dialog).getByLabelText('Future visit date')).toHaveValue(
+      expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/),
+    )
+    expect(mockFetch.mock.calls.some(([url]) => String(url).includes('/api/patients'))).toBe(false)
+
+    await user.type(
+      within(dialog).getByRole('searchbox', { name: 'Search active patients' }),
+      'Aar',
+    )
+    await waitFor(() => {
+      expect(within(dialog).getByRole('option', { name: /Aarav Kumar/ })).toBeInTheDocument()
+    })
+    expect(mockFetch).toHaveBeenCalledWith(
+      expect.stringContaining('/api/patients?q=Aar'),
+      expect.anything(),
+    )
+
+    await user.click(within(dialog).getByRole('option', { name: /Aarav Kumar/ }))
+    expect(within(dialog).getByText('KH-2026-0001')).toBeInTheDocument()
+  })
+
 })
