@@ -3,12 +3,12 @@ gsd_state_version: '1.0'
 milestone: 'v3.0'
 milestone_name: 'Centralized LAN Web Platform'
 status: in_progress
-current_phase: 16
+current_phase: 17
 progress:
   total_phases: 7
-  completed_phases: 5
-  active_phase: 16
-  percent: 86
+  completed_phases: 6
+  active_phase: 17
+  percent: 95
 ---
 
 # Project State: Kalyan Hospital Patient & Physiotherapy Management
@@ -22,10 +22,10 @@ See: `.planning/PROJECT.md` (updated 2026-10-31) and root `PRD.md` (v3.0 baselin
 
 ## Current Position
 
-Phase: 15 (Billing, Receipts & Reversals) — COMPLETE (7/7 plans complete)
-Next Phase: 16 (Audit Viewer, Backup/Restore & Integrity)
-Status: Phase 15 Complete & Verified
-Last activity: 2026-11-02 — Phase 15 complete (Consultation fee and package instalment collection, integer paise math, database trigger overpayment rejection, atomic sequential receipt numbering with 20-thread concurrency proof, dual 80mm thermal and A5 receipt printing with DUPLICATE watermark, dynamic pending dues ledger, admin-only reversal with mandatory justification, unified chronological patient timeline, 93.39% backend coverage across 555 tests, 314-cell RBAC matrix, 70 frontend tests passing, 0 lint/typecheck errors, legacy v2.0 untouched).
+Phase: 16 (Audit Viewer, Backup/Restore & Integrity) — COMPLETE (7/7 plans complete)
+Next Phase: 17 (LAN Deployment, Print Setup & UAT Acceptance)
+Status: Phase 16 Complete & Verified
+Last activity: 2026-11-02 — Phase 16 complete (Filterable audit log viewer with Before/After diffs and credential redaction, SHA-256 checksummed backup bundle generator with secondary destination support, fail-closed restore engine with automatic pre-restore safety snapshot, 5-pillar clinical/financial/file integrity diagnostic engine, REST endpoints + headless server CLI subcommands, React admin dashboards, 92.80% backend coverage across 591 tests, 339-cell RBAC matrix, 75 frontend tests passing, zero legacy v2.0 drift). (Consultation fee and package instalment collection, integer paise math, database trigger overpayment rejection, atomic sequential receipt numbering with 20-thread concurrency proof, dual 80mm thermal and A5 receipt printing with DUPLICATE watermark, dynamic pending dues ledger, admin-only reversal with mandatory justification, unified chronological patient timeline, 93.39% backend coverage across 555 tests, 314-cell RBAC matrix, 70 frontend tests passing, 0 lint/typecheck errors, legacy v2.0 untouched).
 
 ## Phase Overview
 
@@ -38,9 +38,8 @@ Phases 11-17 (continuing from v2.0, which ended at Phase 10). See `.planning/ROA
 | 13 | Appointments & Clinical Encounters | Complete (7/7 plans) |
 | 14 | Prescriptions, Treatment Plans & Sessions | Complete (7/7 plans) |
 | 15 | Billing, Receipts & Reversals | Complete (7/7 plans) |
-| 16 | Audit Viewer, Backup/Restore & Integrity | Next up |
-| 16 | Audit Viewer, Backup/Restore & Integrity | Not started |
-| 17 | LAN Deployment, Printer & Acceptance | Not started |
+| 16 | Audit Viewer, Backup/Restore & Integrity | Complete (7/7 plans) |
+| 17 | LAN Deployment, Printer & Acceptance | Next up |
 
 ## Accumulated Context
 

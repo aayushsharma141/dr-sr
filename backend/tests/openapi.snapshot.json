@@ -335,6 +335,316 @@
         "title": "AppointmentStatusUpdate",
         "type": "object"
       },
+      "AuditLogListResponse": {
+        "description": "Paginated list of audit records.",
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/AuditLogOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "page": {
+            "minimum": 1.0,
+            "title": "Page",
+            "type": "integer"
+          },
+          "page_size": {
+            "maximum": 200.0,
+            "minimum": 1.0,
+            "title": "Page Size",
+            "type": "integer"
+          },
+          "pages": {
+            "title": "Pages",
+            "type": "integer"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "items",
+          "total",
+          "page",
+          "page_size",
+          "pages"
+        ],
+        "title": "AuditLogListResponse",
+        "type": "object"
+      },
+      "AuditLogOut": {
+        "description": "Output representation of an immutable audit log record.",
+        "properties": {
+          "action": {
+            "title": "Action",
+            "type": "string"
+          },
+          "actor_role": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Actor Role"
+          },
+          "actor_user_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Actor User Id"
+          },
+          "actor_username": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Actor Username"
+          },
+          "after_data": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "After Data"
+          },
+          "before_data": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Before Data"
+          },
+          "entity_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Entity Id"
+          },
+          "entity_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Entity Type"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "ip": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ip"
+          },
+          "occurred_at": {
+            "format": "date-time",
+            "title": "Occurred At",
+            "type": "string"
+          },
+          "outcome": {
+            "title": "Outcome",
+            "type": "string"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "request_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Request Id"
+          },
+          "user_agent": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "User Agent"
+          }
+        },
+        "required": [
+          "id",
+          "occurred_at",
+          "action",
+          "outcome"
+        ],
+        "title": "AuditLogOut",
+        "type": "object"
+      },
+      "BackupArchiveInfo": {
+        "description": "Metadata of an available backup archive bundle on disk.",
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "filename": {
+            "title": "Filename",
+            "type": "string"
+          },
+          "filepath": {
+            "title": "Filepath",
+            "type": "string"
+          },
+          "is_valid": {
+            "default": true,
+            "title": "Is Valid",
+            "type": "boolean"
+          },
+          "label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Label"
+          },
+          "manifest": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Manifest"
+          },
+          "size_bytes": {
+            "title": "Size Bytes",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "filename",
+          "filepath",
+          "size_bytes",
+          "created_at"
+        ],
+        "title": "BackupArchiveInfo",
+        "type": "object"
+      },
+      "BackupArchiveListResponse": {
+        "description": "Response containing list of discovered backup bundles.",
+        "properties": {
+          "backup_dir": {
+            "title": "Backup Dir",
+            "type": "string"
+          },
+          "backups": {
+            "items": {
+              "$ref": "#/components/schemas/BackupArchiveInfo"
+            },
+            "title": "Backups",
+            "type": "array"
+          },
+          "total_count": {
+            "title": "Total Count",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "backups",
+          "total_count",
+          "backup_dir"
+        ],
+        "title": "BackupArchiveListResponse",
+        "type": "object"
+      },
+      "BackupCreateRequest": {
+        "description": "Payload to trigger an ad-hoc backup.",
+        "properties": {
+          "destination_dir": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Optional custom directory path on server (e.g. secondary disk)",
+            "title": "Destination Dir"
+          },
+          "label": {
+            "anyOf": [
+              {
+                "maxLength": 50,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Optional label for the archive",
+            "title": "Label"
+          }
+        },
+        "title": "BackupCreateRequest",
+        "type": "object"
+      },
       "ChangePasswordRequest": {
         "additionalProperties": false,
         "description": "Payload for user password change.",
@@ -1410,6 +1720,80 @@
           }
         },
         "title": "HTTPValidationError",
+        "type": "object"
+      },
+      "IntegrityCheckItemOut": {
+        "description": "Status of an individual integrity check.",
+        "properties": {
+          "details": {
+            "title": "Details",
+            "type": "string"
+          },
+          "discrepancies": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Discrepancies",
+            "type": "array"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "passed": {
+            "title": "Passed",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "name",
+          "passed",
+          "details"
+        ],
+        "title": "IntegrityCheckItemOut",
+        "type": "object"
+      },
+      "IntegrityReportOut": {
+        "description": "System-wide clinical and financial integrity report.",
+        "properties": {
+          "checks": {
+            "items": {
+              "$ref": "#/components/schemas/IntegrityCheckItemOut"
+            },
+            "title": "Checks",
+            "type": "array"
+          },
+          "failed_checks": {
+            "title": "Failed Checks",
+            "type": "integer"
+          },
+          "generated_at": {
+            "title": "Generated At",
+            "type": "string"
+          },
+          "is_healthy": {
+            "title": "Is Healthy",
+            "type": "boolean"
+          },
+          "passed_checks": {
+            "title": "Passed Checks",
+            "type": "integer"
+          },
+          "total_checks": {
+            "title": "Total Checks",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "generated_at",
+          "is_healthy",
+          "total_checks",
+          "passed_checks",
+          "failed_checks",
+          "checks"
+        ],
+        "title": "IntegrityReportOut",
         "type": "object"
       },
       "LoginRequest": {
@@ -2629,6 +3013,79 @@
           "role"
         ],
         "title": "ReceptionOverviewResponse",
+        "type": "object"
+      },
+      "RestoreRequest": {
+        "description": "Payload to trigger restoration from a backup archive.",
+        "properties": {
+          "archive_filename": {
+            "description": "Filename of the backup archive in the backup directory",
+            "title": "Archive Filename",
+            "type": "string"
+          },
+          "create_prerestore_snapshot": {
+            "default": true,
+            "description": "Automatically take safety snapshot before restore",
+            "title": "Create Prerestore Snapshot",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "archive_filename"
+        ],
+        "title": "RestoreRequest",
+        "type": "object"
+      },
+      "RestoreResultOut": {
+        "description": "Response payload following a backup restore execution.",
+        "properties": {
+          "archive_restored": {
+            "title": "Archive Restored",
+            "type": "string"
+          },
+          "database_restored": {
+            "title": "Database Restored",
+            "type": "boolean"
+          },
+          "manifest": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Manifest"
+          },
+          "photos_restored_count": {
+            "title": "Photos Restored Count",
+            "type": "integer"
+          },
+          "prerestore_snapshot": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Prerestore Snapshot"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "archive_restored",
+          "database_restored",
+          "photos_restored_count"
+        ],
+        "title": "RestoreResultOut",
         "type": "object"
       },
       "Role": {
@@ -3864,6 +4321,195 @@
         ]
       }
     },
+    "/api/audit-logs": {
+      "get": {
+        "description": "List system audit log records with multi-dimensional filtering (AUD-02).",
+        "operationId": "list_audit_logs_api_audit_logs_get",
+        "parameters": [
+          {
+            "description": "Filter by username",
+            "in": "query",
+            "name": "actor_username",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by username",
+              "title": "Actor Username"
+            }
+          },
+          {
+            "description": "Filter by action name",
+            "in": "query",
+            "name": "action",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by action name",
+              "title": "Action"
+            }
+          },
+          {
+            "description": "Filter by entity type",
+            "in": "query",
+            "name": "entity_type",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by entity type",
+              "title": "Entity Type"
+            }
+          },
+          {
+            "description": "Filter by entity ID",
+            "in": "query",
+            "name": "entity_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by entity ID",
+              "title": "Entity Id"
+            }
+          },
+          {
+            "description": "Filter by outcome",
+            "in": "query",
+            "name": "outcome",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by outcome",
+              "title": "Outcome"
+            }
+          },
+          {
+            "description": "Filter start date (inclusive)",
+            "in": "query",
+            "name": "date_from",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter start date (inclusive)",
+              "title": "Date From"
+            }
+          },
+          {
+            "description": "Filter end date (inclusive)",
+            "in": "query",
+            "name": "date_to",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter end date (inclusive)",
+              "title": "Date To"
+            }
+          },
+          {
+            "description": "Page number",
+            "in": "query",
+            "name": "page",
+            "required": false,
+            "schema": {
+              "default": 1,
+              "description": "Page number",
+              "minimum": 1,
+              "title": "Page",
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Page size",
+            "in": "query",
+            "name": "page_size",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "description": "Page size",
+              "maximum": 200,
+              "minimum": 1,
+              "title": "Page Size",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuditLogListResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Audit Logs",
+        "tags": [
+          "audit"
+        ]
+      }
+    },
     "/api/auth/change-password": {
       "post": {
         "description": "Change user password, enforce NIST policy, revoke all sessions, and issue fresh session.",
@@ -4570,6 +5216,132 @@
         "summary": "Health Check",
         "tags": [
           "health"
+        ]
+      }
+    },
+    "/api/operations/backups": {
+      "get": {
+        "description": "List all backup archives found in configured backup directory.",
+        "operationId": "list_backups_api_operations_backups_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BackupArchiveListResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "List available backup archive bundles (BAK-01)",
+        "tags": [
+          "operations"
+        ]
+      },
+      "post": {
+        "description": "Create a checksummed .tar.gz backup bundle containing database dump and photos.",
+        "operationId": "trigger_backup_api_operations_backups_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BackupCreateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BackupArchiveInfo"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create system backup bundle (BAK-01)",
+        "tags": [
+          "operations"
+        ]
+      }
+    },
+    "/api/operations/integrity": {
+      "get": {
+        "description": "Run full diagnostic audit on database constraints, ledger balances, and files.",
+        "operationId": "get_integrity_report_api_operations_integrity_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IntegrityReportOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Run live clinical and financial integrity inspection (BAK-03)",
+        "tags": [
+          "operations"
+        ]
+      }
+    },
+    "/api/operations/restore": {
+      "post": {
+        "description": "Verify archive and execute safe restore with automatic pre-snapshot.",
+        "operationId": "trigger_restore_api_operations_restore_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RestoreRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RestoreResultOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Restore system from backup archive (BAK-02)",
+        "tags": [
+          "operations"
         ]
       }
     },

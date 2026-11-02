@@ -10,8 +10,16 @@ from kalyan_api.cli import (
 )
 
 
-def test_cli_operations_workflow(tmp_path: Path):
+def test_cli_operations_workflow(tmp_path: Path, db_session):
     """Test full CLI lifecycle: create backup, verify it, run integrity check, and restore."""
+    from kalyan_api.config import get_settings
+
+    settings = get_settings()
+    if settings.photos_dir.exists():
+        for f in settings.photos_dir.glob("*"):
+            if f.is_file() and not f.name.startswith("test_"):
+                f.unlink()
+
     dest_dir = tmp_path / "cli_backups"
 
     # 1. Integrity check

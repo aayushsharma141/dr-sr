@@ -21,12 +21,12 @@ from kalyan_api.routers.appointments import doctor_router
 from kalyan_api.routers.appointments import router as appointments_router
 from kalyan_api.routers.areas import router as areas_router
 from kalyan_api.routers.audit import router as audit_router
-from kalyan_api.routers.operations import router as operations_router
 from kalyan_api.routers.auth import router as auth_router
 from kalyan_api.routers.billing import router as billing_router
 from kalyan_api.routers.doctors import router as doctors_router
 from kalyan_api.routers.encounters import router as encounters_router
 from kalyan_api.routers.health import router as health_router
+from kalyan_api.routers.operations import router as operations_router
 from kalyan_api.routers.patients import router as patients_router
 from kalyan_api.routers.prescriptions import router as prescriptions_router
 from kalyan_api.routers.settings import router as settings_router

@@ -258,6 +258,14 @@ def _reverse_payment_payload(_target: Any = None) -> dict[str, Any]:
     }
 
 
+def _create_backup_payload(_target: Any = None) -> dict[str, Any]:
+    return {"label": "matrix_test"}
+
+
+def _restore_payload(_target: Any = None) -> dict[str, Any]:
+    return {"archive_filename": "non_existent.tar.gz", "create_prerestore_snapshot": False}
+
+
 MATRIX: list[MatrixRow] = [
     # Billing and Timeline (Phase 15)
     MatrixRow(
@@ -1002,6 +1010,67 @@ MATRIX: list[MatrixRow] = [
             "reception": 403,
             "doctor_a": 201,
             "doctor_b": 404,
+        },
+    ),
+    # Phase 16: Audit Viewer & Operations
+    MatrixRow(
+        method="GET",
+        path="/api/audit-logs",
+        body_factory=None,
+        expected={
+            "anonymous": 401,
+            "admin": 200,
+            "reception": 403,
+            "doctor_a": 403,
+            "doctor_b": 403,
+        },
+    ),
+    MatrixRow(
+        method="POST",
+        path="/api/operations/backups",
+        body_factory=_create_backup_payload,
+        expected={
+            "anonymous": 401,
+            "admin": 201,
+            "reception": 403,
+            "doctor_a": 403,
+            "doctor_b": 403,
+        },
+    ),
+    MatrixRow(
+        method="GET",
+        path="/api/operations/backups",
+        body_factory=None,
+        expected={
+            "anonymous": 401,
+            "admin": 200,
+            "reception": 403,
+            "doctor_a": 403,
+            "doctor_b": 403,
+        },
+    ),
+    MatrixRow(
+        method="POST",
+        path="/api/operations/restore",
+        body_factory=_restore_payload,
+        expected={
+            "anonymous": 401,
+            "admin": 404,  # non-existent file returns 404
+            "reception": 403,
+            "doctor_a": 403,
+            "doctor_b": 403,
+        },
+    ),
+    MatrixRow(
+        method="GET",
+        path="/api/operations/integrity",
+        body_factory=None,
+        expected={
+            "anonymous": 401,
+            "admin": 200,
+            "reception": 403,
+            "doctor_a": 403,
+            "doctor_b": 403,
         },
     ),
 ]

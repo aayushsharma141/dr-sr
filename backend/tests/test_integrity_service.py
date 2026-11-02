@@ -11,9 +11,14 @@ from kalyan_api.services.integrity_service import (
 )
 
 
-def test_integrity_audit_clean_database():
+def test_integrity_audit_clean_database(db_session):
     """In a standard clean test database, all integrity checks should pass."""
     settings = get_settings()
+    # Clean any residual orphan test files
+    if settings.photos_dir.exists():
+        for f in settings.photos_dir.glob("*"):
+            if f.is_file() and not f.name.startswith("test_"):
+                f.unlink()
     with session_scope(settings) as session:
         report = run_integrity_audit(session, settings)
         assert report.total_checks == 5

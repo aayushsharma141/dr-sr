@@ -160,8 +160,7 @@ def check_receipt_uniqueness(session: Session) -> CheckResult:
     )
     duplicates = session.execute(dup_stmt).all()
     discrepancies = [
-        {"receipt_number": d.receipt_number, "occurrences": d.count}
-        for d in duplicates
+        {"receipt_number": d.receipt_number, "occurrences": d.count} for d in duplicates
     ]
 
     passed = len(discrepancies) == 0
