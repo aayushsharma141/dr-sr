@@ -64,6 +64,17 @@
 - [ ] **DEP-02**: Server services start automatically after a power cut and recover without manual steps.
 - [ ] **DEP-03**: Acceptance tests pass for offline operation, permissions, data integrity, real-printer output and backup/restore.
 
+### UI/UX Review Hardening (post-acceptance review)
+
+- [ ] **UX-01**: Receipts print from the app: an 80 mm receipt after each payment and from payment history, reprints marked DUPLICATE, header taken from clinic settings, and print page sizes defined per document (80 mm receipt, A4 card and prescription).
+- [ ] **UX-02**: Every pop-up uses one shared native modal dialog with dialog semantics, inert background, Esc to close and focus returned to the opener.
+- [ ] **UX-03**: No blocking `alert()`; failures show persistent, screen-reader-announced inline messages.
+- [ ] **UX-04**: On-screen text is at least 12px and meets 4.5:1 contrast, guarded by an automated check.
+- [ ] **UX-05**: Hindi text is marked `lang="hi"` and uses a bundled Devanagari font that works with no network.
+- [ ] **UX-06**: Every form control has an accessible name, and validation errors are announced only after user interaction.
+- [ ] **UX-07**: The HTTPS-for-webcam decision is recorded and either implemented (trusted local certificate) or documented as upload-only with a clear on-screen explanation.
+- [ ] **UX-08**: Typecheck, lint, frontend tests and headless one-page print checks pass, with a manual-check sheet for printer, screen reader and display scaling.
+
 ## v2 Requirements
 
 Deferred; tracked but not in the current roadmap.
@@ -144,10 +155,18 @@ Deferred; tracked but not in the current roadmap.
 | DEP-02 | Phase 17 | Pending |
 | DEP-03 | Phase 17 | Pending |
 | PRN-01 | Phase 17 | Pending |
+| UX-01 | Phase 18 | Pending |
+| UX-02 | Phase 18 | Pending |
+| UX-03 | Phase 18 | Pending |
+| UX-04 | Phase 18 | Pending |
+| UX-05 | Phase 18 | Pending |
+| UX-06 | Phase 18 | Pending |
+| UX-07 | Phase 18 | Pending |
+| UX-08 | Phase 18 | Pending |
 
 **Coverage:**
-- v1 requirements: 37 total
-- Mapped to phases: 37
+- v1 requirements: 45 total
+- Mapped to phases: 45
 - Unmapped: 0
 
 ---
