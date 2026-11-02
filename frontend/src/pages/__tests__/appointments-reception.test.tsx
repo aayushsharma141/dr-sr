@@ -582,6 +582,7 @@ describe('AppointmentsReception Component', () => {
 
     await waitFor(() => {
       expect(screen.getByLabelText('Filter by Doctor')).toBeInTheDocument()
+      expect(screen.getByRole('option', { name: /Dr. Madan Mohan Dwivedi/ })).toBeInTheDocument()
     })
     await user.selectOptions(screen.getByLabelText('Filter by Doctor'), '1')
     await user.click(screen.getByRole('button', { name: 'Book First Appointment' }))
