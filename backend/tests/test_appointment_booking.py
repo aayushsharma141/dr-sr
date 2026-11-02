@@ -247,3 +247,48 @@ def test_book_appointment_validations(login_client, reception_user, db_session):
     )
     assert resp2.status_code == 404
     assert resp2.json()["code"] == "doctor_not_found"
+
+
+def test_same_day_scheduled_visit_enters_doctor_queue_only_after_check_in(
+    login_client, reception_user, doctor_a_user, db_session, monkeypatch
+):
+    """A same-day scheduled visit stays outside the queue until check-in assigns a token."""
+    clinic_day = date(2026, 11, 2)
+    monkeypatch.setattr("kalyan_api.clock.ist_today", lambda: clinic_day)
+    doctor_id = doctor_a_user.doctor_id
+    assert doctor_id is not None
+    patient = _patient(db_session, "KH-2026-8851", "Queue Check-in Patient", "9876543271")
+    reception = login_client(reception_user)
+    doctor = login_client(doctor_a_user)
+
+    created = reception.post(
+        "/api/appointments",
+        json={
+            "patient_id": patient.id,
+            "doctor_id": doctor_id,
+            "appointment_date": clinic_day.isoformat(),
+            "booking_mode": "SCHEDULED",
+            "visit_type": "FOLLOW_UP",
+        },
+    )
+    assert created.status_code == 201, created.text
+    appointment = created.json()
+    assert appointment["token_number"] is None
+
+    before_check_in = doctor.get("/api/doctor/queue")
+    assert before_check_in.status_code == 200, before_check_in.text
+    assert before_check_in.json()["total_active"] == 0
+
+    arrived = reception.patch(
+        f"/api/appointments/{appointment['id']}/status",
+        json={"status": "ARRIVED", "version_id": 1},
+    )
+    assert arrived.status_code == 200, arrived.text
+    assert arrived.json()["token_number"] == 1
+
+    after_check_in = doctor.get("/api/doctor/queue")
+    assert after_check_in.status_code == 200, after_check_in.text
+    queue = after_check_in.json()
+    assert queue["total_active"] == 1
+    assert len(queue["waiting"]) == 1
+    assert queue["waiting"][0]["token_number"] == 1
