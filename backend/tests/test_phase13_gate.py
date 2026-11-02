@@ -16,7 +16,7 @@ Validates the full Phase 13 contract:
 """
 
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from datetime import UTC, date, datetime
+from datetime import date
 from typing import Any
 
 import pytest
@@ -117,7 +117,6 @@ def test_phase13_full_lifecycle_and_security_gate(
             "patient_id": patient_id,
             "doctor_id": doc_a_id,
             "appointment_date": today_str,
-            "booking_mode": "WALK_IN",
             "notes": "Gate test routine checkup",
         },
     )
