@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router'
 import {
   useBookAppointment,
   useDoctors,
@@ -73,6 +74,7 @@ export function AppointmentBookingModal({
   initialDate,
   onSuccess,
 }: AppointmentBookingModalProps) {
+  const navigate = useNavigate()
   const today = localDateValue(new Date())
   const [bookingMode, setBookingMode] = useState<AppointmentBookingMode>('WALK_IN')
   const [visitType, setVisitType] = useState<AppointmentVisitType>('NEW_CONSULTATION')
@@ -434,9 +436,23 @@ export function AppointmentBookingModal({
                       ))}
                     </div>
                   ) : (
-                    <p className="rounded-lg border border-dashed border-slate-200 bg-slate-50 px-3 py-3 text-xs text-slate-500">
-                      No active patient matched this search. Verify the URN or register the patient first.
-                    </p>
+                    <div className="rounded-lg border border-dashed border-slate-200 bg-slate-50 px-3 py-3">
+                      <p className="text-xs text-slate-600">
+                        No active patient matched this search. Verify the URN or register the patient first.
+                      </p>
+                      {me?.permissions.includes('patient:create') && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            handleClose()
+                            navigate('/reception/patients/new')
+                          }}
+                          className="mt-3 inline-flex min-h-11 items-center rounded-lg border border-[#8E1C3D] bg-white px-3 text-xs font-semibold text-[#5D0B26] hover:bg-rose-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#8E1C3D]"
+                        >
+                          Register new patient
+                        </button>
+                      )}
+                    </div>
                   )}
                 </div>
               )}
