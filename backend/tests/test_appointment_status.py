@@ -378,6 +378,59 @@ def test_scheduled_visit_can_be_marked_no_show_only_after_its_clinic_date(
     assert overdue.json()["token_number"] is None
 
 
+def test_tokenless_scheduled_reservation_is_excluded_until_check_in(
+    login_client, reception_user, doctor_a_user, db_session, clock
+):
+    """A scheduled reservation enters the doctor queue only after check-in allocates a token."""
+    from datetime import timedelta
+
+    from kalyan_api.clock import IST
+
+    patient = Patient(
+        urn="KH-2026-7797",
+        full_name="Tokenless Queue Patient",
+        guardian_name="Guardian",
+        gender="F",
+        age_years=42,
+        mobile="9876543397",
+        address="Ara",
+    )
+    db_session.add(patient)
+    db_session.flush()
+
+    reception = login_client(reception_user)
+    today = clock["t"].astimezone(IST).date()
+    booked = reception.post(
+        "/api/appointments",
+        json={
+            "patient_id": patient.id,
+            "doctor_id": doctor_a_user.doctor_id,
+            "appointment_date": (today + timedelta(days=1)).isoformat(),
+            "booking_mode": "SCHEDULED",
+            "visit_type": "FOLLOW_UP",
+        },
+    )
+    assert booked.status_code == 201, booked.text
+    appointment_id = booked.json()["id"]
+
+    clock["t"] = clock["t"] + timedelta(days=1)
+    doctor = login_client(doctor_a_user)
+    before_check_in = doctor.get("/api/doctor/queue")
+    assert before_check_in.status_code == 200, before_check_in.text
+    assert all(item["id"] != appointment_id for item in before_check_in.json()["booked"])
+
+    checked_in = reception.patch(
+        f"/api/appointments/{appointment_id}/status",
+        json={"status": "ARRIVED", "version_id": 1},
+    )
+    assert checked_in.status_code == 200, checked_in.text
+    assert checked_in.json()["token_number"] == 1
+
+    after_check_in = doctor.get("/api/doctor/queue")
+    assert after_check_in.status_code == 200, after_check_in.text
+    assert any(item["id"] == appointment_id for item in after_check_in.json()["waiting"])
+
+
 def test_doctor_queue_uses_ist_clinic_date_before_utc_midnight(
     login_client, reception_user, doctor_a_user, db_session, clock
 ):
