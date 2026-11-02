@@ -5,7 +5,7 @@ Revises: 0005
 Create Date: 2026-11-03
 
 Adds visit intent and explicit test-data marking. Scheduled dates reserve a
-doctor-specific daily token; they do not imply a guaranteed arrival time.
+place in a doctor's dated queue; tokens are assigned at check-in.
 """
 
 from collections.abc import Sequence
