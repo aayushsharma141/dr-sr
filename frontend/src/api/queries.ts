@@ -1,4 +1,9 @@
 import type {
+  PaymentCreate,
+  PaymentOut,
+  PaymentReversalCreate,
+  PendingDueOut,
+  TimelineItemOut,
   AddendumCreate,
   AddendumRead,
   Appointment,
@@ -767,5 +772,77 @@ export function useAddSessionAddendum() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['treatment-sessions'] })
     },
+  })
+}
+
+
+// ---------------------------------------------------------------------------
+// Phase 15: Payments, Receipts, Dues & Patient Timeline
+// ---------------------------------------------------------------------------
+
+export function usePatientPayments(patientId: number | null | undefined) {
+  return useQuery({
+    queryKey: ['payments', 'patient', patientId],
+    queryFn: () =>
+      apiFetch<PaymentOut[]>(/api/patients//payments),
+    enabled: typeof patientId === 'number' && patientId > 0,
+  })
+}
+
+export function usePayment(id: number | null | undefined) {
+  return useQuery({
+    queryKey: ['payments', id],
+    queryFn: () => apiFetch<PaymentOut>(/api/payments/),
+    enabled: typeof id === 'number' && id > 0,
+  })
+}
+
+export function usePendingDues() {
+  return useQuery({
+    queryKey: ['billing', 'pending-dues'],
+    queryFn: () => apiFetch<PendingDueOut[]>('/api/billing/pending-dues'),
+  })
+}
+
+export function useRecordPayment() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (payload: PaymentCreate) =>
+      apiFetch<PaymentOut>('/api/payments', {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      }),
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['payments'] })
+      queryClient.invalidateQueries({ queryKey: ['billing', 'pending-dues'] })
+      queryClient.invalidateQueries({ queryKey: ['treatment-plans'] })
+      queryClient.invalidateQueries({ queryKey: ['timeline', variables.patient_id] })
+    },
+  })
+}
+
+export function useReversePayment() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, payload }: { id: number; payload: PaymentReversalCreate }) =>
+      apiFetch<PaymentOut>(/api/payments//reverse, {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['payments'] })
+      queryClient.invalidateQueries({ queryKey: ['billing', 'pending-dues'] })
+      queryClient.invalidateQueries({ queryKey: ['treatment-plans'] })
+      queryClient.invalidateQueries({ queryKey: ['timeline'] })
+    },
+  })
+}
+
+export function usePatientTimeline(patientId: number | null | undefined) {
+  return useQuery({
+    queryKey: ['timeline', patientId],
+    queryFn: () =>
+      apiFetch<TimelineItemOut[]>(/api/patients//timeline),
+    enabled: typeof patientId === 'number' && patientId > 0,
   })
 }

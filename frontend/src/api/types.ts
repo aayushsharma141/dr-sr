@@ -545,3 +545,66 @@ export interface TreatmentSessionOut {
   created_at: string
   addenda: TreatmentSessionAddendumOut[]
 }
+
+
+// Phase 15: Billing, Receipts, and Reversals Contracts
+export type PaymentMethod = 'CASH' | 'UPI' | 'CARD'
+
+export interface PaymentCreate {
+  patient_id: number
+  treatment_plan_id?: number | null
+  appointment_id?: number | null
+  amount_paise: number
+  payment_method: PaymentMethod
+  notes?: string | null
+}
+
+export interface PaymentReversalCreate {
+  reversal_reason: string
+}
+
+export interface PaymentOut {
+  id: number
+  receipt_number: string
+  patient_id: number
+  patient_urn: string
+  patient_name: string
+  treatment_plan_id: number | null
+  treatment_plan_name: string | null
+  appointment_id: number | null
+  amount_paise: number
+  payment_method: PaymentMethod
+  notes: string | null
+  is_reversed: boolean
+  reversal_reason: string | null
+  reversed_by_username: string | null
+  reversed_at: string | null
+  created_by_username: string
+  created_at: string
+}
+
+export interface PendingDueOut {
+  treatment_plan_id: number
+  patient_id: number
+  patient_urn: string
+  patient_name: string
+  plan_name: string
+  condition_diagnosis: string | null
+  agreed_price_paise: number
+  paid_paise: number
+  balance_paise: number
+  total_sessions: number
+  completed_sessions: number
+}
+
+export interface TimelineItemOut {
+  id: string
+  event_type: 'APPOINTMENT' | 'ENCOUNTER' | 'PRESCRIPTION' | 'TREATMENT_PLAN' | 'TREATMENT_SESSION' | 'PAYMENT'
+  event_date: string
+  title: string
+  subtitle?: string | null
+  summary?: string | null
+  badge?: string | null
+  badge_variant?: 'default' | 'secondary' | 'destructive' | 'outline' | null
+  metadata: Record<string, unknown>
+}
