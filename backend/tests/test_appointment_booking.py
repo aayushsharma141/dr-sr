@@ -42,7 +42,7 @@ def test_book_appointment_lifecycle(login_client, reception_user, doctor_a_user,
     )
     assert resp1.status_code == 201, resp1.text
     data1 = resp1.json()
-    assert data1["token_number"] == 1
+    assert data1["token_number"] is None
     assert data1["status"] == "BOOKED"
     assert data1["patient_urn"] == "KH-2026-8801"
     assert data1["doctor_id"] == doctor_id
@@ -74,7 +74,17 @@ def test_book_appointment_lifecycle(login_client, reception_user, doctor_a_user,
     )
     assert resp2.status_code == 201, resp2.text
     data2 = resp2.json()
-    assert data2["token_number"] == 2
+    assert data2["token_number"] is None
+
+    # Scheduled reservations receive tokens only on the booked clinic date.
+    clock["t"] = clock["t"] + timedelta(days=3)
+    check_in = client.patch(
+        f"/api/appointments/{appt1_id}/status",
+        json={"status": "ARRIVED", "version_id": 1},
+    )
+    assert check_in.status_code == 200, check_in.text
+    assert check_in.json()["token_number"] == 1
+    assert check_in.json()["status"] == "ARRIVED"
 
     # 5. List appointments
     list_resp = client.get(f"/api/appointments?appointment_date={target_date}")
@@ -130,8 +140,8 @@ def test_book_appointment_validations(login_client, reception_user, db_session, 
     assert resp2.json()["code"] == "doctor_not_found"
 
 
-def test_hybrid_booking_modes_reserve_tokens_and_reject_duplicate_visit(
-    login_client, reception_user, doctor_a_user, db_session
+def test_hybrid_booking_modes_allocate_scheduled_token_at_check_in_and_reject_duplicate_visit(
+    login_client, reception_user, doctor_a_user, db_session, clock
 ):
     """Walk-ins are same-day only; future bookings reserve a future-date token."""
     from datetime import timedelta
@@ -199,7 +209,17 @@ def test_hybrid_booking_modes_reserve_tokens_and_reject_duplicate_visit(
     assert scheduled_data["booking_mode"] == "SCHEDULED"
     assert scheduled_data["visit_type"] == "FOLLOW_UP"
     assert scheduled_data["appointment_date"] == future_date.isoformat()
-    assert scheduled_data["token_number"] == 1
+    assert scheduled_data["token_number"] is None
+
+    # A scheduled reservation must not consume a token before its clinic date.
+    clock["t"] = clock["t"] + timedelta(days=5)
+    checked_in = client.patch(
+        f"/api/appointments/{scheduled_data['id']}/status",
+        json={"status": "ARRIVED", "version_id": 1},
+    )
+    assert checked_in.status_code == 200, checked_in.text
+    assert checked_in.json()["token_number"] == 1
+    assert checked_in.json()["status"] == "ARRIVED"
 
     listed = client.get(
         "/api/appointments",
