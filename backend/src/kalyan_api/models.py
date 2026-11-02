@@ -435,6 +435,7 @@ class Appointment(Base):
             "visit_type",
             "status",
         ),
+        Index("ix_appointments_booking_date_mode", "appointment_date", "booking_mode"),
     )
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
