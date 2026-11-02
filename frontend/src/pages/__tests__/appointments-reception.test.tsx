@@ -469,7 +469,7 @@ describe('AppointmentsReception Component', () => {
   })
 
   it('searches only after two characters and submits a scheduled visit without a token', async () => {
-    let createdBody: Record<string, unknown> | null = null
+    const createdBodies: Record<string, unknown>[] = []
     const activePatient = {
       id: 101,
       urn: 'KH-2026-0001',
@@ -527,7 +527,7 @@ describe('AppointmentsReception Component', () => {
         })
       }
       if (url.includes('/api/appointments') && init?.method === 'POST') {
-        createdBody = JSON.parse(init.body as string) as Record<string, unknown>
+        createdBodies.push(JSON.parse(init.body as string) as Record<string, unknown>)
         return Promise.resolve({
           ok: true,
           status: 201,
@@ -570,15 +570,15 @@ describe('AppointmentsReception Component', () => {
     await user.click(screen.getByRole('button', { name: 'Confirm scheduled visit' }))
 
     await waitFor(() => {
-      expect(createdBody).not.toBeNull()
+      expect(createdBodies).toHaveLength(1)
     })
-    expect(createdBody).toMatchObject({
+    expect(createdBodies[0]).toMatchObject({
       patient_id: 101,
       doctor_id: 1,
       booking_mode: 'SCHEDULED',
       visit_type: 'NEW_CONSULTATION',
     })
-    expect(typeof createdBody?.appointment_date).toBe('string')
+    expect(typeof createdBodies[0].appointment_date).toBe('string')
     expect(screen.getByText('No token allocated yet')).toBeInTheDocument()
   })
 
