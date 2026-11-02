@@ -420,6 +420,7 @@ def get_doctor_queue(
         .where(
             Appointment.doctor_id == principal.doctor_id,
             Appointment.appointment_date == today,
+            Appointment.token_number.is_not(None),
         )
         .order_by(Appointment.token_number.asc())
     )
