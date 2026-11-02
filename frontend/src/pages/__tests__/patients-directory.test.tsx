@@ -292,7 +292,43 @@ describe('Patients Directory and Profile Screens', () => {
     expect(screen.queryByText('Record was modified by another user')).not.toBeInTheDocument()
   })
 
-  it('renders patient detail view with demographics and medical alerts', async () => {
+  it('renders patient record tabs and filters the role-scoped visit, therapy and billing timeline', async () => {
+    const timeline = [
+      {
+        id: 'APPOINTMENT-10',
+        event_type: 'APPOINTMENT',
+        event_date: '2026-11-01T10:00:00Z',
+        title: 'Token #1: Appointment with Dr. Madan Mohan Dwivedi',
+        subtitle: 'Status: BOOKED',
+        summary: 'Knee rehabilitation',
+        badge: 'BOOKED',
+        badge_variant: 'outline',
+        metadata: { appointment_id: 10 },
+      },
+      {
+        id: 'TREATMENT_PLAN-20',
+        event_type: 'TREATMENT_PLAN',
+        event_date: '2026-11-01T11:00:00Z',
+        title: 'Package: Knee Rehabilitation',
+        subtitle: 'Dr. Madan Mohan Dwivedi · ₹4,000.00',
+        summary: 'Diagnosis: Knee pain | Sessions: 1/8',
+        badge: 'ACTIVE',
+        badge_variant: 'default',
+        metadata: { treatment_plan_id: 20 },
+      },
+      {
+        id: 'PAYMENT-30',
+        event_type: 'PAYMENT',
+        event_date: '2026-11-01T12:00:00Z',
+        title: 'Payment Received: ₹500.00',
+        subtitle: 'Receipt: KH-RCPT-0030 · Method: CASH',
+        summary: 'Collected by @reception',
+        badge: 'PAID',
+        badge_variant: 'default',
+        metadata: { payment_id: 30 },
+      },
+    ]
+
     const mockFetch = vi.fn().mockImplementation((url: string) => {
       if (url.includes('/api/auth/me')) {
         return Promise.resolve({
@@ -300,6 +336,14 @@ describe('Patients Directory and Profile Screens', () => {
           status: 200,
           headers: new Headers({ 'content-type': 'application/json' }),
           text: () => Promise.resolve(JSON.stringify(mockMe)),
+        })
+      }
+      if (url.includes('/api/patients/101/timeline')) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          headers: new Headers({ 'content-type': 'application/json' }),
+          text: () => Promise.resolve(JSON.stringify(timeline)),
         })
       }
       if (url.includes('/api/patients/101')) {
@@ -314,6 +358,7 @@ describe('Patients Directory and Profile Screens', () => {
     })
     vi.stubGlobal('fetch', mockFetch)
 
+    const user = userEvent.setup()
     render(
       <QueryClientProvider client={queryClient}>
         <MemoryRouter initialEntries={['/reception/patients/101']}>
@@ -334,5 +379,201 @@ describe('Patients Directory and Profile Screens', () => {
     expect(screen.getByText('30 Years')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /edit demographics/i })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: /print card/i })).toBeInTheDocument()
+
+    expect(screen.getByRole('tab', { name: 'Demographic Profile' })).toHaveAttribute('aria-selected', 'true')
+    expect(screen.queryByRole('tab', { name: 'Clinical Records' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('tab', { name: 'Audit History' })).not.toBeInTheDocument()
+
+    await user.click(screen.getByRole('tab', { name: 'Visits & Appointments' }))
+    await waitFor(() => {
+      expect(screen.getByText('Appointment & visit history')).toBeInTheDocument()
+      expect(screen.getByText(/Token #1: Appointment/)).toBeInTheDocument()
+    })
+
+    await user.click(screen.getByRole('tab', { name: 'Physiotherapy' }))
+    await waitFor(() => {
+      expect(screen.getByText('Package: Knee Rehabilitation')).toBeInTheDocument()
+    })
+    expect(screen.queryByText(/Payment Received/)).not.toBeInTheDocument()
+
+    await user.click(screen.getByRole('tab', { name: 'Financial Ledger' }))
+    await waitFor(() => {
+      expect(screen.getByText('Payment Received: ₹500.00')).toBeInTheDocument()
+    })
+    expect(screen.queryByText(/Package: Knee Rehabilitation/)).not.toBeInTheDocument()
+  })
+
+  it('exposes clinical record tabs to the treating doctor and filters encounter data', async () => {
+    const doctorMe: Me = {
+      ...mockMe,
+      role: 'DOCTOR',
+      username: 'doctor',
+      full_name: 'Treating Doctor',
+      doctor_id: 1,
+      permissions: ['patient:read', 'timeline:read', 'encounter:read', 'prescription:read'],
+    }
+    const timeline = [
+      {
+        id: 'ENCOUNTER-41',
+        event_type: 'ENCOUNTER',
+        event_date: '2026-11-01T10:00:00Z',
+        title: 'Clinical Consultation with Dr. Madan Mohan Dwivedi',
+        subtitle: 'Dr. Madan Mohan Dwivedi',
+        summary: 'Diagnosis: Lumbar radiculopathy',
+        badge: 'FINALIZED',
+        badge_variant: 'default',
+        metadata: { encounter_id: 41 },
+      },
+      {
+        id: 'PRESCRIPTION-42',
+        event_type: 'PRESCRIPTION',
+        event_date: '2026-11-01T11:00:00Z',
+        title: 'Prescription by Dr. Madan Mohan Dwivedi',
+        subtitle: 'Rx #42 · 1 medication(s)',
+        summary: 'Test medicine (10 mg)',
+        badge: 'ACTIVE',
+        badge_variant: 'default',
+        metadata: { prescription_id: 42 },
+      },
+    ]
+
+    const mockFetch = vi.fn().mockImplementation((url: string) => {
+      if (url.includes('/api/auth/me')) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          headers: new Headers({ 'content-type': 'application/json' }),
+          text: () => Promise.resolve(JSON.stringify(doctorMe)),
+        })
+      }
+      if (url.includes('/api/patients/101/timeline')) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          headers: new Headers({ 'content-type': 'application/json' }),
+          text: () => Promise.resolve(JSON.stringify(timeline)),
+        })
+      }
+      if (url.includes('/api/patients/101')) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          headers: new Headers({ 'content-type': 'application/json' }),
+          text: () => Promise.resolve(JSON.stringify(mockPatients[0])),
+        })
+      }
+      return Promise.reject(new Error(`Unhandled: ${url}`))
+    })
+    vi.stubGlobal('fetch', mockFetch)
+
+    const user = userEvent.setup()
+    render(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter initialEntries={['/reception/patients/101']}>
+          <Routes>
+            <Route path="/reception/patients/:id" element={<PatientDetail />} />
+          </Routes>
+        </MemoryRouter>
+      </QueryClientProvider>,
+    )
+
+    await waitFor(() => {
+      expect(screen.getByRole('tab', { name: 'Clinical Records' })).toBeInTheDocument()
+    })
+
+    await user.click(screen.getByRole('tab', { name: 'Clinical Records' }))
+    await waitFor(() => {
+      expect(screen.getByText('Clinical Consultation with Dr. Madan Mohan Dwivedi')).toBeInTheDocument()
+      expect(screen.getByText('Prescription by Dr. Madan Mohan Dwivedi')).toBeInTheDocument()
+    })
+  })
+
+
+  it('shows patient audit history only to an ADMIN with audit:read permission', async () => {
+    const adminMe: Me = {
+      ...mockMe,
+      role: 'ADMIN',
+      username: 'admin',
+      full_name: 'Hospital Administrator',
+      permissions: ['patient:read', 'timeline:read', 'audit:read'],
+    }
+    const auditResponse = {
+      items: [
+        {
+          id: 901,
+          occurred_at: '2026-11-01T09:30:00Z',
+          actor_user_id: 1,
+          actor_username: 'admin',
+          actor_role: 'ADMIN',
+          action: 'PATIENT_UPDATED',
+          outcome: 'SUCCESS',
+          entity_type: 'patient',
+          entity_id: '101',
+          before_data: null,
+          after_data: null,
+          reason: null,
+          request_id: 'req-901',
+          ip: null,
+          user_agent: null,
+        },
+      ],
+      total: 1,
+      page: 1,
+      page_size: 50,
+      pages: 1,
+    }
+
+    const mockFetch = vi.fn().mockImplementation((url: string) => {
+      if (url.includes('/api/auth/me')) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          headers: new Headers({ 'content-type': 'application/json' }),
+          text: () => Promise.resolve(JSON.stringify(adminMe)),
+        })
+      }
+      if (url.includes('/api/patients/101')) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          headers: new Headers({ 'content-type': 'application/json' }),
+          text: () => Promise.resolve(JSON.stringify(mockPatients[0])),
+        })
+      }
+      if (url.includes('/api/audit-logs')) {
+        expect(url).toContain('entity_type=patient')
+        expect(url).toContain('entity_id=101')
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          headers: new Headers({ 'content-type': 'application/json' }),
+          text: () => Promise.resolve(JSON.stringify(auditResponse)),
+        })
+      }
+      return Promise.reject(new Error(`Unhandled: ${url}`))
+    })
+    vi.stubGlobal('fetch', mockFetch)
+
+    const user = userEvent.setup()
+    render(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter initialEntries={['/reception/patients/101']}>
+          <Routes>
+            <Route path="/reception/patients/:id" element={<PatientDetail />} />
+          </Routes>
+        </MemoryRouter>
+      </QueryClientProvider>,
+    )
+
+    await waitFor(() => {
+      expect(screen.getByRole('tab', { name: 'Audit History' })).toBeInTheDocument()
+    })
+    expect(screen.queryByRole('tab', { name: 'Clinical Records' })).not.toBeInTheDocument()
+
+    await user.click(screen.getByRole('tab', { name: 'Audit History' }))
+    await waitFor(() => {
+      expect(screen.getByText('PATIENT_UPDATED')).toBeInTheDocument()
+    })
+    expect(screen.getByText('admin')).toBeInTheDocument()
   })
 })

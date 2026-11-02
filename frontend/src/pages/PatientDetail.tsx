@@ -1,9 +1,89 @@
 import { useState } from 'react'
 import { Link, useParams } from 'react-router'
-import { usePatient, useMe } from '../api/queries'
+import { useAuditLogs, usePatient, useMe } from '../api/queries'
 import { AppShell } from '../components/AppShell'
 import { PatientEditModal } from '../components/PatientEditModal'
+import { PatientTimeline } from '../components/PatientTimeline'
 import type { PatientOut } from '../api/types'
+
+type PatientDetailTab = 'profile' | 'visits' | 'clinical' | 'therapy' | 'billing' | 'audit'
+
+function PatientAuditHistory({ patientId }: { patientId: number }) {
+  const { data, isPending, isError, error, refetch } = useAuditLogs({
+    entity_type: 'patient',
+    entity_id: String(patientId),
+    page: 1,
+    page_size: 50,
+  })
+
+  if (isPending) {
+    return <div className="p-8 text-center text-sm text-slate-500" role="status">Loading patient audit history…</div>
+  }
+  if (isError) {
+    return <div className="rounded-lg border border-red-200 bg-red-50 p-5 text-sm text-red-900" role="alert">Unable to load audit history: {error.message}</div>
+  }
+
+  const records = data?.items ?? []
+  return (
+    <section className="space-y-3" aria-label="Patient audit history">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <h3 className="text-base font-bold text-slate-900">Patient audit history</h3>
+          <p className="mt-1 text-xs text-slate-500">Administrative access · immutable audit events for this patient record</p>
+        </div>
+        <button
+          type="button"
+          onClick={() => refetch()}
+          className="inline-flex min-h-11 items-center rounded-lg border border-slate-300 px-3 text-xs font-semibold text-slate-700 hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#8E1C3D]"
+        >
+          Refresh
+        </button>
+      </div>
+      {records.length === 0 ? (
+        <div className="rounded-xl border border-dashed border-slate-300 p-8 text-center text-sm text-slate-500">
+          No patient-specific audit events were found.
+        </div>
+      ) : (
+        <div className="overflow-x-auto rounded-lg border border-slate-200">
+          <table className="w-full min-w-[650px] text-left text-sm">
+            <thead className="bg-slate-50 text-[11px] font-bold uppercase tracking-wide text-slate-600">
+              <tr>
+                <th scope="col" className="px-4 py-3">Date & time</th>
+                <th scope="col" className="px-4 py-3">Actor</th>
+                <th scope="col" className="px-4 py-3">Action</th>
+                <th scope="col" className="px-4 py-3">Outcome</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {records.map((record) => (
+                <tr key={record.id}>
+                  <td className="whitespace-nowrap px-4 py-3 text-xs text-slate-600">
+                    {new Date(record.occurred_at).toLocaleString('en-IN')}
+                  </td>
+                  <td className="px-4 py-3">
+                    <span className="font-semibold text-slate-800">{record.actor_username || 'System'}</span>
+                    <span className="ml-1 text-xs text-slate-500">{record.actor_role || ''}</span>
+                  </td>
+                  <td className="px-4 py-3 font-mono text-xs text-slate-700">{record.action}</td>
+                  <td className="px-4 py-3">
+                    <span className={`inline-flex min-h-7 items-center rounded-full px-2.5 text-xs font-semibold ${record.outcome === 'SUCCESS' ? 'bg-emerald-50 text-emerald-800 ring-1 ring-inset ring-emerald-200' : 'bg-rose-50 text-rose-800 ring-1 ring-inset ring-rose-200'}`}>
+                      {record.outcome}
+                    </span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {data && data.total > records.length && (
+            <p className="border-t border-slate-100 px-4 py-3 text-xs text-slate-500">
+              Showing the latest {records.length} of {data.total} audit events. Open the Audit Logs workspace for full pagination.
+            </p>
+          )}
+        </div>
+      )}
+    </section>
+  )
+}
 
 export function PatientDetail() {
   const { id } = useParams<{ id: string }>()
@@ -16,6 +96,7 @@ export function PatientDetail() {
 
   const [isEditModalOpen, setIsEditModalOpen] = useState(false)
   const [successBanner, setSuccessBanner] = useState<string | null>(null)
+  const [activeTab, setActiveTab] = useState<PatientDetailTab>('profile')
 
   if (isNaN(patientId) || patientId <= 0) {
     return (
@@ -106,7 +187,45 @@ export function PatientDetail() {
             <p className="text-neutral-700 font-medium">Patient not found.</p>
           </div>
         ) : (
-          <div className="bg-white rounded-lg border border-neutral-200 overflow-hidden shadow-xs">
+          <div className="space-y-4">
+            <nav
+              role="tablist"
+              aria-label="Patient record sections"
+              className="flex flex-wrap gap-1 border-b border-slate-200"
+            >
+              {([
+                { key: 'profile', label: 'Demographic Profile' },
+                { key: 'visits', label: 'Visits & Appointments' },
+                ...(me?.permissions.includes('encounter:read') && me.permissions.includes('prescription:read')
+                  ? [{ key: 'clinical' as const, label: 'Clinical Records' }]
+                  : []),
+                { key: 'therapy', label: 'Physiotherapy' },
+                { key: 'billing', label: 'Financial Ledger' },
+                ...(me?.role === 'ADMIN' && me.permissions.includes('audit:read') ? [{ key: 'audit' as const, label: 'Audit History' }] : []),
+              ] as const).map((tab) => (
+                <button
+                  key={tab.key}
+                  type="button"
+                  role="tab"
+                  id={`patient-tab-${tab.key}`}
+                  aria-controls={`patient-panel-${tab.key}`}
+                  aria-selected={activeTab === tab.key}
+                  onClick={() => setActiveTab(tab.key)}
+                  className={[
+                    'min-h-11 rounded-t-lg border-b-2 px-3 text-xs font-semibold transition-colors sm:px-4 sm:text-sm',
+                    'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-[#8E1C3D]',
+                    activeTab === tab.key
+                      ? 'border-[#C39A35] bg-white text-[#5D0B26]'
+                      : 'border-transparent text-slate-600 hover:bg-white hover:text-[#5D0B26]',
+                  ].join(' ')}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </nav>
+
+            {activeTab === 'profile' ? (
+          <div id="patient-panel-profile" role="tabpanel" aria-labelledby="patient-tab-profile" className="bg-white rounded-lg border border-neutral-200 overflow-hidden shadow-xs">
             {/* Top Identity Banner */}
             <div className="p-6 bg-neutral-50 border-b border-neutral-200 flex flex-col md:flex-row md:items-center justify-between gap-6">
               <div className="flex items-center gap-5">
@@ -256,6 +375,47 @@ export function PatientDetail() {
                 </div>
               )}
             </div>
+          </div>
+            ) : (
+              <section
+                id={`patient-panel-${activeTab}`}
+                role="tabpanel"
+                aria-labelledby={`patient-tab-${activeTab}`}
+                className="rounded-xl border border-slate-200 bg-white p-4 shadow-xs sm:p-5"
+              >
+                {activeTab === 'visits' && (
+                  <PatientTimeline
+                    patientId={patient.id}
+                    eventTypes={['APPOINTMENT']}
+                    heading="Appointment & visit history"
+                  />
+                )}
+                {activeTab === 'clinical' && (
+                  <PatientTimeline
+                    patientId={patient.id}
+                    eventTypes={['ENCOUNTER', 'PRESCRIPTION']}
+                    heading="Clinical encounters & prescriptions"
+                  />
+                )}
+                {activeTab === 'therapy' && (
+                  <PatientTimeline
+                    patientId={patient.id}
+                    eventTypes={['TREATMENT_PLAN', 'TREATMENT_SESSION']}
+                    heading="Physiotherapy plans & sessions"
+                  />
+                )}
+                {activeTab === 'billing' && (
+                  <PatientTimeline
+                    patientId={patient.id}
+                    eventTypes={['PAYMENT']}
+                    heading="Financial ledger & receipts"
+                  />
+                )}
+                {activeTab === 'audit' && me?.role === 'ADMIN' && (
+                  <PatientAuditHistory patientId={patient.id} />
+                )}
+              </section>
+            )}
           </div>
         )}
       </div>

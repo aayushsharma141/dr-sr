@@ -4,6 +4,8 @@ import type { TimelineItemOut } from '../api/types'
 
 interface PatientTimelineProps {
   patientId: number
+  eventTypes?: string[]
+  heading?: string
   onViewReceipt?: (paymentId: number) => void
 }
 
@@ -25,9 +27,14 @@ const badgeColorClasses: Record<string, string> = {
 
 export const PatientTimeline: React.FC<PatientTimelineProps> = ({
   patientId,
+  eventTypes,
+  heading = 'Unified Chronological History',
   onViewReceipt,
 }) => {
   const { data: timeline, isLoading, error } = usePatientTimeline(patientId)
+  const visibleTimeline = eventTypes
+    ? (timeline ?? []).filter((item) => eventTypes.includes(item.event_type))
+    : timeline
 
   if (isLoading) {
     return <div className="p-6 text-center text-sm text-slate-500">Loading patient history...</div>
@@ -37,7 +44,7 @@ export const PatientTimeline: React.FC<PatientTimelineProps> = ({
     return <div className="p-6 text-center text-sm text-red-500">Failed to load patient history.</div>
   }
 
-  if (!timeline || timeline.length === 0) {
+  if (!visibleTimeline || visibleTimeline.length === 0) {
     return (
       <div className="rounded-xl border border-dashed border-slate-300 p-8 text-center text-sm text-slate-500 dark:border-slate-800">
         No recorded history found for this patient yet.
@@ -49,15 +56,15 @@ export const PatientTimeline: React.FC<PatientTimelineProps> = ({
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h3 className="text-base font-bold text-slate-900 dark:text-white">
-          Unified Chronological History
+          {heading}
         </h3>
         <span className="text-xs text-slate-400">
-          {timeline.length} interaction(s) recorded
+          {visibleTimeline.length} interaction(s) recorded
         </span>
       </div>
 
       <div className="relative border-l-2 border-slate-200 pl-6 space-y-6 dark:border-slate-800">
-        {timeline.map((item: TimelineItemOut) => {
+        {visibleTimeline.map((item: TimelineItemOut) => {
           const icon = eventTypeIcons[item.event_type] || '📌'
           const badgeClass =
             badgeColorClasses[item.badge_variant || 'default'] || badgeColorClasses.default

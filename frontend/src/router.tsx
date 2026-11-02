@@ -125,6 +125,34 @@ export const router = createBrowserRouter([
         ],
       },
       {
+        element: <RequireRole role={['ADMIN', 'RECEPTION']} />,
+        children: [
+          {
+            path: '/reception/dues',
+            lazy: async () => {
+              const { PendingDuesPage } = await import('./pages/PendingDuesPage')
+              return {
+                Component: PendingDuesPage,
+              }
+            },
+          },
+        ],
+      },
+      {
+        element: <RequireRole role="RECEPTION" />,
+        children: [
+          {
+            path: '/reception/patients/new',
+            lazy: async () => {
+              const { PatientRegister } = await import('./pages/PatientRegister')
+              return {
+                Component: PatientRegister,
+              }
+            },
+          },
+        ],
+      },
+      {
         element: <RequireRole role={['ADMIN', 'RECEPTION', 'DOCTOR']} />,
         children: [
           {
@@ -146,15 +174,6 @@ export const router = createBrowserRouter([
             },
           },
           {
-            path: '/reception/patients/new',
-            lazy: async () => {
-              const { PatientRegister } = await import('./pages/PatientRegister')
-              return {
-                Component: PatientRegister,
-              }
-            },
-          },
-          {
             path: '/reception/patients/:id',
             lazy: async () => {
               const { PatientDetail } = await import('./pages/PatientDetail')
@@ -169,15 +188,6 @@ export const router = createBrowserRouter([
               const { PatientCardPrint } = await import('./pages/PatientCardPrint')
               return {
                 Component: PatientCardPrint,
-              }
-            },
-          },
-          {
-            path: '/reception/dues',
-            lazy: async () => {
-              const { PendingDuesPage } = await import('./pages/PendingDuesPage')
-              return {
-                Component: PendingDuesPage,
               }
             },
           },

@@ -678,6 +678,25 @@ export function usePatientPrescriptions(patientId: number) {
   })
 }
 
+export function usePrescriptionFollowUps(
+  params?: { date_from?: string; date_to?: string },
+  enabled = true,
+) {
+  const searchParams = new URLSearchParams()
+  if (params?.date_from) searchParams.set('date_from', params.date_from)
+  if (params?.date_to) searchParams.set('date_to', params.date_to)
+  const query = searchParams.toString()
+
+  return useQuery({
+    queryKey: ['prescription-follow-ups', params],
+    queryFn: () =>
+      apiFetch<PrescriptionSummary[]>(
+        `/prescriptions/follow-ups${query ? `?${query}` : ''}`,
+      ),
+    enabled,
+  })
+}
+
 export function usePrescription(id: number) {
   return useQuery({
     queryKey: ['prescription', id],

@@ -14,7 +14,7 @@ const mockMe: Me = {
   doctor_id: null,
   csrf_token: 'test-csrf-token',
   must_change_password: false,
-  permissions: ['appointments:read', 'appointments:write'],
+  permissions: ['appointment:read', 'appointment:write'],
   version_id: 1,
 }
 
@@ -263,5 +263,144 @@ describe('AppointmentsReception Component', () => {
         cancellation_reason: 'Patient unwell today',
       })
     })
+  })
+
+  it('opens the doctor-only prescription follow-up tab from its deep link', async () => {
+    const doctorMe: Me = {
+      ...mockMe,
+      role: 'DOCTOR',
+      username: 'doctor',
+      full_name: 'Consulting Doctor',
+      permissions: ['appointment:read', 'appointment:write', 'prescription:read'],
+      doctor_id: 1,
+    }
+    const followUps = [
+      {
+        id: 71,
+        patient_id: 101,
+        patient_urn: 'KH-2026-0001',
+        patient_name: 'Aarav Kumar',
+        doctor_id: 1,
+        doctor_name: 'Dr. Madan Mohan Dwivedi',
+        encounter_id: null,
+        diagnosis: 'Knee rehabilitation',
+        items_count: 2,
+        follow_up_date: '2026-11-20',
+        created_at: '2026-11-01T10:00:00Z',
+      },
+    ]
+
+    const mockFetch = vi.fn().mockImplementation((url: string) => {
+      if (url.includes('/api/auth/me')) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          headers: new Headers({ 'content-type': 'application/json' }),
+          text: () => Promise.resolve(JSON.stringify(doctorMe)),
+        })
+      }
+      if (url.includes('/api/doctors')) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          headers: new Headers({ 'content-type': 'application/json' }),
+          text: () => Promise.resolve(JSON.stringify(mockDoctors)),
+        })
+      }
+      if (url.includes('/api/prescriptions/follow-ups')) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          headers: new Headers({ 'content-type': 'application/json' }),
+          text: () => Promise.resolve(JSON.stringify(followUps)),
+        })
+      }
+      if (url.includes('/api/appointments')) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          headers: new Headers({ 'content-type': 'application/json' }),
+          text: () => Promise.resolve(JSON.stringify({ total: 0, appointments: [] })),
+        })
+      }
+      return Promise.reject(new Error(`Unhandled: ${url}`))
+    })
+    vi.stubGlobal('fetch', mockFetch)
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter initialEntries={['/reception/appointments?tab=followup']}>
+          <AppointmentsReception />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    )
+
+    await waitFor(() => {
+      expect(screen.getByText('Aarav Kumar')).toBeInTheDocument()
+    })
+
+    expect(screen.getByRole('tab', { name: 'Follow-up Visits' })).toHaveAttribute('aria-selected', 'true')
+    expect(screen.getByText('Knee rehabilitation')).toBeInTheDocument()
+    expect(screen.getByText('Upcoming')).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Open patient' })).toHaveAttribute('href', '/reception/patients/101')
+    expect(mockFetch).toHaveBeenCalledWith(
+      expect.stringContaining('/api/prescriptions/follow-ups'),
+      expect.anything(),
+    )
+  })
+
+  it('keeps appointment actions read-only for ADMIN', async () => {
+    const adminMe: Me = {
+      ...mockMe,
+      role: 'ADMIN',
+      username: 'admin',
+      full_name: 'System Administrator',
+      permissions: ['appointment:read'],
+    }
+    const mockFetch = vi.fn().mockImplementation((url: string) => {
+      if (url.includes('/api/auth/me')) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          headers: new Headers({ 'content-type': 'application/json' }),
+          text: () => Promise.resolve(JSON.stringify(adminMe)),
+        })
+      }
+      if (url.includes('/api/doctors')) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          headers: new Headers({ 'content-type': 'application/json' }),
+          text: () => Promise.resolve(JSON.stringify(mockDoctors)),
+        })
+      }
+      if (url.includes('/api/appointments')) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          headers: new Headers({ 'content-type': 'application/json' }),
+          text: () => Promise.resolve(JSON.stringify({ total: 1, appointments: mockAppointments })),
+        })
+      }
+      return Promise.reject(new Error(`Unhandled: ${url}`))
+    })
+    vi.stubGlobal('fetch', mockFetch)
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter>
+          <AppointmentsReception />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    )
+
+    await waitFor(() => {
+      expect(screen.getByText('Aarav Kumar')).toBeInTheDocument()
+    })
+
+    expect(screen.getByText('Read-only schedule')).toBeInTheDocument()
+    expect(screen.getByText('View only')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /book new appointment/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /mark arrived/i })).not.toBeInTheDocument()
   })
 })

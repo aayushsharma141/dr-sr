@@ -6,7 +6,9 @@ Guarantees:
 - Sequential medication order validation.
 """
 
-from fastapi import APIRouter, Depends, Request
+from datetime import date
+
+from fastapi import APIRouter, Depends, Query, Request
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
@@ -167,6 +169,77 @@ def create_prescription(
     )
 
     return _to_prescription_out(refreshed_rx)
+
+
+@router.get(
+    "/prescriptions/follow-ups",
+    response_model=list[PrescriptionSummary],
+    dependencies=[Depends(require(Permission.PRESCRIPTION_READ))],
+)
+def list_prescription_follow_ups(
+    session: SessionDep,
+    date_from: date | None = Query(None, description="Include follow-ups on or after this date"),
+    date_to: date | None = Query(None, description="Include follow-ups on or before this date"),
+    principal: Principal = Depends(current_principal),
+) -> list[PrescriptionSummary]:
+    """
+    List dated prescription follow-ups for the authenticated doctor.
+
+    Prescription follow-up dates are clinical information. This endpoint deliberately
+    remains doctor-only and applies the existing doctor silo; it is not a receptionist
+    appointment queue.
+    """
+    if principal.role != Role.DOCTOR or principal.doctor_id is None:
+        raise ApiError(
+            status_code=403,
+            code="doctor_only",
+            message="Only authenticated doctors can inspect prescription follow-ups.",
+        )
+
+    if date_from is not None and date_to is not None and date_from > date_to:
+        raise ApiError(
+            status_code=422,
+            code="invalid_date_range",
+            message="The follow-up start date must be on or before the end date.",
+        )
+
+    stmt = (
+        select(Prescription)
+        .join(Patient, Prescription.patient_id == Patient.id)
+        .where(
+            Prescription.doctor_id == principal.doctor_id,
+            Prescription.follow_up_date.is_not(None),
+            Patient.is_active.is_(True),
+        )
+        .options(
+            selectinload(Prescription.patient),
+            selectinload(Prescription.doctor),
+            selectinload(Prescription.items),
+        )
+        .order_by(Prescription.follow_up_date.asc(), Prescription.created_at.desc())
+    )
+    if date_from is not None:
+        stmt = stmt.where(Prescription.follow_up_date >= date_from)
+    if date_to is not None:
+        stmt = stmt.where(Prescription.follow_up_date <= date_to)
+
+    results = session.execute(stmt).scalars().all()
+    return [
+        PrescriptionSummary(
+            id=rx.id,
+            patient_id=rx.patient_id,
+            patient_urn=rx.patient.urn if rx.patient else "",
+            patient_name=rx.patient.full_name if rx.patient else "",
+            doctor_id=rx.doctor_id,
+            doctor_name=rx.doctor.name_en if rx.doctor else "",
+            encounter_id=rx.encounter_id,
+            diagnosis=rx.diagnosis,
+            items_count=len(rx.items),
+            follow_up_date=rx.follow_up_date,
+            created_at=rx.created_at,
+        )
+        for rx in results
+    ]
 
 
 @router.get(
