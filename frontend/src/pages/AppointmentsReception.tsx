@@ -744,6 +744,36 @@ export function AppointmentsReception() {
           )}
         </div>
 
+
+          </div>
+        ) : activeTab === 'scheduled' ? (
+          <div id="appointments-panel-scheduled" role="tabpanel" aria-labelledby="appointments-tab-scheduled">
+            <ScheduledVisits
+              startDate={selectedDate}
+              doctorId={selectedDoctorId}
+              canManage={canManageAppointments}
+              onCancel={(appointment) => setCancellingAppt(appointment)}
+              onBook={() => {
+                const today = localDateValue(new Date())
+                setSelectedDate(selectedDate > today ? selectedDate : addCalendarDays(today, 1))
+                setIsBookingOpen(true)
+              }}
+            />
+          </div>
+        ) : (
+          canViewFollowUps ? (
+            <div id="appointments-panel-followup" role="tabpanel" aria-labelledby="appointments-tab-followup">
+              <FollowUpVisits />
+            </div>
+          ) : (
+            <div role="alert" className="rounded-xl border border-amber-200 bg-amber-50 p-5 text-sm text-amber-900">
+              Prescription follow-up information is available to the treating doctor only. Return to the token queue to continue.
+              <button type="button" onClick={() => selectTab('today')} className="ml-2 font-semibold underline">
+                Open today's queue
+              </button>
+            </div>
+          )
+        )}
         {/* Booking Modal */}
         <AppointmentBookingModal
           isOpen={isBookingOpen}
@@ -795,35 +825,6 @@ export function AppointmentsReception() {
               </div>
             </div>
           </div>
-        )}
-          </div>
-        ) : activeTab === 'scheduled' ? (
-          <div id="appointments-panel-scheduled" role="tabpanel" aria-labelledby="appointments-tab-scheduled">
-            <ScheduledVisits
-              startDate={selectedDate}
-              doctorId={selectedDoctorId}
-              canManage={canManageAppointments}
-              onCancel={(appointment) => setCancellingAppt(appointment)}
-              onBook={() => {
-                const today = localDateValue(new Date())
-                setSelectedDate(selectedDate > today ? selectedDate : addCalendarDays(today, 1))
-                setIsBookingOpen(true)
-              }}
-            />
-          </div>
-        ) : (
-          canViewFollowUps ? (
-            <div id="appointments-panel-followup" role="tabpanel" aria-labelledby="appointments-tab-followup">
-              <FollowUpVisits />
-            </div>
-          ) : (
-            <div role="alert" className="rounded-xl border border-amber-200 bg-amber-50 p-5 text-sm text-amber-900">
-              Prescription follow-up information is available to the treating doctor only. Return to the token queue to continue.
-              <button type="button" onClick={() => selectTab('today')} className="ml-2 font-semibold underline">
-                Open today's queue
-              </button>
-            </div>
-          )
         )}
       </div>
     </AppShell>
