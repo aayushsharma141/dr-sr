@@ -4,7 +4,7 @@ from datetime import date, datetime
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from kalyan_api.models import AppointmentStatus
+from kalyan_api.models import AppointmentBookingMode, AppointmentStatus, AppointmentVisitType
 
 
 class AppointmentCreate(BaseModel):
@@ -12,8 +12,16 @@ class AppointmentCreate(BaseModel):
 
     patient_id: int = Field(..., gt=0, description="Target patient ID")
     doctor_id: int = Field(..., gt=0, description="Target doctor ID")
-    appointment_date: date = Field(..., description="Scheduled appointment date")
-    notes: str | None = Field(default=None, max_length=1000, description="Reception notes")
+    appointment_date: date = Field(..., description="Clinic-local visit date")
+    booking_mode: AppointmentBookingMode = Field(
+        default=AppointmentBookingMode.WALK_IN,
+        description="WALK_IN allocates a token immediately; SCHEDULED allocates one at check-in",
+    )
+    visit_type: AppointmentVisitType = Field(
+        default=AppointmentVisitType.NEW_CONSULTATION,
+        description="Administrative visit category; clinical records are captured separately",
+    )
+    notes: str | None = Field(default=None, max_length=1000, description="Reception-only remarks")
 
 
 class AppointmentStatusUpdate(BaseModel):
@@ -40,7 +48,9 @@ class AppointmentRead(BaseModel):
     doctor_name_en: str
     doctor_name_hi: str | None = None
     appointment_date: date
-    token_number: int
+    booking_mode: AppointmentBookingMode
+    visit_type: AppointmentVisitType
+    token_number: int | None = None
     status: str
     status_updated_at: datetime
     cancellation_reason: str | None = None
