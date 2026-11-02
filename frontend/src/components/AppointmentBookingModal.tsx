@@ -87,6 +87,7 @@ export function AppointmentBookingModal({
   const [notes, setNotes] = useState('')
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
   const [allocatedToken, setAllocatedToken] = useState<number | null>(null)
+  const [bookingSaved, setBookingSaved] = useState(false)
 
   const { data: me } = useMe()
   const { data: doctors, isPending: doctorsPending } = useDoctors(false)
@@ -123,6 +124,7 @@ export function AppointmentBookingModal({
     setNotes('')
     setErrorMsg(null)
     setAllocatedToken(null)
+    setBookingSaved(false)
   }, [isOpen, initialPatient, initialDoctorId, initialDate, today])
 
   useEffect(() => {
@@ -188,6 +190,7 @@ export function AppointmentBookingModal({
         notes: notes.trim() || null,
       })
       setAllocatedToken(result.token_number)
+      setBookingSaved(true)
       onSuccess?.()
     } catch (error: unknown) {
       setErrorMsg(error instanceof Error ? error.message : 'Unable to save this appointment.')
@@ -196,6 +199,7 @@ export function AppointmentBookingModal({
 
   const handleClose = () => {
     setAllocatedToken(null)
+    setBookingSaved(false)
     setErrorMsg(null)
     setSelectedPatient(null)
     setPatientSearch('')
@@ -246,7 +250,7 @@ export function AppointmentBookingModal({
           </button>
         </header>
 
-        {allocatedToken !== null ? (
+        {bookingSaved ? (
           <div className="space-y-5 px-5 py-8 text-center sm:px-8">
             <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-emerald-50 text-emerald-700">
               <svg viewBox="0 0 24 24" className="h-7 w-7" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
@@ -262,12 +266,23 @@ export function AppointmentBookingModal({
               </p>
             </div>
             <div className="mx-auto max-w-md rounded-xl border border-emerald-200 bg-emerald-50 p-5">
-              <p className="text-xs font-bold uppercase tracking-wide text-emerald-800">
-                Daily queue token
-              </p>
-              <p className="mt-1 text-4xl font-extrabold tabular-nums text-emerald-950">
-                #{allocatedToken}
-              </p>
+              {allocatedToken !== null ? (
+                <>
+                  <p className="text-xs font-bold uppercase tracking-wide text-emerald-800">
+                    Daily queue token
+                  </p>
+                  <p className="mt-1 text-4xl font-extrabold tabular-nums text-emerald-950">
+                    #{allocatedToken}
+                  </p>
+                </>
+              ) : (
+                <>
+                  <p className="text-sm font-bold text-emerald-900">Token assigned at check-in</p>
+                  <p className="mt-1 text-xs text-emerald-800">
+                    Reception will issue the queue token on the scheduled clinic date.
+                  </p>
+                </>
+              )}
               <p className="mt-2 text-sm font-semibold text-emerald-950">
                 {selectedDoctor?.name_en ?? 'Assigned doctor'} · {appointmentDate}
               </p>
@@ -541,7 +556,11 @@ export function AppointmentBookingModal({
             </section>
 
             <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-3 text-xs leading-5 text-slate-600">
-              <strong className="text-slate-800">Token allocation:</strong> a token is reserved for this doctor and date when the booking is saved. Scheduled visits are date-based; no exact consultation time is reserved.
+              <strong className="text-slate-800">Token allocation:</strong>{' '}
+              {bookingMode === 'WALK_IN'
+                ? 'A queue token is assigned immediately when today’s walk-in is saved.'
+                : 'A queue token is assigned when reception checks the patient in on the scheduled clinic date.'}{' '}
+              Scheduled visits are date-based; no exact consultation time is reserved.
             </div>
 
             <footer className="flex flex-col-reverse gap-2 border-t border-slate-200 pt-4 sm:flex-row sm:justify-end">
