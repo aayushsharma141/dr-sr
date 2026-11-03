@@ -2,39 +2,345 @@
   "schema_version": 1,
   "diagram_type": "architecture",
   "meta": {
-    "title": "Kalyan Hospital — Central LAN Platform Architecture",
-    "output": "kalyan-hospital-architecture.html",
-    "quality_profile": "showcase"
+    "title": "Kalyan Hospital \u2014 Central LAN Platform Architecture (v3.0)",
+    "output": ".archify/kalyan-hospital-architecture.html",
+    "quality_profile": "showcase",
+    "repository": {
+      "url": "https://github.com/aayushsharma141/dr-sr.git",
+      "provider": "github",
+      "revision": "98056dccfcc6e1248418616ac1e79ed5d4551a6c"
+    }
   },
   "components": [
-    { "id": "reception", "type": "external", "label": "Reception PC", "sublabel": "Browser: /reception", "pos": [50, 160], "size": [140, 64], "tag": "LAN Client" },
-    { "id": "doctor", "type": "external", "label": "Doctor Cabin PC", "sublabel": "Browser: /doctor", "pos": [50, 300], "size": [140, 64], "tag": "LAN Client" },
-    { "id": "admin", "type": "external", "label": "Admin PC", "sublabel": "Browser: /admin", "pos": [50, 440], "size": [140, 64], "tag": "LAN Client" },
-    { "id": "frontend", "type": "frontend", "label": "Web App UI", "sublabel": "React + TypeScript", "pos": [280, 300], "size": [150, 64], "tag": "Role-routed" },
-    { "id": "auth", "type": "security", "label": "Auth Guard", "sublabel": "Server-side Permissions", "pos": [510, 160], "size": [150, 64], "tag": "Zero Trust" },
-    { "id": "backend", "type": "backend", "label": "FastAPI Core", "sublabel": "REST API :8000", "pos": [510, 300], "size": [150, 64], "tag": "Central API" },
-    { "id": "storage", "type": "database", "label": "File Storage", "sublabel": "Patient Photos & Docs", "pos": [510, 440], "size": [150, 64], "tag": "Local Disk" },
-    { "id": "db", "type": "database", "label": "PostgreSQL", "sublabel": "Offline DB :5432", "pos": [740, 300], "size": [150, 64], "tag": "ACID Data" },
-    { "id": "backup", "type": "backend", "label": "Backup Engine", "sublabel": "Automated Verified Dump", "pos": [740, 440], "size": [150, 64], "tag": "Proven Restore" }
+    {
+      "id": "reception",
+      "type": "external",
+      "label": "Reception Workstation",
+      "sublabel": "Browser Client (/reception)",
+      "tag": "Staff Client",
+      "pos": [
+        50,
+        90
+      ],
+      "size": [
+        160,
+        64
+      ],
+      "sources": [
+        {
+          "path": "frontend/src/pages/AppointmentsReception.tsx",
+          "line": 40,
+          "end_line": 80,
+          "label": "AppointmentsReception"
+        }
+      ]
+    },
+    {
+      "id": "doctor",
+      "type": "external",
+      "label": "Doctor Cabin PC",
+      "sublabel": "Browser Client (/doctor)",
+      "tag": "Clinician Client",
+      "pos": [
+        50,
+        230
+      ],
+      "size": [
+        160,
+        64
+      ],
+      "sources": [
+        {
+          "path": "frontend/src/pages/ClinicalEncounterWorkspace.tsx",
+          "line": 40,
+          "end_line": 80,
+          "label": "ClinicalEncounterWorkspace"
+        }
+      ]
+    },
+    {
+      "id": "admin",
+      "type": "external",
+      "label": "Admin Workstation",
+      "sublabel": "Browser Client (/admin)",
+      "tag": "Operations Client",
+      "pos": [
+        50,
+        370
+      ],
+      "size": [
+        160,
+        64
+      ],
+      "sources": [
+        {
+          "path": "frontend/src/pages/admin/BackupManagerPage.tsx",
+          "line": 30,
+          "end_line": 70,
+          "label": "BackupManagerPage"
+        }
+      ]
+    },
+    {
+      "id": "frontend",
+      "type": "frontend",
+      "label": "Vite + React 19 SPA",
+      "sublabel": "Role Routing & ConflictBanner",
+      "tag": "Static Client SPA",
+      "pos": [
+        300,
+        230
+      ],
+      "size": [
+        160,
+        64
+      ],
+      "sources": [
+        {
+          "path": "frontend/src/router.tsx",
+          "line": 33,
+          "end_line": 65,
+          "label": "RoleBrowserRouter"
+        }
+      ]
+    },
+    {
+      "id": "auth",
+      "type": "security",
+      "label": "Auth & RBAC Guard",
+      "sublabel": "Argon2id & Session Cookies",
+      "tag": "Server Policy",
+      "pos": [
+        550,
+        90
+      ],
+      "size": [
+        160,
+        64
+      ],
+      "sources": [
+        {
+          "path": "backend/src/kalyan_api/core/principal.py",
+          "line": 50,
+          "end_line": 95,
+          "label": "PrincipalResolution"
+        }
+      ]
+    },
+    {
+      "id": "backend",
+      "type": "backend",
+      "label": "FastAPI REST Server",
+      "sublabel": "Port 8000 (Sync SQLAlchemy)",
+      "tag": "Application Core",
+      "pos": [
+        550,
+        230
+      ],
+      "size": [
+        160,
+        64
+      ],
+      "sources": [
+        {
+          "path": "backend/src/kalyan_api/main.py",
+          "line": 76,
+          "end_line": 155,
+          "label": "FastAPIAppFactory"
+        }
+      ]
+    },
+    {
+      "id": "storage",
+      "type": "database",
+      "label": "File Storage",
+      "sublabel": "Patient Photos & Backups",
+      "tag": "Encrypted Disk",
+      "pos": [
+        550,
+        370
+      ],
+      "size": [
+        160,
+        64
+      ],
+      "sources": [
+        {
+          "path": "backend/src/kalyan_api/services/photo_service.py",
+          "line": 15,
+          "end_line": 45,
+          "label": "PhotoService"
+        }
+      ]
+    },
+    {
+      "id": "db",
+      "type": "database",
+      "label": "PostgreSQL 18.6",
+      "sublabel": "ACID DB :5432 (Triggers)",
+      "tag": "Offline Relational DB",
+      "pos": [
+        800,
+        230
+      ],
+      "size": [
+        160,
+        64
+      ],
+      "sources": [
+        {
+          "path": "backend/src/kalyan_api/models.py",
+          "line": 50,
+          "end_line": 100,
+          "label": "SQLAlchemyPostgresModels"
+        }
+      ]
+    },
+    {
+      "id": "backup",
+      "type": "backend",
+      "label": "Backup & Integrity Engine",
+      "sublabel": "SHA-256 Bundle & Verified Restore",
+      "tag": "Disaster Recovery",
+      "pos": [
+        800,
+        370
+      ],
+      "size": [
+        160,
+        64
+      ],
+      "sources": [
+        {
+          "path": "backend/src/kalyan_api/services/backup_service.py",
+          "line": 25,
+          "end_line": 75,
+          "label": "BackupService"
+        }
+      ]
+    }
   ],
   "boundaries": [
-    { "kind": "region", "label": "Hospital LAN (Internet-Free)", "wraps": ["reception", "doctor", "admin", "frontend", "auth", "backend", "storage", "db", "backup"] },
-    { "kind": "security-group", "label": "Central Hospital Server PC", "wraps": ["frontend", "auth", "backend", "storage", "db", "backup"] }
+    {
+      "kind": "region",
+      "label": "Kalyan Hospital Secure LAN (Air-Gapped)",
+      "wraps": [
+        "reception",
+        "doctor",
+        "admin",
+        "frontend",
+        "auth",
+        "backend",
+        "storage",
+        "db",
+        "backup"
+      ]
+    },
+    {
+      "kind": "security-group",
+      "label": "Dedicated On-Premise Windows Server PC (Zero-Node Runtime)",
+      "wraps": [
+        "frontend",
+        "auth",
+        "backend",
+        "storage",
+        "db",
+        "backup"
+      ]
+    }
   ],
   "connections": [
-    { "id": "rec-fe", "from": "reception", "to": "frontend", "label": "HTTP :80", "variant": "emphasis" },
-    { "id": "doc-fe", "from": "doctor", "to": "frontend", "label": "HTTP :80", "variant": "emphasis" },
-    { "id": "adm-fe", "from": "admin", "to": "frontend", "label": "HTTP :80", "variant": "emphasis" },
-    { "id": "fe-auth", "from": "frontend", "to": "auth", "label": "API tokens", "fromSide": "top", "toSide": "left" },
-    { "id": "fe-be", "from": "frontend", "to": "backend", "label": "REST requests" },
-    { "id": "auth-be", "from": "auth", "to": "backend", "label": "Enforce perms", "fromSide": "bottom", "toSide": "top" },
-    { "id": "be-db", "from": "backend", "to": "db", "label": "SQL queries", "variant": "emphasis" },
-    { "id": "be-fs", "from": "backend", "to": "storage", "label": "Photos / Files", "fromSide": "bottom", "toSide": "top" },
-    { "id": "db-backup", "from": "db", "to": "backup", "label": "Daily dump", "fromSide": "bottom", "toSide": "top" }
+    {
+      "id": "rec-fe",
+      "from": "reception",
+      "to": "frontend",
+      "label": "HTTP :8000",
+      "variant": "emphasis"
+    },
+    {
+      "id": "doc-fe",
+      "from": "doctor",
+      "to": "frontend",
+      "label": "HTTP :8000",
+      "variant": "emphasis"
+    },
+    {
+      "id": "adm-fe",
+      "from": "admin",
+      "to": "frontend",
+      "label": "HTTP :8000",
+      "variant": "emphasis"
+    },
+    {
+      "id": "fe-auth",
+      "from": "frontend",
+      "to": "auth",
+      "label": "Session Cookie",
+      "fromSide": "top",
+      "toSide": "left"
+    },
+    {
+      "id": "fe-be",
+      "from": "frontend",
+      "to": "backend",
+      "label": "JSON REST API"
+    },
+    {
+      "id": "auth-be",
+      "from": "auth",
+      "to": "backend",
+      "label": "Enforce Permissions",
+      "fromSide": "bottom",
+      "toSide": "top"
+    },
+    {
+      "id": "be-db",
+      "from": "backend",
+      "to": "db",
+      "label": "SQLAlchemy SQL",
+      "variant": "emphasis"
+    },
+    {
+      "id": "be-fs",
+      "from": "backend",
+      "to": "storage",
+      "label": "Read / Stream Photos",
+      "fromSide": "bottom",
+      "toSide": "top"
+    },
+    {
+      "id": "db-backup",
+      "from": "db",
+      "to": "backup",
+      "label": "Atomic pg_dump",
+      "fromSide": "bottom",
+      "toSide": "top"
+    }
   ],
   "cards": [
-    { "dot": "cyan", "title": "Access Layer", "items": ["Reception, Doctor, and Admin work simultaneously across hospital LAN", "Zero internet dependency — 100% offline hospital operations"] },
-    { "dot": "emerald", "title": "Application Core", "items": ["Single React + TypeScript frontend with role routing", "FastAPI server enforces role permissions independently of UI"] },
-    { "dot": "violet", "title": "Data & Resilience", "items": ["PostgreSQL database storing canonical patient & billing records", "Automated backup bundle (data + photos) with verified restore"] }
+    {
+      "dot": "cyan",
+      "title": "Offline LAN Access Layer",
+      "items": [
+        "Reception, Doctor cabin, and Admin workstations operate concurrently across local hospital LAN",
+        "Zero external cloud/internet dependency; fully operational during internet blackouts"
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "Single-Binary Application Runtime",
+      "items": [
+        "FastAPI serves compiled React 19 SPA directly from frontend/dist/ with zero Node.js on server",
+        "Server-side RBAC matrix (339 cells) strictly isolates doctors, receptionists, and admins"
+      ]
+    },
+    {
+      "dot": "violet",
+      "title": "Data Durability & Disaster Recovery",
+      "items": [
+        "PostgreSQL 18.6 with ACID triggers protecting finalized clinical notes and treatment sessions",
+        "Automated SHA-256 checksummed backup bundles with fail-closed safety restore engine"
+      ]
+    }
   ]
 }

@@ -1,4 +1,4 @@
-﻿# GSD Core — Antigravity CLI context
+# GSD Core — Antigravity CLI context
 
 > **Gemini CLI was sunset by Google on 2026-06-18** and is no longer served for
 > free/Pro/Ultra tiers. Antigravity CLI is its official successor, and this file
@@ -51,5 +51,11 @@ namespace):
 - Run the project's tests and linters before declaring a phase done.
 - When unsure what to do next, and the gsd commands are installed, `/gsd-progress`
   is the situational entry point.
+
+## Developer & Agent Profiles
+
+- **Developer Behavioral Profile:** `.agents/gsd-core/USER-PROFILE.md` (terse, test-first, zero-hallucination, autonomous execution).
+- **Universal Agent Directives:** `AGENTS.md` (domain invariants, DB triggers, integer paise, role mapping).
+- **Claude Code Project Profile:** `CLAUDE.md` (FastAPI + React 19 stack commands, architecture, and verification loops).
 
 Learn more: <https://github.com/open-gsd/gsd-core>

@@ -1,5 +1,6 @@
 import { render, screen, fireEvent } from '@testing-library/react'
 import { describe, it, expect, vi } from 'vitest'
+import { MemoryRouter } from 'react-router'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { PendingDuesPage } from '../PendingDuesPage'
 
@@ -20,6 +21,14 @@ const sampleDues = [
 ]
 
 vi.mock('../../api/queries', () => ({
+  useMe: () => ({
+    data: { full_name: 'Reception Staff', role: 'RECEPTION' },
+    isPending: false,
+  }),
+  useLogout: () => ({
+    mutateAsync: vi.fn(),
+    isPending: false,
+  }),
   usePendingDues: () => ({
     data: sampleDues,
     isLoading: false,
@@ -37,7 +46,9 @@ describe('PendingDuesPage', () => {
   it('renders pending dues table with formatted rupee balances', () => {
     render(
       <QueryClientProvider client={queryClient}>
-        <PendingDuesPage />
+        <MemoryRouter>
+          <PendingDuesPage />
+        </MemoryRouter>
       </QueryClientProvider>
     )
 

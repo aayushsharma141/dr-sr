@@ -1,0 +1,708 @@
+{
+  "schema_version": 1,
+  "diagram_type": "erd",
+  "meta": {
+    "title": "Kalyan Hospital \u2014 Relational Database Schema (v3.0)",
+    "locale": "en",
+    "output": ".archify/kalyan-hospital-erd.html",
+    "quality_profile": "standard",
+    "repository": {
+      "url": "https://github.com/aayushsharma141/dr-sr.git",
+      "provider": "github",
+      "revision": "98056dccfcc6e1248418616ac1e79ed5d4551a6c"
+    },
+    "views": [
+      {
+        "id": "identity_auth",
+        "label": "Identity & Security",
+        "focus": [
+          "users",
+          "doctors",
+          "audit_logs"
+        ],
+        "note": "Role-based accounts, doctor profiles, and immutable audit log."
+      },
+      {
+        "id": "clinical_core",
+        "label": "Clinical Encounters",
+        "focus": [
+          "patients",
+          "appointments",
+          "encounters",
+          "prescriptions"
+        ],
+        "note": "Patient demographics, appointment queue, doctor encounters, and prescriptions."
+      },
+      {
+        "id": "treatment_finance",
+        "label": "Physiotherapy & Billing",
+        "focus": [
+          "treatment_plans",
+          "treatment_sessions",
+          "payments"
+        ],
+        "note": "Physiotherapy package quotas, session logs, and sequential receipt billing."
+      }
+    ]
+  },
+  "layout": {
+    "mode": "grid",
+    "gapY": 36,
+    "gapX": 64
+  },
+  "entities": [
+    {
+      "id": "users",
+      "label": "users",
+      "tag": "administration",
+      "row": 0,
+      "col": 0,
+      "width": 260,
+      "sources": [
+        {
+          "path": "backend/src/kalyan_api/models.py",
+          "line": 85,
+          "end_line": 135,
+          "label": "UserAccountModel"
+        }
+      ],
+      "attributes": [
+        {
+          "name": "id",
+          "type": "bigint",
+          "key": "pk"
+        },
+        {
+          "name": "username",
+          "type": "varchar(64)",
+          "key": "uk"
+        },
+        {
+          "name": "full_name",
+          "type": "varchar(120)"
+        },
+        {
+          "name": "role",
+          "type": "varchar(16)"
+        },
+        {
+          "name": "doctor_id",
+          "type": "bigint",
+          "key": "fk",
+          "references": "doctors.id"
+        },
+        {
+          "name": "password_hash",
+          "type": "text"
+        },
+        {
+          "name": "is_active",
+          "type": "boolean"
+        },
+        {
+          "name": "version_id",
+          "type": "integer"
+        }
+      ]
+    },
+    {
+      "id": "doctors",
+      "label": "doctors",
+      "tag": "administration",
+      "row": 1,
+      "col": 0,
+      "width": 260,
+      "sources": [
+        {
+          "path": "backend/src/kalyan_api/models.py",
+          "line": 52,
+          "end_line": 82,
+          "label": "DoctorProfileModel"
+        }
+      ],
+      "attributes": [
+        {
+          "name": "id",
+          "type": "bigint",
+          "key": "pk"
+        },
+        {
+          "name": "name_en",
+          "type": "varchar(120)"
+        },
+        {
+          "name": "name_hi",
+          "type": "varchar(120)"
+        },
+        {
+          "name": "qualification",
+          "type": "varchar(120)"
+        },
+        {
+          "name": "registration_number",
+          "type": "varchar(64)"
+        },
+        {
+          "name": "default_fee_paise",
+          "type": "integer"
+        },
+        {
+          "name": "is_active",
+          "type": "boolean"
+        },
+        {
+          "name": "version_id",
+          "type": "integer"
+        }
+      ]
+    },
+    {
+      "id": "audit_logs",
+      "label": "audit_logs",
+      "tag": "administration",
+      "row": 2,
+      "col": 0,
+      "width": 260,
+      "sources": [
+        {
+          "path": "backend/src/kalyan_api/models.py",
+          "line": 203,
+          "end_line": 235,
+          "label": "AuditLogModel"
+        }
+      ],
+      "attributes": [
+        {
+          "name": "id",
+          "type": "bigint",
+          "key": "pk"
+        },
+        {
+          "name": "actor_username",
+          "type": "varchar(64)"
+        },
+        {
+          "name": "action",
+          "type": "varchar(64)"
+        },
+        {
+          "name": "entity_type",
+          "type": "varchar(64)"
+        },
+        {
+          "name": "entity_id",
+          "type": "varchar(64)"
+        },
+        {
+          "name": "before_data",
+          "type": "jsonb"
+        },
+        {
+          "name": "after_data",
+          "type": "jsonb"
+        },
+        {
+          "name": "created_at",
+          "type": "timestamptz"
+        }
+      ]
+    },
+    {
+      "id": "patients",
+      "label": "patients",
+      "tag": "clinical",
+      "row": 0,
+      "col": 1,
+      "width": 270,
+      "sources": [
+        {
+          "path": "backend/src/kalyan_api/models.py",
+          "line": 318,
+          "end_line": 365,
+          "label": "PatientDemographicsModel"
+        }
+      ],
+      "attributes": [
+        {
+          "name": "id",
+          "type": "bigint",
+          "key": "pk"
+        },
+        {
+          "name": "urn",
+          "type": "varchar(32)",
+          "key": "uk"
+        },
+        {
+          "name": "full_name",
+          "type": "varchar(120)"
+        },
+        {
+          "name": "guardian_name",
+          "type": "varchar(120)"
+        },
+        {
+          "name": "gender",
+          "type": "varchar(1)"
+        },
+        {
+          "name": "age_years",
+          "type": "integer"
+        },
+        {
+          "name": "mobile",
+          "type": "varchar(16)"
+        },
+        {
+          "name": "address",
+          "type": "text"
+        },
+        {
+          "name": "allergies",
+          "type": "text"
+        },
+        {
+          "name": "is_active",
+          "type": "boolean"
+        },
+        {
+          "name": "version_id",
+          "type": "integer"
+        }
+      ]
+    },
+    {
+      "id": "appointments",
+      "label": "appointments",
+      "tag": "clinical",
+      "row": 1,
+      "col": 1,
+      "width": 270,
+      "sources": [
+        {
+          "path": "backend/src/kalyan_api/models.py",
+          "line": 400,
+          "end_line": 450,
+          "label": "AppointmentModel"
+        }
+      ],
+      "attributes": [
+        {
+          "name": "id",
+          "type": "bigint",
+          "key": "pk"
+        },
+        {
+          "name": "patient_id",
+          "type": "bigint",
+          "key": "fk",
+          "references": "patients.id"
+        },
+        {
+          "name": "doctor_id",
+          "type": "bigint",
+          "key": "fk",
+          "references": "doctors.id"
+        },
+        {
+          "name": "appointment_date",
+          "type": "date"
+        },
+        {
+          "name": "token_number",
+          "type": "integer"
+        },
+        {
+          "name": "status",
+          "type": "varchar(20)"
+        },
+        {
+          "name": "fee_paise",
+          "type": "integer"
+        },
+        {
+          "name": "version_id",
+          "type": "integer"
+        }
+      ]
+    },
+    {
+      "id": "encounters",
+      "label": "encounters",
+      "tag": "clinical",
+      "row": 2,
+      "col": 1,
+      "width": 270,
+      "sources": [
+        {
+          "path": "backend/src/kalyan_api/models.py",
+          "line": 456,
+          "end_line": 510,
+          "label": "ClinicalEncounterModel"
+        }
+      ],
+      "attributes": [
+        {
+          "name": "id",
+          "type": "bigint",
+          "key": "pk"
+        },
+        {
+          "name": "patient_id",
+          "type": "bigint",
+          "key": "fk",
+          "references": "patients.id"
+        },
+        {
+          "name": "doctor_id",
+          "type": "bigint",
+          "key": "fk",
+          "references": "doctors.id"
+        },
+        {
+          "name": "appointment_id",
+          "type": "bigint",
+          "key": "fk",
+          "references": "appointments.id"
+        },
+        {
+          "name": "symptoms",
+          "type": "text"
+        },
+        {
+          "name": "clinical_notes",
+          "type": "text"
+        },
+        {
+          "name": "diagnosis",
+          "type": "text"
+        },
+        {
+          "name": "is_finalised",
+          "type": "boolean"
+        },
+        {
+          "name": "version_id",
+          "type": "integer"
+        }
+      ]
+    },
+    {
+      "id": "prescriptions",
+      "label": "prescriptions",
+      "tag": "clinical",
+      "row": 3,
+      "col": 1,
+      "width": 270,
+      "sources": [
+        {
+          "path": "backend/src/kalyan_api/models.py",
+          "line": 703,
+          "end_line": 750,
+          "label": "PrescriptionModel"
+        }
+      ],
+      "attributes": [
+        {
+          "name": "id",
+          "type": "bigint",
+          "key": "pk"
+        },
+        {
+          "name": "patient_id",
+          "type": "bigint",
+          "key": "fk",
+          "references": "patients.id"
+        },
+        {
+          "name": "doctor_id",
+          "type": "bigint",
+          "key": "fk",
+          "references": "doctors.id"
+        },
+        {
+          "name": "encounter_id",
+          "type": "bigint",
+          "key": "fk",
+          "references": "encounters.id"
+        },
+        {
+          "name": "notes",
+          "type": "text"
+        },
+        {
+          "name": "is_active",
+          "type": "boolean"
+        },
+        {
+          "name": "version_id",
+          "type": "integer"
+        }
+      ]
+    },
+    {
+      "id": "treatment_plans",
+      "label": "treatment_plans",
+      "tag": "physio_billing",
+      "row": 0,
+      "col": 2,
+      "width": 270,
+      "sources": [
+        {
+          "path": "backend/src/kalyan_api/models.py",
+          "line": 548,
+          "end_line": 615,
+          "label": "TreatmentPlanModel"
+        }
+      ],
+      "attributes": [
+        {
+          "name": "id",
+          "type": "bigint",
+          "key": "pk"
+        },
+        {
+          "name": "patient_id",
+          "type": "bigint",
+          "key": "fk",
+          "references": "patients.id"
+        },
+        {
+          "name": "doctor_id",
+          "type": "bigint",
+          "key": "fk",
+          "references": "doctors.id"
+        },
+        {
+          "name": "plan_name",
+          "type": "varchar(120)"
+        },
+        {
+          "name": "total_sessions",
+          "type": "integer"
+        },
+        {
+          "name": "completed_sessions",
+          "type": "integer"
+        },
+        {
+          "name": "package_fee_paise",
+          "type": "integer"
+        },
+        {
+          "name": "status",
+          "type": "varchar(20)"
+        },
+        {
+          "name": "version_id",
+          "type": "integer"
+        }
+      ]
+    },
+    {
+      "id": "treatment_sessions",
+      "label": "treatment_sessions",
+      "tag": "physio_billing",
+      "row": 1,
+      "col": 2,
+      "width": 270,
+      "sources": [
+        {
+          "path": "backend/src/kalyan_api/models.py",
+          "line": 624,
+          "end_line": 675,
+          "label": "TreatmentSessionModel"
+        }
+      ],
+      "attributes": [
+        {
+          "name": "id",
+          "type": "bigint",
+          "key": "pk"
+        },
+        {
+          "name": "treatment_plan_id",
+          "type": "bigint",
+          "key": "fk",
+          "references": "treatment_plans.id"
+        },
+        {
+          "name": "session_number",
+          "type": "integer"
+        },
+        {
+          "name": "vas_score",
+          "type": "integer"
+        },
+        {
+          "name": "treatment_notes",
+          "type": "text"
+        },
+        {
+          "name": "is_finalised",
+          "type": "boolean"
+        },
+        {
+          "name": "created_by_user_id",
+          "type": "bigint"
+        }
+      ]
+    },
+    {
+      "id": "payments",
+      "label": "payments",
+      "tag": "physio_billing",
+      "row": 2,
+      "col": 2,
+      "width": 270,
+      "sources": [
+        {
+          "path": "backend/src/kalyan_api/models.py",
+          "line": 803,
+          "end_line": 855,
+          "label": "PaymentLedgerModel"
+        }
+      ],
+      "attributes": [
+        {
+          "name": "id",
+          "type": "bigint",
+          "key": "pk"
+        },
+        {
+          "name": "receipt_number",
+          "type": "varchar(32)",
+          "key": "uk"
+        },
+        {
+          "name": "patient_id",
+          "type": "bigint",
+          "key": "fk",
+          "references": "patients.id"
+        },
+        {
+          "name": "treatment_plan_id",
+          "type": "bigint",
+          "key": "fk",
+          "references": "treatment_plans.id"
+        },
+        {
+          "name": "appointment_id",
+          "type": "bigint",
+          "key": "fk",
+          "references": "appointments.id"
+        },
+        {
+          "name": "amount_paise",
+          "type": "integer"
+        },
+        {
+          "name": "payment_method",
+          "type": "varchar(16)"
+        },
+        {
+          "name": "is_reversed",
+          "type": "boolean"
+        },
+        {
+          "name": "created_at",
+          "type": "timestamptz"
+        }
+      ]
+    }
+  ],
+  "relationships": [
+    {
+      "id": "users_doctors",
+      "from": "users",
+      "to": "doctors",
+      "label": "assigned profile",
+      "fromCardinality": "one",
+      "toCardinality": "one",
+      "fromOptional": true
+    },
+    {
+      "id": "appointments_patients",
+      "from": "appointments",
+      "to": "patients",
+      "label": "booked for",
+      "fromCardinality": "many",
+      "toCardinality": "one"
+    },
+    {
+      "id": "appointments_doctors",
+      "from": "appointments",
+      "to": "doctors",
+      "label": "assigned to",
+      "fromCardinality": "many",
+      "toCardinality": "one"
+    },
+    {
+      "id": "encounters_patients",
+      "from": "encounters",
+      "to": "patients",
+      "label": "consultation for",
+      "fromCardinality": "many",
+      "toCardinality": "one"
+    },
+    {
+      "id": "encounters_doctors",
+      "from": "encounters",
+      "to": "doctors",
+      "label": "conducted by",
+      "fromCardinality": "many",
+      "toCardinality": "one"
+    },
+    {
+      "id": "encounters_appointments",
+      "from": "encounters",
+      "to": "appointments",
+      "label": "links encounter",
+      "fromCardinality": "one",
+      "toCardinality": "one",
+      "fromOptional": true
+    },
+    {
+      "id": "prescriptions_encounters",
+      "from": "prescriptions",
+      "to": "encounters",
+      "label": "prescribed during",
+      "fromCardinality": "one",
+      "toCardinality": "one",
+      "fromOptional": true
+    },
+    {
+      "id": "treatment_plans_patients",
+      "from": "treatment_plans",
+      "to": "patients",
+      "label": "prescribed for",
+      "fromCardinality": "many",
+      "toCardinality": "one"
+    },
+    {
+      "id": "treatment_sessions_plans",
+      "from": "treatment_sessions",
+      "to": "treatment_plans",
+      "label": "session log",
+      "fromCardinality": "many",
+      "toCardinality": "one"
+    },
+    {
+      "id": "payments_patients",
+      "from": "payments",
+      "to": "patients",
+      "label": "billed to",
+      "fromCardinality": "many",
+      "toCardinality": "one"
+    },
+    {
+      "id": "payments_treatment_plans",
+      "from": "payments",
+      "to": "treatment_plans",
+      "label": "instalment for",
+      "fromCardinality": "many",
+      "toCardinality": "one",
+      "fromOptional": true
+    }
+  ]
+}

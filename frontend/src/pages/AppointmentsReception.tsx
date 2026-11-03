@@ -273,8 +273,12 @@ export function AppointmentsReception() {
     }
   }
 
+  if (!me) {
+    return <div className="p-12 text-center text-sm text-slate-600" role="status">Loading...</div>
+  }
+
   return (
-    <AppShell name={me?.full_name || 'Staff'} role={me?.role || 'RECEPTION'}>
+    <AppShell name={me.full_name} role={me.role}>
       <div className="space-y-6">
         <div role="tablist" aria-label="Appointment workspace" className="flex flex-wrap gap-2 border-b border-slate-200 pb-2">
           <button
