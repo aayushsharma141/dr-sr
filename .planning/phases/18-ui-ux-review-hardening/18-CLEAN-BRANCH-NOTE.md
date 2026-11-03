@@ -18,6 +18,15 @@ The validation and decision records of Plan 05 were measured on a tree that incl
 ## Conflicts resolved when applying Phase 18 onto main
 PatientTimeline (kept main's `visibleTimeline` and the darker text colour), PatientDetail (kept both the PatientTimeline and PaymentHistory imports; the PaymentHistory mount merged cleanly), patients-directory test (kept both the timeline and the payments mock routes).
 
-## Gate on this branch (2026-11-03)
-typecheck pass, lint pass, build pass, `npm test` 37 files / 158 passed / 5 skipped (Edge print tests, opt-in), six A4 Edge print checks 6 of 6. package.json and the lockfile are identical to main.
-Still unverified: physical printers (waived by the client).
+## Unresolved issues (current)
+- DEFECT: the session logger and session addendum dialogs open with keyboard focus on the Close button, not the first form field. This is a real accessibility defect, not a pending visual check. It is not fixed on this branch (manual check M-18-16 is recorded as known failing).
+- Criterion 4 (12px minimum) NOT met: 36 existing violations in 10 files are capped by the guard.
+- Physical printer verification WAIVED by the client, not passed. Printed Devanagari glyph rendering is unverified.
+- Plans 06, 07 and 08 are NOT implemented on this branch (no bundled font, no HTTPS or canvas-preview work, no form-accessibility work).
+- Outstanding manual checks (all NOT RUN) are listed in 18-MANUAL-CHECKS.md.
+- PR scope: this branch also carries the earlier webcam-capture and letterhead commits (50b2abd, ae1b557, 9e10ebb), which were never on main. The PR description must disclose that combined scope.
+- CI: the workflow in .github/workflows/tests.yml runs on pull requests to main and on pushes to main and two ui/ branches only, so this branch has no GitHub CI status until a pull request is opened.
+
+## Gate on this branch (2026-11-03, re-run on 9094422 with npm ci)
+npm ci pass (0 vulnerabilities), npm run test 37 files / 158 passed / 5 skipped (Edge print tests, opt-in), typecheck pass, lint pass, build pass, six A4 Edge print checks 6 of 6. package.json and the lockfile are identical to main. No backend, deploy or migration files changed.
+Still unverified: physical printers (waived), the manual checks in 18-MANUAL-CHECKS.md, and GitHub CI (not yet triggered).

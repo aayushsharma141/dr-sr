@@ -33,4 +33,6 @@ These need a person with a real browser, display or screen reader. Automated tes
 - M-18-18 Hindi glyphs on printed output: printed Devanagari rendering on the registration card, prescription slip and receipt. Needs a printer (the printer test was waived) and the bundled font from plan 06, which is not implemented.
   Result: NOT RUN (waived with the printer checks above, plus plan 06 not started)
 
-## Later sections (added by plan 08)
+## Further checks
+
+Plan 08 has not started. It will add any further checks. None are recorded here yet.
