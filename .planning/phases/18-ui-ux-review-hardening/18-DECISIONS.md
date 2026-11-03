@@ -92,8 +92,3 @@ Diff shown to the user: `B1-other-agent-diff.txt` (same folder). Git state at re
 - Closure authorized: the approved 17-line patch, the legibility guard (5 tests) and validation are sufficient. Closure does NOT mean accessibility criterion 4 passed.
 - Recorded conditions: criterion 4 unmet (330 on-screen text-xs uses at 10.5px); 82 violations in 11 files controlled by per-file caps; three rejected typography changes excluded; AuditViewerPage and VasTrendChart outstanding; modal first-field focus outstanding; physical printer verification WAIVED, not passed; the guard allow-list must shrink as the other agent's files are committed and violations are fixed.
 - Root font stays 14px. Protected files unchanged. Nothing committed. Plan 06 not started and not authorized; it needs its own review and authorization.
-
-## Record reconciliation on phase-18-clean (2026-11-03)
-- UX-01 (REQUIREMENTS.md) and Phase 18 success criterion 1 (ROADMAP.md) now say A4, with a note citing the client decision of 2026-11-02. The Phase 15 and Phase 17 records still describe 80 mm thermal and were NOT changed.
-- ROADMAP and STATE now use the clean-branch figures for criterion 4 (36 existing violations, capped). Plans 06-08 are NOT implemented on this branch (no font, no certificate script, no user-invalid bridge) and remain not started.
-- 18-MANUAL-CHECKS.md lists the outstanding manual accessibility and display checks, all NOT RUN. Printer checks M-18-01..04 remain WAIVED, not passed.

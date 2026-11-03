@@ -66,7 +66,7 @@
 
 ### UI/UX Review Hardening (post-acceptance review)
 
-- [ ] **UX-01**: Receipts print from the app: an A4 receipt after each payment and from payment history, reprints marked DUPLICATE, header taken from clinic settings, and print page sizes defined per document (A4 receipt, A4 card and prescription). The receipt paper was changed from 80 mm to A4 by client decision on 2026-11-02 (see phases/18-ui-ux-review-hardening/18-DECISIONS.md); Phase 15 and 17 records still describe 80 mm thermal and are unchanged.
+- [ ] **UX-01**: Receipts print from the app: an 80 mm receipt after each payment and from payment history, reprints marked DUPLICATE, header taken from clinic settings, and print page sizes defined per document (80 mm receipt, A4 card and prescription).
 - [ ] **UX-02**: Every pop-up uses one shared native modal dialog with dialog semantics, inert background, Esc to close and focus returned to the opener.
 - [ ] **UX-03**: No blocking `alert()`; failures show persistent, screen-reader-announced inline messages.
 - [ ] **UX-04**: On-screen text is at least 12px and meets 4.5:1 contrast, guarded by an automated check.

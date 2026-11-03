@@ -39,7 +39,7 @@ Phases 11-17 (continuing from v2.0, which ended at Phase 10). See `.planning/ROA
 | 15 | Billing, Receipts & Reversals | Complete (7/7 plans) |
 | 16 | Audit Viewer, Backup/Restore & Integrity | Complete (7/7 plans) |
 | 17 | LAN Deployment, Printer & Acceptance | Complete (5/5 plans) |
-| 18 | UI/UX Review Hardening | In progress: plans 01-05 closed (04 printer waiver; 05 criterion 4 unmet, 36 existing violations capped); 06-08 not started (no code for them on this branch); manual accessibility checks outstanding; known defect: session dialogs focus Close instead of the first field |
+| 18 | UI/UX Review Hardening | In progress: plans 01-05 closed (04 printer waiver; 05 criterion 4 unmet); 06-08 not started |
 
 ## Accumulated Context
 

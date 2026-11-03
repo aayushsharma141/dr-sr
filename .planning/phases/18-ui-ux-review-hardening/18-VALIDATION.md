@@ -1,7 +1,5 @@
 # Phase 18 validation record
 
-> NOTE (2026-11-03): the Wave 4 figures below (14px root, 330 text-xs uses at 10.5px, 82 violations, the other agent files) were measured on a working tree that had an uncommitted redesign. On the clean branch phase-18-clean the root font is the default 16px (text-xs renders at 12px) and the guard caps 36 existing violations in 10 files. See 18-CLEAN-BRANCH-NOTE.md. Criterion 4 is still NOT met there.
-
 ## Wave 1 (2026-11-02)
 
 Plans: 18-01. Commands (from `D:\dr-sr\frontend`, PowerShell):

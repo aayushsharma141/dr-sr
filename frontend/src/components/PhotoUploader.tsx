@@ -77,6 +77,7 @@ export function PhotoUploader({ onPhotoSelected, disabled = false }: PhotoUpload
   const videoRef = useRef<HTMLVideoElement>(null)
   const streamRef = useRef<MediaStream | null>(null)
   const capturedFileRef = useRef<File | null>(null)
+  const mountedRef = useRef(true)
 
   const unavailableReason = cameraUnavailableReason()
 
@@ -87,7 +88,9 @@ export function PhotoUploader({ onPhotoSelected, disabled = false }: PhotoUpload
 
   // Always release the camera and any object URLs when the component goes away.
   useEffect(() => {
+    mountedRef.current = true
     return () => {
+      mountedRef.current = false
       stopCamera()
     }
   }, [stopCamera])
@@ -163,9 +166,14 @@ export function PhotoUploader({ onPhotoSelected, disabled = false }: PhotoUpload
         video: { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 } },
         audio: false,
       })
+      if (!mountedRef.current) {
+        stream.getTracks().forEach((track) => track.stop())
+        return
+      }
       streamRef.current = stream
       setMode('live')
     } catch (err) {
+      if (!mountedRef.current) return
       stopCamera()
       setMode('idle')
       setError(cameraErrorMessage(err))

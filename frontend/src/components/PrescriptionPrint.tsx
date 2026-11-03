@@ -18,10 +18,12 @@ export function PrescriptionPrint({ prescription, onClose }: PrescriptionPrintPr
   const { data: settings } = useClinicSettings()
 
   const clinicNameEn = settings?.name_en || 'Kalyan Hospital'
-  const addresses =
-    settings?.address_1 && settings?.address_2
-      ? [`क्लिनिक: 1. ${settings.address_1}`, `क्लिनिक: 2. ${settings.address_2}`]
-      : undefined
+  const addresses = settings?.address_1
+    ? [
+        `क्लिनिक: 1. ${settings.address_1}`,
+        ...(settings.address_2 ? [`क्लिनिक: 2. ${settings.address_2}`] : []),
+      ]
+    : undefined
   const issuedOn = new Date(prescription.created_at).toLocaleDateString('en-IN')
 
   // Shared Modal renders this as a print portal on <body>, so printing hides the rest of the

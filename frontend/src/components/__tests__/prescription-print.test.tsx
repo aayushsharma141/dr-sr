@@ -1,6 +1,7 @@
 import { render, screen } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { vi } from 'vitest'
 import '../../test/dialog-shim'
 import { PrescriptionPrint } from '../PrescriptionPrint'
 import type { PrescriptionOut } from '../../api/types'
@@ -33,6 +34,20 @@ const prescription: PrescriptionOut = {
   ],
 } as PrescriptionOut
 
+const clinicSettings = vi.hoisted(() => ({
+  current: {
+    id: 1,
+    name_en: 'Kalyan Hospital & Research Centre',
+    name_hi: 'कल्याण अस्पताल',
+    address_1: 'Station Road, Ara',
+    address_2: 'Near Post Office',
+  },
+}))
+
+vi.mock('../../api/queries', () => ({
+  useClinicSettings: () => ({ data: clinicSettings.current }),
+}))
+
 function renderSlip() {
   return render(
     <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
@@ -53,6 +68,16 @@ describe('PrescriptionPrint', () => {
     expect(screen.getByText('KH-2026-0004')).toBeInTheDocument()
     expect(screen.getByTestId('letterhead-footer')).toBeInTheDocument()
     expect(screen.getByText('Tab Aceclofenac')).toBeInTheDocument()
+  })
+
+  it('prints the configured first address when the optional second address is blank', () => {
+    clinicSettings.current = { ...clinicSettings.current, address_2: '' }
+    renderSlip()
+    const footer = screen.getByTestId('letterhead-footer')
+    expect(footer).toHaveTextContent('Station Road, Ara')
+    expect(footer).not.toHaveTextContent('नवादा थाना')
+    expect(footer).not.toHaveTextContent('श्रीरामपुर रोड')
+    clinicSettings.current = { ...clinicSettings.current, address_2: 'Near Post Office' }
   })
 
   it('renders on <body> as a print portal so printing can hide the app behind it', () => {

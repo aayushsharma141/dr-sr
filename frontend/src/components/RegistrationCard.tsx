@@ -48,10 +48,12 @@ export function RegistrationCard({ patient, settings, onClose }: RegistrationCar
   const printFooterEn = settings?.print_footer_en
   const printFooterHi = settings?.print_footer_hi
 
-  const addresses =
-    settings?.address_1 && settings?.address_2
-      ? [`क्लिनिक: 1. ${settings.address_1}`, `क्लिनिक: 2. ${settings.address_2}`]
-      : undefined
+  const addresses = settings?.address_1
+    ? [
+        `क्लिनिक: 1. ${settings.address_1}`,
+        ...(settings.address_2 ? [`क्लिनिक: 2. ${settings.address_2}`] : []),
+      ]
+    : undefined
 
   const fullAddress = [patient.address, patient.district, patient.state].filter(Boolean).join(', ')
   const ageSex = `${patient.age_years} Years / ${genderLabel(patient.gender)}`

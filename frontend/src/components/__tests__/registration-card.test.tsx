@@ -95,6 +95,15 @@ describe('RegistrationCard Component', () => {
     expect(screen.getByTestId('letterhead-footer')).toHaveTextContent('Station Road, Ara')
   })
 
+  it('prints the configured first address when the optional second address is blank', () => {
+    const settings = { ...mockSettings, address_2: '' }
+    render(<RegistrationCard patient={mockPatient} settings={settings} />)
+    const footer = screen.getByTestId('letterhead-footer')
+    expect(footer).toHaveTextContent('Station Road, Ara')
+    expect(footer).not.toHaveTextContent('नवादा थाना')
+    expect(footer).not.toHaveTextContent('श्रीरामपुर रोड')
+  })
+
   it('falls back to the standard clinic addresses when settings have none', () => {
     render(<RegistrationCard patient={mockPatient} settings={null} />)
 
