@@ -4,7 +4,7 @@ on:
   pull_request:
     branches: [main]
   push:
-    branches: [main, ui/redesign-modern-clinical, ui/clinical-navigation-hierarchy]
+    branches: [main, "phase-*", "chore/**", ui/redesign-modern-clinical, ui/clinical-navigation-hierarchy]
 
 permissions:
   contents: read
@@ -77,3 +77,79 @@ jobs:
       - name: Build production frontend
         working-directory: frontend
         run: npm run build
+
+  backend:
+    name: backend
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: kalyan_owner
+          POSTGRES_PASSWORD: ci_owner_pw
+          POSTGRES_DB: kalyan_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U kalyan_owner"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      KALYAN_ENV: test
+      KALYAN_DB_HOST: 127.0.0.1
+      KALYAN_DB_PORT: "5432"
+      KALYAN_DB_NAME: kalyan_test
+      KALYAN_TEST_DB_NAME: kalyan_test
+      KALYAN_DB_APP_USER: kalyan_app
+      KALYAN_DB_APP_PASSWORD: ciapppw1
+      KALYAN_DB_OWNER_USER: kalyan_owner
+      KALYAN_DB_OWNER_PASSWORD: ci_owner_pw
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/pyproject.toml
+      - name: Install backend with dev extras
+        working-directory: backend
+        run: python -m pip install --upgrade pip && pip install -e ".[dev]"
+      - name: Create runtime application role
+        env:
+          PGPASSWORD: ci_owner_pw
+        run: >-
+          psql -h 127.0.0.1 -U kalyan_owner -d kalyan_test
+          -c "CREATE ROLE kalyan_app LOGIN PASSWORD 'ciapppw1'"
+      - name: Ruff lint
+        working-directory: backend
+        run: ruff check src
+      - name: Ruff format check
+        working-directory: backend
+        run: ruff format --check src
+      - name: Run backend tests with coverage
+        run: pytest backend/tests -v --cov=kalyan_api --cov-report=term-missing
+
+  security:
+    name: dependency audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Audit backend dependencies
+        run: pip install pip-audit && pip-audit -r backend/requirements.lock.txt
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22.22.2"
+      - name: Audit frontend dependencies
+        working-directory: frontend
+        run: npm audit --audit-level=high

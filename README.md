@@ -50,3 +50,7 @@ Use synthetic patient data in tests and demos. Never commit patient records/phot
 
 ---
 Kalyan Hospital — श्री वशिष्ठ कल्याण ट्रस्ट
+
+## License
+
+Proprietary. All rights reserved; see [LICENSE](LICENSE). Security reporting and controls are described in [SECURITY.md](SECURITY.md).
