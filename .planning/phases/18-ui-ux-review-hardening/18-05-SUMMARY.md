@@ -1,5 +1,7 @@
 # 18-05 summary: text size and contrast — CLOSED, ACCESSIBILITY CRITERION 4 NOT MET
 
+> NOTE (2026-11-03): the figures below (14px root, 330 text-xs uses at 10.5px, 82 violations, the other agent files) were measured on a working tree that had an uncommitted redesign. On the clean branch phase-18-clean the root font is the default 16px (text-xs renders at 12px) and the guard caps 36 existing violations in 10 files. See 18-CLEAN-BRANCH-NOTE.md. Criterion 4 is still NOT met there.
+
 Requirements: UX-04 (on-screen text at least 12px and 4.5:1 contrast, guarded by an automated check).
 
 Status: closed 2026-11-03 by the client. Closure means the approved work is implemented and tested. It does NOT mean criterion 4 passed.
