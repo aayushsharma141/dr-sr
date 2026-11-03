@@ -190,7 +190,7 @@ Plans:
 **Requirements**: UX-01, UX-02, UX-03, UX-04, UX-05, UX-06, UX-07, UX-08
 **Success Criteria**:
 
-  1. After recording a payment, reception prints the 80 mm receipt from the app and can reprint it from payment history; reprints carry the DUPLICATE mark; the receipt header (clinic name, address, phone) comes from clinic settings; the receipt prints on an 80 mm page while the registration card and prescription slip each stay on one A4 page.
+  1. After recording a payment, reception prints the A4 receipt from the app and can reprint it from payment history; reprints carry the DUPLICATE mark; the receipt header (clinic name, address, phone) comes from clinic settings; the receipt, the registration card and the prescription slip each print on one A4 page (receipt paper changed from 80 mm to A4 by client decision, 2026-11-02).
   2. Every pop-up (payment, patient edit, reversal, appointment booking, session logger, session addendum, prescription slip, user and doctor forms) is a native modal dialog: announced as a dialog, background inert, Esc closes it, and focus returns to the control that opened it.
   3. No screen uses a blocking browser `alert()`; backup, user-management and payment failures show a persistent inline message that screen readers announce.
   4. All on-screen text is at least 12px and meets 4.5:1 contrast, and an automated source check prevents regressions; print-only documents are exempt from the size floor.
@@ -206,7 +206,7 @@ Plans:
 - [x] 18-02-PLAN.md - Shared native Modal, jsdom shim, named print pages, migrate 4 overlays (Wave 2)
 - [x] 18-03-PLAN.md - Migrate the remaining 14 overlays (Wave 3)
 - [x] 18-04-PLAN.md - Receipt dialog, clinic-settings header, payment history reprint, headless print check (Wave 3). CLOSED WITH WAIVER: physical printer test waived by client, not tested
-- [x] 18-05-PLAN.md - Text size and contrast fixes with legibility guard (Wave 4). CLOSED 2026-11-03: 17-line patch and guard done; criterion 4 (12px minimum) NOT MET, 330 text-xs uses and 82 documented violations remain
+- [x] 18-05-PLAN.md - Text size and contrast fixes with legibility guard (Wave 4). CLOSED 2026-11-03: 17-line patch and guard done; criterion 4 (12px minimum) NOT MET: 36 existing violations in 10 files remain, capped by the guard (measured on phase-18-clean; the earlier 330 text-xs / 82-violation figures came from a tree with an uncommitted 14px root)
 - [ ] 18-06-PLAN.md - Bundled Devanagari font and lang="hi" (Wave 5)
 - [ ] 18-07-PLAN.md - Webcam HTTPS decision and implementation or upload-only (Wave 5)
 - [ ] 18-08-PLAN.md - Form accessibility, final gate and manual-check sheet (Wave 6)

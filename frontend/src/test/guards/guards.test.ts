@@ -73,7 +73,7 @@ describe('legibility guard (UX-04)', () => {
     'pages/AppointmentsReception.tsx': { max: 2, reason: '1 sub-12px class, 1 grey. Existing main code.' },
     'pages/PatientsDirectory.tsx': { max: 4, reason: '4 grey 300/400 classes. Existing main code.' },
     'pages/PendingDuesPage.tsx': { max: 4, reason: '2 grey, 2 semantic colours. Existing main code.' },
-    'pages/PatientDetail.tsx': { max: 5, reason: '4 section labels in grey 400 (2.59:1 on white) and 1 sub-12px class. Excluded from the approved 17-line patch because on the redesign tree a heading rule overrode them; on main they render grey. Needs a decision.' },
+    'pages/PatientDetail.tsx': { max: 1, reason: '1 sub-12px class in the payments table header (11px). The four grey section labels were fixed to neutral-600. Existing main code.' },
     // Held by client decisions.
     'components/VasTrendChart.tsx': { max: 4, reason: 'SVG font sizes (3) and 1 class: needs a visual review before changing. Held by the client.' },
     'pages/admin/AuditViewerPage.tsx': { max: 5, reason: 'Dark log panel uses light grey on near-black on purpose; needs a surface exception or a restyle. Held by the client.' },
