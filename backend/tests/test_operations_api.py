@@ -19,27 +19,42 @@ def test_operations_api_role_restrictions(
     assert client.get("/api/operations/backups").status_code == 401
     assert client.get("/api/operations/integrity").status_code == 401
     assert client.post("/api/operations/backups", json={}).status_code == 401
-    assert (
-        client.post("/api/operations/restore", json={"archive_filename": "foo", "confirmation_phrase": "RESTORE-DATABASE-OVERWRITE", "justification": "Authorised recovery test"}).status_code == 401
-    )
+    assert client.post(
+        "/api/operations/restore",
+        json={
+            "archive_filename": "foo",
+            "confirmation_phrase": "RESTORE-DATABASE-OVERWRITE",
+            "justification": "Authorised recovery test",
+        },
+    ).status_code == 401
 
     # 2. Reception -> 403
     rec_c = login_client(reception_user)
     assert rec_c.get("/api/operations/backups").status_code == 403
     assert rec_c.get("/api/operations/integrity").status_code == 403
     assert rec_c.post("/api/operations/backups", json={}).status_code == 403
-    assert (
-        rec_c.post("/api/operations/restore", json={"archive_filename": "foo", "confirmation_phrase": "RESTORE-DATABASE-OVERWRITE", "justification": "Authorised recovery test"}).status_code == 403
-    )
+    assert rec_c.post(
+        "/api/operations/restore",
+        json={
+            "archive_filename": "foo",
+            "confirmation_phrase": "RESTORE-DATABASE-OVERWRITE",
+            "justification": "Authorised recovery test",
+        },
+    ).status_code == 403
 
     # 3. Doctor -> 403
     doc_c = login_client(doctor_a_user)
     assert doc_c.get("/api/operations/backups").status_code == 403
     assert doc_c.get("/api/operations/integrity").status_code == 403
     assert doc_c.post("/api/operations/backups", json={}).status_code == 403
-    assert (
-        doc_c.post("/api/operations/restore", json={"archive_filename": "foo"}).status_code == 403
-    )
+    assert doc_c.post(
+        "/api/operations/restore",
+        json={
+            "archive_filename": "foo",
+            "confirmation_phrase": "RESTORE-DATABASE-OVERWRITE",
+            "justification": "Authorised recovery test",
+        },
+    ).status_code == 403
 
 
 def test_operations_admin_lifecycle(
