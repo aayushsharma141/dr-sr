@@ -1,8 +1,15 @@
-import { render, screen, fireEvent } from '@testing-library/react'
-import { describe, it, expect, vi } from 'vitest'
+import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { MemoryRouter } from 'react-router'
+import '../../test/dialog-shim'
 import { BackupManagerPage } from '../admin/BackupManagerPage'
+
+const mocks = vi.hoisted(() => ({
+  createMutate: vi.fn(),
+  restoreMutate: vi.fn(),
+}))
 
 const sampleBackups = {
   backups: [
@@ -29,14 +36,11 @@ vi.mock('../../api/queries', () => ({
     refetch: vi.fn(),
   }),
   useCreateBackup: () => ({
-    mutateAsync: vi.fn(),
+    mutateAsync: mocks.createMutate,
     isPending: false,
   }),
   useRestoreBackup: () => ({
-    mutateAsync: vi.fn().mockResolvedValue({
-      status: 'SUCCESS',
-      prerestore_snapshot: '/var/backups/prerestore.tar.gz',
-    }),
+    mutateAsync: mocks.restoreMutate,
     isPending: false,
   }),
   useLogout: () => ({
@@ -79,5 +83,73 @@ describe('BackupManagerPage', () => {
     expect(
       screen.getByText(/Automatic Pre-Restore Safety Snapshot Guarantee/i)
     ).toBeInTheDocument()
+  })
+})
+
+describe('BackupManagerPage failures are persistent inline alerts (UX-03)', () => {
+  const queryClient = new QueryClient()
+  let alertSpy: ReturnType<typeof vi.spyOn>
+
+  function renderPage() {
+    return render(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter>
+          <BackupManagerPage />
+        </MemoryRouter>
+      </QueryClientProvider>
+    )
+  }
+
+  beforeEach(() => {
+    mocks.createMutate.mockReset()
+    mocks.restoreMutate.mockReset()
+    mocks.restoreMutate.mockResolvedValue({
+      status: 'SUCCESS',
+      prerestore_snapshot: '/var/backups/prerestore.tar.gz',
+    })
+    alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {})
+  })
+
+  afterEach(() => {
+    alertSpy.mockRestore()
+  })
+
+  it('shows a failed backup as a persistent role=alert, never window.alert', async () => {
+    mocks.createMutate.mockRejectedValueOnce(new Error('disk full'))
+    renderPage()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Trigger Backup Now' }))
+
+    const alert = await screen.findByRole('alert')
+    expect(alert).toHaveTextContent('Backup failed: disk full')
+    expect(alertSpy).not.toHaveBeenCalled()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Dismiss message' }))
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+  })
+
+  it('shows a failed restore inside the confirmation dialog and keeps it open', async () => {
+    mocks.restoreMutate.mockRejectedValueOnce(new Error('checksum mismatch'))
+    renderPage()
+
+    fireEvent.click(screen.getByText('Restore System'))
+    fireEvent.click(screen.getByRole('button', { name: 'Yes, Execute Safe Restore' }))
+
+    const alert = await screen.findByRole('alert')
+    expect(alert).toHaveTextContent('Restoration failed: checksum mismatch')
+    expect(screen.getByText('⚠ Confirm System Restoration')).toBeInTheDocument()
+    expect(alertSpy).not.toHaveBeenCalled()
+  })
+
+  it('restore confirmation: Esc closes it and focus returns to the Restore button that opened it', async () => {
+    const user = userEvent.setup()
+    renderPage()
+    const trigger = screen.getAllByRole('button', { name: /Restore System/ })[0]
+    await user.click(trigger)
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Cancel' })).toHaveFocus())
+
+    fireEvent.keyDown(document, { key: 'Escape' })
+    await waitFor(() => expect(screen.queryByText('⚠ Confirm System Restoration')).not.toBeInTheDocument())
+    await waitFor(() => expect(trigger).toHaveFocus())
   })
 })

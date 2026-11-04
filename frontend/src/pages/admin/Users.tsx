@@ -10,7 +10,9 @@ import {
 } from '../../api/queries'
 import { ApiError, apiFetch } from '../../api/client'
 import { AppShell } from '../../components/AppShell'
+import { Modal } from '../../components/Modal'
 import { ConflictBanner } from '../../components/ConflictBanner'
+import { InlineAlert } from '../../components/InlineAlert'
 import type { Role, UserCreatedOut, UserOut } from '../../api/types'
 
 export function Users() {
@@ -45,6 +47,7 @@ export function Users() {
 
   // Action error state
   const [actionError, setActionError] = useState<string | null>(null)
+  const [unlockError, setUnlockError] = useState<string | null>(null)
 
   // Mutations
   const createMutation = useCreateUser()
@@ -183,6 +186,7 @@ export function Users() {
   }
 
   const handleUnlock = async (u: UserOut) => {
+    setUnlockError(null)
     try {
       await unlockMutation.mutateAsync({
         id: u.id,
@@ -190,9 +194,7 @@ export function Users() {
       })
       refetchUsers()
     } catch (err: unknown) {
-      if (err instanceof ApiError) {
-        alert(err.message)
-      }
+      setUnlockError(err instanceof ApiError ? err.message : 'Could not unlock this account. Try again.')
     }
   }
 
@@ -225,6 +227,12 @@ export function Users() {
           <div role="alert" className="p-4 bg-red-50 border border-red-200 rounded text-red-900">
             Failed to load users: {error.message}
           </div>
+        )}
+
+        {unlockError && (
+          <InlineAlert tone="error" onDismiss={() => setUnlockError(null)}>
+            {unlockError}
+          </InlineAlert>
         )}
 
         {users && (
@@ -270,7 +278,7 @@ export function Users() {
                           Locked
                         </span>
                       ) : (
-                        <span className="text-neutral-400 text-xs">Clear</span>
+                        <span className="text-neutral-600 text-xs">Clear</span>
                       )}
                     </td>
                     <td className="px-4 py-3 font-mono text-xs text-neutral-500">
@@ -329,16 +337,7 @@ export function Users() {
 
         {/* Create User Dialog */}
         {createOpen && (
-          <div
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="create-dialog-title"
-            className="fixed inset-0 bg-neutral-900/50 backdrop-blur-xs flex items-center justify-center p-4 z-50"
-          >
-            <div className="bg-white rounded-lg border border-neutral-200 max-w-lg w-full p-6 shadow-xl space-y-4">
-              <h3 id="create-dialog-title" className="text-xl font-bold text-neutral-900">
-                Create User Account
-              </h3>
+          <Modal open title="Create User Account" onClose={() => setCreateOpen(false)} busy={createMutation.isPending} className="max-w-lg">
 
               {createError && (
                 <div role="alert" className="p-3 bg-red-50 border border-red-200 rounded text-sm text-red-900">
@@ -353,6 +352,7 @@ export function Users() {
                   </label>
                   <input
                     id="create-username"
+                    data-autofocus
                     type="text"
                     required
                     value={newUsername}
@@ -425,22 +425,12 @@ export function Users() {
                   </button>
                 </div>
               </form>
-            </div>
-          </div>
+        </Modal>
         )}
 
         {/* Edit User Dialog */}
         {editUser && (
-          <div
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="edit-dialog-title"
-            className="fixed inset-0 bg-neutral-900/50 backdrop-blur-xs flex items-center justify-center p-4 z-50"
-          >
-            <div className="bg-white rounded-lg border border-neutral-200 max-w-lg w-full p-6 shadow-xl space-y-4">
-              <h3 id="edit-dialog-title" className="text-xl font-bold text-neutral-900">
-                Edit User: {editUser.username}
-              </h3>
+          <Modal open title={`Edit User: ${editUser.username}`} onClose={() => setEditUser(null)} busy={updateMutation.isPending} className="max-w-lg">
 
               {isConflict && (
                 <ConflictBanner
@@ -462,6 +452,7 @@ export function Users() {
                   </label>
                   <input
                     id="edit-fullname"
+                    data-autofocus
                     type="text"
                     required
                     value={editFullName}
@@ -503,22 +494,12 @@ export function Users() {
                   </button>
                 </div>
               </form>
-            </div>
-          </div>
+        </Modal>
         )}
 
         {/* Confirmation Dialog for Destructive Actions */}
         {confirmAction && (
-          <div
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="confirm-dialog-title"
-            className="fixed inset-0 bg-neutral-900/50 backdrop-blur-xs flex items-center justify-center p-4 z-50"
-          >
-            <div className="bg-white rounded-lg border border-neutral-200 max-w-md w-full p-6 shadow-xl space-y-4">
-              <h3 id="confirm-dialog-title" className="text-lg font-bold text-neutral-900 capitalize">
-                Confirm {confirmAction.type.replace('-', ' ')}
-              </h3>
+          <Modal open title={`Confirm ${confirmAction.type.replace('-', ' ')}`} onClose={() => setConfirmAction(null)} dismiss="none" busy={deactivateMutation.isPending || reactivateMutation.isPending || resetPasswordMutation.isPending} className="max-w-md">
               <p className="text-sm text-neutral-600">
                 Are you sure you want to {confirmAction.type.replace('-', ' ')} user account{' '}
                 <strong className="font-mono">{confirmAction.user.username}</strong>?
@@ -533,6 +514,7 @@ export function Users() {
               <div className="flex items-center justify-end gap-3 pt-2">
                 <button
                   type="button"
+                  data-autofocus
                   onClick={() => {
                     setConfirmAction(null)
                     setActionError(null)
@@ -554,22 +536,12 @@ export function Users() {
                   Confirm
                 </button>
               </div>
-            </div>
-          </div>
+        </Modal>
         )}
 
         {/* Temporary Password Notice Dialog */}
         {tempPasswordNotice && (
-          <div
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="temp-pwd-title"
-            className="fixed inset-0 bg-neutral-900/50 backdrop-blur-xs flex items-center justify-center p-4 z-50"
-          >
-            <div className="bg-white rounded-lg border border-neutral-200 max-w-md w-full p-6 shadow-xl space-y-4">
-              <h3 id="temp-pwd-title" className="text-lg font-bold text-neutral-900">
-                Temporary Password Generated
-              </h3>
+          <Modal open title="Temporary Password Generated" onClose={() => setTempPasswordNotice(null)} dismiss="none" className="max-w-md">
               <p className="text-sm text-neutral-600">
                 Account: <strong className="font-mono">{tempPasswordNotice.username}</strong>
               </p>
@@ -601,8 +573,7 @@ export function Users() {
                   Done
                 </button>
               </div>
-            </div>
-          </div>
+        </Modal>
         )}
       </div>
     </AppShell>

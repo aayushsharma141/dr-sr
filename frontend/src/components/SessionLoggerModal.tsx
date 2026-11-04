@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Modal } from './Modal'
 import type { TreatmentPlanOut } from '../api/types'
 import { useLogTreatmentSession } from '../api/queries'
 
@@ -76,30 +77,18 @@ export function SessionLoggerModal({ plan, onClose, onSuccess }: SessionLoggerMo
   const vasInfo = getVasDescription(vasScore)
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 overflow-y-auto">
-      <div className="bg-white rounded-xl shadow-2xl max-w-lg w-full p-6 space-y-5 my-8">
-        {/* Header */}
-        <div className="border-b border-gray-200 pb-3 flex justify-between items-start">
-          <div>
-            <span className="text-xs font-semibold uppercase tracking-wider text-teal-700">
-              Session Logger · सत्र प्रविष्टि
-            </span>
-            <h3 className="text-lg font-bold text-gray-900 mt-0.5">
-              Log Session #{nextSessionNumber} of {plan.total_sessions}
-            </h3>
-            <p className="text-xs text-gray-500">{plan.plan_name}</p>
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 text-lg"
-          >
-            ✕
-          </button>
-        </div>
+    <Modal
+      open
+      onClose={onClose}
+      title={`Log Session #${nextSessionNumber} of ${plan.total_sessions}`}
+      description={`Session Logger · सत्र प्रविष्टि · ${plan.plan_name}`}
+      busy={logSessionMutation.isPending}
+      className="max-w-lg"
+    >
+      <div className="space-y-5">
 
         {errorMessage && (
-          <div className="p-3 rounded-lg bg-red-50 border border-red-200 text-xs text-red-800">
+          <div role="alert" className="p-3 rounded-lg bg-red-50 border border-red-200 text-xs text-red-800">
             {errorMessage}
           </div>
         )}
@@ -140,7 +129,7 @@ export function SessionLoggerModal({ plan, onClose, onSuccess }: SessionLoggerMo
               onChange={(e) => setVasScore(Number(e.target.value))}
               className="w-full accent-teal-700 cursor-pointer"
             />
-            <div className="flex justify-between text-[10px] text-gray-400 font-mono px-1">
+            <div className="flex justify-between text-sm text-gray-600 font-mono px-1">
               <span>0 (None)</span>
               <span>2</span>
               <span>4</span>
@@ -205,7 +194,7 @@ export function SessionLoggerModal({ plan, onClose, onSuccess }: SessionLoggerMo
           </div>
         </form>
       </div>
-    </div>
+    </Modal>
   )
 }
 

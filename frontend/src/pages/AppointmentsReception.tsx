@@ -3,6 +3,7 @@ import { Link, useSearchParams } from 'react-router'
 import { AppShell } from '../components/AppShell'
 import { ConflictBanner } from '../components/ConflictBanner'
 import { AppointmentBookingModal } from '../components/AppointmentBookingModal'
+import { Modal } from '../components/Modal'
 import {
   useAppointments,
   useDoctors,
@@ -551,13 +552,20 @@ export function AppointmentsReception() {
 
         {/* Cancellation Reason Dialog */}
         {cancellingAppt && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-            <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6 space-y-4">
-              <h3 className="text-lg font-bold text-neutral-900">Cancel Appointment</h3>
+          <Modal
+            open
+            variant="destructive"
+            title="Cancel Appointment"
+            onClose={() => setCancellingAppt(null)}
+            busy={updateStatusMutation.isPending}
+            className="max-w-md"
+          >
+            <div className="space-y-4">
               <p className="text-xs text-neutral-600">
                 Provide a cancellation reason for Token #{cancellingAppt.token_number} ({cancellingAppt.patient_name}).
               </p>
               <textarea
+                data-autofocus
                 value={cancelReason}
                 onChange={(e) => setCancelReason(e.target.value)}
                 placeholder="Reason for cancellation (e.g. Patient called to reschedule)..."
@@ -586,7 +594,7 @@ export function AppointmentsReception() {
                 </button>
               </div>
             </div>
-          </div>
+          </Modal>
         )}
           </div>
         ) : (

@@ -89,7 +89,7 @@ describe('Hospital Print Layouts & Typography (PRN-01)', () => {
     render(<RegistrationCard patient={mockPatient} settings={mockSettings} />)
 
     expect(screen.getByText('Kalyan Hospital')).toBeInTheDocument()
-    expect(screen.getByText('कल्याण अस्पताल')).toBeInTheDocument()
+    expect(screen.getByText(/कल्याण अस्पताल/)).toBeInTheDocument()
     expect(screen.getByText('KHM-2026-00010')).toBeInTheDocument()
     expect(screen.getByText('Suresh Kumar')).toBeInTheDocument()
     expect(screen.getByText(/Authorized Signatory \/ Receptionist/i)).toBeInTheDocument()

@@ -3,12 +3,16 @@ import { Link } from 'react-router'
 import { AppShell } from '../../components/AppShell'
 import { useBackups, useCreateBackup, useRestoreBackup } from '../../api/queries'
 import type { BackupArchiveInfo } from '../../api/types'
+import { InlineAlert } from '../../components/InlineAlert'
+import { Modal } from '../../components/Modal'
 
 export function BackupManagerPage() {
   const [label, setLabel] = useState('')
   const [destinationDir, setDestinationDir] = useState('')
   const [confirmRestoreFile, setConfirmRestoreFile] = useState<string | null>(null)
   const [restoreStatus, setRestoreStatus] = useState<string | null>(null)
+  const [backupError, setBackupError] = useState<string | null>(null)
+  const [restoreError, setRestoreError] = useState<string | null>(null)
 
   const { data, isPending, isError, error, refetch } = useBackups()
   const createBackup = useCreateBackup()
@@ -16,6 +20,7 @@ export function BackupManagerPage() {
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault()
+    setBackupError(null)
     try {
       await createBackup.mutateAsync({
         label: label.trim() || undefined,
@@ -24,11 +29,12 @@ export function BackupManagerPage() {
       setLabel('')
       setDestinationDir('')
     } catch (err: unknown) {
-      alert(`Backup failed: ${err instanceof Error ? err.message : 'Unknown error'}`)
+      setBackupError(`Backup failed: ${err instanceof Error ? err.message : 'Unknown error'}`)
     }
   }
 
   const handleRestore = async (archiveFilename: string) => {
+    setRestoreError(null)
     try {
       setRestoreStatus('Verifying archive and restoring database...')
       const res = await restoreBackup.mutateAsync({
@@ -43,7 +49,8 @@ export function BackupManagerPage() {
       setConfirmRestoreFile(null)
       refetch()
     } catch (err: unknown) {
-      setRestoreStatus(`Restoration failed: ${err instanceof Error ? err.message : 'Unknown error'}`)
+      setRestoreStatus(null)
+      setRestoreError(`Restoration failed: ${err instanceof Error ? err.message : 'Unknown error'}`)
     }
   }
 
@@ -75,17 +82,17 @@ export function BackupManagerPage() {
 
         {/* Status notification */}
         {restoreStatus && (
-          <div className="p-4 bg-amber-50 border border-amber-300 rounded-lg text-sm text-amber-900 flex justify-between items-center">
-            <span>{restoreStatus}</span>
-            <button
-              type="button"
-              onClick={() => setRestoreStatus(null)}
-              className="text-amber-700 hover:text-amber-900 font-bold"
-            >
-              ✕
-            </button>
-          </div>
+          <InlineAlert tone="info" onDismiss={() => setRestoreStatus(null)}>
+            {restoreStatus}
+          </InlineAlert>
         )}
+
+        {backupError && (
+          <InlineAlert tone="error" onDismiss={() => setBackupError(null)}>
+            {backupError}
+          </InlineAlert>
+        )}
+
 
         {/* Create Backup Box */}
         <div className="bg-white p-5 rounded-lg border border-neutral-200 shadow-xs">
@@ -220,11 +227,15 @@ export function BackupManagerPage() {
 
         {/* Confirmation Modal */}
         {confirmRestoreFile && (
-          <div className="fixed inset-0 bg-neutral-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50">
-            <div className="bg-white rounded-lg shadow-xl max-w-lg w-full p-6 border border-neutral-300 space-y-4">
-              <h3 className="text-lg font-bold text-red-900 flex items-center gap-2">
-                ⚠ Confirm System Restoration
-              </h3>
+          <Modal
+            open
+            variant="destructive"
+            title="⚠ Confirm System Restoration"
+            onClose={() => setConfirmRestoreFile(null)}
+            busy={restoreBackup.isPending}
+            className="max-w-lg"
+          >
+            <div className="space-y-4">
               <p className="text-sm text-neutral-700">
                 You are about to restore the Kalyan Hospital database and patient photographs from archive:
               </p>
@@ -239,9 +250,15 @@ export function BackupManagerPage() {
                   instantly without touching the database.
                 </p>
               </div>
+              {restoreError && (
+                <InlineAlert tone="error" onDismiss={() => setRestoreError(null)}>
+                  {restoreError}
+                </InlineAlert>
+              )}
               <div className="flex justify-end gap-3 pt-2">
                 <button
                   type="button"
+                  data-autofocus
                   onClick={() => setConfirmRestoreFile(null)}
                   className="px-4 py-2 bg-neutral-200 hover:bg-neutral-300 text-neutral-800 text-sm font-medium rounded cursor-pointer"
                 >
@@ -257,7 +274,7 @@ export function BackupManagerPage() {
                 </button>
               </div>
             </div>
-          </div>
+          </Modal>
         )}
       </div>
     </AppShell>

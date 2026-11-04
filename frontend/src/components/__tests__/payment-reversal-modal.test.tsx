@@ -1,6 +1,7 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { describe, it, expect, vi } from 'vitest'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import '../../test/dialog-shim'
 import { PaymentReversalModal } from '../PaymentReversalModal'
 import type { PaymentOut } from '../../api/types'
 
@@ -86,6 +87,23 @@ describe('PaymentReversalModal', () => {
       expect(onSuccess).toHaveBeenCalled()
       expect(onClose).toHaveBeenCalled()
     })
+  })
+
+  it('destructive reversal ignores Esc (accidental dismiss), while Cancel still closes it', async () => {
+    const onClose = vi.fn()
+    render(
+      <QueryClientProvider client={new QueryClient()}>
+        <PaymentReversalModal isOpen onClose={onClose} payment={samplePayment} />
+      </QueryClientProvider>,
+    )
+    expect(screen.getByRole('dialog', { name: 'Reverse Payment Transaction' })).toBeInTheDocument()
+    await waitFor(() => expect(screen.getByLabelText(/Mandatory Reversal Justification/)).toHaveFocus())
+
+    fireEvent.keyDown(document, { key: 'Escape' })
+    expect(onClose).not.toHaveBeenCalled()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
+    expect(onClose).toHaveBeenCalledTimes(1)
   })
 })
 

@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Modal } from './Modal'
 import type { TreatmentSessionOut } from '../api/types'
 import { useAddSessionAddendum } from '../api/queries'
 
@@ -36,40 +37,27 @@ export function SessionAddendumModal({ session, onClose, onSuccess }: SessionAdd
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 overflow-y-auto">
-      <div className="bg-white rounded-xl shadow-2xl max-w-lg w-full p-6 space-y-4 my-8">
-        <div className="border-b border-gray-200 pb-3 flex justify-between items-start">
-          <div>
-            <span className="text-xs font-semibold uppercase tracking-wider text-amber-700">
-              Session Addendum · परिशिष्ट टिप्पणी
-            </span>
-            <h3 className="text-lg font-bold text-gray-900 mt-0.5">
-              Append Addendum to Session #{session.session_number}
-            </h3>
-            <p className="text-xs text-gray-500">
-              Conducted on {new Date(session.session_date).toLocaleDateString('en-IN')} by {session.doctor_name}
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 text-lg"
-          >
-            ✕
-          </button>
-        </div>
+    <Modal
+      open
+      onClose={onClose}
+      title={`Append Addendum to Session #${session.session_number}`}
+      description={`Session Addendum · परिशिष्ट टिप्पणी · Conducted on ${new Date(session.session_date).toLocaleDateString('en-IN')} by ${session.doctor_name}`}
+      busy={addAddendumMutation.isPending}
+      className="max-w-lg"
+    >
+      <div className="space-y-4">
 
         {/* Existing Session Summary Card */}
         <div className="rounded-lg bg-gray-50 p-3 text-xs border border-gray-200 space-y-1">
           <div className="font-semibold text-gray-700">Original Clinical Notes:</div>
           <p className="text-gray-800 italic">{session.clinical_notes}</p>
-          <div className="text-[11px] text-gray-500 pt-1">
+          <div className="text-sm text-gray-500 pt-1">
             VAS Score: {session.vas_score}/10 · Modalities: {session.modalities.join(', ') || 'None'}
           </div>
         </div>
 
         {errorMessage && (
-          <div className="p-3 rounded-lg bg-red-50 border border-red-200 text-xs text-red-800">
+          <div role="alert" className="p-3 rounded-lg bg-red-50 border border-red-200 text-xs text-red-800">
             {errorMessage}
           </div>
         )}
@@ -108,7 +96,7 @@ export function SessionAddendumModal({ session, onClose, onSuccess }: SessionAdd
           </div>
         </form>
       </div>
-    </div>
+    </Modal>
   )
 }
 
