@@ -2,13 +2,13 @@
 
 **Product direction: v3.0 centralized offline LAN web platform.**
 
-> Status: The current main branch contains the earlier PySide6 + SQLite single-workstation desktop application. The v3 React + FastAPI + PostgreSQL platform is the target architecture and has not yet been implemented. Do not deploy or describe the legacy desktop application as the v3 LAN system.
+> Status: The v3 React + FastAPI + PostgreSQL platform is implemented in `frontend/` and `backend/`. It is not yet accepted for live hospital use: client decisions are still open (see `DECISIONS.md` and `docs/admin-panel-gap-report.md`). The earlier PySide6 + SQLite desktop application in `app/` is kept for reference only; do not deploy or describe it as the v3 LAN system.
 
 ## Product goal
 
 Shared patient records for reception and doctors across 3–5 PCs on the hospital LAN without internet dependency. One central server owns authentication, permissions, records, files, clinical history, payments, audit and backups.
 
-## Target stack
+## Stack
 
 - React + TypeScript frontend
 - Python FastAPI backend

@@ -175,7 +175,7 @@ function LedgerSection() {
       )}
       {data && data.length === 0 && <p className="mt-3 text-sm text-slate-700">No payments match this search.</p>}
       {data && data.length > 0 && (
-        <div className="mt-3 overflow-x-auto">
+        <div className="relative mt-3 overflow-x-auto">
           <table className="w-full">
             <thead className="border-b border-slate-200 bg-slate-50">
               <tr>

@@ -35,6 +35,61 @@ def _consultation_fee_version_column(owner_engine: Engine) -> tuple[str, str | N
     return (str(row.is_nullable), row.column_default)
 
 
+def _table_exists(owner_engine: Engine, table: str) -> bool:
+    with owner_engine.connect() as conn:
+        return (
+            conn.execute(text("SELECT to_regclass(:name)"), {"name": f"public.{table}"}).scalar()
+            is not None
+        )
+
+
+def test_0007_admin_settings_up_down(
+    test_settings: Settings, owner_engine: Engine, app_engine: Engine
+) -> None:
+    """0007 adds settings tables that change nothing until used, and downgrades cleanly."""
+    cfg = alembic_config(test_settings.owner_url)
+    tables = ("security_settings", "backup_settings", "backup_runs")
+
+    with app_engine.connect() as conn:
+        overrides = conn.execute(
+            text(
+                "SELECT session_idle_minutes, lockout_threshold, password_min_length "
+                "FROM security_settings WHERE id = 1"
+            )
+        ).one()
+        schedule = conn.execute(
+            text("SELECT schedule_enabled, retention_count FROM backup_settings WHERE id = 1")
+        ).one()
+    assert tuple(overrides) == (None, None, None)
+    assert tuple(schedule) == (False, None)
+
+    try:
+        command.downgrade(cfg, "0006")
+        assert not any(_table_exists(owner_engine, table) for table in tables)
+    finally:
+        command.upgrade(cfg, "head")
+    assert all(_table_exists(owner_engine, table) for table in tables)
+
+    # The runtime role can never delete a singleton or a run record
+    with app_engine.connect() as conn:
+        for table, expected in (
+            ("security_settings", {"SELECT", "UPDATE"}),
+            ("backup_settings", {"SELECT", "UPDATE"}),
+            ("backup_runs", {"SELECT", "INSERT", "UPDATE"}),
+        ):
+            privileges = {
+                row[0]
+                for row in conn.execute(
+                    text(
+                        "SELECT privilege_type FROM information_schema.role_table_grants "
+                        "WHERE grantee = 'kalyan_app' AND table_name = :table"
+                    ),
+                    {"table": table},
+                )
+            }
+            assert privileges == expected, table
+
+
 def test_0006_consultation_fee_version_column_up_down(
     test_settings: Settings, owner_engine: Engine, app_engine: Engine
 ) -> None:

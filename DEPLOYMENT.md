@@ -73,12 +73,15 @@ UPS is strongly recommended; software cannot guarantee recovery from failing har
 
 ## 7. Backup operations
 
-- Schedule database + patient-file backup.
-- Write to second physical drive.
-- Verify checksums after each run.
-- Show last successful verified backup and failure state to Admin.
-- Retain backups according to client-approved schedule.
+- Register the scheduled task once, as administrator: `powershell -ExecutionPolicy Bypass -File deploy\register-backup-task.ps1`. It runs every 15 minutes and does nothing until the schedule is enabled.
+- List approved second-drive folders in `KALYAN_BACKUP_DESTINATIONS` in `backend/.env` (JSON list), then restart the server. Administrators can only choose from this list.
+- Set frequency, time, second copy and retention in Admin > Backup & Restore, using the client-approved schedule.
+- Each run verifies the archive checksum, and the second copy is compared with the original before it counts.
+- Retention deletes only scheduled archives, permanently. Manual and pre-restore archives are never deleted.
+- Admin > System Health and the dashboard show a missed schedule, for example if the task was never registered.
 - Perform clean-machine restore drill before handover and periodically thereafter.
+
+Never run the test suite on the hospital server. The suite creates and destroys data; it is isolated from the database in `backend/.env`, but it does not belong on a live system.
 
 ## 8. Handover checklist
 

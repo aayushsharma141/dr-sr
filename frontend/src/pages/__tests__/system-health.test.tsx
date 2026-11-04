@@ -42,6 +42,11 @@ const STATUS: SystemStatusOut = {
   uptime_seconds: 7200,
   storage: [{ label: 'backups', path_label: 'E:\\backups', total_bytes: 1000, free_bytes: 250 }],
   frontend_served: true,
+  checks: [
+    { key: 'photos', label: 'Patient photos folder', status: 'ok', detail: 'Server can write here.' },
+    { key: 'backup_schedule', label: 'Backup schedule', status: 'not_configured', detail: 'Scheduled backups are off.' },
+    { key: 'backups', label: 'Backup folder', status: 'error', detail: 'Folder not found.' },
+  ],
 }
 
 function renderPage() {
@@ -72,6 +77,10 @@ describe('SystemHealthPage', () => {
     expect(screen.getByText('E:\\backups')).toBeInTheDocument()
     expect(screen.getByText('75% used')).toBeInTheDocument()
     expect(screen.getByText(/matches the code head revision/)).toBeInTheDocument()
+    expect(screen.getByText('Backup folder')).toBeInTheDocument()
+    expect(screen.getByText('Folder not found.')).toBeInTheDocument()
+    expect(screen.getByText('Problem')).toBeInTheDocument()
+    expect(screen.getByText('Off')).toBeInTheDocument()
   })
 
   it('warns when the database schema revision differs from the code head', () => {

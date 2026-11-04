@@ -1,5 +1,7 @@
 # Kalyan Hospital — Admin Panel expansion: gap report
 
+> Superseded in part by `docs/admin-panel-p0-evidence.md`, which covers the P0 sprint: editable security policy, backup scheduling and retention, the reversal screen, and the test isolation fix.
+
 Status date: 2026-11-04. Branch `chore/repo-audit-hardening`. Changes are **uncommitted** in the working tree.
 
 ## Verification status

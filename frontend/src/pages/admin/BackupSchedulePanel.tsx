@@ -237,6 +237,12 @@ export function BackupSchedulePanel() {
   const settings = useBackupSettings()
   const runs = useBackupRuns()
   const data = settings.data
+  const [formKey, setFormKey] = useState(0)
+
+  const reload = async () => {
+    await settings.refetch()
+    setFormKey((k) => k + 1)
+  }
 
   return (
     <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-xs" aria-labelledby="backup-schedule-heading">
@@ -262,9 +268,9 @@ export function BackupSchedulePanel() {
           )}
           {data.next_run_at && <p className="mt-3 text-sm text-slate-800">Next run: {formatIst(data.next_run_at)} IST</p>}
           <ScheduleForm
-            key={data.version_id}
+            key={formKey}
             settings={data}
-            onReload={() => void settings.refetch()}
+            onReload={() => void reload()}
             isReloading={settings.isFetching}
           />
         </>

@@ -2,6 +2,7 @@ import { cleanup, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { MemoryRouter } from 'react-router'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { AppShell } from '../AppShell'
 
 vi.mock('../../api/queries', () => ({
@@ -13,11 +14,13 @@ vi.mock('../../api/queries', () => ({
 
 function renderShell(role: 'ADMIN' | 'RECEPTION' | 'DOCTOR', route = '/') {
   return render(
+    <QueryClientProvider client={new QueryClient()}>
     <MemoryRouter initialEntries={[route]}>
       <AppShell name="Test User" role={role}>
         <div>Workspace content</div>
       </AppShell>
-    </MemoryRouter>,
+    </MemoryRouter>
+    </QueryClientProvider>,
   )
 }
 

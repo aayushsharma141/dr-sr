@@ -22,6 +22,9 @@ const mockSettings: ClinicSettingsOut = {
   id: 1,
   name_en: 'Kalyan Hospital',
   name_hi: 'कल्याण अस्पताल',
+  trust_name_en: 'Sri Vashishtha Kalyan Trust',
+  trust_name_hi: null,
+  location_line: 'Ara, Bhojpur, Bihar',
   address_1: 'Station Road, Ara, Bhojpur',
   address_2: 'Near Railway Station',
   phone: '06182234567',
@@ -308,7 +311,7 @@ describe('Clinic Settings Page', () => {
     )
     expect(screen.getByLabelText(/Clinic Name \(Hindi\)/i)).toHaveAttribute('lang', 'hi')
     expect(screen.getByLabelText(/Print Footer \(Hindi\)/i)).toHaveAttribute('lang', 'hi')
-    expect(screen.getByText(/Print header \(English and Hindi\): not printed on any document yet/i)).toBeInTheDocument()
+    expect(screen.getByText(/Print header \(English and Hindi\): prescriptions, registration cards and receipts/i)).toBeInTheDocument()
   })
 
   it('describes receipt cycles by period with the real RCP number format', async () => {

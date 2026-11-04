@@ -286,10 +286,8 @@ describe('BillingAdminPage', () => {
     await waitFor(() => expect(requests.some((r) => r.url.includes('q=Asha'))).toBe(true))
 
     await user.click(await screen.findByRole('button', { name: 'Reverse receipt RCP-2026-2027-0041' }))
-    await user.type(await screen.findByRole('textbox', { name: /reason/i }), 'Duplicate entry')
-    const confirm = screen.getAllByRole('button').find((b) => /confirm|reverse payment/i.test(b.textContent ?? ''))
-    expect(confirm).toBeDefined()
-    await user.click(confirm as HTMLElement)
+    await user.type(await screen.findByLabelText(/justification/i), 'Duplicate entry')
+    await user.click(screen.getByRole('button', { name: 'Confirm Reversal' }))
 
     await waitFor(() => expect(requests.some((r) => r.url.includes('/payments/9/reverse'))).toBe(true))
     expect(requests.find((r) => r.url.includes('/reverse'))?.body).toEqual({ reversal_reason: 'Duplicate entry' })

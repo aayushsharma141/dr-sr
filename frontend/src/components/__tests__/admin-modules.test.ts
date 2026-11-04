@@ -52,10 +52,10 @@ describe('admin module registry', () => {
     expect(findAdminModuleForPath('/administer')).toBeNull()
   })
 
-  it('cross-reference modules own no admin page of their own', () => {
+  it('billing has its own page and print settings stay a cross-reference', () => {
     const billing = ADMIN_MODULES.find((m) => m.number === '06')!
     const print = ADMIN_MODULES.find((m) => m.number === '08')!
-    expect(ownedAdminPaths(billing)).toEqual(['/reception/dues'])
+    expect(ownedAdminPaths(billing)).toEqual(['/admin/billing', '/reception/dues'])
     expect(ownedAdminPaths(print)).toEqual([])
   })
 })

@@ -29,7 +29,18 @@ def test_deploy_scripts_exist_and_executable():
     assert (deploy_dir / "register-autostart.ps1").exists()
     assert (deploy_dir / "unregister-autostart.ps1").exists()
     assert (deploy_dir / "health-check.ps1").exists()
+    assert (deploy_dir / "register-backup-task.ps1").exists()
+    assert (deploy_dir / "unregister-backup-task.ps1").exists()
     assert (deploy_dir / ".env.production.template").exists()
+
+
+def test_backup_task_runs_the_scheduled_cli_command():
+    """The Windows task must call a command the CLI actually defines."""
+    from kalyan_api.cli import build_parser
+
+    script = (HEALTH_SCRIPT.parent / "register-backup-task.ps1").read_text(encoding="utf-8")
+    assert "-m kalyan_api.cli backup-run-scheduled" in script
+    assert build_parser().parse_args(["backup-run-scheduled"]).command == "backup-run-scheduled"
 
 
 def test_production_env_template_configuration():
