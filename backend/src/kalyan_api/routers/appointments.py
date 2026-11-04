@@ -16,7 +16,7 @@ from kalyan_api.core.principal import (
     get_current_settings,
 )
 from kalyan_api.db.session import SessionDep
-from kalyan_api.models import Appointment, AppointmentStatus, Doctor, Patient
+from kalyan_api.models import Appointment, AppointmentStatus, Department, Doctor, Patient
 from kalyan_api.schemas.appointments import (
     AppointmentCreate,
     AppointmentListResponse,
@@ -88,12 +88,21 @@ def book_appointment(
             message="Doctor not found or inactive.",
         )
 
-    # 3. Generate sequential token for (doctor_id, appointment_date)
+    # 3. Verify that the selected doctor belongs to the requested active department.
+    department = session.get(Department, payload.department_id)
+    if department is None or not department.is_active or department not in doctor.departments:
+        raise ApiError(
+            status_code=422,
+            code="doctor_department_mismatch",
+            message="Selected doctor is not assigned to the selected department.",
+        )
+
+    # 4. Generate sequential token for (doctor_id, appointment_date)
     token_num = token_service.generate_next_daily_token(
         session, payload.doctor_id, payload.appointment_date
     )
 
-    # 4. Create appointment
+    # 5. Create appointment
     appt = Appointment(
         patient_id=payload.patient_id,
         doctor_id=payload.doctor_id,
@@ -118,6 +127,7 @@ def book_appointment(
             "patient_id": appt.patient_id,
             "patient_urn": patient.urn,
             "doctor_id": appt.doctor_id,
+            "department_id": payload.department_id,
             "appointment_date": appt.appointment_date.isoformat(),
             "token_number": appt.token_number,
             "status": appt.status,
