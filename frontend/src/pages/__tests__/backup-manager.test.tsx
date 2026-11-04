@@ -57,7 +57,7 @@ describe('BackupManagerPage', () => {
       </QueryClientProvider>
     )
 
-    expect(screen.getByText('Backup & Recovery Manager')).toBeInTheDocument()
+    expect(screen.getByText('Backup & Recovery')).toBeInTheDocument()
     expect(screen.getByText('kalyan_backup_20261102_100000.tar.gz')).toBeInTheDocument()
     expect(screen.getByText('✓ Cryptographically Verified')).toBeInTheDocument()
     expect(screen.getByText('1.00 MB')).toBeInTheDocument()
