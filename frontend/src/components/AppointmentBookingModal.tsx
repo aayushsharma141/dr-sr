@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Modal } from './Modal'
 import { useDepartments, useDepartmentDoctors, usePatients, useBookAppointment } from '../api/queries'
 import type { PatientOut, DepartmentDoctorOut } from '../api/types'
 
@@ -83,18 +84,14 @@ export function AppointmentBookingModal({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div className="bg-white rounded-lg shadow-xl max-w-lg w-full p-6 space-y-6">
-        <div className="flex justify-between items-center border-b pb-3">
-          <h3 className="text-lg font-bold text-neutral-900">Book New Appointment</h3>
-          <button
-            onClick={handleClose}
-            className="text-neutral-500 hover:text-neutral-800 text-xl font-bold"
-          >
-            &times;
-          </button>
-        </div>
-
+    <Modal
+      open
+      onClose={handleClose}
+      title="Book New Appointment"
+      busy={bookMutation.isPending}
+      className="max-w-lg"
+    >
+      <div className="space-y-6">
         {allocatedToken !== null ? (
           <div className="space-y-4 text-center py-4">
             <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-green-100 text-green-800 mb-2">
@@ -153,6 +150,7 @@ export function AppointmentBookingModal({
               ) : (
                 <div className="space-y-2">
                   <input
+                    data-autofocus
                     type="text"
                     value={patientSearch}
                     onChange={(e) => setPatientSearch(e.target.value)}
@@ -277,6 +275,6 @@ export function AppointmentBookingModal({
           </form>
         )}
       </div>
-    </div>
+    </Modal>
   )
 }

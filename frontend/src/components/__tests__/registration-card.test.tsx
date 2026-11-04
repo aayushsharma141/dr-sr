@@ -45,34 +45,75 @@ const mockSettings: ClinicSettingsOut = {
 }
 
 describe('RegistrationCard Component', () => {
-  it('renders bilingual clinic header and patient URN', () => {
+  it('renders the approved letterhead with clinic name and patient URN', () => {
     render(<RegistrationCard patient={mockPatient} settings={mockSettings} />)
 
     expect(screen.getByText('Kalyan Hospital & Research Centre')).toBeInTheDocument()
-    expect(screen.getByText('कल्याण अस्पताल एवं शोध केंद्र')).toBeInTheDocument()
+    expect(screen.getByText(/physiotherapy department/i)).toBeInTheDocument()
+    expect(screen.getByText('Dr. Madan Mohan Dwivedi')).toBeInTheDocument()
+    expect(screen.getByText('Dr. Chandan Kr. Dwivedi')).toBeInTheDocument()
+    expect(screen.getByAltText('Caduceus emblem')).toBeInTheDocument()
     expect(screen.getByText('KH-2026-0001')).toBeInTheDocument()
+    expect(screen.getByText('RECORD #KH-2026-0001')).toBeInTheDocument()
   })
 
-  it('renders demographics table, barcode SVG, and allergies alert', () => {
+  it('fills the ruled patient strip and the numbered fields from the record', () => {
     render(<RegistrationCard patient={mockPatient} settings={mockSettings} />)
 
-    expect(screen.getByText('Aarav Kumar')).toBeInTheDocument()
+    // Name, age/sex and address appear in both the strip and the numbered fields.
+    expect(screen.getAllByText('Aarav Kumar')).toHaveLength(2)
+    expect(screen.getAllByText('30 Years / Male')).toHaveLength(2)
+    expect(screen.getAllByText(/Main Bazaar, Ara, Bhojpur, Bihar/i)).toHaveLength(2)
     expect(screen.getByText('Suresh Kumar')).toBeInTheDocument()
-    expect(screen.getByText('30 Years / Male')).toBeInTheDocument()
     expect(screen.getByText('9876543210')).toBeInTheDocument()
-    expect(screen.getByText(/Main Bazaar, Ara, Bhojpur, Bihar/i)).toBeInTheDocument()
     expect(screen.getByText('Penicillin allergy')).toBeInTheDocument()
     expect(screen.getByText(/Needs wheelchair assistance/i)).toBeInTheDocument()
-
-    // Barcode SVG check
-    expect(screen.getByLabelText('Barcode for KH-2026-0001')).toBeInTheDocument()
   })
 
-  it('renders dual signature block for patient and authorized signatory', () => {
+  it('leaves the visit and payment fields as lines to write on', () => {
+    render(<RegistrationCard patient={mockPatient} settings={mockSettings} />)
+
+    for (const label of [
+      /7\. Patient In/,
+      /8\. Patient Out/,
+      /9\. Reference \/ Referred By/,
+      /10\. Patient Condition/,
+      /11\. No\. of Sessions/,
+      /12\. Payment Details/,
+    ]) {
+      expect(screen.getByText(label)).toBeInTheDocument()
+    }
+    expect(screen.getByText(/Consulting Doctor/)).toBeInTheDocument()
+  })
+
+  it('renders dual signature block and the clinic address footer', () => {
     render(<RegistrationCard patient={mockPatient} settings={mockSettings} />)
 
     expect(screen.getByText('Patient / Attendant Signature')).toBeInTheDocument()
     expect(screen.getByText('मरीज / परिचारक के हस्ताक्षर')).toBeInTheDocument()
     expect(screen.getByText('Authorized Signatory / Receptionist')).toBeInTheDocument()
+    expect(screen.getByTestId('letterhead-footer')).toHaveTextContent('Station Road, Ara')
+  })
+
+  it('prints the configured first address when the optional second address is blank', () => {
+    const settings = { ...mockSettings, address_2: '' }
+    render(<RegistrationCard patient={mockPatient} settings={settings} />)
+    const footer = screen.getByTestId('letterhead-footer')
+    expect(footer).toHaveTextContent('Station Road, Ara')
+    expect(footer).not.toHaveTextContent('नवादा थाना')
+    expect(footer).not.toHaveTextContent('श्रीरामपुर रोड')
+  })
+
+  it('falls back to the standard clinic addresses when settings have none', () => {
+    render(<RegistrationCard patient={mockPatient} settings={null} />)
+
+    expect(screen.getByText('Kalyan Hospital')).toBeInTheDocument()
+    expect(screen.getByTestId('letterhead-footer')).toHaveTextContent('नवादा थाना')
+  })
+
+  it('shows the stored photo when the patient has one', () => {
+    render(<RegistrationCard patient={{ ...mockPatient, photo_path: 'p.jpg' }} settings={mockSettings} />)
+
+    expect(screen.getByAltText('Patient photo')).toHaveAttribute('src', '/api/patients/1/photo')
   })
 })

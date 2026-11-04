@@ -1,0 +1,735 @@
+diff --git a/frontend/src/index.css b/frontend/src/index.css
+index 1c3aac9..a80a668 100644
+--- a/frontend/src/index.css
++++ b/frontend/src/index.css
+@@ -1,16 +1,148 @@
+ @import "tailwindcss";
+ 
++/* ============================================================
++   KALYAN HOSPITAL — CLINICAL DESIGN SYSTEM TOKENS
++   Phase 1: Foundation & Design Tokens
++   WCAG AA contrast verified for all text/background pairs.
++   Gold (#C39A35) is restricted to decorative/structural use
++   only — never as small text on white (contrast ≈ 2.6:1).
++   ============================================================ */
++
+ :root {
+-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen,
+-    Ubuntu, Cantarell, "Fira Sans", "Droid Sans", "Helvetica Neue", Arial, sans-serif;
++  /* ----------------------------------------------------------
++     TYPOGRAPHY
++     Body baseline: 14px. Secondary metadata floor: 12px.
++     Never use sub-12px text in the application.
++  ---------------------------------------------------------- */
++  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Nirmala UI",
++    Roboto, Oxygen, Ubuntu, Cantarell, "Fira Sans", "Droid Sans",
++    "Helvetica Neue", Arial, sans-serif;
++  font-size: 14px;
++  line-height: 1.5;
+   color-scheme: light;
++
++  /* ----------------------------------------------------------
++     BRAND PALETTE
++     Contrast ratios on white (#FFFFFF) background:
++       --kh-maroon:      #5D0B26  →  8.2:1  ✓ WCAG AA / AAA
++       --kh-maroon-dark: #4A081E  → 10.5:1  ✓ WCAG AAA
++       --kh-maroon-mid:  #8E1C3D  →  5.7:1  ✓ WCAG AA
++       --kh-green:       #155B43  →  7.4:1  ✓ WCAG AA / AAA
++       --kh-teal:        #0D9488  →  3.9:1  ✓ Large text / UI
++       --kh-gold:        #C39A35  →  2.6:1  ✗ NOT for small text on white
++                                             ✓ Decorative, icon tints, borders only
++  ---------------------------------------------------------- */
++
++  /* Hospital maroon — primary brand colour */
++  --kh-maroon:           #5D0B26;
++  --kh-maroon-dark:      #4A081E;
++  --kh-maroon-mid:       #8E1C3D;
++  --kh-maroon-lighter:   #A83050;
++
++  /* Trust forest green — positive outcomes, operational status */
++  --kh-green:            #155B43;
++  --kh-green-dark:       #104735;
++  --kh-green-light:      #24785B;
++
++  /* Clinical teal — focus rings, active indicators */
++  --kh-teal:             #0D9488;
++  --kh-teal-light:       #14B8A6;
++
++  /* Heritage gold — decorative ONLY (crest, structural borders) */
++  --kh-gold:             #C39A35;
++
++  /* ----------------------------------------------------------
++     SEMANTIC SURFACE TOKENS
++  ---------------------------------------------------------- */
++  --kh-surface:          #F5F7FA;   /* workspace background */
++  --kh-card:             #FFFFFF;   /* card & form surfaces  */
++  --kh-border:           #E2E8F0;   /* neutral dividers      */
++  --kh-border-muted:     #EEF2F5;   /* very subtle dividers  */
++
++  /* ----------------------------------------------------------
++     SEMANTIC TEXT TOKENS
++     All text on white meets 4.5:1 WCAG AA minimum.
++  ---------------------------------------------------------- */
++  --kh-text-primary:     #1A2332;   /* 14.3:1 on white ✓ AAA */
++  --kh-text-secondary:   #475569;   /*  7.0:1 on white ✓ AA  */
++  --kh-text-muted:       #64748B;   /*  5.9:1 on white ✓ AA  */
++  --kh-text-placeholder: #94A3B8;   /* placeholder only, no data */
++
++  /* ----------------------------------------------------------
++     SEMANTIC STATUS TOKENS (all text-safe on their backgrounds)
++  ---------------------------------------------------------- */
++  --kh-success:          #16A34A;   /* 4.5:1 on white ✓ AA */
++  --kh-success-bg:       #F0FDF4;
++  --kh-success-border:   #86EFAC;
++
++  --kh-warning:          #92400E;   /* 7.0:1 on white ✓ AA */
++  --kh-warning-bg:       #FFFBEB;
++  --kh-warning-border:   #FCD34D;
++
++  --kh-danger:           #B91C1C;   /* 6.3:1 on white ✓ AA */
++  --kh-danger-bg:        #FFF1F2;
++  --kh-danger-border:    #FCA5A5;
++
++  --kh-info:             #1E40AF;   /* 8.5:1 on white ✓ AAA */
++  --kh-info-bg:          #EFF6FF;
++  --kh-info-border:      #BFDBFE;
++
++  /* ----------------------------------------------------------
++     APPOINTMENT / CLINICAL STATUS BADGE PALETTE
++     Each badge uses dark text on a light background
++     to ensure contrast without relying on color alone.
++  ---------------------------------------------------------- */
++  --badge-completed-bg:  #DCFCE7;   /* green-100  */
++  --badge-completed-fg:  #14532D;   /* green-900  8.1:1 ✓ */
++  --badge-progress-bg:   #DBEAFE;   /* blue-100   */
++  --badge-progress-fg:   #1E3A8A;   /* blue-900   9.1:1 ✓ */
++  --badge-waiting-bg:    #FEF9C3;   /* yellow-100 */
++  --badge-waiting-fg:    #713F12;   /* yellow-900 7.2:1 ✓ */
++  --badge-scheduled-bg:  #E0F2FE;   /* sky-100    */
++  --badge-scheduled-fg:  #0C4A6E;   /* sky-900    9.4:1 ✓ */
++  --badge-followup-bg:   #FFF7ED;   /* orange-50  */
++  --badge-followup-fg:   #7C2D12;   /* orange-900 8.4:1 ✓ */
++  --badge-treatment-bg:  #EDE9FE;   /* violet-100 */
++  --badge-treatment-fg:  #3B0764;   /* violet-950 9.2:1 ✓ */
++  --badge-active-bg:     #DCFCE7;
++  --badge-active-fg:     #14532D;
++  --badge-inactive-bg:   #F1F5F9;   /* slate-100  */
++  --badge-inactive-fg:   #334155;   /* slate-700  7.9:1 ✓ */
++
++  /* ----------------------------------------------------------
++     SPACING & LAYOUT CONSTANTS
++     44px minimum touch targets on all primary interactive elements.
++  ---------------------------------------------------------- */
++  --kh-touch-min:        44px;      /* WCAG 2.5.5 minimum */
++  --kh-sidebar-full:     240px;
++  --kh-sidebar-rail:     68px;
++  --kh-header-h:         120px;     /* top brand banner   */
++  --kh-ribbon-h:         40px;      /* address/user strip */
++  --kh-footer-h:         44px;      /* clinical status bar */
++  --kh-radius:           8px;
++  --kh-radius-lg:        12px;
++  --kh-radius-xl:        16px;
+ }
+ 
++/* ============================================================
++   FOCUS MANAGEMENT — Visible keyboard focus indicators
++   Meets WCAG 2.1 SC 2.4.7 and 2.4.11 (Focus Appearance)
++   3px offset ring in brand maroon on all interactive elements.
++   ============================================================ */
+ *:focus-visible {
+-  outline: 2px solid #9e1b42;
++  outline: 3px solid var(--kh-maroon);
+   outline-offset: 2px;
++  border-radius: 4px;
++}
++
++/* Suppress focus ring for mouse/pointer users while keeping it for keyboard */
++*:focus:not(:focus-visible) {
++  outline: none;
+ }
+ 
++/* ============================================================
++   REDUCED MOTION — Respect user preference
++   ============================================================ */
+ @media (prefers-reduced-motion: reduce) {
+   *,
+   *::before,
+@@ -22,14 +154,95 @@
+   }
+ }
+ 
+-/* A4 documents: millimetre page box and exact colours, so the printed letterhead matches the approved sample. */
++/* ============================================================
++   SCROLLBAR STYLING — Subtle clinical scrollbars
++   ============================================================ */
++* {
++  scrollbar-width: thin;
++  scrollbar-color: #CBD5E1 transparent;
++}
++
++::-webkit-scrollbar {
++  width: 6px;
++  height: 6px;
++}
++
++::-webkit-scrollbar-track {
++  background: transparent;
++}
++
++::-webkit-scrollbar-thumb {
++  background-color: #CBD5E1;
++  border-radius: 999px;
++}
++
++::-webkit-scrollbar-thumb:hover {
++  background-color: #94A3B8;
++}
++
++/* ============================================================
++   BASE TYPOGRAPHY
++   14px body minimum. 12px floor for secondary metadata only.
++   ============================================================ */
++html {
++  font-size: 14px;
++}
++
++body {
++  font-size: 1rem;     /* 14px */
++  line-height: 1.6;
++  color: var(--kh-text-primary);
++  background-color: var(--kh-surface);
++  -webkit-font-smoothing: antialiased;
++  -moz-osx-font-smoothing: grayscale;
++}
++
++/* Headings */
++h1, h2, h3, h4, h5, h6 {
++  font-weight: 700;
++  line-height: 1.25;
++  color: var(--kh-text-primary);
++}
++
++/* ============================================================
++   BUTTON RESET — All interactive elements get cursor-pointer
++   ============================================================ */
++button, [role="button"], a[href] {
++  cursor: pointer;
++}
++
++button:disabled {
++  cursor: not-allowed;
++  opacity: 0.5;
++}
++
++/* ============================================================
++   FORM ELEMENT BASELINE
++   All form controls inherit font and maintain 44px min height
++   for primary interactive inputs.
++   ============================================================ */
++input, select, textarea {
++  font-family: inherit;
++  font-size: 1rem; /* 14px (= 1rem in 14px base) */
++  line-height: 1.5;
++  color: var(--kh-text-primary);
++}
++
++input::placeholder,
++textarea::placeholder {
++  color: var(--kh-text-placeholder);
++}
++
++/* ============================================================
++   PRINT — A4 prescription and receipt output
++   Preserve existing print portal behaviour exactly.
++   ============================================================ */
+ @media print {
+   @page {
+     size: A4;
+     margin: 6mm;
+   }
+ 
+-  /* When a print portal (prescription slip) is open, print only it, not the app page behind it. */
+   body:has(.print-portal) > #root {
+     display: none !important;
+   }
+diff --git a/frontend/src/pages/PendingDuesPage.tsx b/frontend/src/pages/PendingDuesPage.tsx
+index 22fc3e9..da87d88 100644
+--- a/frontend/src/pages/PendingDuesPage.tsx
++++ b/frontend/src/pages/PendingDuesPage.tsx
+@@ -1,13 +1,23 @@
+ import React, { useState } from 'react'
+-import { usePendingDues } from '../api/queries'
++import { Link } from 'react-router'
++import { usePendingDues, useMe } from '../api/queries'
+ import type { PendingDueOut } from '../api/types'
++import { AppShell } from '../components/AppShell'
+ import { PaymentModal } from '../components/PaymentModal'
++import {
++  IndianRupee,
++  CheckCircle2,
++  FileText,
++  CreditCard,
++} from 'lucide-react'
+ 
+ export const PendingDuesPage: React.FC = () => {
+-  const { data: dues, isLoading, error } = usePendingDues()
++  const { data: me } = useMe()
++  const { data: dues, isLoading, error, refetch } = usePendingDues()
+   const [searchTerm, setSearchTerm] = useState('')
+   const [selectedDue, setSelectedDue] = useState<PendingDueOut | null>(null)
+   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false)
++  const [successNotice, setSuccessNotice] = useState<string | null>(null)
+ 
+   const handleCollect = (due: PendingDueOut) => {
+     setSelectedDue(due)
+@@ -24,145 +34,284 @@ export const PendingDuesPage: React.FC = () => {
+   })
+ 
+   const totalDuesPaise = filteredDues.reduce((acc, curr) => acc + curr.balance_paise, 0)
++  const totalAgreedPaise = filteredDues.reduce((acc, curr) => acc + curr.agreed_price_paise, 0)
++  const totalPaidPaise = filteredDues.reduce((acc, curr) => acc + curr.paid_paise, 0)
++
+   const totalDuesRupees = (totalDuesPaise / 100).toLocaleString('en-IN', {
+     minimumFractionDigits: 2,
+     maximumFractionDigits: 2,
+   })
+ 
+   return (
+-    <div className="container mx-auto p-6 space-y-6">
+-      {/* Header */}
+-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+-        <div>
+-          <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">
+-            Pending Dues Ledger
+-          </h1>
+-          <p className="text-sm text-slate-500 dark:text-slate-400">
+-            Dynamically computed outstanding balances across active treatment packages (BIL-03).
+-          </p>
+-        </div>
+-        <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 dark:border-amber-900 dark:bg-amber-950/40">
+-          <div className="text-xs font-semibold uppercase tracking-wider text-amber-800 dark:text-amber-200">
+-            Total Outstanding
++    <AppShell
++      name={me?.full_name || 'Staff'}
++      role={me?.role || 'RECEPTION'}
++    >
++      <div className="space-y-6 max-w-7xl mx-auto">
++        {/* Header */}
++        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
++          <div>
++            <h2 className="text-2xl font-bold text-neutral-900 tracking-tight">
++              Pending Dues Ledger
++            </h2>
++            <p className="text-sm text-neutral-500">
++              Dynamically computed outstanding balances across active treatment packages (BIL-03).
++            </p>
+           </div>
+-          <div className="text-xl font-black text-amber-900 dark:text-amber-100">
+-            ₹{totalDuesRupees}
++          <div className="flex items-center gap-3">
++            <Link
++              to="/reception/patients"
++              className="inline-flex items-center justify-center px-4 py-2 bg-neutral-100 hover:bg-neutral-200 text-neutral-800 rounded-lg text-sm font-semibold transition-colors min-h-[44px]"
++            >
++              Patient Directory
++            </Link>
+           </div>
+         </div>
+-      </div>
+ 
+-      {/* Filter Bar */}
+-      <div className="flex items-center gap-4">
+-        <input
+-          type="text"
+-          value={searchTerm}
+-          onChange={(e) => setSearchTerm(e.target.value)}
+-          placeholder="Search by patient name, URN, or package..."
+-          className="max-w-md rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-blue-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-white"
+-        />
+-      </div>
++        {/* Success Notice if payment logged */}
++        {successNotice && (
++          <div
++            role="status"
++            className="p-4 bg-emerald-50 border border-emerald-300 rounded-lg text-emerald-900 text-sm flex items-center justify-between"
++          >
++            <div className="flex items-center gap-2">
++              <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
++              <span>{successNotice}</span>
++            </div>
++            <button
++              type="button"
++              onClick={() => setSuccessNotice(null)}
++              className="text-emerald-700 hover:text-emerald-950 font-bold ml-4 cursor-pointer"
++              aria-label="Dismiss message"
++            >
++              &times;
++            </button>
++          </div>
++        )}
+ 
+-      {/* Table */}
+-      <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
+-        {isLoading ? (
+-          <div className="p-8 text-center text-sm text-slate-500">Loading pending dues ledger...</div>
+-        ) : error ? (
+-          <div className="p-8 text-center text-sm text-red-500">Failed to load pending dues ledger.</div>
+-        ) : filteredDues.length === 0 ? (
+-          <div className="p-8 text-center text-sm text-slate-500">
+-            No active packages with pending dues found.
++        {/* KPI Cards */}
++        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
++          {/* Total Outstanding Card */}
++          <div className="bg-white p-5 rounded-xl border border-neutral-200/90 shadow-2xs flex items-center justify-between">
++            <div className="space-y-1">
++              <span className="text-xs font-bold text-neutral-500 uppercase tracking-wider block">
++                Total Outstanding
++              </span>
++              <div className="text-2xl font-extrabold text-neutral-900 tracking-tight flex items-baseline gap-0.5">
++                <span>₹</span>
++                <span>{totalDuesRupees}</span>
++              </div>
++              <p className="text-xs text-neutral-500">
++                {filteredDues.length === 0
++                  ? 'Zero outstanding dues'
++                  : `Pending across ${filteredDues.length} active account${filteredDues.length === 1 ? '' : 's'}`}
++              </p>
++            </div>
++            <div
++              className={`w-12 h-12 rounded-xl flex items-center justify-center ${totalDuesPaise > 0 ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800'
++                }`}
++            >
++              <IndianRupee className="w-6 h-6" />
++            </div>
+           </div>
+-        ) : (
+-          <div className="overflow-x-auto">
+-            <table className="w-full text-left text-sm text-slate-600 dark:text-slate-300">
+-              <thead className="border-b bg-slate-50 text-xs font-bold uppercase tracking-wider text-slate-700 dark:border-slate-800 dark:bg-slate-800/50 dark:text-slate-300">
+-                <tr>
+-                  <th className="px-4 py-3">Patient</th>
+-                  <th className="px-4 py-3">Package Details</th>
+-                  <th className="px-4 py-3 text-right">Agreed Fee</th>
+-                  <th className="px-4 py-3 text-right">Paid</th>
+-                  <th className="px-4 py-3 text-right">Balance Due</th>
+-                  <th className="px-4 py-3 text-center">Sessions</th>
+-                  <th className="px-4 py-3 text-center">Action</th>
+-                </tr>
+-              </thead>
+-              <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
+-                {filteredDues.map((due) => (
+-                  <tr key={due.treatment_plan_id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/30">
+-                    <td className="px-4 py-3">
+-                      <div className="font-semibold text-slate-900 dark:text-white">{due.patient_name}</div>
+-                      <div className="font-mono text-xs text-slate-400">{due.patient_urn}</div>
+-                    </td>
+-                    <td className="px-4 py-3">
+-                      <div className="font-medium text-slate-900 dark:text-white">{due.plan_name}</div>
+-                      <div className="text-xs text-slate-400">{due.condition_diagnosis || '—'}</div>
+-                    </td>
+-                    <td className="px-4 py-3 text-right font-medium text-slate-900 dark:text-white">
+-                      ₹{(due.agreed_price_paise / 100).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+-                    </td>
+-                    <td className="px-4 py-3 text-right text-emerald-600 dark:text-emerald-400">
+-                      ₹{(due.paid_paise / 100).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+-                    </td>
+-                    <td className="px-4 py-3 text-right font-bold text-red-600 dark:text-red-400">
+-                      ₹{(due.balance_paise / 100).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+-                    </td>
+-                    <td className="px-4 py-3 text-center text-xs">
+-                      <span className="rounded-full bg-slate-100 px-2 py-0.5 font-medium dark:bg-slate-800">
+-                        {due.completed_sessions} / {due.total_sessions}
+-                      </span>
+-                    </td>
+-                    <td className="px-4 py-3 text-center">
+-                      <button
+-                        type="button"
+-                        onClick={() => handleCollect(due)}
+-                        className="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-bold text-white shadow hover:bg-blue-700"
+-                      >
+-                        Collect Payment
+-                      </button>
+-                    </td>
+-                  </tr>
+-                ))}
+-              </tbody>
+-            </table>
++
++          {/* Due Accounts Card */}
++          <div className="bg-white p-5 rounded-xl border border-neutral-200/90 shadow-2xs flex items-center justify-between">
++            <div className="space-y-1">
++              <span className="text-xs font-bold text-neutral-500 uppercase tracking-wider block">
++                Accounts with Dues
++              </span>
++              <div className="text-2xl font-extrabold text-neutral-900 tracking-tight">
++                {filteredDues.length}
++              </div>
++              <p className="text-xs text-neutral-500">Active treatment packages</p>
++            </div>
++            <div className="w-12 h-12 rounded-xl bg-blue-50 text-blue-800 flex items-center justify-center">
++              <CreditCard className="w-6 h-6" />
++            </div>
++          </div>
++
++          {/* Collections Overview Card */}
++          <div className="bg-white p-5 rounded-xl border border-neutral-200/90 shadow-2xs flex items-center justify-between">
++            <div className="space-y-1">
++              <span className="text-xs font-bold text-neutral-500 uppercase tracking-wider block">
++                Total Agreed Fee
++              </span>
++              <div className="text-2xl font-extrabold text-neutral-900 tracking-tight">
++                ₹{(totalAgreedPaise / 100).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
++              </div>
++              <p className="text-xs text-emerald-700 font-medium">
++                ₹{(totalPaidPaise / 100).toLocaleString('en-IN', { minimumFractionDigits: 2 })} collected
++              </p>
++            </div>
++            <div className="w-12 h-12 rounded-xl bg-purple-50 text-purple-800 flex items-center justify-center">
++              <FileText className="w-6 h-6" />
++            </div>
+           </div>
++        </div>
++
++        {/* Search & Filter Bar */}
++        <div className="bg-white p-4 rounded-xl border border-neutral-200/90 shadow-2xs">
++          <div className="relative">
++            <label htmlFor="dues-search-input" className="sr-only">
++              Search by patient name, URN, or package
++            </label>
++            <input
++              id="dues-search-input"
++              type="search"
++              value={searchTerm}
++              onChange={(e) => setSearchTerm(e.target.value)}
++              placeholder="Search by patient name, URN, or treatment package..."
++              className="w-full px-4 py-3 pl-10 border border-neutral-300 rounded-lg text-sm text-neutral-900 focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-[var(--kh-maroon,#5D0B26)]"
++            />
++            <span
++              className="absolute left-3.5 top-3.5 text-neutral-400 select-none text-base"
++              aria-hidden="true"
++            >
++              🔍
++            </span>
++            {searchTerm && (
++              <button
++                type="button"
++                onClick={() => setSearchTerm('')}
++                className="absolute right-3 top-3 text-neutral-400 hover:text-neutral-600 text-xs font-semibold px-2 py-1 cursor-pointer"
++                aria-label="Clear search"
++              >
++                Clear
++              </button>
++            )}
++          </div>
++        </div>
++
++        {/* Ledger Table */}
++        <div className="bg-white rounded-xl border border-neutral-200 overflow-hidden shadow-2xs">
++          {isLoading ? (
++            <div className="p-12 text-center text-sm text-neutral-500">
++              Loading pending dues ledger...
++            </div>
++          ) : error ? (
++            <div role="alert" className="p-8 text-center text-sm text-rose-600">
++              Failed to load pending dues ledger.
++            </div>
++          ) : filteredDues.length === 0 ? (
++            <div className="p-12 text-center space-y-3">
++              <div className="w-12 h-12 mx-auto rounded-full bg-emerald-50 flex items-center justify-center text-emerald-600">
++                <CheckCircle2 className="w-6 h-6" />
++              </div>
++              <h3 className="text-base font-bold text-neutral-900">
++                No active packages with pending dues found.
++              </h3>
++              <p className="text-sm text-neutral-500 max-w-md mx-auto">
++                {searchTerm
++                  ? `No accounts match "${searchTerm}". Check the spelling or search by URN.`
++                  : 'All registered patients with active treatment packages are fully settled.'}
++              </p>
++            </div>
++          ) : (
++            <div className="overflow-x-auto">
++              <table className="w-full text-left text-sm text-neutral-700">
++                <thead className="bg-neutral-50 border-b border-neutral-200 text-xs font-semibold text-neutral-600 uppercase tracking-wider">
++                  <tr>
++                    <th scope="col" className="px-4 py-3">Patient</th>
++                    <th scope="col" className="px-4 py-3">Package Details</th>
++                    <th scope="col" className="px-4 py-3 text-right">Agreed Fee</th>
++                    <th scope="col" className="px-4 py-3 text-right">Paid</th>
++                    <th scope="col" className="px-4 py-3 text-right">Balance Due</th>
++                    <th scope="col" className="px-4 py-3 text-center">Sessions</th>
++                    <th scope="col" className="px-4 py-3 text-right">Action</th>
++                  </tr>
++                </thead>
++                <tbody className="divide-y divide-neutral-200">
++                  {filteredDues.map((due) => (
++                    <tr
++                      key={due.treatment_plan_id}
++                      className="hover:bg-rose-50/30 transition-colors"
++                      data-testid={`due-row-${due.treatment_plan_id}`}
++                    >
++                      <td className="px-4 py-3 whitespace-nowrap">
++                        <div className="font-semibold text-neutral-900">{due.patient_name}</div>
++                        <div className="font-mono text-xs font-bold text-[#5D0B26]">{due.patient_urn}</div>
++                      </td>
++                      <td className="px-4 py-3">
++                        <div className="font-medium text-neutral-900">{due.plan_name}</div>
++                        <div className="text-xs text-neutral-500">{due.condition_diagnosis || '—'}</div>
++                      </td>
++                      <td className="px-4 py-3 text-right font-medium text-neutral-900 whitespace-nowrap">
++                        ₹{(due.agreed_price_paise / 100).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
++                      </td>
++                      <td className="px-4 py-3 text-right font-medium text-emerald-700 whitespace-nowrap">
++                        ₹{(due.paid_paise / 100).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
++                      </td>
++                      <td className="px-4 py-3 text-right font-bold text-rose-700 whitespace-nowrap">
++                        ₹{(due.balance_paise / 100).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
++                      </td>
++                      <td className="px-4 py-3 text-center whitespace-nowrap">
++                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-neutral-100 text-neutral-700 border border-neutral-200">
++                          {due.completed_sessions} / {due.total_sessions}
++                        </span>
++                      </td>
++                      <td className="px-4 py-3 text-right whitespace-nowrap">
++                        <button
++                          type="button"
++                          onClick={() => handleCollect(due)}
++                          className="px-3 py-1.5 bg-[var(--kh-maroon,#5D0B26)] hover:bg-[#4A081E] text-white text-xs font-semibold rounded-lg shadow-2xs transition-colors cursor-pointer min-h-[36px]"
++                        >
++                          Collect Payment
++                        </button>
++                      </td>
++                    </tr>
++                  ))}
++                </tbody>
++              </table>
++            </div>
++          )}
++        </div>
++
++        {/* Payment Modal */}
++        {selectedDue && (
++          <PaymentModal
++            isOpen={isPaymentModalOpen}
++            onClose={() => {
++              setIsPaymentModalOpen(false)
++              setSelectedDue(null)
++            }}
++            patientId={selectedDue.patient_id}
++            patientName={selectedDue.patient_name}
++            patientUrn={selectedDue.patient_urn}
++            treatmentPlan={{
++              id: selectedDue.treatment_plan_id,
++              patient_id: selectedDue.patient_id,
++              patient_urn: selectedDue.patient_urn,
++              patient_name: selectedDue.patient_name,
++              doctor_id: 0,
++              doctor_name: '',
++              encounter_id: null,
++              plan_name: selectedDue.plan_name,
++              condition_diagnosis: selectedDue.condition_diagnosis || '',
++              referred_by: null,
++              total_sessions: selectedDue.total_sessions,
++              completed_sessions: selectedDue.completed_sessions,
++              agreed_price_paise: selectedDue.agreed_price_paise,
++              status: 'ACTIVE',
++              cancellation_reason: null,
++              version_id: 1,
++              created_at: '',
++              updated_at: '',
++            }}
++            defaultAmountPaise={selectedDue.balance_paise}
++            onSuccess={(payment) => {
++              setIsPaymentModalOpen(false)
++              setSelectedDue(null)
++              setSuccessNotice(
++                `Payment of ₹${(payment.amount_paise / 100).toFixed(2)} received for ${selectedDue.patient_name} (${payment.receipt_number}).`
++              )
++              refetch()
++            }}
++          />
+         )}
+       </div>
+-
+-      {/* Payment Modal */}
+-      {selectedDue && (
+-        <PaymentModal
+-          isOpen={isPaymentModalOpen}
+-          onClose={() => {
+-            setIsPaymentModalOpen(false)
+-            setSelectedDue(null)
+-          }}
+-          patientId={selectedDue.patient_id}
+-          patientName={selectedDue.patient_name}
+-          patientUrn={selectedDue.patient_urn}
+-          treatmentPlan={{
+-            id: selectedDue.treatment_plan_id,
+-            patient_id: selectedDue.patient_id,
+-            patient_urn: selectedDue.patient_urn,
+-            patient_name: selectedDue.patient_name,
+-            doctor_id: 0,
+-            doctor_name: '',
+-            encounter_id: null,
+-            plan_name: selectedDue.plan_name,
+-            condition_diagnosis: selectedDue.condition_diagnosis || "",
+-            referred_by: null,
+-            total_sessions: selectedDue.total_sessions,
+-            completed_sessions: selectedDue.completed_sessions,
+-            agreed_price_paise: selectedDue.agreed_price_paise,
+-            status: 'ACTIVE',
+-            cancellation_reason: null,
+-            version_id: 1,
+-            created_at: '',
+-            updated_at: '',
+-          }}
+-          defaultAmountPaise={selectedDue.balance_paise}
+-        />
+-      )}
+-    </div>
++    </AppShell>
+   )
+ }
++
+ export default PendingDuesPage
+diff --git a/frontend/src/pages/__tests__/pending-dues.test.tsx b/frontend/src/pages/__tests__/pending-dues.test.tsx
+index e0aedd8..74a60e6 100644
+--- a/frontend/src/pages/__tests__/pending-dues.test.tsx
++++ b/frontend/src/pages/__tests__/pending-dues.test.tsx
+@@ -1,6 +1,7 @@
+ import { render, screen, fireEvent } from '@testing-library/react'
+ import { describe, it, expect, vi } from 'vitest'
+ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
++import { MemoryRouter } from 'react-router'
+ import { PendingDuesPage } from '../PendingDuesPage'
+ 
+ const sampleDues = [
+@@ -24,11 +25,18 @@ vi.mock('../../api/queries', () => ({
+     data: sampleDues,
+     isLoading: false,
+     error: null,
++    refetch: vi.fn(),
+   }),
+   useRecordPayment: () => ({
+     mutateAsync: vi.fn(),
+     isPending: false,
+   }),
++  useMe: () => ({
++    data: { id: 2, username: 'reception', full_name: 'Reception Staff', role: 'RECEPTION' },
++  }),
++  useLogout: () => ({
++    mutateAsync: vi.fn(),
++  }),
+ }))
+ 
+ describe('PendingDuesPage', () => {
+@@ -37,7 +45,9 @@ describe('PendingDuesPage', () => {
+   it('renders pending dues table with formatted rupee balances', () => {
+     render(
+       <QueryClientProvider client={queryClient}>
+-        <PendingDuesPage />
++        <MemoryRouter>
++          <PendingDuesPage />
++        </MemoryRouter>
+       </QueryClientProvider>
+     )
+ 

@@ -896,7 +896,7 @@ export function useRecordPayment() {
     mutationFn: (payload: PaymentCreate) =>
       apiFetch<PaymentOut>('/api/payments', {
         method: 'POST',
-        body: JSON.stringify(payload),
+        body: payload,
       }),
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['payments'] })
@@ -913,7 +913,7 @@ export function useReversePayment() {
     mutationFn: ({ id, payload }: { id: number; payload: PaymentReversalCreate }) =>
       apiFetch<PaymentOut>('/api/payments/' + id + '/reverse', {
         method: 'POST',
-        body: JSON.stringify(payload),
+        body: payload,
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['payments'] })
@@ -978,7 +978,7 @@ export function useCreateBackup() {
     mutationFn: (payload: BackupCreateRequest) =>
       apiFetch<BackupArchiveInfo>('/api/operations/backups', {
         method: 'POST',
-        body: JSON.stringify(payload),
+        body: payload,
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['operations', 'backups'] })
@@ -992,7 +992,7 @@ export function useRestoreBackup() {
     mutationFn: (payload: RestoreRequest) =>
       apiFetch<RestoreResultOut>('/api/operations/restore', {
         method: 'POST',
-        body: JSON.stringify(payload),
+        body: payload,
       }),
     onSuccess: () => {
       queryClient.invalidateQueries()

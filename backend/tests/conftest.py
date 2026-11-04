@@ -17,7 +17,7 @@ from kalyan_api.core.setup_code import issue_setup_code
 from kalyan_api.db.migrate import upgrade_head
 from kalyan_api.db.session import build_engine, get_session
 from kalyan_api.main import create_app
-from kalyan_api.models import Doctor, User
+from kalyan_api.models import Department, Doctor, User
 
 
 @pytest.fixture(scope="session")
@@ -209,6 +209,12 @@ def make_user(
     if role == "DOCTOR":
         d_name = doctor_name or f"Dr. {username.capitalize()}"
         doc = Doctor(name_en=d_name, is_active=True)
+        dept = session.query(Department).filter_by(name_en="Physiotherapy / General OPD").first()
+        if not dept:
+            dept = Department(name_en="Physiotherapy / General OPD", is_active=True)
+            session.add(dept)
+            session.flush()
+        doc.departments.append(dept)
         session.add(doc)
         session.flush()
         doc_id = doc.id

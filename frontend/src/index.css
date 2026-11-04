@@ -21,3 +21,23 @@
     scroll-behavior: auto !important;
   }
 }
+
+/* A4 documents: millimetre page box and exact colours, so the printed letterhead matches the approved sample. */
+@media print {
+  @page {
+    size: A4;
+    margin: 6mm;
+  }
+
+  /* When a print portal (prescription slip) is open, print only it, not the app page behind it. */
+  body:has(.print-portal) > #root {
+    display: none !important;
+  }
+
+  html,
+  body {
+    background: #ffffff !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+}

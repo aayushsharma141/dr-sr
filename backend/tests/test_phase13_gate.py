@@ -110,11 +110,13 @@ def test_phase13_full_lifecycle_and_security_gate(
     today_str = datetime.now(UTC).date().isoformat()
 
     # 1. Reception books appointment (APT-01)
+    dept_id = doctor_a_user.doctor.departments[0].id
     book_res = rec_c.post(
         "/api/appointments",
         json={
             "patient_id": patient_id,
             "doctor_id": doc_a_id,
+            "department_id": dept_id,
             "appointment_date": today_str,
             "notes": "Gate test routine checkup",
         },

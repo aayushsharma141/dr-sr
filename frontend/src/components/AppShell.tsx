@@ -2,7 +2,6 @@ import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router'
 import { useLogout } from '../api/queries'
 import type { Role } from '../api/types'
-import { AdminNavTabs } from './AdminNavTabs'
 
 interface AppShellProps {
   name: string
@@ -61,7 +60,7 @@ const NAVIGATION: NavigationItem[] = [
     description: 'Search and inspect patient records',
     path: '/reception/patients',
     icon: 'folder',
-    roles: ALL_ROLES,
+    roles: ['RECEPTION', 'DOCTOR'],
   },
   {
     key: 'physiotherapy',
@@ -77,7 +76,7 @@ const NAVIGATION: NavigationItem[] = [
     description: "Today's token queue and appointment booking",
     path: '/reception/appointments?tab=today',
     icon: 'calendar',
-    roles: ALL_ROLES,
+    roles: ['RECEPTION', 'DOCTOR'],
   },
   {
     key: 'followups',
@@ -88,19 +87,11 @@ const NAVIGATION: NavigationItem[] = [
     roles: DOCTOR_ONLY,
   },
   {
-    key: 'billing',
-    label: 'Billing & Payments',
-    description: 'Patient balances, collections and receipts',
-    path: '/reception/dues',
-    icon: 'rupee',
-    roles: ADMIN_RECEPTION,
-  },
-  {
-    key: 'reports',
-    label: 'Reports',
-    description: 'System integrity and operational reports',
-    path: '/admin/integrity',
-    icon: 'chart',
+    key: 'settings',
+    label: 'Settings',
+    description: 'Clinic identity and system configuration',
+    path: '/admin/settings',
+    icon: 'settings',
     roles: ADMIN_ONLY,
   },
   {
@@ -112,6 +103,14 @@ const NAVIGATION: NavigationItem[] = [
     roles: ADMIN_ONLY,
   },
   {
+    key: 'departments',
+    label: 'Departments',
+    description: 'Specialties and doctor assignments',
+    path: '/admin/departments',
+    icon: 'folder',
+    roles: ADMIN_ONLY,
+  },
+  {
     key: 'users',
     label: 'Users & Permissions',
     description: 'Accounts, roles and access controls',
@@ -120,19 +119,35 @@ const NAVIGATION: NavigationItem[] = [
     roles: ADMIN_ONLY,
   },
   {
+    key: 'billing',
+    label: 'Billing & Payments',
+    description: 'Patient balances, collections and receipts',
+    path: '/reception/dues',
+    icon: 'rupee',
+    roles: ADMIN_RECEPTION,
+  },
+  {
+    key: 'reports',
+    label: 'System Integrity',
+    description: 'Clinical, financial and storage integrity checks',
+    path: '/admin/integrity',
+    icon: 'chart',
+    roles: ADMIN_ONLY,
+  },
+  {
+    key: 'audit',
+    label: 'Audit & Compliance',
+    description: 'Security and operational event history',
+    path: '/admin/audit',
+    icon: 'chart',
+    roles: ADMIN_ONLY,
+  },
+  {
     key: 'backup',
     label: 'Backup & Restore',
     description: 'Local backup archives and recovery',
     path: '/admin/backups',
     icon: 'backup',
-    roles: ADMIN_ONLY,
-  },
-  {
-    key: 'settings',
-    label: 'Settings',
-    description: 'Clinic identity and system configuration',
-    path: '/admin/settings',
-    icon: 'settings',
     roles: ADMIN_ONLY,
   },
 ]
@@ -241,8 +256,6 @@ export function AppShell({ name, role, children }: AppShellProps) {
     () => NAVIGATION.filter((item) => item.roles.includes(role)),
     [role],
   )
-  const showAdminTabs = role === 'ADMIN' && location.pathname.startsWith('/admin/')
-  const adminTabs = showAdminTabs ? <AdminNavTabs /> : null
 
   const handleSignOut = async () => {
     try {
@@ -259,10 +272,12 @@ export function AppShell({ name, role, children }: AppShellProps) {
           const href = navigationHref(item, role)
           const active = isNavigationItemActive(item, location.pathname, location.search, role)
           const sectionLabel =
-            index === 1
-              ? role === 'RECEPTION' ? 'RECEPTION DESK' : 'PATIENT & CLINICAL WORKFLOW'
-              : role === 'ADMIN' && item.key === 'reports' ? 'ADMINISTRATION & SAFETY'
-                : null
+            role === 'ADMIN' && item.key === 'billing' ? 'FINANCIAL ADMINISTRATION'
+              : role === 'ADMIN' && item.key === 'reports' ? 'SECURITY & COMPLIANCE'
+                : index === 1
+                  ? role === 'ADMIN' ? 'HOSPITAL ADMINISTRATION'
+                    : role === 'RECEPTION' ? 'RECEPTION DESK' : 'PATIENT & CLINICAL WORKFLOW'
+                  : null
           return (
             <div key={item.key}>
               {sectionLabel && (
@@ -407,7 +422,6 @@ export function AppShell({ name, role, children }: AppShellProps) {
         <div className="hidden md:flex">{renderSidebar()}</div>
         <main className="min-w-0 flex-1 px-3 py-4 sm:px-5 sm:py-5 xl:px-7">
           <div className="mx-auto w-full max-w-[1600px] space-y-4">
-            {adminTabs}
             {children}
           </div>
           <footer className="mx-auto mt-8 flex max-w-[1600px] flex-wrap items-center justify-between gap-2 border-t border-slate-200 pt-3 text-[11px] text-slate-500">

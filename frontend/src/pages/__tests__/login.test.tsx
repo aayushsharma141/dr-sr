@@ -198,7 +198,7 @@ describe('Login & Role Navigation Flow', () => {
     await user.click(screen.getByRole('button', { name: /sign in/i }))
 
     await waitFor(() => {
-      expect(screen.getByText('admin Dashboard')).toBeInTheDocument()
+      expect(screen.getByText('Administration Dashboard')).toBeInTheDocument()
       expect(screen.getByText('System User Counts')).toBeInTheDocument()
       expect(screen.getByText(/3 active/)).toBeInTheDocument()
     })
@@ -268,7 +268,7 @@ describe('Login & Role Navigation Flow', () => {
     await user.click(screen.getByRole('button', { name: /sign in/i }))
 
     await waitFor(() => {
-      expect(screen.getByText('reception Dashboard')).toBeInTheDocument()
+      expect(screen.getByText('Reception Dashboard')).toBeInTheDocument()
       expect(
         screen.getByText(/Reception area active. Ready for patient check-ins/i),
       ).toBeInTheDocument()
@@ -341,7 +341,7 @@ describe('Login & Role Navigation Flow', () => {
     await user.click(screen.getByRole('button', { name: /sign in/i }))
 
     await waitFor(() => {
-      expect(screen.getByText('doctor Dashboard')).toBeInTheDocument()
+      expect(screen.getByText('Doctor Dashboard')).toBeInTheDocument()
       expect(screen.getByText(/Doctor ID: 10/)).toBeInTheDocument()
       expect(screen.getByText(/Doctor Name: Dr. Ashok Kumar/)).toBeInTheDocument()
     })
@@ -612,7 +612,7 @@ describe('Login & Role Navigation Flow', () => {
     )
 
     await waitFor(() => {
-      expect(screen.getByText('admin Dashboard')).toBeInTheDocument()
+      expect(screen.getByText('Administration Dashboard')).toBeInTheDocument()
     })
 
     // Click "Sign out"

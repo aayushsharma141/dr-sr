@@ -1,6 +1,9 @@
+import { useState } from 'react'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { describe, it, expect, vi } from 'vitest'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import '../../test/dialog-shim'
 import { PaymentModal } from '../PaymentModal'
 
 const mockMutateAsync = vi.fn()
@@ -90,5 +93,46 @@ describe('PaymentModal', () => {
       ).toBeInTheDocument()
       expect(mockMutateAsync).not.toHaveBeenCalled()
     })
+  })
+
+  it('shows a validation error as role=alert', async () => {
+    renderComponent()
+    fireEvent.change(screen.getByLabelText(/Amount/i), { target: { value: '0' } })
+    fireEvent.submit(screen.getByRole('dialog').querySelector('form')!)
+    expect(await screen.findByRole('alert')).toHaveTextContent(/greater than zero/i)
+  })
+
+  it('Esc closes once through onClose and returns focus to the control that opened it', async () => {
+    const user = userEvent.setup()
+    const onClose = vi.fn()
+    function Opener() {
+      const [open, setOpen] = useState(false)
+      return (
+        <QueryClientProvider client={queryClient}>
+          <button type="button" onClick={() => setOpen(true)}>
+            Collect Payment
+          </button>
+          <PaymentModal
+            isOpen={open}
+            onClose={() => {
+              onClose()
+              setOpen(false)
+            }}
+            patientId={101}
+            patientName="Test Patient"
+            patientUrn="KLY-001"
+          />
+        </QueryClientProvider>
+      )
+    }
+    render(<Opener />)
+
+    await user.click(screen.getByRole('button', { name: 'Collect Payment' }))
+    await waitFor(() => expect(screen.getByLabelText(/Amount/i)).toHaveFocus())
+
+    await user.keyboard('{Escape}')
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+    expect(onClose).toHaveBeenCalledTimes(1)
+    expect(screen.getByRole('button', { name: 'Collect Payment' })).toHaveFocus()
   })
 })

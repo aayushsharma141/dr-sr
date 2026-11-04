@@ -39,10 +39,11 @@ def test_department_relationships_are_mapped() -> None:
 
 def test_department_routes_are_registered_with_role_permissions() -> None:
     """Reception can read/filter departments; only Admin can manage assignments."""
+    from test_route_policies import walk_routes
+
     routes = {
-        (method, route.path): route
-        for route in create_app().routes
-        for method in (route.methods or set())
+        (method, path)
+        for method, path, _ in walk_routes(create_app())
     }
     assert ("GET", "/api/departments") in routes
     assert ("GET", "/api/departments/{department_id}/doctors") in routes

@@ -25,11 +25,13 @@ def test_appointment_status_lifecycle(login_client, reception_user, doctor_a_use
 
     # 2. Reception logs in and books appointment
     reception_client = login_client(reception_user)
+    dept = doctor_a_user.doctor.departments[0]
     book_resp = reception_client.post(
         "/api/appointments",
         json={
             "patient_id": patient.id,
             "doctor_id": doctor_id,
+            "department_id": dept.id,
             "appointment_date": today.isoformat(),
         },
     )
@@ -95,11 +97,13 @@ def test_invalid_status_transitions_rejected(
 
     today = clock.utcnow().date()
     reception_client = login_client(reception_user)
+    dept = doctor_a_user.doctor.departments[0]
     book_resp = reception_client.post(
         "/api/appointments",
         json={
             "patient_id": patient.id,
             "doctor_id": doctor_a_user.doctor_id,
+            "department_id": dept.id,
             "appointment_date": today.isoformat(),
         },
     )
@@ -133,11 +137,13 @@ def test_cancellation_requires_reason(login_client, reception_user, doctor_a_use
 
     today = clock.utcnow().date()
     reception_client = login_client(reception_user)
+    dept = doctor_a_user.doctor.departments[0]
     book_resp = reception_client.post(
         "/api/appointments",
         json={
             "patient_id": patient.id,
             "doctor_id": doctor_a_user.doctor_id,
+            "department_id": dept.id,
             "appointment_date": today.isoformat(),
         },
     )
@@ -185,11 +191,13 @@ def test_status_update_conflict(login_client, reception_user, doctor_a_user, db_
 
     today = clock.utcnow().date()
     reception_client = login_client(reception_user)
+    dept = doctor_a_user.doctor.departments[0]
     book_resp = reception_client.post(
         "/api/appointments",
         json={
             "patient_id": patient.id,
             "doctor_id": doctor_a_user.doctor_id,
+            "department_id": dept.id,
             "appointment_date": today.isoformat(),
         },
     )

@@ -44,6 +44,7 @@ export function IntegrityDashboard() {
           <>
             {/* Status Banner */}
             <div
+              role={data.is_healthy ? 'status' : 'alert'}
               className={`p-5 rounded-lg border flex items-center justify-between shadow-xs ${
                 data.is_healthy
                   ? 'bg-emerald-50 border-emerald-300 text-emerald-900'

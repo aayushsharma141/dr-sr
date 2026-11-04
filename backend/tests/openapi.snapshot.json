@@ -116,6 +116,12 @@
             "title": "Appointment Date",
             "type": "string"
           },
+          "department_id": {
+            "description": "Configured department/specialty ID",
+            "exclusiveMinimum": 0.0,
+            "title": "Department Id",
+            "type": "integer"
+          },
           "doctor_id": {
             "description": "Target doctor ID",
             "exclusiveMinimum": 0.0,
@@ -145,6 +151,7 @@
         "required": [
           "patient_id",
           "doctor_id",
+          "department_id",
           "appointment_date"
         ],
         "title": "AppointmentCreate",
@@ -195,6 +202,17 @@
             "format": "date-time",
             "title": "Created At",
             "type": "string"
+          },
+          "department_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Department Id"
           },
           "doctor_id": {
             "title": "Doctor Id",
@@ -925,6 +943,161 @@
         "title": "ClinicSettingsUpdate",
         "type": "object"
       },
+      "DepartmentCreate": {
+        "additionalProperties": false,
+        "properties": {
+          "description": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "name_en": {
+            "maxLength": 120,
+            "minLength": 2,
+            "title": "Name En",
+            "type": "string"
+          },
+          "name_hi": {
+            "anyOf": [
+              {
+                "maxLength": 120,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name Hi"
+          }
+        },
+        "required": [
+          "name_en"
+        ],
+        "title": "DepartmentCreate",
+        "type": "object"
+      },
+      "DepartmentOut": {
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "is_active": {
+            "title": "Is Active",
+            "type": "boolean"
+          },
+          "name_en": {
+            "title": "Name En",
+            "type": "string"
+          },
+          "name_hi": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name Hi"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          },
+          "version_id": {
+            "title": "Version Id",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "name_en",
+          "name_hi",
+          "description",
+          "is_active",
+          "version_id",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "DepartmentOut",
+        "type": "object"
+      },
+      "DepartmentUpdate": {
+        "additionalProperties": false,
+        "properties": {
+          "description": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "is_active": {
+            "title": "Is Active",
+            "type": "boolean"
+          },
+          "name_en": {
+            "maxLength": 120,
+            "minLength": 2,
+            "title": "Name En",
+            "type": "string"
+          },
+          "name_hi": {
+            "anyOf": [
+              {
+                "maxLength": 120,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name Hi"
+          },
+          "version_id": {
+            "minimum": 1.0,
+            "title": "Version Id",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "name_en",
+          "is_active",
+          "version_id"
+        ],
+        "title": "DepartmentUpdate",
+        "type": "object"
+      },
       "DoctorCreate": {
         "additionalProperties": false,
         "description": "Payload for creating a new doctor profile.",
@@ -982,6 +1155,30 @@
           "name_en"
         ],
         "title": "DoctorCreate",
+        "type": "object"
+      },
+      "DoctorDepartmentAssignment": {
+        "additionalProperties": false,
+        "properties": {
+          "department_ids": {
+            "items": {
+              "type": "integer"
+            },
+            "maxItems": 30,
+            "title": "Department Ids",
+            "type": "array"
+          },
+          "version_id": {
+            "minimum": 1.0,
+            "title": "Version Id",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "department_ids",
+          "version_id"
+        ],
+        "title": "DoctorDepartmentAssignment",
         "type": "object"
       },
       "DoctorOut": {
@@ -3023,15 +3220,30 @@
             "title": "Archive Filename",
             "type": "string"
           },
+          "confirmation_phrase": {
+            "const": "RESTORE-DATABASE-OVERWRITE",
+            "description": "Explicit confirmation that the active database will be overwritten",
+            "title": "Confirmation Phrase",
+            "type": "string"
+          },
           "create_prerestore_snapshot": {
             "default": true,
             "description": "Automatically take safety snapshot before restore",
             "title": "Create Prerestore Snapshot",
             "type": "boolean"
+          },
+          "justification": {
+            "description": "Mandatory reason recorded in the audit log",
+            "maxLength": 500,
+            "minLength": 10,
+            "title": "Justification",
+            "type": "string"
           }
         },
         "required": [
-          "archive_filename"
+          "archive_filename",
+          "confirmation_phrase",
+          "justification"
         ],
         "title": "RestoreRequest",
         "type": "object"
@@ -4653,6 +4865,169 @@
         ]
       }
     },
+    "/api/departments": {
+      "get": {
+        "operationId": "list_departments_api_departments_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/DepartmentOut"
+                  },
+                  "title": "Response List Departments Api Departments Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "List Departments",
+        "tags": [
+          "departments"
+        ]
+      },
+      "post": {
+        "operationId": "create_department_api_departments_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DepartmentCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DepartmentOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Department",
+        "tags": [
+          "departments"
+        ]
+      }
+    },
+    "/api/departments/{department_id}": {
+      "patch": {
+        "operationId": "update_department_api_departments__department_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "department_id",
+            "required": true,
+            "schema": {
+              "title": "Department Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DepartmentUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DepartmentOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Department",
+        "tags": [
+          "departments"
+        ]
+      }
+    },
+    "/api/departments/{department_id}/doctors": {
+      "get": {
+        "operationId": "list_department_doctors_api_departments__department_id__doctors_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "department_id",
+            "required": true,
+            "schema": {
+              "title": "Department Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "additionalProperties": true,
+                    "type": "object"
+                  },
+                  "title": "Response List Department Doctors Api Departments  Department Id  Doctors Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Department Doctors",
+        "tags": [
+          "departments"
+        ]
+      }
+    },
     "/api/doctor/overview": {
       "get": {
         "description": "Return doctor overview with doctor_id and linked doctor profile.",
@@ -4784,6 +5159,106 @@
         "tags": [
           "doctors",
           "fees"
+        ]
+      }
+    },
+    "/api/doctors/{doctor_id}/departments": {
+      "get": {
+        "operationId": "list_doctor_departments_api_doctors__doctor_id__departments_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "doctor_id",
+            "required": true,
+            "schema": {
+              "title": "Doctor Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/DepartmentOut"
+                  },
+                  "title": "Response List Doctor Departments Api Doctors  Doctor Id  Departments Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Doctor Departments",
+        "tags": [
+          "departments"
+        ]
+      },
+      "put": {
+        "operationId": "assign_doctor_departments_api_doctors__doctor_id__departments_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "doctor_id",
+            "required": true,
+            "schema": {
+              "title": "Doctor Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DoctorDepartmentAssignment"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/DepartmentOut"
+                  },
+                  "title": "Response Assign Doctor Departments Api Doctors  Doctor Id  Departments Put",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Assign Doctor Departments",
+        "tags": [
+          "departments"
         ]
       }
     },
@@ -6147,6 +6622,82 @@
           }
         },
         "summary": "Create Prescription",
+        "tags": [
+          "prescriptions"
+        ]
+      }
+    },
+    "/api/prescriptions/follow-ups": {
+      "get": {
+        "description": "List dated prescription follow-ups for the authenticated doctor.\n\nPrescription follow-up dates are clinical information. This endpoint deliberately\nremains doctor-only and applies the existing doctor silo; it is not a receptionist\nappointment queue.",
+        "operationId": "list_prescription_follow_ups_api_prescriptions_follow_ups_get",
+        "parameters": [
+          {
+            "description": "Include follow-ups on or after this date",
+            "in": "query",
+            "name": "date_from",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Include follow-ups on or after this date",
+              "title": "Date From"
+            }
+          },
+          {
+            "description": "Include follow-ups on or before this date",
+            "in": "query",
+            "name": "date_to",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Include follow-ups on or before this date",
+              "title": "Date To"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/PrescriptionSummary"
+                  },
+                  "title": "Response List Prescription Follow Ups Api Prescriptions Follow Ups Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Prescription Follow Ups",
         "tags": [
           "prescriptions"
         ]
