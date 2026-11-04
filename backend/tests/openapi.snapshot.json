@@ -6152,6 +6152,82 @@
         ]
       }
     },
+    "/api/prescriptions/follow-ups": {
+      "get": {
+        "description": "List dated prescription follow-ups for the authenticated doctor.\n\nPrescription follow-up dates are clinical information. This endpoint deliberately\nremains doctor-only and applies the existing doctor silo; it is not a receptionist\nappointment queue.",
+        "operationId": "list_prescription_follow_ups_api_prescriptions_follow_ups_get",
+        "parameters": [
+          {
+            "description": "Include follow-ups on or after this date",
+            "in": "query",
+            "name": "date_from",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Include follow-ups on or after this date",
+              "title": "Date From"
+            }
+          },
+          {
+            "description": "Include follow-ups on or before this date",
+            "in": "query",
+            "name": "date_to",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Include follow-ups on or before this date",
+              "title": "Date To"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/PrescriptionSummary"
+                  },
+                  "title": "Response List Prescription Follow Ups Api Prescriptions Follow Ups Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Prescription Follow Ups",
+        "tags": [
+          "prescriptions"
+        ]
+      }
+    },
     "/api/prescriptions/{id}": {
       "get": {
         "description": "Retrieve full prescription details including all medication lines (RX-01).",

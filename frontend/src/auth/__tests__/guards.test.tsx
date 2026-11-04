@@ -1,8 +1,8 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { cleanup, render, screen, waitFor } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { createMemoryRouter, RouterProvider } from 'react-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { setCsrfToken } from '../../api/client'
+import { apiFetch, getCsrfToken, setCsrfToken } from '../../api/client'
 import { RequireAuth, RequireRole } from '../guards'
 import { Forbidden, NotFound } from '../../pages/StatusPages'
 
@@ -29,7 +29,19 @@ function createGuardsRouter(initialEntries = ['/admin']) {
             children: [
               {
                 path: '/admin',
-                element: <div data-testid="admin-content">Admin Protected Content</div>,
+                element: (
+                  <div data-testid="admin-content">
+                    Admin Protected Content
+                    <button
+                      type="button"
+                      onClick={() => {
+                        void apiFetch('/protected-test').catch(() => undefined)
+                      }}
+                    >
+                      Trigger protected request
+                    </button>
+                  </div>
+                ),
               },
             ],
           },
@@ -244,6 +256,72 @@ describe('RequireAuth & RequireRole UX Guards', () => {
 
     await waitFor(() => {
       expect(screen.getByTestId('admin-content')).toBeInTheDocument()
+    })
+  })
+
+
+  it('clears cached data and redirects to sign-in when a protected request reports an expired session', async () => {
+    testQueryClient.setQueryData(['patients'], [{ id: 1, name: 'Sensitive patient record' }])
+
+    const mockFetch = vi.fn().mockImplementation((url: string) => {
+      if (url.includes('/api/auth/me')) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          headers: new Headers({ 'content-type': 'application/json' }),
+          text: () =>
+            Promise.resolve(
+              JSON.stringify({
+                id: 1,
+                username: 'superadmin',
+                full_name: 'Admin',
+                role: 'ADMIN',
+                doctor_id: null,
+                permissions: ['admin:*'],
+                must_change_password: false,
+                csrf_token: 'csrf_active_session',
+                version_id: 1,
+              }),
+            ),
+        })
+      }
+      if (url.includes('/api/protected-test')) {
+        return Promise.resolve({
+          ok: false,
+          status: 401,
+          statusText: 'Unauthorized',
+          headers: new Headers({ 'content-type': 'application/json' }),
+          text: () =>
+            Promise.resolve(
+              JSON.stringify({
+                code: 'session_expired',
+                message: 'Session expired after inactivity',
+              }),
+            ),
+        })
+      }
+      return Promise.reject(new Error(`Unhandled URL: ${url}`))
+    })
+    vi.stubGlobal('fetch', mockFetch)
+
+    const router = createGuardsRouter(['/admin'])
+    render(
+      <QueryClientProvider client={testQueryClient}>
+        <RouterProvider router={router} />
+      </QueryClientProvider>,
+    )
+
+    await waitFor(() => {
+      expect(screen.getByTestId('admin-content')).toBeInTheDocument()
+      expect(getCsrfToken()).toBe('csrf_active_session')
+    })
+
+    fireEvent.click(screen.getByRole('button', { name: 'Trigger protected request' }))
+
+    await waitFor(() => {
+      expect(screen.getByTestId('login-page')).toBeInTheDocument()
+      expect(testQueryClient.getQueryData(['patients'])).toBeUndefined()
+      expect(getCsrfToken()).toBeNull()
     })
   })
 
