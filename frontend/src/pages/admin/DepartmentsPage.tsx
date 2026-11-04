@@ -11,12 +11,14 @@ export function DepartmentsPage() {
   const [name, setName] = useState('')
   const [nameHi, setNameHi] = useState('')
   const [doctorId, setDoctorId] = useState<number | null>(null)
-  const { data: assigned = [] } = useDoctorDepartments(doctorId)
+  const { data: assigned } = useDoctorDepartments(doctorId)
   const [ids, setIds] = useState<number[]>([])
   const [notice, setNotice] = useState('')
   const [error, setError] = useState('')
 
-  useEffect(() => setIds(assigned.map((item) => item.id)), [assigned])
+  useEffect(() => {
+    if (assigned) setIds(assigned.map((item) => item.id))
+  }, [assigned])
 
   async function createDepartment(event: FormEvent) {
     event.preventDefault()
