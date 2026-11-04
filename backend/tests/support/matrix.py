@@ -263,7 +263,12 @@ def _create_backup_payload(_target: Any = None) -> dict[str, Any]:
 
 
 def _restore_payload(_target: Any = None) -> dict[str, Any]:
-    return {"archive_filename": "non_existent.tar.gz", "create_prerestore_snapshot": False}
+    return {
+        "archive_filename": "non_existent.tar.gz",
+        "create_prerestore_snapshot": False,
+        "confirmation_phrase": "RESTORE-DATABASE-OVERWRITE",
+        "justification": "Authorization matrix restore request",
+    }
 
 
 MATRIX: list[MatrixRow] = [
@@ -878,6 +883,18 @@ MATRIX: list[MatrixRow] = [
             "reception": 403,
             "doctor_a": 201,
             "doctor_b": 201,
+        },
+    ),
+    MatrixRow(
+        method="GET",
+        path="/api/prescriptions/follow-ups",
+        body_factory=None,
+        expected={
+            "anonymous": 401,
+            "admin": 403,
+            "reception": 403,
+            "doctor_a": 200,
+            "doctor_b": 200,
         },
     ),
     MatrixRow(
