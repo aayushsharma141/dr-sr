@@ -76,7 +76,7 @@ const NAVIGATION: NavigationItem[] = [
     description: "Today's token queue and appointment booking",
     path: '/reception/appointments?tab=today',
     icon: 'calendar',
-    roles: ALL_ROLES,
+    roles: ['RECEPTION', 'DOCTOR'],
   },
   {
     key: 'followups',
@@ -264,11 +264,12 @@ export function AppShell({ name, role, children }: AppShellProps) {
           const href = navigationHref(item, role)
           const active = isNavigationItemActive(item, location.pathname, location.search, role)
           const sectionLabel =
-            index === 1
-              ? role === 'ADMIN' ? 'HOSPITAL ADMINISTRATION'
-                : role === 'RECEPTION' ? 'RECEPTION DESK' : 'PATIENT & CLINICAL WORKFLOW'
+            role === 'ADMIN' && item.key === 'billing' ? 'FINANCIAL ADMINISTRATION'
               : role === 'ADMIN' && item.key === 'reports' ? 'SECURITY & COMPLIANCE'
-                : null
+                : index === 1
+                  ? role === 'ADMIN' ? 'HOSPITAL ADMINISTRATION'
+                    : role === 'RECEPTION' ? 'RECEPTION DESK' : 'PATIENT & CLINICAL WORKFLOW'
+                  : null
           return (
             <div key={item.key}>
               {sectionLabel && (
