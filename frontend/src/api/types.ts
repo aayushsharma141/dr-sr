@@ -149,6 +149,39 @@ export interface ClinicSettingsUpdate {
   version_id: number
 }
 
+export interface DepartmentOut {
+  id: number
+  name_en: string
+  name_hi: string | null
+  description: string | null
+  is_active: boolean
+  version_id: number
+}
+
+export interface DepartmentCreate {
+  name_en: string
+  name_hi?: string | null
+  description?: string | null
+}
+
+export interface DepartmentUpdate extends DepartmentCreate {
+  is_active: boolean
+  version_id: number
+}
+
+export interface DoctorDepartmentAssignment {
+  department_ids: number[]
+  version_id: number
+}
+
+export interface DepartmentDoctorOut {
+  id: number
+  name_en: string
+  name_hi: string | null
+  qualification: string | null
+  default_fee_paise: number
+}
+
 export interface DoctorOut {
   id: number
   name_en: string
@@ -294,6 +327,7 @@ export interface Appointment {
 
 export interface AppointmentCreate {
   patient_id: number
+  department_id: number
   doctor_id: number
   appointment_date: string
   notes?: string | null
