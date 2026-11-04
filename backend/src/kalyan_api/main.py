@@ -24,6 +24,7 @@ from kalyan_api.routers.audit import router as audit_router
 from kalyan_api.routers.auth import router as auth_router
 from kalyan_api.routers.billing import router as billing_router
 from kalyan_api.routers.doctors import router as doctors_router
+from kalyan_api.routers.departments import router as departments_router
 from kalyan_api.routers.encounters import router as encounters_router
 from kalyan_api.routers.health import router as health_router
 from kalyan_api.routers.operations import router as operations_router
@@ -142,6 +143,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(users_router, prefix="/api")
     app.include_router(settings_router, prefix="/api")
     app.include_router(doctors_router, prefix="/api")
+    app.include_router(departments_router, prefix="/api")
     app.include_router(patients_router, prefix="/api")
     app.include_router(appointments_router, prefix="/api")
     app.include_router(doctor_router, prefix="/api")
