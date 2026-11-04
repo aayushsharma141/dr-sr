@@ -660,6 +660,8 @@ export interface BackupCreateRequest {
 export interface RestoreRequest {
   archive_filename: string
   create_prerestore_snapshot?: boolean
+  confirmation_phrase: 'RESTORE-DATABASE-OVERWRITE'
+  justification: string
 }
 
 export interface RestoreResultOut {
