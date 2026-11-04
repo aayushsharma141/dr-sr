@@ -188,6 +188,7 @@ def trigger_restore(
             "restored_archive": payload.archive_filename,
             "prerestore_snapshot": result.get("prerestore_snapshot"),
         },
+        reason=payload.justification,
     )
 
     return RestoreResultOut(

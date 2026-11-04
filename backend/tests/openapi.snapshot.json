@@ -3028,10 +3028,25 @@
             "description": "Automatically take safety snapshot before restore",
             "title": "Create Prerestore Snapshot",
             "type": "boolean"
+          },
+          "confirmation_phrase": {
+            "const": "RESTORE-DATABASE-OVERWRITE",
+            "description": "Explicit confirmation that the active database will be overwritten",
+            "title": "Confirmation Phrase",
+            "type": "string"
+          },
+          "justification": {
+            "description": "Mandatory reason recorded in the audit log",
+            "maxLength": 500,
+            "minLength": 10,
+            "title": "Justification",
+            "type": "string"
           }
         },
         "required": [
-          "archive_filename"
+          "archive_filename",
+          "confirmation_phrase",
+          "justification"
         ],
         "title": "RestoreRequest",
         "type": "object"

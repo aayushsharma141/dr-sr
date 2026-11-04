@@ -41,9 +41,9 @@ export function AreaHome({ area }: AreaHomeProps) {
     <AppShell name={data.name} role={role}>
       <div className="space-y-6">
         <div className="bg-white p-6 rounded-lg border border-neutral-200 shadow-xs">
-          <h2 className="text-xl font-bold capitalize text-neutral-900">
-            {area} Dashboard
-          </h2>
+          <h1 className="text-xl font-bold text-neutral-900">
+            {area === 'admin' ? 'Administration Dashboard' : `${area[0].toUpperCase()}${area.slice(1)} Dashboard`}
+          </h1>
           <p className="text-sm text-neutral-600 mt-1">
             Welcome, {data.name} ({role})
           </p>
@@ -87,66 +87,12 @@ export function AreaHome({ area }: AreaHomeProps) {
                 </div>
               </div>
 
-              <div>
-                <h3 className="text-sm font-semibold text-neutral-700 uppercase tracking-wider mb-3">
-                  Administration Modules
-                </h3>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                  <Link
-                    to="/admin/settings"
-                    className="p-4 bg-white rounded border border-neutral-300 hover:border-red-800 hover:shadow-xs transition-all block"
-                  >
-                    <p className="font-bold text-neutral-900">Clinic Settings</p>
-                    <p className="text-xs text-neutral-500 mt-1">
-                      Clinic identity, numbering cycles & print slips
-                    </p>
-                  </Link>
-                  <Link
-                    to="/admin/doctors"
-                    className="p-4 bg-white rounded border border-neutral-300 hover:border-red-800 hover:shadow-xs transition-all block"
-                  >
-                    <p className="font-bold text-neutral-900">Doctors & Fees</p>
-                    <p className="text-xs text-neutral-500 mt-1">
-                      Doctor profiles, qualifications & fee schedules
-                    </p>
-                  </Link>
-                  <Link
-                    to="/admin/users"
-                    className="p-4 bg-white rounded border border-neutral-300 hover:border-red-800 hover:shadow-xs transition-all block"
-                  >
-                    <p className="font-bold text-neutral-900">User Management</p>
-                    <p className="text-xs text-neutral-500 mt-1">
-                      User accounts, roles, locks & passwords
-                    </p>
-                  </Link>
-                  <Link
-                    to="/admin/audit"
-                    className="p-4 bg-white rounded border border-neutral-300 hover:border-red-800 hover:shadow-xs transition-all block"
-                  >
-                    <p className="font-bold text-neutral-900">Audit Log Viewer</p>
-                    <p className="text-xs text-neutral-500 mt-1">
-                      Filter immutable security and operational event trail
-                    </p>
-                  </Link>
-                  <Link
-                    to="/admin/backups"
-                    className="p-4 bg-white rounded border border-neutral-300 hover:border-red-800 hover:shadow-xs transition-all block"
-                  >
-                    <p className="font-bold text-neutral-900">Backup & Restore</p>
-                    <p className="text-xs text-neutral-500 mt-1">
-                      Checksummed database & patient photo archives
-                    </p>
-                  </Link>
-                  <Link
-                    to="/admin/integrity"
-                    className="p-4 bg-white rounded border border-neutral-300 hover:border-red-800 hover:shadow-xs transition-all block"
-                  >
-                    <p className="font-bold text-neutral-900">Integrity Diagnostic</p>
-                    <p className="text-xs text-neutral-500 mt-1">
-                      5-pillar clinical, financial & storage invariant checks
-                    </p>
-                  </Link>
-                </div>
+              <div className="rounded-lg border border-neutral-200 bg-neutral-50 p-4">
+                <p className="text-sm font-semibold text-neutral-900">Administration workspace</p>
+                <p className="mt-1 text-sm text-neutral-600">
+                  Use the single navigation menu to manage clinic settings, doctors and fees,
+                  staff access, audit history, backups and system integrity.
+                </p>
               </div>
             </div>
           )}

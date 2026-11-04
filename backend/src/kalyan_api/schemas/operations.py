@@ -1,7 +1,7 @@
 """Pydantic schemas for operational administrative endpoints (BAK-01, BAK-02, BAK-03)."""
 
 from datetime import datetime
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -47,6 +47,14 @@ class RestoreRequest(BaseModel):
     create_prerestore_snapshot: bool = Field(
         default=True,
         description="Automatically take safety snapshot before restore",
+    )
+    confirmation_phrase: Literal["RESTORE-DATABASE-OVERWRITE"] = Field(
+        description="Explicit confirmation that the active database will be overwritten",
+    )
+    justification: str = Field(
+        min_length=10,
+        max_length=500,
+        description="Mandatory reason recorded in the audit log",
     )
 
 
