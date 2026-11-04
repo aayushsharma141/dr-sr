@@ -9,7 +9,7 @@ import {
   useMe,
 } from '../api/queries'
 import { ApiError } from '../api/client'
-import { AppShell } from '../components/AppShell'
+import { AdminPageLayout } from '../components/AdminPageLayout'
 import { ConflictBanner } from '../components/ConflictBanner'
 import type { DoctorOut, DoctorCreate, DoctorUpdate, FeeOut } from '../api/types'
 
@@ -188,8 +188,8 @@ export function Doctors() {
   }
 
   return (
-    <AppShell name={me?.full_name ?? 'Admin'} role={me?.role ?? 'ADMIN'}>
-      <div className="space-y-8 max-w-6xl mx-auto">
+    <AdminPageLayout name={me?.full_name ?? 'Admin'} title="Doctors & Consultation Fees" description="Maintain doctor profiles, qualifications, registration details and the consultation fee schedules used by the hospital.">
+      <div className="space-y-6">
         {/* Doctors Section */}
         <div className="space-y-4">
           <div className="flex items-center justify-between">
@@ -547,6 +547,6 @@ export function Doctors() {
           </div>
         )}
       </div>
-    </AppShell>
+    </AdminPageLayout>
   )
 }
