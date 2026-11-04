@@ -1,10 +1,10 @@
 """Tests for clinical and financial integrity check engine (BAK-03, Plan 16-04)."""
 
-import pytest
-
 from pathlib import Path
 from typing import Any
 
+import pytest
+from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from kalyan_api.config import get_settings
@@ -38,7 +38,7 @@ def test_integrity_audit_clean_database(db_session):
 
 
 @pytest.mark.real_restore
-def test_integrity_audit_detects_orphan_and_missing_photos(tmp_path: Path):
+def test_integrity_audit_detects_orphan_and_missing_photos(tmp_path: Path, owner_engine):
     """Test photo storage check detects missing files and untracked orphans."""
     settings = get_settings()
 
@@ -71,9 +71,10 @@ def test_integrity_audit_detects_orphan_and_missing_photos(tmp_path: Path):
         assert "missing_photo_file" in issues
         assert "orphan_photo_file" in issues
 
-        # Cleanup
-        session.delete(p)
-        session.commit()
+    # Cleanup runs as the migration owner: the runtime role may not delete patients (by design)
+    with Session(owner_engine) as owner_session:
+        owner_session.execute(text("DELETE FROM patients WHERE urn = 'KHM-2026-88888'"))
+        owner_session.commit()
 
     if orphan_file.exists():
         orphan_file.unlink()

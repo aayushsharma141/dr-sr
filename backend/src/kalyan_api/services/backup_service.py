@@ -284,6 +284,49 @@ def dump_database(destination_file: Path, settings: Settings | None = None) -> N
         raise RuntimeError(f"Database dump failed: {err}")
 
 
+# Runtime role rights exactly as the migrations grant them. A pg_dump is taken with
+# --no-privileges, so the restored schema would otherwise give the runtime role nothing, or the
+# wrong rights if defaults were used. tests/test_migrations.py checks this table against a
+# migrated database, so the two cannot drift apart silently.
+RUNTIME_TABLE_GRANTS: dict[str, tuple[str, ...]] = {
+    "audit_logs": ("SELECT", "INSERT"),
+    "system_setup": ("SELECT", "INSERT"),
+    "users": ("SELECT", "INSERT", "UPDATE"),
+    "doctors": ("SELECT", "INSERT", "UPDATE"),
+    "login_throttle": ("SELECT", "INSERT", "UPDATE"),
+    "sessions": ("SELECT", "INSERT", "UPDATE", "DELETE"),
+    "alembic_version": ("SELECT",),
+    "clinic_settings": ("SELECT", "INSERT", "UPDATE"),
+    "consultation_fees": ("SELECT", "INSERT", "UPDATE"),
+    "urn_sequences": ("SELECT", "INSERT", "UPDATE"),
+    "patients": ("SELECT", "INSERT", "UPDATE"),
+    "daily_token_sequences": ("SELECT", "INSERT", "UPDATE", "DELETE"),
+    "appointments": ("SELECT", "INSERT", "UPDATE", "DELETE"),
+    "clinical_encounters": ("SELECT", "INSERT", "UPDATE", "DELETE"),
+    "clinical_addenda": ("SELECT", "INSERT", "UPDATE", "DELETE"),
+    "treatment_plans": ("SELECT", "INSERT", "UPDATE", "DELETE"),
+    "treatment_sessions": ("SELECT", "INSERT", "UPDATE", "DELETE"),
+    "treatment_session_addenda": ("SELECT", "INSERT", "UPDATE", "DELETE"),
+    "prescriptions": ("SELECT", "INSERT", "UPDATE", "DELETE"),
+    "prescription_items": ("SELECT", "INSERT", "UPDATE", "DELETE"),
+    "receipt_sequences": ("SELECT", "INSERT", "UPDATE", "DELETE"),
+    "payments": ("SELECT", "INSERT", "UPDATE", "DELETE"),
+    "security_settings": ("SELECT", "UPDATE"),
+    "backup_settings": ("SELECT", "UPDATE"),
+    "backup_runs": ("SELECT", "INSERT", "UPDATE"),
+}
+
+
+def runtime_grant_sql(app_user: str) -> str:
+    """SQL that gives the runtime role exactly the rights RUNTIME_TABLE_GRANTS lists."""
+    statements = [
+        f'GRANT {", ".join(privileges)} ON "{table}" TO "{app_user}";'
+        for table, privileges in RUNTIME_TABLE_GRANTS.items()
+    ]
+    statements.append(f'GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO "{app_user}";')
+    return "\n".join(statements)
+
+
 def restore_database_sql(sql_file: Path, settings: Settings | None = None) -> None:
     """Wipe schema public and execute SQL dump using psql with owner credentials."""
     cfg = settings or get_settings()
@@ -297,11 +340,7 @@ def restore_database_sql(sql_file: Path, settings: Settings | None = None) -> No
     DROP SCHEMA IF EXISTS public CASCADE;
     CREATE SCHEMA public;
     GRANT ALL ON SCHEMA public TO {cfg.db_owner_user};
-    GRANT ALL ON SCHEMA public TO {cfg.db_app_user};
-    ALTER DEFAULT PRIVILEGES FOR ROLE {cfg.db_owner_user} IN SCHEMA public
-        GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO {cfg.db_app_user};
-    ALTER DEFAULT PRIVILEGES FOR ROLE {cfg.db_owner_user} IN SCHEMA public
-        GRANT USAGE, SELECT ON SEQUENCES TO {cfg.db_app_user};
+    GRANT USAGE ON SCHEMA public TO {cfg.db_app_user};
     """
     reset_cmd = [
         psql_bin,
@@ -356,12 +395,8 @@ def restore_database_sql(sql_file: Path, settings: Settings | None = None) -> No
         err = apply_res.stderr.strip() or apply_res.stdout.strip()
         raise RestoreError(f"Restoring SQL dump failed: {err}")
 
-    # Step 3: Re-grant table privileges to application role
-    regrant_sql = f"""
-    GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO {cfg.db_app_user};
-    GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO {cfg.db_app_user};
-    """
-    regrant_cmd = [
+    # Step 3: Restore the runtime role's rights, which the dump does not carry
+    grant_cmd = [
         psql_bin,
         "-v",
         "ON_ERROR_STOP=1",
@@ -374,18 +409,18 @@ def restore_database_sql(sql_file: Path, settings: Settings | None = None) -> No
         "-d",
         cfg.db_name,
         "-c",
-        regrant_sql,
+        runtime_grant_sql(cfg.db_app_user),
     ]
-    regrant_res = subprocess.run(  # noqa: S603
-        regrant_cmd,
+    grant_res = subprocess.run(  # noqa: S603
+        grant_cmd,
         env=env,
         capture_output=True,
         text=True,
         check=False,
     )
-    if regrant_res.returncode != 0:
-        err = regrant_res.stderr.strip() or regrant_res.stdout.strip()
-        raise RestoreError(f"Re-granting schema permissions failed: {err}")
+    if grant_res.returncode != 0:
+        err = grant_res.stderr.strip() or grant_res.stdout.strip()
+        raise RestoreError(f"Restoring runtime role rights failed: {err}")
 
 
 def create_backup(

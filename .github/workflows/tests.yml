@@ -124,6 +124,25 @@ jobs:
         run: >-
           psql -h 127.0.0.1 -U kalyan_owner -d kalyan_test
           -c "CREATE ROLE kalyan_app LOGIN PASSWORD 'ciapppw1'"
+      - name: Install PostgreSQL 17 client tools
+        # pg_dump must match the server major version (postgres:17 service); the runner's default is 16.
+        run: |
+          sudo install -d /usr/share/postgresql-common/pgdg
+          sudo curl -fsSL -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc https://www.postgresql.org/media/keys/ACCC4CF8.asc
+          echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" | sudo tee /etc/apt/sources.list.d/pgdg.list
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client-17
+          echo "/usr/lib/postgresql/17/bin" >> "$GITHUB_PATH"
+      - name: Create throwaway restore database
+        # Real backup and restore tests run pg_dump and DROP SCHEMA here, never on kalyan_test.
+        env:
+          PGPASSWORD: ci_owner_pw
+        run: >-
+          psql -h 127.0.0.1 -U kalyan_owner -d postgres
+          -c "CREATE DATABASE kalyan_restore_test WITH OWNER kalyan_owner TEMPLATE template0 ENCODING 'UTF8' LOCALE_PROVIDER builtin BUILTIN_LOCALE 'C.UTF-8'"
+          -c "ALTER DATABASE kalyan_restore_test SET timezone TO 'Asia/Kolkata'"
+          -c "REVOKE ALL ON DATABASE kalyan_restore_test FROM PUBLIC"
+          -c "GRANT CONNECT ON DATABASE kalyan_restore_test TO kalyan_app"
       - name: Ruff lint
         working-directory: backend
         run: ruff check src

@@ -1,6 +1,6 @@
 """Tests for Origin header verification and per-session CSRF token enforcement (SEC-02, D-01)."""
 
-from collections.abc import Callable
+from collections.abc import Callable, Generator
 
 from fastapi import APIRouter, Depends, FastAPI
 from fastapi.testclient import TestClient
@@ -9,6 +9,8 @@ from sqlalchemy.orm import Session
 from kalyan_api.config import Settings
 from kalyan_api.core.permissions import Permission
 from kalyan_api.core.policy import public, require
+from kalyan_api.db.session import get_session
+from kalyan_api.main import create_app
 from kalyan_api.models import User
 from tests.conftest import TEST_PASSWORD, make_user
 
@@ -63,10 +65,26 @@ def test_unsafe_methods_require_valid_origin_or_referer(
 
 
 def test_extra_allowed_origins_permitted(
-    app: FastAPI,
+    db_session: Session,
+    test_settings: Settings,
     admin_user: User,
 ) -> None:
-    """Origins in KALYAN_EXTRA_ALLOWED_ORIGINS (e.g. dev proxy) are accepted."""
+    """Origins in KALYAN_EXTRA_ALLOWED_ORIGINS (e.g. dev proxy) are accepted.
+
+    The origin is set on the settings here, not read from the developer's environment, so the
+    test means the same thing on CI and on a workstation.
+    """
+    app = create_app(
+        settings=test_settings.model_copy(
+            update={"extra_allowed_origins": ["http://localhost:5173"]}
+        )
+    )
+
+    def _override_get_session() -> Generator[Session, None, None]:
+        with db_session.begin_nested():
+            yield db_session
+
+    app.dependency_overrides[get_session] = _override_get_session
     with TestClient(app, base_url="http://testserver") as c:
         res = c.post(
             "/api/auth/login",
