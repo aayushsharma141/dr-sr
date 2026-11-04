@@ -78,11 +78,47 @@ export const router = createBrowserRouter([
             },
           },
           {
+            path: '/admin/roles',
+            lazy: async () => {
+              const { RolesMatrixPage } = await import('./pages/admin/RolesMatrixPage')
+              return {
+                Component: RolesMatrixPage,
+              }
+            },
+          },
+          {
+            path: '/admin/security',
+            lazy: async () => {
+              const { SecurityCenterPage } = await import('./pages/admin/SecurityCenterPage')
+              return {
+                Component: SecurityCenterPage,
+              }
+            },
+          },
+          {
+            path: '/admin/system',
+            lazy: async () => {
+              const { SystemHealthPage } = await import('./pages/admin/SystemHealthPage')
+              return {
+                Component: SystemHealthPage,
+              }
+            },
+          },
+          {
             path: '/admin/settings',
             lazy: async () => {
               const { Settings } = await import('./pages/Settings')
               return {
                 Component: Settings,
+              }
+            },
+          },
+          {
+            path: '/admin/billing',
+            lazy: async () => {
+              const { BillingAdminPage } = await import('./pages/admin/BillingAdminPage')
+              return {
+                Component: BillingAdminPage,
               }
             },
           },

@@ -150,10 +150,11 @@ describe('BackupManagerPage failures are persistent inline alerts (UX-03)', () =
     mocks.createMutate.mockRejectedValueOnce(new Error('disk full'))
     renderPage()
 
-    fireEvent.click(screen.getByRole('button', { name: 'Trigger Backup Now' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Create backup' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Start backup' }))
 
     const alert = await screen.findByRole('alert')
-    expect(alert).toHaveTextContent('Backup failed: disk full')
+    expect(alert).toHaveTextContent(/Backup could not be created.*disk full/)
     expect(alertSpy).not.toHaveBeenCalled()
 
     fireEvent.click(screen.getByRole('button', { name: 'Dismiss message' }))
@@ -164,24 +165,33 @@ describe('BackupManagerPage failures are persistent inline alerts (UX-03)', () =
     mocks.restoreMutate.mockRejectedValueOnce(new Error('checksum mismatch'))
     renderPage()
 
-    fireEvent.click(screen.getByText('Restore System'))
-    fireEvent.click(screen.getByRole('button', { name: 'Yes, Execute Safe Restore' }))
+    fireEvent.click(screen.getAllByText('More actions')[0])
+    fireEvent.click(screen.getAllByRole('button', { name: /Restore this archive/ })[0])
+
+    fireEvent.change(screen.getByLabelText('Reason for restoration *'), {
+      target: { value: 'Approved recovery after a verified server incident' },
+    })
+    fireEvent.change(screen.getByLabelText('Type the confirmation phrase'), {
+      target: { value: 'RESTORE-DATABASE-OVERWRITE' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Confirm database restoration' }))
 
     const alert = await screen.findByRole('alert')
-    expect(alert).toHaveTextContent('Restoration failed: checksum mismatch')
-    expect(screen.getByText('⚠ Confirm System Restoration')).toBeInTheDocument()
+    expect(alert).toHaveTextContent('Restore failed: checksum mismatch')
+    expect(screen.getByRole('dialog')).toBeInTheDocument()
     expect(alertSpy).not.toHaveBeenCalled()
   })
 
   it('restore confirmation: Esc closes it and focus returns to the Restore button that opened it', async () => {
     const user = userEvent.setup()
     renderPage()
-    const trigger = screen.getAllByRole('button', { name: /Restore System/ })[0]
+    fireEvent.click(screen.getAllByText('More actions')[0])
+    const trigger = screen.getAllByRole('button', { name: /Restore this archive/ })[0]
     await user.click(trigger)
     await waitFor(() => expect(screen.getByRole('button', { name: 'Cancel' })).toHaveFocus())
 
     fireEvent.keyDown(document, { key: 'Escape' })
-    await waitFor(() => expect(screen.queryByText('⚠ Confirm System Restoration')).not.toBeInTheDocument())
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
     await waitFor(() => expect(trigger).toHaveFocus())
   })
 })

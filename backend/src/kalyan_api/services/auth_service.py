@@ -12,13 +12,16 @@ import logging
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 
-from sqlalchemy import case, delete, select, update
+from sqlalchemy import ColumnElement, case, delete, select, update
 from sqlalchemy.orm import Session
 
 from kalyan_api import clock
 from kalyan_api.config import Settings
 from kalyan_api.core import security
+from kalyan_api.core.errors import ApiError
 from kalyan_api.models import AuthSession, User
+from kalyan_api.services import audit_service
+from kalyan_api.services.audit_service import AuditAction, AuditContext
 
 logger = logging.getLogger("kalyan_api.auth_service")
 
@@ -190,6 +193,211 @@ def revoke_all_user_sessions(session: Session, user_id: int) -> None:
         .where(AuthSession.user_id == user_id, AuthSession.revoked_at.is_(None))
         .values(revoked_at=now)
     )
+
+
+def idle_expires_at(auth_session: AuthSession, settings: Settings) -> datetime:
+    """Return the instant after which the session expires for inactivity (D-07)."""
+    return auth_session.last_seen_at + timedelta(minutes=settings.session_idle_minutes)
+
+
+def absolute_expires_at(auth_session: AuthSession, settings: Settings) -> datetime:
+    """Return the instant after which the session exceeds its maximum lifetime."""
+    return auth_session.created_at + timedelta(hours=settings.session_absolute_hours)
+
+
+def active_session_criteria(settings: Settings, now: datetime) -> list[ColumnElement[bool]]:
+    """SQL criteria selecting sessions that would still authenticate at ``now``.
+
+    Mirrors the request-time checks in core.principal: not revoked, owner account active,
+    ``now`` not past ``last_seen_at + idle`` and not past ``created_at + absolute``.
+    Callers must join ``User`` on ``AuthSession.user_id``.
+    """
+    idle_cutoff = now - timedelta(minutes=settings.session_idle_minutes)
+    absolute_cutoff = now - timedelta(hours=settings.session_absolute_hours)
+    return [
+        AuthSession.revoked_at.is_(None),
+        User.is_active.is_(True),
+        AuthSession.last_seen_at >= idle_cutoff,
+        AuthSession.created_at >= absolute_cutoff,
+    ]
+
+
+def list_active_sessions(
+    session: Session,
+    settings: Settings,
+    now: datetime,
+    user_id: int | None = None,
+) -> list[tuple[AuthSession, User]]:
+    """List currently valid sessions with their owners, most recently active first."""
+    stmt = (
+        select(AuthSession, User)
+        .join(User, AuthSession.user_id == User.id)
+        .where(*active_session_criteria(settings, now))
+        .order_by(AuthSession.last_seen_at.desc(), AuthSession.id.desc())
+    )
+    if user_id is not None:
+        stmt = stmt.where(AuthSession.user_id == user_id)
+    return [(row[0], row[1]) for row in session.execute(stmt).all()]
+
+
+def get_active_session(
+    session: Session,
+    settings: Settings,
+    now: datetime,
+    session_id: int,
+) -> tuple[AuthSession, User] | None:
+    """Fetch one currently valid session and its owner, locking the session row."""
+    stmt = (
+        select(AuthSession, User)
+        .join(User, AuthSession.user_id == User.id)
+        .where(AuthSession.id == session_id, *active_session_criteria(settings, now))
+        .with_for_update(of=AuthSession)
+    )
+    row = session.execute(stmt).first()
+    if row is None:
+        return None
+    return row[0], row[1]
+
+
+def revoke_session_if_active(session: Session, session_id: int, now: datetime) -> bool:
+    """Revoke a session not yet revoked; return True only if this call revoked it."""
+    result = session.execute(
+        update(AuthSession)
+        .where(AuthSession.id == session_id, AuthSession.revoked_at.is_(None))
+        .values(revoked_at=now)
+        .returning(AuthSession.id)
+    ).first()
+    return result is not None
+
+
+def revoke_active_user_sessions(
+    session: Session,
+    settings: Settings,
+    user_id: int,
+    now: datetime,
+    keep_session_id: int | None = None,
+) -> list[int]:
+    """Revoke every currently valid session of a user, optionally sparing one session.
+
+    Returns the identifiers of the sessions revoked by this call, in ascending order.
+    """
+    active_ids = select(AuthSession.id).join(User, AuthSession.user_id == User.id)
+    active_ids = active_ids.where(
+        AuthSession.user_id == user_id, *active_session_criteria(settings, now)
+    )
+    if keep_session_id is not None:
+        active_ids = active_ids.where(AuthSession.id != keep_session_id)
+
+    result = session.execute(
+        update(AuthSession)
+        .where(AuthSession.id.in_(active_ids), AuthSession.revoked_at.is_(None))
+        .values(revoked_at=now)
+        .returning(AuthSession.id)
+    )
+    return sorted(int(r[0]) for r in result.all())
+
+
+def admin_revoke_session(
+    session: Session,
+    ctx: AuditContext,
+    settings: Settings,
+    session_id: int,
+    current_session_id: int,
+    reason: str | None = None,
+) -> tuple[AuthSession, datetime]:
+    """Revoke one active session on an administrator's request and audit SESSION_REVOKED.
+
+    Returns:
+        (the revoked session, the revocation instant).
+
+    Raises:
+        ApiError 404 session_not_found when the session is unknown, revoked or expired.
+        ApiError 409 cannot_revoke_current_session when it is the caller's own session.
+    """
+    now = clock.utcnow()
+    found = get_active_session(session, settings, now, session_id)
+    if found is None:
+        raise ApiError(
+            status_code=404,
+            code="session_not_found",
+            message=f"Active session #{session_id} not found",
+        )
+    auth_sess, owner = found
+
+    if auth_sess.id == current_session_id:
+        raise ApiError(
+            status_code=409,
+            code="cannot_revoke_current_session",
+            message="You cannot revoke your own current session; log out instead",
+        )
+
+    if not revoke_session_if_active(session, auth_sess.id, now):
+        raise ApiError(
+            status_code=404,
+            code="session_not_found",
+            message=f"Active session #{session_id} not found",
+        )
+
+    audit_service.record(
+        session,
+        ctx,
+        AuditAction.SESSION_REVOKED,
+        "SESSION",
+        auth_sess.id,
+        before={"user_id": owner.id, "username": owner.username, "revoked_at": None},
+        after={"user_id": owner.id, "username": owner.username, "revoked_at": now.isoformat()},
+        reason=reason,
+    )
+    return auth_sess, now
+
+
+def admin_revoke_user_sessions(
+    session: Session,
+    ctx: AuditContext,
+    settings: Settings,
+    user_id: int,
+    current_session_id: int,
+    reason: str | None = None,
+) -> tuple[list[int], bool]:
+    """Revoke all active sessions of a user and audit USER_SESSIONS_REVOKED.
+
+    When the target is the caller, the caller's current session is kept.
+
+    Returns:
+        (revoked session ids, whether the caller's current session was kept).
+
+    Raises:
+        ApiError 404 not_found when the user does not exist.
+    """
+    target = session.scalar(select(User).where(User.id == user_id))
+    if target is None:
+        raise ApiError(status_code=404, code="not_found", message=f"User #{user_id} not found")
+
+    now = clock.utcnow()
+    is_self = target.id == ctx.actor_user_id
+    keep_id = current_session_id if is_self else None
+    active_before = [s.id for s, _ in list_active_sessions(session, settings, now, user_id)]
+    revoked_ids = revoke_active_user_sessions(
+        session, settings, target.id, now, keep_session_id=keep_id
+    )
+    kept_current = keep_id is not None and keep_id in active_before
+
+    audit_service.record(
+        session,
+        ctx,
+        AuditAction.USER_SESSIONS_REVOKED,
+        "USER",
+        target.id,
+        before={"active_session_count": len(active_before)},
+        after={
+            "active_session_count": len(active_before) - len(revoked_ids),
+            "revoked_count": len(revoked_ids),
+            "revoked_session_ids": revoked_ids,
+            "kept_current_session": kept_current,
+        },
+        reason=reason,
+    )
+    return revoked_ids, kept_current
 
 
 def purge_expired_sessions(session: Session, max_age_hours: int = 36) -> int:

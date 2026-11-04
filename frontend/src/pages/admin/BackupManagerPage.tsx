@@ -1,6 +1,7 @@
 import { useMemo, useState, type FormEvent } from 'react'
 import { Link } from 'react-router'
 import { AppShell } from '../../components/AppShell'
+import { Modal } from '../../components/Modal'
 import { useBackups, useCreateBackup, useRestoreBackup } from '../../api/queries'
 import type { BackupArchiveInfo } from '../../api/types'
 
@@ -114,7 +115,7 @@ export function BackupManagerPage() {
         archive_filename: restoreArchive.filename,
         create_prerestore_snapshot: true,
         confirmation_phrase: RESTORE_CONFIRMATION,
-        justification: restoreReason.trim(),
+        reason: restoreReason.trim(),
       })
       setFeedback({
         tone: 'success',
@@ -169,8 +170,8 @@ export function BackupManagerPage() {
           </div>
         </header>
 
-        {feedback && (
-          <div role="status" className={`flex items-start justify-between gap-3 rounded-lg border p-3 text-sm ${
+        {!restoreArchive && feedback && (
+          <div role={feedback.tone === 'error' ? 'alert' : 'status'} className={`flex items-start justify-between gap-3 rounded-lg border p-3 text-sm ${
             feedback.tone === 'success' ? 'border-emerald-200 bg-emerald-50 text-emerald-900'
               : feedback.tone === 'error' ? 'border-red-200 bg-red-50 text-red-900'
                 : 'border-amber-200 bg-amber-50 text-amber-900'
@@ -373,13 +374,24 @@ export function BackupManagerPage() {
         </section>
 
         {restoreArchive && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-slate-950/60 p-4" role="presentation">
-            <section role="dialog" aria-modal="true" aria-labelledby="restore-dialog-title" className="my-auto w-full max-w-xl space-y-4 rounded-xl border border-slate-200 bg-white p-5 shadow-2xl sm:p-6">
+          <Modal
+            open
+            variant="destructive"
+            title="Restore hospital records?"
+            onClose={closeRestore}
+            busy={restoreBackup.isPending}
+            className="max-w-xl"
+          >
+            <div className="space-y-4">
               <div>
                 <p className="text-xs font-bold uppercase tracking-wide text-red-800">Destructive operation</p>
-                <h2 id="restore-dialog-title" className="mt-1 text-xl font-bold text-slate-900">Restore hospital records?</h2>
                 <p className="mt-2 text-sm leading-6 text-slate-600">Restoring replaces the current database with the selected archive. Newer patient, treatment and payment records may be lost.</p>
               </div>
+              {feedback && feedback.tone === 'error' && (
+                <div role="alert" className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-900">
+                  {feedback.message}
+                </div>
+              )}
               <div className="break-all rounded-lg bg-slate-50 p-3 font-mono text-xs text-slate-800">{restoreArchive.filename}</div>
               <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950">
                 A pre-restore safety snapshot is requested before the database is changed. The server checks archive integrity before restoration.
@@ -395,14 +407,14 @@ export function BackupManagerPage() {
                   <input id="restore-confirmation" required value={restorePhrase} onChange={(event) => setRestorePhrase(event.target.value)} autoComplete="off" spellCheck={false} placeholder={RESTORE_CONFIRMATION} className="min-h-11 w-full rounded-lg border border-slate-300 px-3 font-mono text-xs focus:border-[#8E1C3D] focus:outline-none focus:ring-2 focus:ring-[#8E1C3D]/15" />
                 </div>
                 <div className="flex flex-col-reverse justify-end gap-2 border-t border-slate-200 pt-4 sm:flex-row">
-                  <button type="button" onClick={closeRestore} disabled={restoreBackup.isPending} className="min-h-11 rounded-lg border border-slate-300 px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50">Cancel</button>
+                  <button type="button" data-autofocus onClick={closeRestore} disabled={restoreBackup.isPending} className="min-h-11 rounded-lg border border-slate-300 px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50">Cancel</button>
                   <button type="submit" disabled={restoreBackup.isPending || restorePhrase !== RESTORE_CONFIRMATION || restoreReason.trim().length < 10} className="min-h-11 rounded-lg bg-red-800 px-4 text-sm font-bold text-white hover:bg-red-900 disabled:cursor-not-allowed disabled:opacity-40">
                     {restoreBackup.isPending ? 'Restoring…' : 'Confirm database restoration'}
                   </button>
                 </div>
               </form>
-            </section>
-          </div>
+            </div>
+          </Modal>
         )}
       </div>
     </AppShell>

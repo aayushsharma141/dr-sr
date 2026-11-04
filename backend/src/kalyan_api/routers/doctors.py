@@ -22,6 +22,9 @@ from kalyan_api.services.audit_service import AuditAction
 
 router = APIRouter(tags=["doctors", "fees"])
 
+# Every mutable consultation fee column plus the optimistic-lock version (audit before/after).
+_FEE_AUDIT_FIELDS: tuple[str, ...] = ("name", "fee_paise", "is_active", "version_id")
+
 
 # ==============================================================================
 # DOCTORS (SET-02)
@@ -157,13 +160,15 @@ def update_doctor(
     dependencies=[Depends(require(Permission.FEE_READ))],
     response_model=list[FeeOut],
 )
-def list_fees(session: SessionDep) -> list[FeeOut]:
-    """List available consultation fee schedules."""
-    fees = session.scalars(
-        select(ConsultationFee)
-        .where(ConsultationFee.is_active.is_(True))
-        .order_by(ConsultationFee.id)
-    ).all()
+def list_fees(
+    session: SessionDep,
+    include_inactive: bool = Query(default=False),
+) -> list[FeeOut]:
+    """List consultation fee schedules; deactivated ones only when include_inactive is set."""
+    query = select(ConsultationFee).order_by(ConsultationFee.id)
+    if not include_inactive:
+        query = query.where(ConsultationFee.is_active.is_(True))
+    fees = session.scalars(query).all()
     return [FeeOut.model_validate(f) for f in fees]
 
 
@@ -194,7 +199,7 @@ def create_fee(
         AuditAction.FEE_CREATED,
         "FEE",
         str(fee.id),
-        after={"name": fee.name, "fee_paise": fee.fee_paise},
+        after=audit_service.snapshot(fee, _FEE_AUDIT_FIELDS),
     )
 
     return FeeOut.model_validate(fee)
@@ -212,19 +217,21 @@ def update_fee(
     session: SessionDep,
     principal: Principal = Depends(current_principal),
 ) -> FeeOut:
-    """Modify a consultation fee rate."""
-    fee = session.scalar(select(ConsultationFee).where(ConsultationFee.id == id))
+    """Modify a consultation fee rate with optimistic concurrency control (SEC-06)."""
+    fee = session.scalar(select(ConsultationFee).where(ConsultationFee.id == id).with_for_update())
     if not fee:
         raise ApiError(status_code=404, code="not_found", message=f"Fee rate #{id} not found")
 
-    before_state = {"name": fee.name, "fee_paise": fee.fee_paise, "is_active": fee.is_active}
+    require_version(fee, payload.version_id, "consultation_fee")
+
+    before_state = audit_service.snapshot(fee, _FEE_AUDIT_FIELDS)
     fee.name = payload.name
     fee.fee_paise = payload.fee_paise
     fee.is_active = payload.is_active
 
     session.flush()
 
-    after_state = {"name": fee.name, "fee_paise": fee.fee_paise, "is_active": fee.is_active}
+    after_state = audit_service.snapshot(fee, _FEE_AUDIT_FIELDS)
     ctx = build_audit_context(request, principal)
     audit_service.record(
         session,

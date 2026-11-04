@@ -5,6 +5,7 @@ Guarantees:
 - Cycle support:
   - CALENDAR_YEAR: RCP-YYYY-XXXX (e.g. RCP-2026-0001)
   - FINANCIAL_YEAR: RCP-YYYY-YYYY-XXXX (e.g. RCP-2026-2027-0001)
+- Cycle periods are evaluated on the IST business date (clock.ist_today()), never the UTC date.
 """
 
 from datetime import date
@@ -31,6 +32,37 @@ def get_cycle_key(cycle: str, ref_date: date) -> str:
     return f"{ref_date.year - 1}-{ref_date.year}"
 
 
+def current_cycle_key(cycle: str) -> str:
+    """Return the sequence cycle key for today's IST business date."""
+    return get_cycle_key(cycle, clock.ist_today())
+
+
+def receipts_issued_in_current_cycle(session: Session, cycle: str) -> int:
+    """Count receipts already issued in the active cycle for the given cycle setting.
+
+    Reads the gap-free sequence counter, which advances only inside committed payment
+    transactions, so it equals the number of receipts issued under that cycle key.
+    """
+    issued = session.scalar(
+        select(ReceiptSequence.last_number).where(
+            ReceiptSequence.cycle_key == current_cycle_key(cycle)
+        )
+    )
+    return issued or 0
+
+
+def format_receipt_number(cycle_key: str, number: int) -> str:
+    """Render a receipt number for a cycle key."""
+    return f"RCP-{cycle_key}-{number:04d}"
+
+
+def preview_next_receipt_number(session: Session, cycle: str) -> str:
+    """Show the number the next payment would receive, without allocating it."""
+    return format_receipt_number(
+        current_cycle_key(cycle), receipts_issued_in_current_cycle(session, cycle) + 1
+    )
+
+
 def allocate_next_receipt_number(
     session: Session,
     cycle: str = "FINANCIAL_YEAR",
@@ -42,7 +74,7 @@ def allocate_next_receipt_number(
     and returns a formatted sequential receipt identifier string.
     """
     if ref_date is None:
-        ref_date = clock.utcnow().date()
+        ref_date = clock.ist_today()
 
     cycle_key = get_cycle_key(cycle, ref_date)
 
@@ -64,4 +96,4 @@ def allocate_next_receipt_number(
     session.flush()
     next_num = seq_record.last_number
 
-    return f"RCP-{cycle_key}-{next_num:04d}"
+    return format_receipt_number(cycle_key, next_num)

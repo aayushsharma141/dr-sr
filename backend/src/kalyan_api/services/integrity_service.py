@@ -7,7 +7,9 @@ Checks implemented:
    - Pending balance must equal agreed_price_paise - sum(active payments).
 2. Sequential URN & Identity Integrity:
    - Zero duplicate URNs across all patients.
-   - Checks format: KHM-YYYY-NNNNN.
+   - URN sequence gaps (KH-YYYY-XXXX): per year, sequence numbers between 1 and the highest
+     issued number that map to no patient. Gap semantics are an open decision (OD-12), so this
+     is reported as a WARNING-level finding that does not make the report unhealthy.
 3. Sequential Receipt Integrity:
    - Zero duplicate receipt numbers within the same sequence key.
    - Monotonic continuity check.
@@ -20,25 +22,37 @@ Checks implemented:
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
-from typing import Any
+from typing import Any, Literal
 
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from kalyan_api.config import Settings, get_settings
-from kalyan_api.models import Patient, Payment, TreatmentPlan, TreatmentSession
+from kalyan_api.models import Patient, Payment, TreatmentPlan, TreatmentSession, UrnSequence
+
+Severity = Literal["ERROR", "WARNING"]
+
+URN_PATTERN = re.compile(r"^KH-(\d{4})-(\d+)$")
+# Cap on listed missing numbers per year so a pathological gap cannot bloat the response.
+MAX_LISTED_GAPS_PER_YEAR = 200
 
 
 @dataclass
 class CheckResult:
-    """Outcome of an individual integrity check."""
+    """Outcome of an individual integrity check.
+
+    ``severity`` classifies a non-passing result: ERROR findings make the report unhealthy,
+    WARNING findings are surfaced but leave ``is_healthy`` untouched.
+    """
 
     name: str
     passed: bool
     details: str
     discrepancies: list[dict[str, Any]] = field(default_factory=list)
+    severity: Severity = "ERROR"
 
 
 @dataclass
@@ -51,6 +65,7 @@ class IntegrityReport:
     total_checks: int
     passed_checks: int
     failed_checks: int
+    warning_checks: int = 0
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -59,10 +74,12 @@ class IntegrityReport:
             "total_checks": self.total_checks,
             "passed_checks": self.passed_checks,
             "failed_checks": self.failed_checks,
+            "warning_checks": self.warning_checks,
             "checks": [
                 {
                     "name": c.name,
                     "passed": c.passed,
+                    "severity": c.severity,
                     "details": c.details,
                     "discrepancies": c.discrepancies,
                 }
@@ -145,6 +162,79 @@ def check_urn_uniqueness(session: Session) -> CheckResult:
             "All patient URNs are unique"
             if passed
             else f"Found {len(discrepancies)} duplicate URNs"
+        ),
+        discrepancies=discrepancies,
+    )
+
+
+def check_urn_sequence_gaps(session: Session) -> CheckResult:
+    """Report, per URN year, sequence numbers in 1..max issued that map to no patient (BAK-03).
+
+    "Max issued" is the larger of the highest sequence observed on a patient URN and the
+    year's urn_sequences.last_seq counter, so numbers consumed by the counter but never mapped
+    to a patient are also reported. URNs that do not match KH-YYYY-XXXX are ignored here.
+    Because gap semantics are an open decision (OD-12), findings are WARNING-level only.
+    """
+    seqs_by_year: dict[int, set[int]] = {}
+    for (urn,) in session.execute(select(Patient.urn)).all():
+        match = URN_PATTERN.fullmatch(urn or "")
+        if match is None:
+            continue
+        year = int(match.group(1))
+        seqs_by_year.setdefault(year, set()).add(int(match.group(2)))
+
+    counters: dict[int, int] = {
+        int(year): int(last_seq)
+        for year, last_seq in session.execute(select(UrnSequence.year, UrnSequence.last_seq)).all()
+    }
+
+    discrepancies: list[dict[str, Any]] = []
+    for year in sorted(set(seqs_by_year) | set(counters)):
+        observed = seqs_by_year.get(year, set())
+        max_observed = max(observed) if observed else 0
+        counter_value = counters.get(year, 0)
+        max_issued = max(max_observed, counter_value)
+        if max_issued <= 0:
+            continue
+        in_range = sum(1 for n in observed if 1 <= n <= max_issued)
+        missing_count = max_issued - in_range
+        if missing_count <= 0:
+            continue
+        # Bounded scan: stops after the first MAX_LISTED_GAPS_PER_YEAR gaps, so the work is
+        # at most len(observed) + cap iterations even when max_issued is very large.
+        listed: list[int] = []
+        candidate = 1
+        target = min(missing_count, MAX_LISTED_GAPS_PER_YEAR)
+        while len(listed) < target and candidate <= max_issued:
+            if candidate not in observed:
+                listed.append(candidate)
+            candidate += 1
+        discrepancies.append(
+            {
+                "year": year,
+                "issue": "urn_sequence_gap",
+                "max_issued": max_issued,
+                "max_observed_on_patient": max_observed,
+                "sequence_counter": counter_value,
+                "missing_count": missing_count,
+                "missing_numbers": listed,
+                "missing_numbers_truncated": missing_count > len(listed),
+            }
+        )
+
+    passed = len(discrepancies) == 0
+    total_missing = sum(int(d["missing_count"]) for d in discrepancies)
+    return CheckResult(
+        name="Patient URN Sequence Gaps",
+        passed=passed,
+        severity="WARNING",
+        details=(
+            "No URN sequence gaps found"
+            if passed
+            else (
+                f"Found {total_missing} unmapped URN sequence numbers across "
+                f"{len(discrepancies)} year(s) (warning only; gap policy OD-12 is undecided)"
+            )
         ),
         discrepancies=discrepancies,
     )
@@ -279,6 +369,7 @@ def run_integrity_audit(session: Session, settings: Settings | None = None) -> I
     checks = [
         check_financial_ledger_integrity(session),
         check_urn_uniqueness(session),
+        check_urn_sequence_gaps(session),
         check_receipt_uniqueness(session),
         check_session_progress_synchronization(session),
         check_photo_storage_integrity(session, cfg),
@@ -286,7 +377,8 @@ def run_integrity_audit(session: Session, settings: Settings | None = None) -> I
 
     total = len(checks)
     passed = sum(1 for c in checks if c.passed)
-    failed = total - passed
+    failed = sum(1 for c in checks if not c.passed and c.severity == "ERROR")
+    warnings = sum(1 for c in checks if not c.passed and c.severity == "WARNING")
 
     return IntegrityReport(
         generated_at=datetime.now(UTC).isoformat(),
@@ -295,4 +387,5 @@ def run_integrity_audit(session: Session, settings: Settings | None = None) -> I
         total_checks=total,
         passed_checks=passed,
         failed_checks=failed,
+        warning_checks=warnings,
     )

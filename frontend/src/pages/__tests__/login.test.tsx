@@ -198,7 +198,7 @@ describe('Login & Role Navigation Flow', () => {
     await user.click(screen.getByRole('button', { name: /sign in/i }))
 
     await waitFor(() => {
-      expect(screen.getByText('Administration Dashboard')).toBeInTheDocument()
+      expect(screen.getByRole('heading', { name: 'Administration Dashboard' })).toBeInTheDocument()
       expect(screen.getByText('System User Counts')).toBeInTheDocument()
       expect(screen.getByText(/3 active/)).toBeInTheDocument()
     })
@@ -612,7 +612,7 @@ describe('Login & Role Navigation Flow', () => {
     )
 
     await waitFor(() => {
-      expect(screen.getByText('Administration Dashboard')).toBeInTheDocument()
+      expect(screen.getByRole('heading', { name: 'Administration Dashboard' })).toBeInTheDocument()
     })
 
     // Click "Sign out"

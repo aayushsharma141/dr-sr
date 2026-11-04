@@ -25,6 +25,15 @@ export type ApiErrorCode =
   | 'validation_error'
   | 'setup_closed'
   | 'setup_code_invalid'
+  | 'session_not_found'
+  | 'cannot_revoke_current_session'
+  | 'receipt_cycle_change_requires_confirmation'
+  | 'invalid_archive_filename'
+  | 'invalid_destination_dir'
+  | 'invalid_backup_label'
+  | 'backup_failed'
+  | 'restore_failed'
+  | 'backup_corrupted'
   | 'error'
 
 export interface Me {
@@ -44,11 +53,97 @@ export interface RoleUserCounts {
   inactive: number
 }
 
+export interface DoctorTodayOut {
+  doctor_id: number
+  name: string
+  /** All statuses for the IST business day. */
+  appointments_today: number
+  /** BOOKED + ARRIVED. */
+  waiting: number
+  in_consultation: number
+  done: number
+}
+
+/**
+ * Today's ledger activity (IST), reported without any netting rule:
+ * gross covers payments CREATED today (including ones later reversed); reversals cover
+ * payments REVERSED today, whatever day they were collected.
+ */
+export interface CollectionsTodayOut {
+  payments_count: number
+  gross_paise: number
+  reversals_count: number
+  reversed_paise: number
+  /** Gross paise per payment method (CASH, UPI, CARD). */
+  by_method: Record<string, number>
+}
+
+export interface RecentAdminActionOut {
+  occurred_at: string
+  actor_username: string | null
+  action: string
+  entity_type: string | null
+  entity_id: string | null
+  outcome: string
+}
+
+export interface LastBackupOut {
+  filename: string
+  created_at: string
+  size_bytes: number
+  label: string | null
+  manifest_readable: boolean
+}
+
+export interface LastIntegrityCheckOut {
+  occurred_at: string
+  outcome: string
+  is_healthy: boolean | null
+}
+
+export interface StorageFreeOut {
+  data_free_bytes: number | null
+  backup_free_bytes: number | null
+}
+
+/** Known alert codes. The backend field is a plain string, so other values must be tolerated. */
+export type OverviewAlertCode =
+  | 'no_backup_yet'
+  | 'last_backup_failed'
+  | 'accounts_locked'
+  | 'integrity_issues'
+
+export interface OverviewAlertOut {
+  code: string
+  /** 'warning' | 'error' today; typed as string to mirror the backend schema. */
+  severity: string
+  message: string
+}
+
 export interface AdminOverview {
   area: 'admin'
   name: string
   role: string
   user_counts: Record<string, RoleUserCounts>
+  /** IST business date, YYYY-MM-DD. */
+  business_date: string
+  registrations_today: number
+  /** Count per AppointmentStatus for today. */
+  appointments_today: Record<string, number>
+  /** Every active doctor, ordered by id. */
+  doctors_today: DoctorTodayOut[]
+  collections_today: CollectionsTodayOut
+  /** Sum of balance_paise from /billing/pending-dues. */
+  outstanding_dues_paise: number
+  locked_accounts: number
+  failed_logins_24h: number
+  /** Max 10, ADMIN actors, newest first. */
+  recent_admin_actions: RecentAdminActionOut[]
+  last_backup: LastBackupOut | null
+  last_backup_failure_at: string | null
+  last_integrity_check: LastIntegrityCheckOut | null
+  storage: StorageFreeOut
+  alerts: OverviewAlertOut[]
 }
 
 export interface ReceptionOverview {
@@ -76,7 +171,10 @@ export interface UserOut {
   is_active: boolean
   must_change_password: boolean
   is_locked: boolean
+  /** Non-null only while the lock is in effect. */
+  locked_until: string | null
   last_login_at: string | null
+  password_changed_at: string | null
   created_at: string
   version_id: number
 }
@@ -100,6 +198,198 @@ export interface UserUpdate {
 
 export interface ActionRequest {
   version_id: number
+  /** Optional justification (max 500 chars; blank becomes null) stored on the audit row. */
+  reason?: string | null
+}
+
+export const ADMIN_REASON_MAX_LENGTH = 500
+
+export type LoginHistoryOutcome = 'SUCCESS' | 'FAILURE' | 'DENIED'
+
+export interface LoginHistoryEntry {
+  id: number
+  occurred_at: string
+  action: string
+  /** SUCCESS | FAILURE | DENIED (backend field is a plain string). */
+  outcome: string
+  actor_username: string | null
+  ip_address: string | null
+  user_agent: string | null
+  reason: string | null
+  /** Allow-listed scalar keys only (reason, failed_login_count, locked_until, session_id, ...). */
+  details: Record<string, string | number | boolean | null>
+}
+
+// Admin module 02: read-only role & permission catalogue (GET /roles/permissions)
+export interface RoleInfo {
+  role: Role
+  label: string
+}
+
+export interface PermissionInfo {
+  key: string
+  group: string
+  label: string
+}
+
+export interface RolePermissionsOut {
+  roles: RoleInfo[]
+  permissions: PermissionInfo[]
+  /** role -> sorted permission keys granted to it. */
+  grants: Record<string, string[]>
+}
+
+// Admin module 09: sessions & security policy
+export interface ActiveSessionOut {
+  id: number
+  user_id: number
+  username: string
+  full_name: string
+  role: Role
+  ip_address: string | null
+  user_agent: string | null
+  created_at: string
+  last_seen_at: string
+  idle_expires_at: string
+  absolute_expires_at: string
+  is_current: boolean
+}
+
+export interface RevokeSessionRequest {
+  /** Optional justification (max 500 chars; blank becomes null). */
+  reason?: string | null
+}
+
+export interface RevokeSessionOut {
+  id: number
+  user_id: number
+  revoked_at: string
+}
+
+export interface RevokeUserSessionsOut {
+  user_id: number
+  revoked_count: number
+  kept_current_session: boolean
+}
+
+export interface SecurityPolicyOut {
+  session_idle_minutes: number
+  session_absolute_hours: number
+  lockout_threshold: number
+  lockout_minutes: number
+  throttle_max_failures: number
+  throttle_window_minutes: number
+  password_min_length: number
+  password_max_length: number
+  source: 'environment' | 'administrator'
+  editable: true
+  limits: Record<SecurityPolicyField, PolicyFieldLimits>
+  version_id: number
+  updated_at: string
+}
+
+export type SecurityPolicyField =
+  | 'session_idle_minutes'
+  | 'session_absolute_hours'
+  | 'lockout_threshold'
+  | 'lockout_minutes'
+  | 'password_min_length'
+
+export interface PolicyFieldLimits {
+  baseline: number
+  minimum: number
+  maximum: number
+}
+
+export type SecurityPolicyUpdate = Record<SecurityPolicyField, number> & {
+  version_id: number
+  reason: string
+}
+
+export interface PasswordPolicyOut {
+  min_length: number
+  max_length: number
+}
+
+// Admin module 12: system health (GET /system/status)
+export interface StorageVolumeOut {
+  /** 'photos' | 'backups' */
+  label: string
+  path_label: string
+  total_bytes: number | null
+  free_bytes: number | null
+}
+
+export interface SystemStatusOut {
+  app_version: string
+  environment: string
+  db_revision: string | null
+  code_head_revision: string | null
+  revision_matches: boolean
+  postgres_version: string
+  db_size_bytes: number
+  db_connections: number
+  server_time_utc: string
+  server_time_ist: string
+  process_started_at: string
+  uptime_seconds: number
+  storage: StorageVolumeOut[]
+  frontend_served: boolean
+  checks: ServiceCheckOut[]
+}
+
+export interface ServiceCheckOut {
+  key: string
+  label: string
+  status: 'ok' | 'warning' | 'error' | 'not_configured'
+  detail: string
+}
+
+export interface BackupSettingsOut {
+  schedule_enabled: boolean
+  frequency: 'DAILY' | 'WEEKLY'
+  run_at: string
+  weekly_day: number | null
+  destination_dir: string | null
+  retention_count: number | null
+  version_id: number
+  updated_at: string
+  next_run_at: string | null
+  overdue: boolean
+  approved_destinations: string[]
+}
+
+export interface BackupSettingsUpdate {
+  version_id: number
+  schedule_enabled: boolean
+  frequency: 'DAILY' | 'WEEKLY'
+  run_at: string
+  weekly_day: number | null
+  destination_dir: string | null
+  retention_count: number | null
+  reason: string
+}
+
+export interface BackupRunOut {
+  id: number
+  trigger: 'MANUAL' | 'SCHEDULED'
+  outcome: 'RUNNING' | 'SUCCESS' | 'FAILURE'
+  started_at: string
+  finished_at: string | null
+  filename: string | null
+  size_bytes: number | null
+  copied_to: string | null
+  pruned_count: number
+  error_type: string | null
+}
+
+export interface BillingConfigurationOut {
+  receipt_sequence_cycle: 'FINANCIAL_YEAR' | 'CALENDAR_YEAR'
+  current_cycle_key: string
+  receipts_issued_in_cycle: number
+  next_receipt_number: string
+  payment_methods: string[]
+  reversal_roles: string[]
 }
 
 export interface SetupStatusResponse {
@@ -118,6 +408,9 @@ export interface ClinicSettingsOut {
   id: number
   name_en: string
   name_hi: string
+  trust_name_en: string
+  trust_name_hi: string | null
+  location_line: string
   address_1: string
   address_2: string | null
   phone: string
@@ -136,6 +429,9 @@ export interface ClinicSettingsOut {
 export interface ClinicSettingsUpdate {
   name_en: string
   name_hi: string
+  trust_name_en?: string
+  trust_name_hi?: string | null
+  location_line?: string
   address_1: string
   address_2?: string | null
   phone: string
@@ -147,6 +443,18 @@ export interface ClinicSettingsUpdate {
   print_footer_hi?: string | null
   consultation_validity_days: number
   version_id: number
+  /** Must be true when the cycle changes after receipts exist in the current cycle. */
+  confirm_receipt_cycle_change?: boolean
+  /** Required non-blank (max 500) when confirm_receipt_cycle_change is true; stored on the audit row. */
+  change_reason?: string | null
+}
+
+/** Extra fields on the 409 receipt_cycle_change_requires_confirmation error envelope. */
+export interface ReceiptCycleConfirmationExtra {
+  current_cycle: string
+  current_cycle_key: string
+  requested_cycle: string
+  receipts_issued: number
 }
 
 export interface DoctorOut {
@@ -185,6 +493,7 @@ export interface FeeOut {
   name: string
   fee_paise: number
   is_active: boolean
+  version_id: number
   created_at: string
   updated_at: string
 }
@@ -198,6 +507,8 @@ export interface FeeUpdate {
   name: string
   fee_paise: number
   is_active?: boolean
+  /** Required: the fee's current version_id (a stale value gives 409 version_conflict). */
+  version_id: number
 }
 
 
@@ -653,15 +964,33 @@ export interface BackupArchiveListResponse {
 }
 
 export interface BackupCreateRequest {
+  /** Letters, digits, '_' and '-' only, max 50 (see BACKUP_LABEL_PATTERN). */
   label?: string | null
+  /** Absolute path to an EXISTING directory on the server, max 1024. */
   destination_dir?: string | null
 }
 
+export const BACKUP_LABEL_PATTERN = /^[A-Za-z0-9_-]{0,50}$/
+
+export interface BackupVerifyResponse {
+  filename: string
+  valid: boolean
+  details: string
+}
+
+export const RESTORE_CONFIRMATION_PHRASE = 'RESTORE'
+export const RESTORE_REASON_MIN_LENGTH = 10
+export const RESTORE_REASON_MAX_LENGTH = 500
+
 export interface RestoreRequest {
+  /** Bare filename inside the configured backup directory. */
   archive_filename: string
-  create_prerestore_snapshot?: boolean
-  confirmation_phrase: 'RESTORE-DATABASE-OVERWRITE'
-  justification: string
+  /** Must be exactly RESTORE_CONFIRMATION_PHRASE. */
+  confirmation_phrase: string
+  /** 10-500 characters after trimming; stored on the audit row. */
+  reason: string
+  /** Deprecated: the pre-restore snapshot is always taken; only true is accepted. */
+  create_prerestore_snapshot?: true
 }
 
 export interface RestoreResultOut {
@@ -673,9 +1002,13 @@ export interface RestoreResultOut {
   manifest?: Record<string, unknown> | null
 }
 
+export type IntegritySeverity = 'ERROR' | 'WARNING'
+
 export interface IntegrityCheckItemOut {
   name: string
   passed: boolean
+  /** ERROR findings make the report unhealthy; WARNING findings are reported only. */
+  severity: IntegritySeverity
   details: string
   discrepancies: Record<string, unknown>[]
 }
@@ -685,6 +1018,8 @@ export interface IntegrityReportOut {
   is_healthy: boolean
   total_checks: number
   passed_checks: number
+  /** Counts ERROR-level failures only. */
   failed_checks: number
+  warning_checks: number
   checks: IntegrityCheckItemOut[]
 }

@@ -1,12 +1,31 @@
 """Pydantic request and response schemas for user management."""
 
 from datetime import datetime
+from typing import Annotated
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import AfterValidator, BaseModel, ConfigDict, Field, model_validator
 
 from kalyan_api import clock
 from kalyan_api.core.permissions import Role
 from kalyan_api.models import User
+
+REASON_MAX_LENGTH = 500
+
+
+def _blank_reason_to_none(value: str | None) -> str | None:
+    """Trim an optional free-text reason, treating blank input as no reason."""
+    if value is None:
+        return None
+    stripped = value.strip()
+    return stripped or None
+
+
+OptionalReason = Annotated[
+    str | None,
+    Field(max_length=REASON_MAX_LENGTH),
+    AfterValidator(_blank_reason_to_none),
+]
+"""Optional administrator-supplied justification stored in the audit row's reason column."""
 
 
 class UserCreate(BaseModel):
@@ -38,6 +57,7 @@ class ActionRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     version_id: int = Field(ge=1)
+    reason: OptionalReason = None
 
 
 class UserUpdate(BaseModel):
@@ -70,7 +90,9 @@ class UserOut(BaseModel):
     is_active: bool
     must_change_password: bool
     is_locked: bool
+    locked_until: datetime | None
     last_login_at: datetime | None
+    password_changed_at: datetime | None
     created_at: datetime
     version_id: int
 
@@ -88,7 +110,9 @@ class UserOut(BaseModel):
             is_active=user.is_active,
             must_change_password=user.must_change_password,
             is_locked=is_locked,
+            locked_until=user.locked_until if is_locked else None,
             last_login_at=user.last_login_at,
+            password_changed_at=user.password_changed_at,
             created_at=user.created_at,
             version_id=user.version_id,
         )
@@ -109,3 +133,19 @@ class UserCreatedOut(UserOut):
             **base.model_dump(),
             temporary_password=temp_password,
         )
+
+
+class LoginHistoryEntry(BaseModel):
+    """One authentication or account-security event concerning a user (secrets never included)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    id: int
+    occurred_at: datetime
+    action: str
+    outcome: str
+    actor_username: str | None
+    ip_address: str | None
+    user_agent: str | None
+    reason: str | None
+    details: dict[str, str | int | bool | None]
