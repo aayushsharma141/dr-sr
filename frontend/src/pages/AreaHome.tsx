@@ -41,9 +41,9 @@ export function AreaHome({ area }: AreaHomeProps) {
     <AppShell name={data.name} role={role}>
       <div className="space-y-6">
         <div className="bg-white p-6 rounded-lg border border-neutral-200 shadow-xs">
-          <h2 className="text-xl font-bold capitalize text-neutral-900">
-            {area} Dashboard
-          </h2>
+          <h1 className="text-xl font-bold text-neutral-900">
+            {area === 'admin' ? 'Administration Dashboard' : `${area[0].toUpperCase()}${area.slice(1)} Dashboard`}
+          </h1>
           <p className="text-sm text-neutral-600 mt-1">
             Welcome, {data.name} ({role})
           </p>
