@@ -12,6 +12,7 @@ class AppointmentCreate(BaseModel):
 
     patient_id: int = Field(..., gt=0, description="Target patient ID")
     doctor_id: int = Field(..., gt=0, description="Target doctor ID")
+    department_id: int = Field(..., gt=0, description="Configured department/specialty ID")
     appointment_date: date = Field(..., description="Scheduled appointment date")
     notes: str | None = Field(default=None, max_length=1000, description="Reception notes")
 
