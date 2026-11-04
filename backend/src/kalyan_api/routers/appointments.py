@@ -42,6 +42,7 @@ def _to_read_schema(appt: Appointment) -> AppointmentRead:
         patient_name=appt.patient.full_name,
         patient_mobile=appt.patient.mobile,
         doctor_id=appt.doctor_id,
+        department_id=appt.department_id,
         doctor_name_en=appt.doctor.name_en,
         doctor_name_hi=appt.doctor.name_hi,
         appointment_date=appt.appointment_date,
@@ -106,6 +107,7 @@ def book_appointment(
     appt = Appointment(
         patient_id=payload.patient_id,
         doctor_id=payload.doctor_id,
+        department_id=payload.department_id,
         appointment_date=payload.appointment_date,
         token_number=token_num,
         status=AppointmentStatus.BOOKED.value,
