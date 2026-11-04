@@ -89,6 +89,8 @@ PERMISSION_LABELS: dict[Permission, str] = {
     Permission.SESSION_READ: "View active login sessions",
     Permission.SESSION_REVOKE: "Sign out login sessions",
     Permission.SECURITY_READ: "View security policy",
+    Permission.SECURITY_WRITE: "Tighten security policy",
+    Permission.BACKUP_CONFIGURE: "Configure backup schedule and retention",
     Permission.SYSTEM_READ: "View system health",
 }
 

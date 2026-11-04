@@ -2,6 +2,7 @@ import type { ReactNode } from 'react'
 import type { PatientOut, ClinicSettingsOut } from '../api/types'
 import {
   LetterheadBanner,
+  PrintNote,
   LetterheadDoctors,
   LetterheadFooter,
   PatientStrip,
@@ -93,6 +94,7 @@ export function RegistrationCard({ patient, settings, onClose }: RegistrationCar
         data-testid="registration-sheet"
       >
         <LetterheadBanner clinicName={clinicNameEn} />
+        <PrintNote en={settings?.print_header_en} hi={settings?.print_header_hi} testId="print-header-note" />
         <LetterheadDoctors />
         <PatientStrip
           values={{

@@ -51,6 +51,18 @@ def receipts_issued_in_current_cycle(session: Session, cycle: str) -> int:
     return issued or 0
 
 
+def format_receipt_number(cycle_key: str, number: int) -> str:
+    """Render a receipt number for a cycle key."""
+    return f"RCP-{cycle_key}-{number:04d}"
+
+
+def preview_next_receipt_number(session: Session, cycle: str) -> str:
+    """Show the number the next payment would receive, without allocating it."""
+    return format_receipt_number(
+        current_cycle_key(cycle), receipts_issued_in_current_cycle(session, cycle) + 1
+    )
+
+
 def allocate_next_receipt_number(
     session: Session,
     cycle: str = "FINANCIAL_YEAR",
@@ -84,4 +96,4 @@ def allocate_next_receipt_number(
     session.flush()
     next_num = seq_record.last_number
 
-    return f"RCP-{cycle_key}-{next_num:04d}"
+    return format_receipt_number(cycle_key, next_num)

@@ -10,6 +10,7 @@ Guarantees:
 import secrets
 import uuid
 from datetime import UTC, datetime
+from pathlib import Path
 from typing import Any
 
 import pytest
@@ -98,6 +99,16 @@ def test_matrix_completeness_negative_control() -> None:
 
     uncovered = check_matrix_completeness(dummy_app, MATRIX)
     assert "GET /api/unlisted-protected" in uncovered
+
+
+@pytest.fixture(autouse=True)
+def _no_real_dump(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The matrix tests authorization only, so the admin backup cell needs no real pg_dump."""
+
+    def _write_placeholder(destination_file: Path, _settings: Settings | None = None) -> None:
+        destination_file.write_text("-- matrix placeholder\n", encoding="utf-8")
+
+    monkeypatch.setattr("kalyan_api.services.backup_service.dump_database", _write_placeholder)
 
 
 @pytest.mark.parametrize(

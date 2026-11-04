@@ -34,6 +34,7 @@ from kalyan_api.services.backup_service import (
 from kalyan_api.services.integrity_service import run_integrity_audit
 
 
+@pytest.mark.real_restore
 def test_phase16_complete_gate(
     client: TestClient,
     login_client: Any,

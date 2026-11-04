@@ -19,6 +19,7 @@ import {
 import { AppShell } from '../../components/AppShell'
 import { InlineAlert } from '../../components/InlineAlert'
 import { Modal } from '../../components/Modal'
+import { BackupSchedulePanel } from './BackupSchedulePanel'
 
 const IST_ZONE = 'Asia/Kolkata'
 
@@ -288,6 +289,8 @@ export function BackupManagerPage() {
             </div>
           </form>
         </section>
+
+        <BackupSchedulePanel />
 
         <section className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-xs" aria-labelledby="archives-heading">
           <div className="flex items-center justify-between gap-3 border-b border-slate-200 bg-slate-50 p-4">

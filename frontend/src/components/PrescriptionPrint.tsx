@@ -3,6 +3,7 @@ import { Modal } from './Modal'
 import { useClinicSettings } from '../api/queries'
 import {
   LetterheadBanner,
+  PrintNote,
   LetterheadDoctors,
   LetterheadFooter,
   PatientStrip,
@@ -63,6 +64,7 @@ export function PrescriptionPrint({ prescription, onClose }: PrescriptionPrintPr
         data-testid="prescription-sheet"
       >
         <LetterheadBanner clinicName={clinicNameEn} />
+        <PrintNote en={settings?.print_header_en} hi={settings?.print_header_hi} testId="print-header-note" />
         <LetterheadDoctors />
         <PatientStrip
           values={{ name: prescription.patient_name, date: issuedOn }}

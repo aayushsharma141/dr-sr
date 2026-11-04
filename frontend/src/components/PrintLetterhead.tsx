@@ -49,6 +49,17 @@ const DOCTORS = [
   },
 ]
 
+/** Optional administrator text for a printed document; renders nothing until it is set. */
+export function PrintNote({ en, hi, testId }: { en?: string | null; hi?: string | null; testId: string }) {
+  if (!en && !hi) return null
+  return (
+    <div data-testid={testId} className="mt-1 text-center text-[11px] text-slate-800">
+      {en && <p>{en}</p>}
+      {hi && <p lang="hi">{hi}</p>}
+    </div>
+  )
+}
+
 export function LetterheadBanner({ clinicName }: { clinicName: string }) {
   return (
     <div

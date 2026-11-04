@@ -32,6 +32,7 @@ from kalyan_api.models import (
 from kalyan_api.routers.system import measure_volume
 from kalyan_api.services import billing_service
 from kalyan_api.services.audit_service import AuditAction, Outcome
+from kalyan_api.services.backup_schedule_service import is_overdue
 from kalyan_api.services.backup_service import latest_backup_info
 
 router = APIRouter(tags=["areas"])
@@ -255,8 +256,17 @@ def _build_alerts(
     last_backup_failure_at: datetime | None,
     locked_accounts: int,
     last_integrity: LastIntegrityCheckOut | None,
+    schedule_overdue: bool,
 ) -> list[OverviewAlertOut]:
     alerts: list[OverviewAlertOut] = []
+    if schedule_overdue:
+        alerts.append(
+            OverviewAlertOut(
+                code="scheduled_backup_overdue",
+                severity="error",
+                message="A scheduled backup did not run. Check the Windows scheduled task.",
+            )
+        )
     if last_backup is None:
         alerts.append(
             OverviewAlertOut(
@@ -454,7 +464,13 @@ def get_admin_overview(
         last_backup_failure_at=last_backup_failure_at,
         last_integrity_check=last_integrity,
         storage=storage,
-        alerts=_build_alerts(last_backup, last_backup_failure_at, locked_accounts, last_integrity),
+        alerts=_build_alerts(
+            last_backup,
+            last_backup_failure_at,
+            locked_accounts,
+            last_integrity,
+            is_overdue(session, clock.utcnow()),
+        ),
     )
 
 

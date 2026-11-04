@@ -61,6 +61,19 @@ class PaymentReversalCreate(BaseModel):
     )
 
 
+class BillingConfigurationOut(BaseModel):
+    """How billing works on this system today. Read-only: these are not editable settings."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    receipt_sequence_cycle: str
+    current_cycle_key: str
+    receipts_issued_in_cycle: int
+    next_receipt_number: str
+    payment_methods: list[str]
+    reversal_roles: list[str]
+
+
 class PendingDueOut(BaseModel):
     """Schema for reporting active treatment package pending dues (BIL-03)."""
 

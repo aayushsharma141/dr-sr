@@ -260,6 +260,11 @@ def _reverse_payment_payload(_target: Any = None) -> dict[str, Any]:
     }
 
 
+def _empty_settings_update(_target: Any = None) -> dict[str, Any]:
+    """Authorized callers reach validation; the 422 proves the route is open to them."""
+    return {}
+
+
 def _create_backup_payload(_target: Any = None) -> dict[str, Any]:
     return {"label": "matrix_test"}
 
@@ -1147,6 +1152,78 @@ MATRIX: list[MatrixRow] = [
     MatrixRow(
         method="GET",
         path="/api/users/{id}/login-history",
+        body_factory=None,
+        expected={
+            "anonymous": 401,
+            "admin": 200,
+            "reception": 403,
+            "doctor_a": 403,
+            "doctor_b": 403,
+        },
+    ),
+    MatrixRow(
+        method="PATCH",
+        path="/api/security/policy",
+        body_factory=_empty_settings_update,
+        expected={
+            "anonymous": 401,
+            "admin": 422,
+            "reception": 403,
+            "doctor_a": 403,
+            "doctor_b": 403,
+        },
+    ),
+    MatrixRow(
+        method="GET",
+        path="/api/operations/backup-settings",
+        body_factory=None,
+        expected={
+            "anonymous": 401,
+            "admin": 200,
+            "reception": 403,
+            "doctor_a": 403,
+            "doctor_b": 403,
+        },
+    ),
+    MatrixRow(
+        method="PATCH",
+        path="/api/operations/backup-settings",
+        body_factory=_empty_settings_update,
+        expected={
+            "anonymous": 401,
+            "admin": 422,
+            "reception": 403,
+            "doctor_a": 403,
+            "doctor_b": 403,
+        },
+    ),
+    MatrixRow(
+        method="GET",
+        path="/api/operations/backup-runs",
+        body_factory=None,
+        expected={
+            "anonymous": 401,
+            "admin": 200,
+            "reception": 403,
+            "doctor_a": 403,
+            "doctor_b": 403,
+        },
+    ),
+    MatrixRow(
+        method="GET",
+        path="/api/billing/configuration",
+        body_factory=None,
+        expected={
+            "anonymous": 401,
+            "admin": 200,
+            "reception": 403,
+            "doctor_a": 403,
+            "doctor_b": 403,
+        },
+    ),
+    MatrixRow(
+        method="GET",
+        path="/api/billing/ledger",
         body_factory=None,
         expected={
             "anonymous": 401,

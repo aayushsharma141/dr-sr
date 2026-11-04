@@ -849,6 +849,287 @@
         "title": "BackupCreateRequest",
         "type": "object"
       },
+      "BackupRunOut": {
+        "additionalProperties": false,
+        "description": "One attempted backup.",
+        "properties": {
+          "copied_to": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Copied To"
+          },
+          "error_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Type"
+          },
+          "filename": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Filename"
+          },
+          "finished_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finished At"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "outcome": {
+            "title": "Outcome",
+            "type": "string"
+          },
+          "pruned_count": {
+            "title": "Pruned Count",
+            "type": "integer"
+          },
+          "size_bytes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Size Bytes"
+          },
+          "started_at": {
+            "format": "date-time",
+            "title": "Started At",
+            "type": "string"
+          },
+          "trigger": {
+            "title": "Trigger",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "trigger",
+          "outcome",
+          "started_at",
+          "finished_at",
+          "filename",
+          "size_bytes",
+          "copied_to",
+          "pruned_count",
+          "error_type"
+        ],
+        "title": "BackupRunOut",
+        "type": "object"
+      },
+      "BackupSettingsOut": {
+        "additionalProperties": false,
+        "description": "Persisted backup schedule with the next planned run and approved second-copy folders.",
+        "properties": {
+          "approved_destinations": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Approved Destinations",
+            "type": "array"
+          },
+          "destination_dir": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Destination Dir"
+          },
+          "frequency": {
+            "enum": [
+              "DAILY",
+              "WEEKLY"
+            ],
+            "title": "Frequency",
+            "type": "string"
+          },
+          "next_run_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Run At"
+          },
+          "overdue": {
+            "title": "Overdue",
+            "type": "boolean"
+          },
+          "retention_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Retention Count"
+          },
+          "run_at": {
+            "format": "time",
+            "title": "Run At",
+            "type": "string"
+          },
+          "schedule_enabled": {
+            "title": "Schedule Enabled",
+            "type": "boolean"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          },
+          "version_id": {
+            "title": "Version Id",
+            "type": "integer"
+          },
+          "weekly_day": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Weekly Day"
+          }
+        },
+        "required": [
+          "schedule_enabled",
+          "frequency",
+          "run_at",
+          "weekly_day",
+          "destination_dir",
+          "retention_count",
+          "version_id",
+          "updated_at",
+          "next_run_at",
+          "overdue",
+          "approved_destinations"
+        ],
+        "title": "BackupSettingsOut",
+        "type": "object"
+      },
+      "BackupSettingsUpdate": {
+        "additionalProperties": false,
+        "description": "Full replacement of the backup schedule, with a mandatory reason.",
+        "properties": {
+          "destination_dir": {
+            "anyOf": [
+              {
+                "maxLength": 1024,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Destination Dir"
+          },
+          "frequency": {
+            "enum": [
+              "DAILY",
+              "WEEKLY"
+            ],
+            "title": "Frequency",
+            "type": "string"
+          },
+          "reason": {
+            "maxLength": 500,
+            "minLength": 10,
+            "title": "Reason",
+            "type": "string"
+          },
+          "retention_count": {
+            "anyOf": [
+              {
+                "maximum": 3650.0,
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Retention Count"
+          },
+          "run_at": {
+            "format": "time",
+            "title": "Run At",
+            "type": "string"
+          },
+          "schedule_enabled": {
+            "title": "Schedule Enabled",
+            "type": "boolean"
+          },
+          "version_id": {
+            "minimum": 1.0,
+            "title": "Version Id",
+            "type": "integer"
+          },
+          "weekly_day": {
+            "anyOf": [
+              {
+                "maximum": 6.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Weekly Day"
+          }
+        },
+        "required": [
+          "version_id",
+          "schedule_enabled",
+          "frequency",
+          "run_at",
+          "reason"
+        ],
+        "title": "BackupSettingsUpdate",
+        "type": "object"
+      },
       "BackupVerifyResponse": {
         "additionalProperties": false,
         "description": "Result of re-hashing a single archive against its manifest.",
@@ -872,6 +1153,52 @@
           "details"
         ],
         "title": "BackupVerifyResponse",
+        "type": "object"
+      },
+      "BillingConfigurationOut": {
+        "additionalProperties": false,
+        "description": "How billing works on this system today. Read-only: these are not editable settings.",
+        "properties": {
+          "current_cycle_key": {
+            "title": "Current Cycle Key",
+            "type": "string"
+          },
+          "next_receipt_number": {
+            "title": "Next Receipt Number",
+            "type": "string"
+          },
+          "payment_methods": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Payment Methods",
+            "type": "array"
+          },
+          "receipt_sequence_cycle": {
+            "title": "Receipt Sequence Cycle",
+            "type": "string"
+          },
+          "receipts_issued_in_cycle": {
+            "title": "Receipts Issued In Cycle",
+            "type": "integer"
+          },
+          "reversal_roles": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Reversal Roles",
+            "type": "array"
+          }
+        },
+        "required": [
+          "receipt_sequence_cycle",
+          "current_cycle_key",
+          "receipts_issued_in_cycle",
+          "next_receipt_number",
+          "payment_methods",
+          "reversal_roles"
+        ],
+        "title": "BillingConfigurationOut",
         "type": "object"
       },
       "ChangePasswordRequest": {
@@ -940,6 +1267,10 @@
             "title": "Id",
             "type": "integer"
           },
+          "location_line": {
+            "title": "Location Line",
+            "type": "string"
+          },
           "name_en": {
             "title": "Name En",
             "type": "string"
@@ -1000,6 +1331,21 @@
             "title": "Receipt Sequence Cycle",
             "type": "string"
           },
+          "trust_name_en": {
+            "title": "Trust Name En",
+            "type": "string"
+          },
+          "trust_name_hi": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Trust Name Hi"
+          },
           "updated_at": {
             "format": "date-time",
             "title": "Updated At",
@@ -1014,6 +1360,8 @@
           "id",
           "name_en",
           "name_hi",
+          "trust_name_en",
+          "location_line",
           "address_1",
           "phone",
           "receipt_sequence_cycle",
@@ -1081,6 +1429,19 @@
               }
             ],
             "title": "Email"
+          },
+          "location_line": {
+            "anyOf": [
+              {
+                "maxLength": 120,
+                "minLength": 2,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Location Line"
           },
           "name_en": {
             "maxLength": 120,
@@ -1153,6 +1514,31 @@
             "pattern": "^(FINANCIAL_YEAR|CALENDAR_YEAR)$",
             "title": "Receipt Sequence Cycle",
             "type": "string"
+          },
+          "trust_name_en": {
+            "anyOf": [
+              {
+                "maxLength": 120,
+                "minLength": 2,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Trust Name En"
+          },
+          "trust_name_hi": {
+            "anyOf": [
+              {
+                "maxLength": 120,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Trust Name Hi"
           },
           "version_id": {
             "minimum": 1.0,
@@ -3193,6 +3579,31 @@
         "title": "PermissionInfo",
         "type": "object"
       },
+      "PolicyFieldLimits": {
+        "additionalProperties": false,
+        "description": "Inclusive range a field may take and the environment value it starts from.",
+        "properties": {
+          "baseline": {
+            "title": "Baseline",
+            "type": "integer"
+          },
+          "maximum": {
+            "title": "Maximum",
+            "type": "integer"
+          },
+          "minimum": {
+            "title": "Minimum",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "baseline",
+          "minimum",
+          "maximum"
+        ],
+        "title": "PolicyFieldLimits",
+        "type": "object"
+      },
       "PrescriptionCreate": {
         "additionalProperties": false,
         "description": "Schema for doctor creating a prescription.",
@@ -3923,9 +4334,16 @@
         "description": "Currently effective authentication and session security settings.",
         "properties": {
           "editable": {
-            "const": false,
+            "const": true,
             "title": "Editable",
             "type": "boolean"
+          },
+          "limits": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/PolicyFieldLimits"
+            },
+            "title": "Limits",
+            "type": "object"
           },
           "lockout_minutes": {
             "title": "Lockout Minutes",
@@ -3952,7 +4370,10 @@
             "type": "integer"
           },
           "source": {
-            "const": "environment",
+            "enum": [
+              "environment",
+              "administrator"
+            ],
             "title": "Source",
             "type": "string"
           },
@@ -3962,6 +4383,15 @@
           },
           "throttle_window_minutes": {
             "title": "Throttle Window Minutes",
+            "type": "integer"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          },
+          "version_id": {
+            "title": "Version Id",
             "type": "integer"
           }
         },
@@ -3975,9 +4405,96 @@
           "password_min_length",
           "password_max_length",
           "source",
-          "editable"
+          "editable",
+          "limits",
+          "version_id",
+          "updated_at"
         ],
         "title": "SecurityPolicyOut",
+        "type": "object"
+      },
+      "SecurityPolicyUpdate": {
+        "additionalProperties": false,
+        "description": "Full replacement of the administrator-editable fields, with a mandatory reason.",
+        "properties": {
+          "lockout_minutes": {
+            "title": "Lockout Minutes",
+            "type": "integer"
+          },
+          "lockout_threshold": {
+            "title": "Lockout Threshold",
+            "type": "integer"
+          },
+          "password_min_length": {
+            "title": "Password Min Length",
+            "type": "integer"
+          },
+          "reason": {
+            "maxLength": 500,
+            "minLength": 10,
+            "title": "Reason",
+            "type": "string"
+          },
+          "session_absolute_hours": {
+            "title": "Session Absolute Hours",
+            "type": "integer"
+          },
+          "session_idle_minutes": {
+            "title": "Session Idle Minutes",
+            "type": "integer"
+          },
+          "version_id": {
+            "minimum": 1.0,
+            "title": "Version Id",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "version_id",
+          "session_idle_minutes",
+          "session_absolute_hours",
+          "lockout_threshold",
+          "lockout_minutes",
+          "password_min_length",
+          "reason"
+        ],
+        "title": "SecurityPolicyUpdate",
+        "type": "object"
+      },
+      "ServiceCheckOut": {
+        "additionalProperties": false,
+        "description": "One live check of something the hospital depends on. No thresholds are invented here.",
+        "properties": {
+          "detail": {
+            "title": "Detail",
+            "type": "string"
+          },
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "ok",
+              "warning",
+              "error",
+              "not_configured"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "key",
+          "label",
+          "status",
+          "detail"
+        ],
+        "title": "ServiceCheckOut",
         "type": "object"
       },
       "SetupAdminRequest": {
@@ -4105,6 +4622,13 @@
             "title": "App Version",
             "type": "string"
           },
+          "checks": {
+            "items": {
+              "$ref": "#/components/schemas/ServiceCheckOut"
+            },
+            "title": "Checks",
+            "type": "array"
+          },
           "code_head_revision": {
             "anyOf": [
               {
@@ -4192,7 +4716,8 @@
           "process_started_at",
           "uptime_seconds",
           "storage",
-          "frontend_served"
+          "frontend_served",
+          "checks"
         ],
         "title": "SystemStatusOut",
         "type": "object"
@@ -5747,6 +6272,110 @@
         ]
       }
     },
+    "/api/billing/configuration": {
+      "get": {
+        "description": "Report the receipt cycle, payment methods and reversal authority actually in force.",
+        "operationId": "get_billing_configuration_api_billing_configuration_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BillingConfigurationOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Get Billing Configuration",
+        "tags": [
+          "billing"
+        ]
+      }
+    },
+    "/api/billing/ledger": {
+      "get": {
+        "description": "Find payments by receipt number, URN or patient name, newest first.",
+        "operationId": "search_ledger_api_billing_ledger_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "q",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 120,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Q"
+            }
+          },
+          {
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "default": "all",
+              "enum": [
+                "all",
+                "active",
+                "reversed"
+              ],
+              "title": "Status",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 200,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/PaymentOut"
+                  },
+                  "title": "Response Search Ledger Api Billing Ledger Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Search Ledger",
+        "tags": [
+          "billing"
+        ]
+      }
+    },
     "/api/billing/pending-dues": {
       "get": {
         "description": "List active treatment packages with outstanding pending balances (BIL-03).",
@@ -6358,6 +6987,118 @@
         "summary": "Health Check",
         "tags": [
           "health"
+        ]
+      }
+    },
+    "/api/operations/backup-runs": {
+      "get": {
+        "description": "Return recent manual and scheduled backup attempts, including failures.",
+        "operationId": "list_backup_runs_api_operations_backup_runs_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 20,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/BackupRunOut"
+                  },
+                  "title": "Response List Backup Runs Api Operations Backup Runs Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Recent backup attempts, newest first (BAK-01)",
+        "tags": [
+          "operations"
+        ]
+      }
+    },
+    "/api/operations/backup-settings": {
+      "get": {
+        "description": "Return the persisted backup schedule used by the scheduled task.",
+        "operationId": "get_backup_settings_api_operations_backup_settings_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BackupSettingsOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Read the backup schedule, retention and second-copy destination (BAK-01)",
+        "tags": [
+          "operations"
+        ]
+      },
+      "patch": {
+        "description": "Validate and store the backup schedule; the scheduled task reads it on its next tick.",
+        "operationId": "update_backup_settings_api_operations_backup_settings_patch",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BackupSettingsUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BackupSettingsOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Change the backup schedule, retention and second-copy destination (BAK-01)",
+        "tags": [
+          "operations"
         ]
       }
     },
@@ -7524,7 +8265,7 @@
     },
     "/api/security/policy": {
       "get": {
-        "description": "Return the effective session, lockout, throttle and password-length settings.",
+        "description": "Return the enforced session, lockout, throttle and password-length settings.",
         "operationId": "get_security_policy_api_security_policy_get",
         "responses": {
           "200": {
@@ -7539,6 +8280,46 @@
           }
         },
         "summary": "Get Security Policy",
+        "tags": [
+          "security"
+        ]
+      },
+      "patch": {
+        "description": "Store tighter security values; they take effect on the next request.",
+        "operationId": "update_security_policy_api_security_policy_patch",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SecurityPolicyUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SecurityPolicyOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Security Policy",
         "tags": [
           "security"
         ]

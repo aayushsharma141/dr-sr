@@ -20,6 +20,9 @@ from kalyan_api.services.receipt_service import current_cycle_key
 MUTABLE_FIELDS: tuple[str, ...] = (
     "name_en",
     "name_hi",
+    "trust_name_en",
+    "trust_name_hi",
+    "location_line",
     "address_1",
     "address_2",
     "phone",
@@ -162,6 +165,8 @@ def test_patch_settings_admin_success_and_audit(
     # 3. Audit before/after are complete: every mutable field plus version_id
     expected_after = {k: v for k, v in update_payload.items() if k != "version_id"}
     expected_after["version_id"] = curr_version + 1
+    for identity_field in ("trust_name_en", "trust_name_hi", "location_line"):
+        expected_after[identity_field] = current[identity_field]
     assert latest_audit.after_data == expected_after
     assert set(latest_audit.before_data) == set(MUTABLE_FIELDS) | {"version_id"}
     for field in MUTABLE_FIELDS:

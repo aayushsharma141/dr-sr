@@ -281,8 +281,29 @@ export interface SecurityPolicyOut {
   throttle_window_minutes: number
   password_min_length: number
   password_max_length: number
-  source: 'environment'
-  editable: false
+  source: 'environment' | 'administrator'
+  editable: true
+  limits: Record<SecurityPolicyField, PolicyFieldLimits>
+  version_id: number
+  updated_at: string
+}
+
+export type SecurityPolicyField =
+  | 'session_idle_minutes'
+  | 'session_absolute_hours'
+  | 'lockout_threshold'
+  | 'lockout_minutes'
+  | 'password_min_length'
+
+export interface PolicyFieldLimits {
+  baseline: number
+  minimum: number
+  maximum: number
+}
+
+export type SecurityPolicyUpdate = Record<SecurityPolicyField, number> & {
+  version_id: number
+  reason: string
 }
 
 export interface PasswordPolicyOut {
@@ -314,6 +335,61 @@ export interface SystemStatusOut {
   uptime_seconds: number
   storage: StorageVolumeOut[]
   frontend_served: boolean
+  checks: ServiceCheckOut[]
+}
+
+export interface ServiceCheckOut {
+  key: string
+  label: string
+  status: 'ok' | 'warning' | 'error' | 'not_configured'
+  detail: string
+}
+
+export interface BackupSettingsOut {
+  schedule_enabled: boolean
+  frequency: 'DAILY' | 'WEEKLY'
+  run_at: string
+  weekly_day: number | null
+  destination_dir: string | null
+  retention_count: number | null
+  version_id: number
+  updated_at: string
+  next_run_at: string | null
+  overdue: boolean
+  approved_destinations: string[]
+}
+
+export interface BackupSettingsUpdate {
+  version_id: number
+  schedule_enabled: boolean
+  frequency: 'DAILY' | 'WEEKLY'
+  run_at: string
+  weekly_day: number | null
+  destination_dir: string | null
+  retention_count: number | null
+  reason: string
+}
+
+export interface BackupRunOut {
+  id: number
+  trigger: 'MANUAL' | 'SCHEDULED'
+  outcome: 'RUNNING' | 'SUCCESS' | 'FAILURE'
+  started_at: string
+  finished_at: string | null
+  filename: string | null
+  size_bytes: number | null
+  copied_to: string | null
+  pruned_count: number
+  error_type: string | null
+}
+
+export interface BillingConfigurationOut {
+  receipt_sequence_cycle: 'FINANCIAL_YEAR' | 'CALENDAR_YEAR'
+  current_cycle_key: string
+  receipts_issued_in_cycle: number
+  next_receipt_number: string
+  payment_methods: string[]
+  reversal_roles: string[]
 }
 
 export interface SetupStatusResponse {
@@ -332,6 +408,9 @@ export interface ClinicSettingsOut {
   id: number
   name_en: string
   name_hi: string
+  trust_name_en: string
+  trust_name_hi: string | null
+  location_line: string
   address_1: string
   address_2: string | null
   phone: string
@@ -350,6 +429,9 @@ export interface ClinicSettingsOut {
 export interface ClinicSettingsUpdate {
   name_en: string
   name_hi: string
+  trust_name_en?: string
+  trust_name_hi?: string | null
+  location_line?: string
   address_1: string
   address_2?: string | null
   phone: string

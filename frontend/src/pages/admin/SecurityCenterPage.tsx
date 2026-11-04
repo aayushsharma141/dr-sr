@@ -4,6 +4,7 @@ import { ApiError } from '../../api/client'
 import { AppShell } from '../../components/AppShell'
 import { InlineAlert } from '../../components/InlineAlert'
 import { Modal } from '../../components/Modal'
+import { SecurityPolicyEditor } from './SecurityPolicyEditor'
 import { ADMIN_REASON_MAX_LENGTH, type ActiveSessionOut, type Role } from '../../api/types'
 
 // ---------------------------------------------------------------------------
@@ -116,6 +117,7 @@ const SECTION = 'rounded-lg border border-neutral-200 bg-white p-5 shadow-xs'
 
 function SecurityPolicySection() {
   const { data, isPending, isError, error, refetch } = useSecurityPolicy()
+  const [editing, setEditing] = useState(false)
   const rows: { label: string; value: string }[] = data
     ? [
         { label: 'Sign out after inactivity', value: `${data.session_idle_minutes} minutes` },
@@ -136,7 +138,10 @@ function SecurityPolicySection() {
         Current security policy
       </h2>
       <p className="mt-1 text-sm text-neutral-700">
-        Set at server installation (environment). Changing these values requires client approval.
+        {data?.source === 'administrator'
+          ? 'Tightened by an administrator from the values set at server installation.'
+          : 'Set at server installation.'}{' '}
+        Administrators can make these stricter. Relaxing them needs a server change and client approval.
       </p>
       {isPending && (
         <p role="status" className="mt-4 text-sm text-neutral-700">
@@ -161,6 +166,12 @@ function SecurityPolicySection() {
           ))}
         </dl>
       )}
+      {data && (
+        <button type="button" onClick={() => setEditing(true)} className={`${BTN_SECONDARY} mt-4`}>
+          Tighten policy
+        </button>
+      )}
+      {data && editing && <SecurityPolicyEditor policy={data} onClose={() => setEditing(false)} />}
     </section>
   )
 }

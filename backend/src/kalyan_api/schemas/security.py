@@ -1,13 +1,24 @@
-"""Pydantic schemas for read-only security policy visibility (Admin module 09).
+"""Pydantic schemas for the security policy (Admin module 09).
 
-The values are locked/default decisions (D-07 session and lockout timings, EG-19 password
-length bounds) sourced from environment configuration. Runtime editing is a pending client
-decision, so these schemas describe read-only responses only.
+The environment holds the baseline (D-07 session and lockout timings, EG-19 password length).
+Administrators may store tighter values within the limits reported here. Throttle settings and
+the maximum password length stay environment-only.
 """
 
+from datetime import datetime
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field, field_validator
+
+
+class PolicyFieldLimits(BaseModel):
+    """Inclusive range a field may take and the environment value it starts from."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    baseline: int
+    minimum: int
+    maximum: int
 
 
 class SecurityPolicyOut(BaseModel):
@@ -23,8 +34,33 @@ class SecurityPolicyOut(BaseModel):
     throttle_window_minutes: int
     password_min_length: int
     password_max_length: int
-    source: Literal["environment"]
-    editable: Literal[False]
+    source: Literal["environment", "administrator"]
+    editable: Literal[True]
+    limits: dict[str, PolicyFieldLimits]
+    version_id: int
+    updated_at: datetime
+
+
+class SecurityPolicyUpdate(BaseModel):
+    """Full replacement of the administrator-editable fields, with a mandatory reason."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    version_id: int = Field(ge=1)
+    session_idle_minutes: int
+    session_absolute_hours: int
+    lockout_threshold: int
+    lockout_minutes: int
+    password_min_length: int
+    reason: str = Field(min_length=10, max_length=500)
+
+    @field_validator("reason")
+    @classmethod
+    def reason_not_blank(cls, value: str) -> str:
+        stripped = value.strip()
+        if len(stripped) < 10:
+            raise ValueError("reason must be at least 10 characters")
+        return stripped
 
 
 class PasswordPolicyOut(BaseModel):

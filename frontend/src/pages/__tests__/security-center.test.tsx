@@ -35,7 +35,16 @@ const policy: SecurityPolicyOut = {
   password_min_length: 10,
   password_max_length: 128,
   source: 'environment',
-  editable: false,
+  editable: true,
+  limits: {
+    session_idle_minutes: { baseline: 30, minimum: 5, maximum: 30 },
+    session_absolute_hours: { baseline: 12, minimum: 1, maximum: 12 },
+    lockout_threshold: { baseline: 5, minimum: 3, maximum: 5 },
+    lockout_minutes: { baseline: 15, minimum: 15, maximum: 1440 },
+    password_min_length: { baseline: 10, minimum: 10, maximum: 128 },
+  },
+  version_id: 1,
+  updated_at: '2026-11-04T03:00:00Z',
 }
 
 const sessions: ActiveSessionOut[] = [
@@ -166,12 +175,8 @@ describe('Security & Access centre (admin module 09)', () => {
     renderPage()
 
     const section = screen.getByRole('region', { name: 'Current security policy' })
-    expect(
-      within(section).getByText(
-        'Set at server installation (environment). Changing these values requires client approval.',
-      ),
-    ).toBeInTheDocument()
     expect(await within(section).findByText('30 minutes')).toBeInTheDocument()
+    expect(within(section).getByText(/Set at server installation/)).toBeInTheDocument()
     expect(within(section).getByText('12 hours')).toBeInTheDocument()
     expect(within(section).getByText('5')).toBeInTheDocument()
     expect(within(section).getByText('10 to 128 characters')).toBeInTheDocument()

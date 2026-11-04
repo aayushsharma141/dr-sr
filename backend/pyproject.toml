@@ -44,6 +44,7 @@ pythonpath = ["tests"]
 markers = [
     "concurrency: Concurrency stress and race condition tests",
     "db_owner: Tests requiring PostgreSQL owner role privileges",
+    "real_restore: Tests running pg_dump or DROP SCHEMA against the throwaway restore database",
     "slow: Tests with extended execution time",
     "needs_build: Tests requiring frontend dist static assets",
 ]

@@ -5,6 +5,7 @@ no usernames of database roles.
 """
 
 from datetime import datetime
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict
 
@@ -18,6 +19,17 @@ class StorageVolumeOut(BaseModel):
     path_label: str
     total_bytes: int | None
     free_bytes: int | None
+
+
+class ServiceCheckOut(BaseModel):
+    """One live check of something the hospital depends on. No thresholds are invented here."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    key: str
+    label: str
+    status: Literal["ok", "warning", "error", "not_configured"]
+    detail: str
 
 
 class SystemStatusOut(BaseModel):
@@ -39,3 +51,4 @@ class SystemStatusOut(BaseModel):
     uptime_seconds: int
     storage: list[StorageVolumeOut]
     frontend_served: bool
+    checks: list[ServiceCheckOut]

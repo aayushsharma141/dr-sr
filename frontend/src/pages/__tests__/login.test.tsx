@@ -471,7 +471,7 @@ describe('Login & Role Navigation Flow', () => {
 
     await waitFor(() => {
       expect(
-        screen.getByText('You were signed out after 30 minutes of inactivity'),
+        screen.getByText('You were signed out because this computer was left inactive'),
       ).toBeInTheDocument()
     })
   })

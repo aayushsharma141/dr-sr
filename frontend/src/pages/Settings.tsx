@@ -14,6 +14,9 @@ type ReceiptCycle = ClinicSettingsOut['receipt_sequence_cycle']
 interface SettingsForm {
   name_en: string
   name_hi: string
+  trust_name_en: string
+  trust_name_hi: string
+  location_line: string
   address_1: string
   address_2: string
   phone: string
@@ -33,6 +36,9 @@ const FIELD_NAMES: readonly FieldName[] = [
   'name_en',
   'name_hi',
   'address_1',
+  'trust_name_en',
+  'trust_name_hi',
+  'location_line',
   'address_2',
   'phone',
   'email',
@@ -55,6 +61,9 @@ function toForm(s: ClinicSettingsOut): SettingsForm {
   return {
     name_en: s.name_en,
     name_hi: s.name_hi,
+    trust_name_en: s.trust_name_en ?? '',
+    trust_name_hi: s.trust_name_hi ?? '',
+    location_line: s.location_line ?? '',
     address_1: s.address_1,
     address_2: s.address_2 ?? '',
     phone: s.phone,
@@ -461,6 +470,20 @@ export function Settings() {
               <Field id="settings-name_hi" label="Clinic Name (Hindi)" error={fieldErrors.name_hi}>
                 {textInput('name_hi', { required: true, maxLength: 120, lang: 'hi' })}
               </Field>
+              <Field id="settings-trust_name_en" label="Trust Name (English)" error={fieldErrors.trust_name_en}>
+                {textInput('trust_name_en', { required: true, maxLength: 120 })}
+              </Field>
+              <Field id="settings-trust_name_hi" label="Trust Name (Hindi)" error={fieldErrors.trust_name_hi}>
+                {textInput('trust_name_hi', { maxLength: 120, lang: 'hi' })}
+              </Field>
+              <Field
+                id="settings-location_line"
+                label="Location Line"
+                error={fieldErrors.location_line}
+                hint="Shown in the application header, for example Ara, Bhojpur, Bihar."
+              >
+                {textInput('location_line', { required: true, maxLength: 120 })}
+              </Field>
             </Section>
 
             <Section
@@ -548,7 +571,7 @@ export function Settings() {
               <div className="md:col-span-2 rounded-lg border border-neutral-300 bg-neutral-50 p-4 text-sm text-neutral-800">
                 <p className="font-semibold text-neutral-900">Where this text is printed today</p>
                 <ul className="mt-1 list-disc space-y-1 pl-5">
-                  <li>Print header (English and Hindi): not printed on any document yet.</li>
+                  <li>Print header (English and Hindi): prescriptions, registration cards and receipts, when filled in.</li>
                   <li>
                     Print footer (Hindi): payment receipts and the patient registration card. When it is blank,
                     receipts print their built-in Hindi thank-you line.

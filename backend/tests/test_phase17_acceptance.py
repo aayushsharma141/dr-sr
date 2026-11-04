@@ -21,6 +21,8 @@ Invariants verified:
    - CLI operations check-db runs and returns cleanly.
 """
 
+import pytest
+
 from pathlib import Path
 from typing import Any
 
@@ -34,6 +36,7 @@ from kalyan_api.services.backup_service import create_backup, restore_backup, ve
 from kalyan_api.services.integrity_service import run_integrity_audit
 
 
+@pytest.mark.real_restore
 def test_lan_health_and_cli_check(client: TestClient) -> None:
     """Verifies server health endpoint and CLI check-db tool respond cleanly for LAN watchdogs."""
     res = client.get("/api/health")
@@ -125,6 +128,7 @@ def test_multi_role_lan_simulation(
     assert rec_c.get("/api/audit-logs").status_code == 403
 
 
+@pytest.mark.real_restore
 def test_disaster_recovery_rehearsal(
     tmp_path: Path,
 ) -> None:

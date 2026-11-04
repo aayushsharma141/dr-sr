@@ -9,6 +9,7 @@ psycopg==3.3.6
 psycopg-binary==3.3.6
 argon2-cffi==25.1.0
 tzdata==2026.6
+python-multipart>=0.0.20
 
 [dev]
 pytest==9.2.0

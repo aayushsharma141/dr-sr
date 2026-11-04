@@ -238,6 +238,15 @@ def cmd_backup_create(destination: str | None = None, label: str | None = None) 
         return 1
 
 
+def cmd_backup_run_scheduled() -> int:
+    """Run the persisted backup schedule once; intended for the Windows Scheduled Task."""
+    from kalyan_api.services.backup_schedule_service import run_scheduled_backup
+
+    result = run_scheduled_backup(get_settings())
+    print(f"Scheduled backup: {result}")
+    return 1 if result == "failure" else 0
+
+
 def cmd_backup_restore(archive_path_str: str, force: bool = False) -> int:
     """Restore from a backup bundle with pre-flight verification and pre-snapshot."""
     from kalyan_api.services.backup_service import restore_backup
@@ -358,6 +367,12 @@ def build_parser() -> argparse.ArgumentParser:
     b_create.add_argument("--destination", help="Optional target directory")
     b_create.add_argument("--label", help="Optional backup label")
 
+    # Subcommand: backup-run-scheduled
+    subparsers.add_parser(
+        "backup-run-scheduled",
+        help="Run the configured backup schedule once if a backup is due",
+    )
+
     # Subcommand: backup-restore
     b_restore = subparsers.add_parser(
         "backup-restore", help="Restore system from verified backup bundle"
@@ -396,6 +411,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         )
     if args.command == "backup-create":
         return cmd_backup_create(destination=args.destination, label=args.label)
+    if args.command == "backup-run-scheduled":
+        return cmd_backup_run_scheduled()
     if args.command == "backup-restore":
         return cmd_backup_restore(archive_path_str=args.archive, force=args.force)
     if args.command == "backup-verify":

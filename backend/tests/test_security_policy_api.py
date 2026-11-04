@@ -42,18 +42,18 @@ def test_admin_reads_effective_policy(
     """Policy values equal the effective Settings and are flagged read-only."""
     res = login_client(admin_user).get(POLICY)
     assert res.status_code == 200
-    assert res.json() == {
-        "session_idle_minutes": test_settings.session_idle_minutes,
-        "session_absolute_hours": test_settings.session_absolute_hours,
-        "lockout_threshold": test_settings.lockout_threshold,
-        "lockout_minutes": test_settings.lockout_minutes,
-        "throttle_max_failures": test_settings.throttle_max_failures,
-        "throttle_window_minutes": test_settings.throttle_window_minutes,
-        "password_min_length": test_settings.password_min_length,
-        "password_max_length": test_settings.password_max_length,
-        "source": "environment",
-        "editable": False,
-    }
+    body = res.json()
+    assert body["session_idle_minutes"] == test_settings.session_idle_minutes
+    assert body["session_absolute_hours"] == test_settings.session_absolute_hours
+    assert body["lockout_threshold"] == test_settings.lockout_threshold
+    assert body["lockout_minutes"] == test_settings.lockout_minutes
+    assert body["throttle_max_failures"] == test_settings.throttle_max_failures
+    assert body["throttle_window_minutes"] == test_settings.throttle_window_minutes
+    assert body["password_min_length"] == test_settings.password_min_length
+    assert body["password_max_length"] == test_settings.password_max_length
+    assert body["source"] == "environment"
+    assert body["editable"] is True
+    assert body["limits"]["session_idle_minutes"]["maximum"] == test_settings.session_idle_minutes
 
 
 def test_policy_reflects_configured_overrides(db_session: Session, test_settings: Settings) -> None:
@@ -98,14 +98,15 @@ def test_policy_forbidden_for_non_admin_and_anonymous(
     assert login_client(doctor_a_user).get(POLICY).status_code == 403
 
 
-def test_policy_has_no_write_endpoints(
+def test_only_policy_patch_is_writable(
     login_client: Callable[..., TestClient], admin_user: User
 ) -> None:
-    """Runtime editing is a pending client decision: no write verbs are routed."""
+    """PATCH /policy is the single write path; see test_security_policy_update.py."""
     admin_c = login_client(admin_user)
-    for path in (POLICY, PASSWORD_POLICY):
-        for method in ("POST", "PUT", "PATCH", "DELETE"):
-            assert admin_c.request(method, path, json={}).status_code == 405, (method, path)
+    for method in ("POST", "PUT", "DELETE"):
+        assert admin_c.request(method, POLICY, json={}).status_code == 405, method
+    for method in ("POST", "PUT", "PATCH", "DELETE"):
+        assert admin_c.request(method, PASSWORD_POLICY, json={}).status_code == 405, method
 
 
 def test_password_policy_readable_by_every_authenticated_role(

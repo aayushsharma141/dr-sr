@@ -21,6 +21,7 @@ from kalyan_api.services.backup_service import (
 )
 
 
+@pytest.mark.real_restore
 def test_create_and_verify_backup_bundle(tmp_path: Path):
     """Test full backup creation and verification against active test database."""
     settings = get_settings()
@@ -52,6 +53,7 @@ def test_create_and_verify_backup_bundle(tmp_path: Path):
     assert any(p["filename"] == "test_photo_sample.jpg" for p in manifest["photos_manifest"])
 
 
+@pytest.mark.real_restore
 def test_backup_detects_corruption(tmp_path: Path):
     """Test that tampering with archive contents triggers verification failure."""
     dest_dir = tmp_path / "corrupt_test"

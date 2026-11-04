@@ -33,6 +33,9 @@ router = APIRouter(prefix="/settings", tags=["settings"])
 _SETTINGS_AUDIT_FIELDS: tuple[str, ...] = (
     "name_en",
     "name_hi",
+    "trust_name_en",
+    "trust_name_hi",
+    "location_line",
     "address_1",
     "address_2",
     "phone",
@@ -102,6 +105,12 @@ def update_clinic_settings(
 
     settings.name_en = payload.name_en
     settings.name_hi = payload.name_hi
+    if payload.trust_name_en is not None:
+        settings.trust_name_en = payload.trust_name_en
+    if payload.trust_name_hi is not None:
+        settings.trust_name_hi = payload.trust_name_hi.strip() or None
+    if payload.location_line is not None:
+        settings.location_line = payload.location_line
     settings.address_1 = payload.address_1
     settings.address_2 = payload.address_2
     settings.phone = payload.phone

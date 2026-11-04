@@ -9,7 +9,7 @@ Locked decisions:
 """
 
 import uuid
-from datetime import date, datetime
+from datetime import date, datetime, time
 from enum import StrEnum
 
 from sqlalchemy import (
@@ -26,7 +26,9 @@ from sqlalchemy import (
     SmallInteger,
     String,
     Text,
+    Time,
     UniqueConstraint,
+    false,
     func,
     text,
 )
@@ -255,6 +257,19 @@ class ClinicSettings(Base):
     name_hi: Mapped[str] = mapped_column(
         String(120), default="कल्याण हॉस्पिटल", server_default="कल्याण हॉस्पिटल", nullable=False
     )
+    trust_name_en: Mapped[str] = mapped_column(
+        String(120),
+        default="Sri Vashishtha Kalyan Trust",
+        server_default="Sri Vashishtha Kalyan Trust",
+        nullable=False,
+    )
+    trust_name_hi: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    location_line: Mapped[str] = mapped_column(
+        String(120),
+        default="Ara, Bhojpur, Bihar",
+        server_default="Ara, Bhojpur, Bihar",
+        nullable=False,
+    )
     address_1: Mapped[str] = mapped_column(String(255), nullable=False)
     address_2: Mapped[str | None] = mapped_column(String(255), nullable=True)
     phone: Mapped[str] = mapped_column(String(64), nullable=False)
@@ -281,6 +296,107 @@ class ClinicSettings(Base):
     )
 
     __mapper_args__ = {"version_id_col": version_id}
+
+
+class SecuritySettings(Base):
+    """Singleton administrator overrides of the environment security baseline (id=1).
+
+    NULL means "use the environment value". Overrides may only tighten that baseline; see
+    services/security_policy_service.py.
+    """
+
+    __tablename__ = "security_settings"
+    __table_args__ = (CheckConstraint("id = 1", name="security_settings_singleton"),)
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, default=1)
+    session_idle_minutes: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    session_absolute_hours: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    lockout_threshold: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    lockout_minutes: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    password_min_length: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    version_id: Mapped[int] = mapped_column(Integer, default=1, server_default="1", nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
+
+    __mapper_args__ = {"version_id_col": version_id}
+
+
+class BackupSettings(Base):
+    """Singleton schedule, retention and second-copy destination for scheduled backups (id=1).
+
+    Scheduling is off and retention is unset until an administrator configures them.
+    """
+
+    __tablename__ = "backup_settings"
+    __table_args__ = (
+        CheckConstraint("id = 1", name="backup_settings_singleton"),
+        CheckConstraint("frequency IN ('DAILY', 'WEEKLY')", name="backup_settings_frequency_valid"),
+        CheckConstraint(
+            "weekly_day IS NULL OR weekly_day BETWEEN 0 AND 6",
+            name="backup_settings_weekly_day_valid",
+        ),
+        CheckConstraint(
+            "frequency <> 'WEEKLY' OR weekly_day IS NOT NULL",
+            name="backup_settings_weekly_day_required",
+        ),
+        CheckConstraint(
+            "retention_count IS NULL OR retention_count >= 1",
+            name="backup_settings_retention_positive",
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, default=1)
+    schedule_enabled: Mapped[bool] = mapped_column(
+        Boolean, default=False, server_default=false(), nullable=False
+    )
+    frequency: Mapped[str] = mapped_column(
+        String(16), default="DAILY", server_default="DAILY", nullable=False
+    )
+    run_at: Mapped[time] = mapped_column(
+        Time, default=time(2, 0), server_default="02:00:00", nullable=False
+    )
+    weekly_day: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    destination_dir: Mapped[str | None] = mapped_column(Text, nullable=True)
+    retention_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    version_id: Mapped[int] = mapped_column(Integer, default=1, server_default="1", nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
+
+    __mapper_args__ = {"version_id_col": version_id}
+
+
+class BackupRun(Base):
+    """One attempted backup, kept even when it fails (the failed archive leaves no other trace)."""
+
+    __tablename__ = "backup_runs"
+    __table_args__ = (
+        CheckConstraint("trigger IN ('MANUAL', 'SCHEDULED')", name="backup_runs_trigger_valid"),
+        CheckConstraint(
+            "outcome IN ('RUNNING', 'SUCCESS', 'FAILURE')", name="backup_runs_outcome_valid"
+        ),
+        Index("ix_backup_runs_started_at", "started_at"),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, Identity(always=False), primary_key=True)
+    trigger: Mapped[str] = mapped_column(String(16), nullable=False)
+    outcome: Mapped[str] = mapped_column(String(16), nullable=False)
+    started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    filename: Mapped[str | None] = mapped_column(Text, nullable=True)
+    size_bytes: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    copied_to: Mapped[str | None] = mapped_column(Text, nullable=True)
+    pruned_count: Mapped[int] = mapped_column(
+        Integer, default=0, server_default="0", nullable=False
+    )
+    error_type: Mapped[str | None] = mapped_column(String(120), nullable=True)
 
 
 class ConsultationFee(Base):

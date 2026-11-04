@@ -20,12 +20,13 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from fastapi import APIRouter, Depends, Request, status
+from fastapi import APIRouter, Depends, Query, Request, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from kalyan_api import clock
 from kalyan_api.config import Settings, get_settings
-from kalyan_api.core.errors import ApiError
+from kalyan_api.core.errors import ApiError, require_version
 from kalyan_api.core.permissions import Permission
 from kalyan_api.core.policy import require
 from kalyan_api.core.principal import (
@@ -34,18 +35,21 @@ from kalyan_api.core.principal import (
     current_principal,
 )
 from kalyan_api.db.session import SessionDep, SessionLocal
-from kalyan_api.models import User
+from kalyan_api.models import BackupRun, BackupSettings, User
 from kalyan_api.schemas.operations import (
     BackupArchiveInfo,
     BackupArchiveListResponse,
     BackupCreateRequest,
+    BackupRunOut,
+    BackupSettingsOut,
+    BackupSettingsUpdate,
     BackupVerifyResponse,
     IntegrityCheckItemOut,
     IntegrityReportOut,
     RestoreRequest,
     RestoreResultOut,
 )
-from kalyan_api.services import audit_service
+from kalyan_api.services import audit_service, backup_schedule_service
 from kalyan_api.services.audit_service import AuditAction, AuditContext, Outcome
 from kalyan_api.services.backup_service import (
     ARCHIVE_GLOB,
@@ -62,6 +66,15 @@ from kalyan_api.services.backup_service import (
 from kalyan_api.services.integrity_service import run_integrity_audit
 
 logger = logging.getLogger("kalyan_api.operations")
+
+_BACKUP_SETTINGS_AUDIT_FIELDS: tuple[str, ...] = (
+    "schedule_enabled",
+    "frequency",
+    "run_at",
+    "weekly_day",
+    "destination_dir",
+    "retention_count",
+)
 
 router = APIRouter(prefix="/operations", tags=["operations"])
 
@@ -100,14 +113,17 @@ def _record_failure_isolated(
     entity_id: str | None,
     after: dict[str, Any],
     reason: str | None = None,
+    failed_run: BackupRun | None = None,
 ) -> None:
-    """Persist a FAILURE audit row in its own transaction.
+    """Persist a FAILURE audit row, and any failed run record, in its own transaction.
 
     If persisting the audit itself fails, that secondary error is logged with traceback and the
     caller still re-raises the ORIGINAL operational error (the primary failure must surface).
     """
     try:
         with _isolated_audit_session() as audit_session:
+            if failed_run is not None:
+                audit_session.add(failed_run)
             audit_service.record(
                 audit_session,
                 ctx,
@@ -164,6 +180,7 @@ def trigger_backup(
                 message=str(exc),
             ) from exc
 
+    started_at = clock.utcnow()
     try:
         archive_path = create_backup(
             destination_dir=target_dir,
@@ -188,6 +205,13 @@ def trigger_backup(
                 "destination_dir": str(target_dir),
                 "error": summary,
             },
+            failed_run=BackupRun(
+                trigger="MANUAL",
+                outcome="FAILURE",
+                started_at=started_at,
+                finished_at=clock.utcnow(),
+                error_type=summary,
+            ),
         )
         raise ApiError(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -199,6 +223,17 @@ def trigger_backup(
     is_valid, _, manifest = verify_backup_bundle(archive_path)
     stat = archive_path.stat()
 
+    session.add(
+        BackupRun(
+            trigger="MANUAL",
+            outcome="SUCCESS" if is_valid else "FAILURE",
+            started_at=started_at,
+            finished_at=clock.utcnow(),
+            filename=archive_path.name,
+            size_bytes=stat.st_size,
+            error_type=None if is_valid else "BackupCorruptedError",
+        )
+    )
     audit_service.record(
         session,
         ctx,
@@ -222,6 +257,125 @@ def trigger_backup(
         label=payload.label,
         is_valid=is_valid,
         manifest=manifest,
+    )
+
+
+def _load_backup_settings(session: Session) -> BackupSettings:
+    config = session.get(BackupSettings, backup_schedule_service.SINGLETON_ID)
+    if config is None:
+        raise ApiError(status_code=404, code="not_found", message="Backup settings not found")
+    return config
+
+
+def _backup_settings_out(
+    session: Session, config: BackupSettings, settings: Settings
+) -> BackupSettingsOut:
+    now = clock.utcnow()
+    return BackupSettingsOut(
+        schedule_enabled=config.schedule_enabled,
+        frequency=config.frequency,
+        run_at=config.run_at,
+        weekly_day=config.weekly_day,
+        destination_dir=config.destination_dir,
+        retention_count=config.retention_count,
+        version_id=config.version_id,
+        updated_at=config.updated_at,
+        next_run_at=(
+            backup_schedule_service.next_slot(config, now) if config.schedule_enabled else None
+        ),
+        overdue=backup_schedule_service.is_overdue(session, now),
+        approved_destinations=[str(path) for path in settings.backup_destinations],
+    )
+
+
+@router.get(
+    "/backup-settings",
+    response_model=BackupSettingsOut,
+    summary="Read the backup schedule, retention and second-copy destination (BAK-01)",
+    dependencies=[Depends(require(Permission.BACKUP_RUN))],
+)
+def get_backup_settings(session: SessionDep) -> BackupSettingsOut:
+    """Return the persisted backup schedule used by the scheduled task."""
+    return _backup_settings_out(session, _load_backup_settings(session), get_settings())
+
+
+@router.patch(
+    "/backup-settings",
+    response_model=BackupSettingsOut,
+    summary="Change the backup schedule, retention and second-copy destination (BAK-01)",
+    dependencies=[Depends(require(Permission.BACKUP_CONFIGURE))],
+)
+def update_backup_settings(
+    payload: BackupSettingsUpdate,
+    request: Request,
+    session: SessionDep,
+    principal: Principal = Depends(current_principal),
+) -> BackupSettingsOut:
+    """Validate and store the backup schedule; the scheduled task reads it on its next tick."""
+    settings = get_settings()
+    config = session.scalar(
+        select(BackupSettings)
+        .where(BackupSettings.id == backup_schedule_service.SINGLETON_ID)
+        .with_for_update()
+        .execution_options(populate_existing=True)
+    )
+    if config is None:
+        raise ApiError(status_code=404, code="not_found", message="Backup settings not found")
+    require_version(config, payload.version_id, "backup_settings")
+
+    destination: str | None = None
+    if payload.destination_dir is not None and payload.destination_dir.strip():
+        try:
+            destination = str(
+                validate_destination_dir(payload.destination_dir, settings.backup_destinations)
+            )
+        except InvalidDestinationDirError as exc:
+            raise ApiError(
+                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+                code="invalid_destination_dir",
+                message=str(exc),
+            ) from exc
+
+    before = audit_service.snapshot(config, _BACKUP_SETTINGS_AUDIT_FIELDS)
+    config.schedule_enabled = payload.schedule_enabled
+    config.frequency = payload.frequency
+    config.run_at = payload.run_at
+    config.weekly_day = payload.weekly_day if payload.frequency == "WEEKLY" else None
+    config.destination_dir = destination
+    config.retention_count = payload.retention_count
+    session.flush()
+
+    audit_service.record(
+        session,
+        build_audit_context(request, principal),
+        AuditAction.BACKUP_SETTINGS_UPDATED,
+        "BACKUP_SETTINGS",
+        str(config.id),
+        before=before,
+        after=audit_service.snapshot(config, _BACKUP_SETTINGS_AUDIT_FIELDS),
+        reason=payload.reason,
+    )
+    session.refresh(config)
+    return _backup_settings_out(session, config, settings)
+
+
+@router.get(
+    "/backup-runs",
+    response_model=list[BackupRunOut],
+    summary="Recent backup attempts, newest first (BAK-01)",
+    dependencies=[Depends(require(Permission.BACKUP_RUN))],
+)
+def list_backup_runs(
+    session: SessionDep,
+    limit: int = Query(default=20, ge=1, le=100),
+) -> list[BackupRun]:
+    """Return recent manual and scheduled backup attempts, including failures."""
+    return list(
+        session.scalars(
+            select(BackupRun)
+            .order_by(BackupRun.started_at.desc(), BackupRun.id.desc())
+            .limit(limit)
+        )
     )
 
 

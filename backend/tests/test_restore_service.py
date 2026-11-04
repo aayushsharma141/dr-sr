@@ -14,6 +14,7 @@ from kalyan_api.services.backup_service import (
 )
 
 
+@pytest.mark.real_restore
 def test_restore_database_and_photos(tmp_path: Path):
     """Test full backup, data mutation, and verified restoration."""
     settings = get_settings()

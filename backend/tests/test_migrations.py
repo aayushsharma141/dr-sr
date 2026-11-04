@@ -9,14 +9,14 @@ from kalyan_api.db.migrate import alembic_config
 
 
 def test_single_head(test_settings: Settings) -> None:
-    """ScriptDirectory has exactly one linear head revision: 0006."""
+    """ScriptDirectory has exactly one linear head revision: 0007."""
     cfg = alembic_config(test_settings.owner_url)
     script = ScriptDirectory.from_config(cfg)
     heads = script.get_heads()
-    assert heads == ["0006"]
-    head = script.get_revision("0006")
+    assert heads == ["0007"]
+    head = script.get_revision("0007")
     assert head is not None
-    assert head.down_revision == "0005"
+    assert head.down_revision == "0006"
 
 
 def _consultation_fee_version_column(owner_engine: Engine) -> tuple[str, str | None] | None:

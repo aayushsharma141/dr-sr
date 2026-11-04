@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 import { useMe, useSystemStatus } from '../../api/queries'
-import type { StorageVolumeOut, SystemStatusOut } from '../../api/types'
+import type { ServiceCheckOut, StorageVolumeOut, SystemStatusOut } from '../../api/types'
 import { AppShell } from '../../components/AppShell'
 import { InlineAlert } from '../../components/InlineAlert'
 
@@ -83,6 +83,36 @@ function UsageBar({ volume }: { volume: StorageVolumeOut }) {
   )
 }
 
+const CHECK_STYLE: Record<ServiceCheckOut['status'], { label: string; className: string }> = {
+  ok: { label: 'OK', className: 'bg-emerald-50 text-emerald-900 border-emerald-300' },
+  warning: { label: 'Attention', className: 'bg-amber-50 text-amber-900 border-amber-300' },
+  error: { label: 'Problem', className: 'bg-red-50 text-red-900 border-red-300' },
+  not_configured: { label: 'Off', className: 'bg-slate-100 text-slate-800 border-slate-300' },
+}
+
+function ServiceChecks({ checks }: { checks: ServiceCheckOut[] }) {
+  return (
+    <section aria-labelledby="system-checks-heading" className="rounded-lg border border-slate-200 bg-white p-5 shadow-xs">
+      <h2 id="system-checks-heading" className="text-base font-bold text-slate-900">
+        Live checks
+      </h2>
+      <ul className="mt-3 divide-y divide-slate-100">
+        {checks.map((check) => (
+          <li key={check.key} className="flex flex-wrap items-center justify-between gap-2 py-2">
+            <div>
+              <p className="text-sm font-semibold text-slate-900">{check.label}</p>
+              <p className="text-sm text-slate-700">{check.detail}</p>
+            </div>
+            <span className={`rounded border px-2 py-0.5 text-sm font-semibold ${CHECK_STYLE[check.status].className}`}>
+              {CHECK_STYLE[check.status].label}
+            </span>
+          </li>
+        ))}
+      </ul>
+    </section>
+  )
+}
+
 function RevisionNotice({ status }: { status: SystemStatusOut }) {
   if (status.revision_matches) {
     return (
@@ -138,6 +168,7 @@ export function SystemHealthPage() {
         {data && (
           <>
             <RevisionNotice status={data} />
+            <ServiceChecks checks={data.checks} />
 
             <section aria-labelledby="system-runtime-heading" className="space-y-3">
               <h2 id="system-runtime-heading" className="text-base font-bold text-slate-900">

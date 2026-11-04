@@ -105,6 +105,8 @@ def test_golden_role_permissions_snapshot() -> None:
                 Permission.SESSION_READ,
                 Permission.SESSION_REVOKE,
                 Permission.SECURITY_READ,
+                Permission.SECURITY_WRITE,
+                Permission.BACKUP_CONFIGURE,
                 Permission.SYSTEM_READ,
             }
         ),

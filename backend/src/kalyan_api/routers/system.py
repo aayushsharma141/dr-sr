@@ -10,11 +10,13 @@ from datetime import UTC, datetime
 from functools import lru_cache
 from importlib import metadata
 from pathlib import Path
+from tempfile import NamedTemporaryFile
 
 from alembic.runtime.migration import MigrationContext
 from alembic.script import ScriptDirectory
 from fastapi import APIRouter, Depends, Request
-from sqlalchemy import text
+from sqlalchemy import select, text
+from sqlalchemy.orm import Session
 
 from kalyan_api import __version__ as PACKAGE_FALLBACK_VERSION
 from kalyan_api import clock
@@ -24,7 +26,9 @@ from kalyan_api.core.policy import require
 from kalyan_api.core.principal import get_current_settings
 from kalyan_api.db.migrate import alembic_config
 from kalyan_api.db.session import SessionDep
-from kalyan_api.schemas.system import StorageVolumeOut, SystemStatusOut
+from kalyan_api.models import BackupRun, BackupSettings
+from kalyan_api.schemas.system import ServiceCheckOut, StorageVolumeOut, SystemStatusOut
+from kalyan_api.services import backup_schedule_service
 
 router = APIRouter(prefix="/system", tags=["system"])
 
@@ -80,6 +84,77 @@ def _frontend_served(settings: Settings) -> bool:
     return bool(dist_dir and (dist_dir / "index.html").is_file())
 
 
+def _folder_check(key: str, label: str, path: Path) -> ServiceCheckOut:
+    """Prove a folder is usable by writing to it, because existing does not mean writable."""
+    if not path.is_dir():
+        return ServiceCheckOut(key=key, label=label, status="error", detail="Folder not found.")
+    try:
+        with NamedTemporaryFile(dir=path, prefix=".health-"):
+            pass
+    except OSError as exc:
+        return ServiceCheckOut(
+            key=key,
+            label=label,
+            status="error",
+            detail=f"Server cannot write here ({type(exc).__name__}).",
+        )
+    return ServiceCheckOut(key=key, label=label, status="ok", detail="Server can write here.")
+
+
+def _backup_checks(session: Session, settings: Settings) -> list[ServiceCheckOut]:
+    last_run = session.scalars(
+        select(BackupRun).order_by(BackupRun.started_at.desc(), BackupRun.id.desc()).limit(1)
+    ).first()
+    if last_run is None:
+        result = ServiceCheckOut(
+            key="last_backup_run",
+            label="Latest backup run",
+            status="warning",
+            detail="No backup run has been recorded.",
+        )
+    else:
+        failed = last_run.outcome == "FAILURE"
+        result = ServiceCheckOut(
+            key="last_backup_run",
+            label="Latest backup run",
+            status="error" if failed else "ok",
+            detail=(
+                f"{last_run.trigger.title()} run {last_run.outcome.lower()} at "
+                f"{last_run.started_at.astimezone(clock.IST):%d %b %Y %H:%M} IST."
+            ),
+        )
+
+    config = session.get(BackupSettings, backup_schedule_service.SINGLETON_ID)
+    if config is None or not config.schedule_enabled:
+        schedule = ServiceCheckOut(
+            key="backup_schedule",
+            label="Backup schedule",
+            status="not_configured",
+            detail="Scheduled backups are off.",
+        )
+    elif backup_schedule_service.is_overdue(session, clock.utcnow()):
+        schedule = ServiceCheckOut(
+            key="backup_schedule",
+            label="Backup schedule",
+            status="error",
+            detail="A scheduled backup did not run. Check the Windows scheduled task.",
+        )
+    else:
+        schedule = ServiceCheckOut(
+            key="backup_schedule",
+            label="Backup schedule",
+            status="ok",
+            detail="Scheduled backups are running to plan.",
+        )
+
+    checks = [result, schedule]
+    if config is not None and config.destination_dir:
+        checks.append(
+            _folder_check("second_copy", "Second backup copy", Path(config.destination_dir))
+        )
+    return checks
+
+
 @router.get(
     "/status",
     response_model=SystemStatusOut,
@@ -122,4 +197,19 @@ def get_system_status(request: Request, session: SessionDep) -> SystemStatusOut:
             measure_volume("backups", settings.backup_dir),
         ],
         frontend_served=_frontend_served(settings),
+        checks=[
+            ServiceCheckOut(
+                key="database",
+                label="Database",
+                status="ok" if db_revision == head_revision else "error",
+                detail=(
+                    "Connected, and the schema matches this software version."
+                    if db_revision == head_revision
+                    else "Connected, but the schema does not match this software version."
+                ),
+            ),
+            _folder_check("photos", "Patient photos folder", settings.photos_dir),
+            _folder_check("backups", "Backup folder", settings.backup_dir),
+            *_backup_checks(session, settings),
+        ],
     )

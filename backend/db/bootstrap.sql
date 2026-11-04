@@ -42,16 +42,27 @@ CREATE DATABASE kalyan_test
     LOCALE_PROVIDER builtin
     BUILTIN_LOCALE 'C.UTF-8';
 
+-- Throwaway database for real pg_dump and DROP SCHEMA tests; its contents are destroyed by every run
+CREATE DATABASE kalyan_restore_test
+    WITH OWNER kalyan_owner
+    TEMPLATE template0
+    ENCODING 'UTF8'
+    LOCALE_PROVIDER builtin
+    BUILTIN_LOCALE 'C.UTF-8';
+
 -- Standardize application timezone strictly to Indian Standard Time (Asia/Kolkata)
 ALTER DATABASE kalyan_dev SET timezone TO 'Asia/Kolkata';
 ALTER DATABASE kalyan_test SET timezone TO 'Asia/Kolkata';
+ALTER DATABASE kalyan_restore_test SET timezone TO 'Asia/Kolkata';
 
 -- Enforce access restrictions: revoke public access and grant connect only to kalyan_app
 REVOKE ALL ON DATABASE kalyan_dev FROM PUBLIC;
 REVOKE ALL ON DATABASE kalyan_test FROM PUBLIC;
+REVOKE ALL ON DATABASE kalyan_restore_test FROM PUBLIC;
 
 GRANT CONNECT ON DATABASE kalyan_dev TO kalyan_app;
 GRANT CONNECT ON DATABASE kalyan_test TO kalyan_app;
+GRANT CONNECT ON DATABASE kalyan_restore_test TO kalyan_app;
 
 -- PRODUCTION NOTES (Phase 17):
 -- In production, the hospital server runs this script targeting a single database named `kalyan`.

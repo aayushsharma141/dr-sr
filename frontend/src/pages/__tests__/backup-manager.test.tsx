@@ -48,6 +48,9 @@ vi.mock('../../api/queries', () => ({
     mutateAsync: mocks.restoreMutate,
     isPending: false,
   }),
+  useBackupSettings: () => ({ data: undefined, isPending: true, isError: false, isFetching: false, refetch: vi.fn() }),
+  useUpdateBackupSettings: () => ({ mutateAsync: vi.fn(), isPending: false }),
+  useBackupRuns: () => ({ data: [], isPending: false, isError: false }),
   useVerifyBackup: () => ({
     mutateAsync: vi.fn(),
     isPending: false,

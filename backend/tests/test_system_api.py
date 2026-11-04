@@ -32,6 +32,7 @@ EXPECTED_KEYS = {
     "uptime_seconds",
     "storage",
     "frontend_served",
+    "checks",
 }
 
 

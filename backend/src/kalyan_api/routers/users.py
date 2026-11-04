@@ -12,7 +12,7 @@ from kalyan_api.core.principal import (
     Principal,
     build_audit_context,
     current_principal,
-    get_current_settings,
+    get_effective_settings,
 )
 from kalyan_api.db.session import SessionDep
 from kalyan_api.schemas.sessions import RevokeSessionRequest, RevokeUserSessionsOut
@@ -77,7 +77,7 @@ def create_new_user(
     payload: UserCreate,
     session: SessionDep,
     principal: Principal = Depends(current_principal),
-    settings: Settings = Depends(get_current_settings),
+    settings: Settings = Depends(get_effective_settings),
 ) -> JSONResponse:
     """Create a new user account returning a one-time temporary password."""
     ctx = build_audit_context(request, principal)
@@ -157,7 +157,7 @@ def reset_user_password(
     payload: ActionRequest,
     session: SessionDep,
     principal: Principal = Depends(current_principal),
-    settings: Settings = Depends(get_current_settings),
+    settings: Settings = Depends(get_effective_settings),
 ) -> JSONResponse:
     """Generate and return a one-time temporary password, revoking existing sessions."""
     ctx = build_audit_context(request, principal)
@@ -201,7 +201,7 @@ def revoke_user_sessions(
     payload: RevokeSessionRequest,
     session: SessionDep,
     principal: Principal = Depends(current_principal),
-    settings: Settings = Depends(get_current_settings),
+    settings: Settings = Depends(get_effective_settings),
 ) -> RevokeUserSessionsOut:
     """Sign out every active session of a user; the caller's own current session is kept."""
     ctx = build_audit_context(request, principal)

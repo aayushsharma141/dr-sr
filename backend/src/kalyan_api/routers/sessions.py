@@ -18,7 +18,7 @@ from kalyan_api.core.principal import (
     Principal,
     build_audit_context,
     current_principal,
-    get_current_settings,
+    get_effective_settings,
 )
 from kalyan_api.db.session import SessionDep
 from kalyan_api.models import AuthSession, User
@@ -57,7 +57,7 @@ def list_sessions(
     session: SessionDep,
     user_id: int | None = Query(default=None, ge=1),
     principal: Principal = Depends(current_principal),
-    settings: Settings = Depends(get_current_settings),
+    settings: Settings = Depends(get_effective_settings),
 ) -> list[ActiveSessionOut]:
     """List currently active login sessions, most recently active first."""
     rows = auth_service.list_active_sessions(session, settings, clock.utcnow(), user_id=user_id)
@@ -75,7 +75,7 @@ def revoke_session(
     payload: RevokeSessionRequest,
     session: SessionDep,
     principal: Principal = Depends(current_principal),
-    settings: Settings = Depends(get_current_settings),
+    settings: Settings = Depends(get_effective_settings),
 ) -> RevokeSessionOut:
     """Sign out one active session of any user other than the caller's current session."""
     ctx = build_audit_context(request, principal)

@@ -1,14 +1,30 @@
 """Test configuration, database fixtures, and isolated test clients."""
 
 import os
+import tempfile
 from collections.abc import Generator
 from datetime import UTC, datetime
 from pathlib import Path
+
+# Safety boundary. This runs before the application is imported, so nothing in the suite can reach
+# the database or folders named in backend/.env, which may be a shared or production system.
+# Code using plain get_settings() gets a dedicated throwaway database: real backup and restore
+# tests run pg_dump and DROP SCHEMA against it. Environment values take priority over .env.
+RESTORE_TEST_DB = os.environ.get("KALYAN_RESTORE_TEST_DB", "kalyan_restore_test")
+if not RESTORE_TEST_DB.endswith("_test"):
+    raise RuntimeError(f"Refusing restore tests on non-test database '{RESTORE_TEST_DB}'")
+if "KALYAN_TESTS_ISOLATED" not in os.environ:
+    _isolated_dir = Path(tempfile.mkdtemp(prefix="kalyan_tests_"))
+    os.environ["KALYAN_TESTS_ISOLATED"] = "1"
+    os.environ["KALYAN_DB_NAME"] = RESTORE_TEST_DB
+    os.environ["KALYAN_BACKUP_DIR"] = str(_isolated_dir / "backups")
+    os.environ["KALYAN_PHOTOS_DIR"] = str(_isolated_dir / "photos")
 
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from sqlalchemy import Engine, create_engine, text
+from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session
 
 from kalyan_api.config import Settings
@@ -77,6 +93,34 @@ def migrated_db(test_settings: Settings) -> dict[str, int]:
         "doctors": doctors_count,
         "system_setup": setup_count,
     }
+
+
+@pytest.fixture(scope="session")
+def restore_database(test_settings: Settings) -> bool:
+    """Reset and migrate the throwaway restore database; False when it has not been created."""
+    settings = test_settings.model_copy(update={"db_name": RESTORE_TEST_DB})
+    owner = create_engine(settings.owner_url, isolation_level="AUTOCOMMIT")
+    try:
+        with owner.connect() as conn:
+            conn.execute(text("DROP SCHEMA IF EXISTS public CASCADE"))
+            conn.execute(text("CREATE SCHEMA public"))
+    except OperationalError:
+        return False
+    finally:
+        owner.dispose()
+    upgrade_head(settings.owner_url)
+    return True
+
+
+@pytest.fixture(autouse=True)
+def _require_restore_database(request: pytest.FixtureRequest) -> None:
+    """Skip real backup and restore tests until the throwaway database exists."""
+    if request.node.get_closest_marker("real_restore") is None:
+        return
+    if not request.getfixturevalue("restore_database"):
+        pytest.skip(
+            f"Database '{RESTORE_TEST_DB}' does not exist; create it from backend/db/bootstrap.sql"
+        )
 
 
 @pytest.fixture(scope="session")

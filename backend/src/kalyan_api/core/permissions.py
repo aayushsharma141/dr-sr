@@ -77,6 +77,8 @@ class Permission(StrEnum):
     SESSION_READ = "session:read"
     SESSION_REVOKE = "session:revoke"
     SECURITY_READ = "security:read"
+    SECURITY_WRITE = "security:write"
+    BACKUP_CONFIGURE = "backup:configure"
     SYSTEM_READ = "system:read"
 
 
@@ -111,6 +113,8 @@ ROLE_PERMISSIONS: dict[Role, frozenset[Permission]] = {
             Permission.SESSION_READ,
             Permission.SESSION_REVOKE,
             Permission.SECURITY_READ,
+            Permission.SECURITY_WRITE,
+            Permission.BACKUP_CONFIGURE,
             Permission.SYSTEM_READ,
         }
     ),

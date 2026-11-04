@@ -5,10 +5,10 @@ existence are validated in the router against the live filesystem (they cannot b
 the schema alone) and are reported as 422 with a specific error code.
 """
 
-from datetime import datetime
+from datetime import datetime, time
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 RESTORE_CONFIRMATION_PHRASE = "RESTORE"
 RESTORE_REASON_MIN_LENGTH = 10
@@ -150,3 +150,67 @@ class IntegrityReportOut(BaseModel):
     checks: list[IntegrityCheckItemOut]
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class BackupSettingsOut(BaseModel):
+    """Persisted backup schedule with the next planned run and approved second-copy folders."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    schedule_enabled: bool
+    frequency: Literal["DAILY", "WEEKLY"]
+    run_at: time
+    weekly_day: int | None
+    destination_dir: str | None
+    retention_count: int | None
+    version_id: int
+    updated_at: datetime
+    next_run_at: datetime | None
+    overdue: bool
+    approved_destinations: list[str]
+
+
+class BackupSettingsUpdate(BaseModel):
+    """Full replacement of the backup schedule, with a mandatory reason."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    version_id: int = Field(ge=1)
+    schedule_enabled: bool
+    frequency: Literal["DAILY", "WEEKLY"]
+    run_at: time
+    weekly_day: int | None = Field(default=None, ge=0, le=6)
+    destination_dir: str | None = Field(default=None, max_length=1024)
+    retention_count: int | None = Field(default=None, ge=1, le=3650)
+    reason: str = Field(min_length=10, max_length=500)
+
+    @field_validator("reason")
+    @classmethod
+    def reason_not_blank(cls, value: str) -> str:
+        stripped = value.strip()
+        if len(stripped) < 10:
+            raise ValueError("reason must be at least 10 characters")
+        return stripped
+
+    @model_validator(mode="after")
+    def weekly_needs_day(self) -> "BackupSettingsUpdate":
+        if self.frequency == "WEEKLY" and self.weekly_day is None:
+            raise ValueError("weekly_day is required for a weekly schedule")
+        return self
+
+
+class BackupRunOut(BaseModel):
+    """One attempted backup."""
+
+    model_config = ConfigDict(extra="forbid", from_attributes=True)
+
+    id: int
+    trigger: str
+    outcome: str
+    started_at: datetime
+    finished_at: datetime | None
+    filename: str | None
+    size_bytes: int | None
+    copied_to: str | None
+    pruned_count: int
+    error_type: str | None

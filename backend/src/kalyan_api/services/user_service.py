@@ -27,7 +27,7 @@ def generate_temp_password(
     full_name: str | None = None,
 ) -> str:
     """Generate unambiguous temporary password conforming to password policy."""
-    length = settings.temp_password_length
+    length = max(settings.temp_password_length, settings.password_min_length)
     for _ in range(100):
         candidate = "".join(secrets.choice(UNAMBIGUOUS_CHARS) for _ in range(length))
         try:

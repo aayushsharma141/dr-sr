@@ -87,7 +87,7 @@ export function Login() {
             role="status"
             className="p-3 bg-amber-50 border border-amber-200 rounded text-sm text-amber-900"
           >
-            You were signed out after 30 minutes of inactivity
+            You were signed out because this computer was left inactive
           </div>
         )}
 

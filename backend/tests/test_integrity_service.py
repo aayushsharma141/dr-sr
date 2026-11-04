@@ -1,5 +1,7 @@
 """Tests for clinical and financial integrity check engine (BAK-03, Plan 16-04)."""
 
+import pytest
+
 from pathlib import Path
 from typing import Any
 
@@ -17,6 +19,7 @@ from kalyan_api.services.integrity_service import (
 )
 
 
+@pytest.mark.real_restore
 def test_integrity_audit_clean_database(db_session):
     """In a standard clean test database, all integrity checks should pass."""
     settings = get_settings()
@@ -34,6 +37,7 @@ def test_integrity_audit_clean_database(db_session):
         assert all(c.passed for c in report.checks if c.severity == "ERROR")
 
 
+@pytest.mark.real_restore
 def test_integrity_audit_detects_orphan_and_missing_photos(tmp_path: Path):
     """Test photo storage check detects missing files and untracked orphans."""
     settings = get_settings()

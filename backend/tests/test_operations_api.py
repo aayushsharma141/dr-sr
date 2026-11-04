@@ -148,6 +148,7 @@ def test_operations_api_role_restrictions(
         assert c.post(verify_url).status_code == 403
 
 
+@pytest.mark.real_restore
 def test_operations_admin_lifecycle(
     login_client: Any,
     admin_user: User,
@@ -487,8 +488,9 @@ def test_backup_failure_audited_in_separate_transaction(
     assert len(isolated_audits) == 1
     fake = isolated_audits[0]
     assert fake.committed is True
-    assert len(fake.added) == 1
-    entry = fake.added[0]
+    assert len(fake.added) == 2
+    run, entry = fake.added
+    assert (run.trigger, run.outcome, run.error_type) == ("MANUAL", "FAILURE", "RuntimeError")
     assert entry.action == AuditAction.BACKUP_FAILED.value
     assert entry.outcome == "FAILURE"
     assert entry.actor_user_id == admin_user.id

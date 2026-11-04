@@ -69,6 +69,13 @@ import {
 } from '@tanstack/react-query'
 import { ApiError, apiFetch, setCsrfToken } from './client'
 import type {
+  BackupRunOut,
+  BackupSettingsOut,
+  BackupSettingsUpdate,
+  BillingConfigurationOut,
+  SecurityPolicyUpdate,
+} from './types'
+import type {
   ActionRequest,
   AreaOverview,
   Me,
@@ -402,6 +409,20 @@ export function useSecurityPolicy() {
   return useQuery({
     queryKey: ['security', 'policy'],
     queryFn: () => apiFetch<SecurityPolicyOut>('/security/policy'),
+  })
+}
+
+/** PATCH /security/policy: stores tighter values; takes effect on the next request. */
+export function useUpdateSecurityPolicy() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (payload: SecurityPolicyUpdate) =>
+      apiFetch<SecurityPolicyOut>('/security/policy', { method: 'PATCH', body: payload }),
+    onSuccess: (data) => {
+      queryClient.setQueryData(['security', 'policy'], data)
+      queryClient.invalidateQueries({ queryKey: ['security', 'password-policy'] })
+      queryClient.invalidateQueries({ queryKey: ['audit-logs'] })
+    },
   })
 }
 
@@ -992,7 +1013,7 @@ export function useReversePayment() {
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['payments'] })
-      queryClient.invalidateQueries({ queryKey: ['billing', 'pending-dues'] })
+      queryClient.invalidateQueries({ queryKey: ['billing'] })
       queryClient.invalidateQueries({ queryKey: ['treatment-plans'] })
       queryClient.invalidateQueries({ queryKey: ['timeline'] })
     },
@@ -1079,6 +1100,58 @@ export function useCreateBackup() {
  * POST /operations/backups/{filename}/verify: re-hashes one archive against its manifest.
  * Read-only on the server (not audited), so nothing is invalidated. 422 invalid_archive_filename.
  */
+export function useBackupSettings() {
+  return useQuery({
+    queryKey: ['operations', 'backup-settings'],
+    queryFn: () => apiFetch<BackupSettingsOut>('/api/operations/backup-settings'),
+  })
+}
+
+export function useUpdateBackupSettings() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (payload: BackupSettingsUpdate) =>
+      apiFetch<BackupSettingsOut>('/api/operations/backup-settings', {
+        method: 'PATCH',
+        body: payload,
+      }),
+    onSuccess: (data) => {
+      queryClient.setQueryData(['operations', 'backup-settings'], data)
+      queryClient.invalidateQueries({ queryKey: ['audit-logs'] })
+    },
+  })
+}
+
+export function useBackupRuns() {
+  return useQuery({
+    queryKey: ['operations', 'backup-runs'],
+    queryFn: () => apiFetch<BackupRunOut[]>('/api/operations/backup-runs'),
+  })
+}
+
+export function useBillingConfiguration() {
+  return useQuery({
+    queryKey: ['billing', 'configuration'],
+    queryFn: () => apiFetch<BillingConfigurationOut>('/api/billing/configuration'),
+  })
+}
+
+export interface LedgerFilter {
+  q: string
+  status: 'all' | 'active' | 'reversed'
+}
+
+export function useLedger(filter: LedgerFilter) {
+  return useQuery({
+    queryKey: ['billing', 'ledger', filter],
+    queryFn: () => {
+      const params = new URLSearchParams({ status: filter.status })
+      if (filter.q) params.set('q', filter.q)
+      return apiFetch<PaymentOut[]>(`/api/billing/ledger?${params.toString()}`)
+    },
+  })
+}
+
 export function useVerifyBackup() {
   return useMutation({
     mutationFn: (filename: string) =>

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
+import { useClinicBranding } from '../api/branding'
 import { Link, useLocation, useNavigate } from 'react-router'
 import { useLogout } from '../api/queries'
 import type { Role } from '../api/types'
@@ -415,6 +416,7 @@ function Breadcrumbs({ pathname, role }: { pathname: string; role: Role }) {
 }
 
 export function AppShell({ name, role, children }: AppShellProps) {
+  const branding = useClinicBranding()
   const navigate = useNavigate()
   const location = useLocation()
   const logout = useLogout()
@@ -615,22 +617,20 @@ export function AppShell({ name, role, children }: AppShellProps) {
             <div className="min-w-0">
               <div className="flex items-center gap-2">
                 <span className="truncate text-sm font-extrabold text-[#5D0B26] sm:text-base">
-                  Sri Vashishtha Kalyan Trust
+                  {branding.trustNameEn}
                 </span>
                 <span className="hidden lg:inline text-xs font-semibold text-slate-600">
-                  &bull; श्री वशिष्ठ कल्याण ट्रस्ट · KALYAN HOSPITAL
+                  &bull; <span lang="hi">{branding.trustNameHi}</span> · {branding.hospitalName.toUpperCase()}
                 </span>
               </div>
-              <p className="truncate text-xs font-medium text-slate-600">
-                स्टेशन रोड, नवादा थाना के सामने वाली गली, आरा, भोजपुर, बिहार - 802301
-              </p>
+              <p className="truncate text-xs font-medium text-slate-600">{branding.address}</p>
             </div>
           </div>
 
           <div className="flex shrink-0 items-center gap-3 sm:gap-4">
             <div className="hidden text-right lg:block">
               <p className="text-xs font-bold text-slate-800">{clock}</p>
-              <p className="text-xs text-slate-600 font-medium">Ara &bull; Bhojpur &bull; Bihar</p>
+              <p className="text-xs text-slate-600 font-medium">{branding.locationLine}</p>
             </div>
             <div className="hidden sm:block text-right border-l border-slate-200 pl-3">
               <p className="max-w-40 truncate text-xs font-bold text-slate-900">{name}</p>

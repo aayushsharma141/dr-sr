@@ -20,6 +20,9 @@ class ClinicSettingsOut(BaseModel):
     id: int
     name_en: str
     name_hi: str
+    trust_name_en: str
+    trust_name_hi: str | None = None
+    location_line: str
     address_1: str
     address_2: str | None = None
     phone: str
@@ -47,6 +50,10 @@ class ClinicSettingsUpdate(BaseModel):
 
     name_en: str = Field(min_length=2, max_length=120)
     name_hi: str = Field(min_length=2, max_length=120)
+    # Left out means unchanged, so existing clients of this full-replace endpoint keep working.
+    trust_name_en: str | None = Field(default=None, min_length=2, max_length=120)
+    trust_name_hi: str | None = Field(default=None, max_length=120)
+    location_line: str | None = Field(default=None, min_length=2, max_length=120)
     address_1: str = Field(min_length=2, max_length=255)
     address_2: str | None = Field(default=None, max_length=255)
     phone: str = Field(min_length=5, max_length=64, pattern=PHONE_PATTERN)

@@ -120,6 +120,7 @@ def test_check_durability_invariant_enforcement(
     assert res_remote["synchronous_commit"] == "remote_apply"
 
 
+@pytest.mark.real_restore
 def test_cli_commands_migrate_and_check_db(
     test_settings: Settings, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture
 ) -> None:

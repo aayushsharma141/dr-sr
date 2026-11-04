@@ -1,5 +1,6 @@
 import React from 'react'
 import type { ClinicSettingsOut, PaymentOut } from '../api/types'
+import { PrintNote } from './PrintLetterhead'
 
 interface ReceiptPrintProps {
   payment: PaymentOut
@@ -68,6 +69,7 @@ export const ReceiptPrint: React.FC<ReceiptPrintProps> = ({ payment, isReprint =
           <p className="mt-1 text-[11px] text-slate-700">{FALLBACK.address}</p>
         )}
         {settings?.phone && <p className="text-[11px] text-slate-700">Phone: {settings.phone}</p>}
+        <PrintNote en={settings?.print_header_en} hi={settings?.print_header_hi} testId="print-header-note" />
         <div className="mt-2 inline-block rounded bg-slate-100 px-2.5 py-0.5 text-xs font-bold uppercase tracking-wider text-slate-900">
           {payment.is_reversed ? 'REVERSED PAYMENT RECEIPT' : 'PAYMENT RECEIPT'}
           {isReprint && ' (DUPLICATE COPY)'}

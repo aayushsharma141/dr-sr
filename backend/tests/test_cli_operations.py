@@ -1,5 +1,7 @@
 """Tests for CLI operations subcommands (BAK-01, BAK-02, BAK-03, Plan 16-05)."""
 
+import pytest
+
 from pathlib import Path
 
 from kalyan_api.cli import (
@@ -10,6 +12,7 @@ from kalyan_api.cli import (
 )
 
 
+@pytest.mark.real_restore
 def test_cli_operations_workflow(tmp_path: Path, db_session):
     """Test full CLI lifecycle: create backup, verify it, run integrity check, and restore."""
     from kalyan_api.config import get_settings
