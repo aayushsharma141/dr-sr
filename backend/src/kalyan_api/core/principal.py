@@ -24,6 +24,7 @@ from kalyan_api.core.security import hash_token
 from kalyan_api.db.session import SessionDep
 from kalyan_api.models import AuthSession, User
 from kalyan_api.services.audit_service import AuditContext
+from kalyan_api.services.security_policy_service import effective_settings
 
 
 @dataclass(frozen=True)
@@ -45,6 +46,14 @@ def get_current_settings(request: Request) -> Settings:
     return app_settings if app_settings is not None else get_settings()
 
 
+def get_effective_settings(
+    session: SessionDep,
+    settings: Settings = Depends(get_current_settings),
+) -> Settings:
+    """Settings with the administrator's stored security policy applied."""
+    return effective_settings(session, settings)
+
+
 def _resolve_principal_from_request(
     request: Request,
     session: SessionDep,
@@ -52,6 +61,7 @@ def _resolve_principal_from_request(
     allow_pending: bool,
 ) -> Principal:
     """Validate session cookie, evaluate expirations, touch session, and build Principal."""
+    settings = effective_settings(session, settings)
     token = request.cookies.get(settings.cookie_name)
     if not token:
         raise ApiError(

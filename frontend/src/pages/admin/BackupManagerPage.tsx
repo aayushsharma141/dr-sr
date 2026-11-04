@@ -115,7 +115,7 @@ export function BackupManagerPage() {
         archive_filename: restoreArchive.filename,
         create_prerestore_snapshot: true,
         confirmation_phrase: RESTORE_CONFIRMATION,
-        justification: restoreReason.trim(),
+        reason: restoreReason.trim(),
       })
       setFeedback({
         tone: 'success',

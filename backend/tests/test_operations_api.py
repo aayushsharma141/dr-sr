@@ -69,7 +69,7 @@ def test_operations_admin_lifecycle(
     assert integ_res.status_code == 200
     integ_data = integ_res.json()
     assert "is_healthy" in integ_data
-    assert integ_data["total_checks"] == 5
+    assert integ_data["total_checks"] == 6
 
     # 2. Trigger backup
     backup_res = admin_c.post("/api/operations/backups", json={"label": "api_test"})
@@ -90,9 +90,9 @@ def test_operations_admin_lifecycle(
         "/api/operations/restore",
         json={
             "archive_filename": backup_data["filename"],
-            "create_prerestore_snapshot": False,
-            "confirmation_phrase": "RESTORE",
-            "justification": "Testing invalid restore confirmation",
+            "create_prerestore_snapshot": True,
+            "confirmation_phrase": "INVALID_CONFIRMATION",
+            "reason": "Testing invalid restore confirmation phrase",
         },
     )
     assert invalid_restore.status_code == 422
@@ -102,9 +102,9 @@ def test_operations_admin_lifecycle(
         "/api/operations/restore",
         json={
             "archive_filename": backup_data["filename"],
-            "create_prerestore_snapshot": False,
-            "confirmation_phrase": "RESTORE-DATABASE-OVERWRITE",
-            "justification": "Restore test archive after verified API backup lifecycle",
+            "create_prerestore_snapshot": True,
+            "confirmation_phrase": "RESTORE",
+            "reason": "Restore test archive after verified API backup lifecycle",
         },
     )
     assert restore_res.status_code == 200

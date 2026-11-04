@@ -9,13 +9,15 @@ Guarantees:
 - Audit trail for payment collection and reversal.
 """
 
-from fastapi import APIRouter, Depends, Request
-from sqlalchemy import func, select
+from typing import Literal
+
+from fastapi import APIRouter, Depends, Query, Request
+from sqlalchemy import func, or_, select
 from sqlalchemy.orm import lazyload, selectinload
 
 from kalyan_api import clock
 from kalyan_api.core.errors import ApiError
-from kalyan_api.core.permissions import Permission
+from kalyan_api.core.permissions import ROLE_PERMISSIONS, Permission
 from kalyan_api.core.policy import require
 from kalyan_api.core.principal import (
     Principal,
@@ -28,17 +30,24 @@ from kalyan_api.models import (
     ClinicSettings,
     Patient,
     Payment,
+    PaymentMethod,
     TreatmentPlan,
 )
 from kalyan_api.schemas.billing import (
+    BillingConfigurationOut,
     PaymentCreate,
     PaymentOut,
     PaymentReversalCreate,
     PendingDueOut,
 )
-from kalyan_api.services import audit_service
+from kalyan_api.services import audit_service, billing_service
 from kalyan_api.services.audit_service import AuditAction
-from kalyan_api.services.receipt_service import allocate_next_receipt_number
+from kalyan_api.services.receipt_service import (
+    allocate_next_receipt_number,
+    current_cycle_key,
+    preview_next_receipt_number,
+    receipts_issued_in_current_cycle,
+)
 
 router = APIRouter(tags=["billing"])
 
@@ -189,9 +198,35 @@ def record_payment(
     response_model=PaymentOut,
     dependencies=[Depends(require(Permission.RECEIPT_REPRINT))],
 )
-def reprint_receipt(id: int, session: SessionDep) -> PaymentOut:
-    """Fetch payment receipt specifically for reprint with audit check (BIL-04)."""
-    return get_payment(id=id, session=session)
+def reprint_receipt(
+    id: int,
+    session: SessionDep,
+    request: Request,
+    principal: Principal = Depends(current_principal),
+) -> PaymentOut:
+    """Fetch a payment receipt for reprint and record a RECEIPT_REPRINTED audit row (BIL-04).
+
+    The audit row is written in the same transaction as the read; an unknown payment id
+    raises 404 before anything is audited.
+    """
+    payment_out = get_payment(id=id, session=session)
+
+    ctx = build_audit_context(request, principal)
+    audit_service.record(
+        session,
+        ctx,
+        action=AuditAction.RECEIPT_REPRINTED,
+        entity_type="payment",
+        entity_id=str(payment_out.id),
+        after={
+            "receipt_number": payment_out.receipt_number,
+            "patient_id": payment_out.patient_id,
+            "amount_paise": payment_out.amount_paise,
+            "is_reversed": payment_out.is_reversed,
+        },
+    )
+
+    return payment_out
 
 
 @router.get(
@@ -258,42 +293,71 @@ def list_patient_payments(patient_id: int, session: SessionDep) -> list[PaymentO
 )
 def list_pending_dues(session: SessionDep) -> list[PendingDueOut]:
     """List active treatment packages with outstanding pending balances (BIL-03)."""
-    # Query active plans
-    stmt = (
-        select(TreatmentPlan)
-        .where(TreatmentPlan.status == "ACTIVE")
-        .options(selectinload(TreatmentPlan.patient))
-        .order_by(TreatmentPlan.created_at.desc())
+    return billing_service.compute_pending_dues(session)
+
+
+@router.get(
+    "/billing/configuration",
+    response_model=BillingConfigurationOut,
+    dependencies=[Depends(require(Permission.PAYMENT_REVERSE))],
+)
+def get_billing_configuration(session: SessionDep) -> BillingConfigurationOut:
+    """Report the receipt cycle, payment methods and reversal authority actually in force."""
+    settings = session.get(ClinicSettings, 1)
+    if settings is None:
+        raise ApiError(status_code=404, code="not_found", message="Clinic settings not found")
+    cycle = settings.receipt_sequence_cycle
+    return BillingConfigurationOut(
+        receipt_sequence_cycle=cycle,
+        current_cycle_key=current_cycle_key(cycle),
+        receipts_issued_in_cycle=receipts_issued_in_current_cycle(session, cycle),
+        next_receipt_number=preview_next_receipt_number(session, cycle),
+        payment_methods=[method.value for method in PaymentMethod],
+        reversal_roles=[
+            role.value
+            for role, permissions in ROLE_PERMISSIONS.items()
+            if Permission.PAYMENT_REVERSE in permissions
+        ],
     )
-    active_plans = session.execute(stmt).scalars().all()
 
-    dues: list[PendingDueOut] = []
-    for plan in active_plans:
-        paid_stmt = select(func.coalesce(func.sum(Payment.amount_paise), 0)).where(
-            Payment.treatment_plan_id == plan.id,
-            Payment.is_reversed.is_(False),
+
+@router.get(
+    "/billing/ledger",
+    response_model=list[PaymentOut],
+    dependencies=[Depends(require(Permission.PAYMENT_REVERSE))],
+)
+def search_ledger(
+    session: SessionDep,
+    q: str | None = Query(default=None, max_length=120),
+    status: Literal["all", "active", "reversed"] = "all",
+    limit: int = Query(default=50, ge=1, le=200),
+) -> list[PaymentOut]:
+    """Find payments by receipt number, URN or patient name, newest first."""
+    stmt = (
+        select(Payment)
+        .join(Patient, Payment.patient_id == Patient.id)
+        .options(
+            selectinload(Payment.patient),
+            selectinload(Payment.treatment_plan),
+            selectinload(Payment.created_by_user),
+            selectinload(Payment.reversed_by_user),
         )
-        paid_paise: int = session.scalar(paid_stmt) or 0
-        balance_paise = plan.agreed_price_paise - paid_paise
-
-        if balance_paise > 0:
-            dues.append(
-                PendingDueOut(
-                    treatment_plan_id=plan.id,
-                    patient_id=plan.patient_id,
-                    patient_urn=plan.patient.urn if plan.patient else "",
-                    patient_name=plan.patient.full_name if plan.patient else "",
-                    plan_name=plan.plan_name,
-                    condition_diagnosis=plan.condition_diagnosis,
-                    agreed_price_paise=plan.agreed_price_paise,
-                    paid_paise=paid_paise,
-                    balance_paise=balance_paise,
-                    total_sessions=plan.total_sessions,
-                    completed_sessions=plan.completed_sessions,
-                )
+        .order_by(Payment.created_at.desc(), Payment.id.desc())
+        .limit(limit)
+    )
+    if status != "all":
+        stmt = stmt.where(Payment.is_reversed.is_(status == "reversed"))
+    term = q.strip() if q else ""
+    if term:
+        pattern = "%" + term.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%"
+        stmt = stmt.where(
+            or_(
+                Payment.receipt_number.ilike(pattern, escape="\\"),
+                Patient.urn.ilike(pattern, escape="\\"),
+                Patient.full_name.ilike(pattern, escape="\\"),
             )
-
-    return dues
+        )
+    return [_to_payment_out(p) for p in session.scalars(stmt)]
 
 
 @router.post(

@@ -15,7 +15,9 @@ const lockedUser: UserOut = {
   is_active: true,
   must_change_password: false,
   is_locked: true,
+  locked_until: '2026-11-01T09:15:00Z',
   last_login_at: null,
+  password_changed_at: null,
   created_at: '2026-11-01T09:00:00Z',
   version_id: 2,
 }
@@ -38,6 +40,9 @@ vi.mock('../../api/queries', () => ({
   useResetUserPassword: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useUpdateUser: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useUnlockUser: () => ({ mutateAsync: mocks.unlockMutate, isPending: false }),
+  useRevokeUserSessions: () => ({ mutateAsync: vi.fn(), isPending: false }),
+  useLoginHistory: () => ({ data: undefined, isPending: true, isError: false, error: null, refetch: vi.fn() }),
+  useMe: () => ({ data: undefined }),
   useLogout: () => ({ mutateAsync: vi.fn(), isPending: false }),
 }))
 
@@ -68,7 +73,8 @@ describe('Users page unlock failures are persistent inline alerts (UX-03)', () =
     mocks.unlockMutate.mockRejectedValueOnce(new ApiError(409, 'conflict', 'User changed elsewhere'))
     renderUsers()
 
-    fireEvent.click(screen.getByRole('button', { name: 'Unlock' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Unlock test.reception' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Unlock account' }))
 
     const alert = await screen.findByRole('alert')
     expect(alert).toHaveTextContent('User changed elsewhere')
@@ -79,7 +85,8 @@ describe('Users page unlock failures are persistent inline alerts (UX-03)', () =
     mocks.unlockMutate.mockRejectedValueOnce(new TypeError('network down'))
     renderUsers()
 
-    fireEvent.click(screen.getByRole('button', { name: 'Unlock' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Unlock test.reception' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Unlock account' }))
 
     const alert = await screen.findByRole('alert')
     expect(alert).toHaveTextContent('Could not unlock this account. Try again.')

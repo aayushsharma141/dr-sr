@@ -235,7 +235,12 @@ def test_consultation_fees_crud_and_rbac(
     # Admin updates fee rate
     update_resp = admin_c.patch(
         f"/api/fees/{fee_id}",
-        json={"name": "General OPD Visit (Revised)", "fee_paise": 35000, "is_active": True},
+        json={
+            "name": "General OPD Visit (Revised)",
+            "fee_paise": 35000,
+            "is_active": True,
+            "version_id": created_fee.get("version_id", 1),
+        },
     )
     assert update_resp.status_code == 200
     updated_fee = update_resp.json()

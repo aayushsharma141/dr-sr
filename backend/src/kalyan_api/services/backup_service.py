@@ -6,8 +6,10 @@ Guarantees:
 - Cryptographic SHA-256 manifest computed for each constituent file and overall bundle.
 - Integrity verification: inspects bundle without full restore, detecting single-bit tampering.
 - Secondary drive path support: accepts optional destination directory.
-- Pre-restore safety snapshot: automatically creates a full backup before restoring.
+- Pre-restore safety snapshot: ALWAYS creates a full backup before restoring (cannot be disabled).
 - Fail-closed restore: verifies manifest checksums *before* touching the database.
+- Path confinement: archive filenames supplied by callers must be bare names that resolve
+  inside the configured backup directory (no traversal, no absolute paths).
 """
 
 from __future__ import annotations
@@ -15,16 +17,21 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import re
 import shutil
 import subprocess
 import tarfile
 import tempfile
+from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
-from pathlib import Path
+from pathlib import Path, PurePosixPath, PureWindowsPath
 from typing import Any
 
 from kalyan_api.config import Settings, get_settings
+
+ARCHIVE_GLOB = "kalyan_backup_*.tar.gz"
+LABEL_PATTERN = re.compile(r"^[A-Za-z0-9_-]{1,50}$")
 
 
 class BackupCorruptedError(Exception):
@@ -33,6 +40,159 @@ class BackupCorruptedError(Exception):
 
 class RestoreError(Exception):
     """Raised when restoration encounters an execution error."""
+
+
+class InvalidArchiveFilenameError(ValueError):
+    """Raised when a caller-supplied archive name is not a bare file inside the backup dir."""
+
+
+class InvalidDestinationDirError(ValueError):
+    """Raised when a caller-supplied backup destination is not an existing absolute directory."""
+
+
+class InvalidBackupLabelError(ValueError):
+    """Raised when a backup label contains characters unsafe for use in a filename."""
+
+
+@dataclass(frozen=True)
+class LatestBackupInfo:
+    """Cheap description of the newest archive on disk (manifest read, no re-hashing)."""
+
+    filename: str
+    created_at: datetime
+    size_bytes: int
+    label: str | None
+    manifest_readable: bool
+
+
+def validate_label(label: str | None) -> str | None:
+    """Return the stripped label, or None when blank; reject filename-unsafe characters."""
+    if label is None:
+        return None
+    stripped = label.strip()
+    if not stripped:
+        return None
+    if not LABEL_PATTERN.fullmatch(stripped):
+        raise InvalidBackupLabelError(
+            "Backup label may contain only letters, digits, '_' and '-' (max 50 characters)"
+        )
+    return stripped
+
+
+def resolve_archive_in_dir(backup_dir: Path, filename: str) -> Path:
+    """Resolve a caller-supplied archive name to a file confined to backup_dir.
+
+    The name must be a bare filename: no path separators, no '..', no drive or absolute
+    prefix, no NUL byte, and the resolved path must be an existing regular file whose parent
+    is exactly the resolved backup directory (this also defeats symlink escapes).
+    """
+    name = filename
+    is_bare = (
+        bool(name)
+        and name == name.strip()
+        and ".." not in name
+        and "/" not in name
+        and "\\" not in name
+        and ":" not in name
+        and "\x00" not in name
+        and not PurePosixPath(name).is_absolute()
+        and not PureWindowsPath(name).is_absolute()
+        and PurePosixPath(name).name == name
+        and PureWindowsPath(name).name == name
+    )
+    if not is_bare:
+        raise InvalidArchiveFilenameError(
+            "archive_filename must be a bare file name inside the backup directory"
+        )
+
+    base = Path(backup_dir).resolve()
+    candidate = (base / name).resolve()
+    if candidate.parent != base or not candidate.is_file():
+        raise InvalidArchiveFilenameError(
+            "archive_filename does not name an existing archive in the backup directory"
+        )
+    return candidate
+
+
+def validate_destination_dir(raw: str, approved_roots: Sequence[Path]) -> Path:
+    """Validate a manual-backup destination against the approved backup locations.
+
+    The destination must be an existing local absolute directory equal to, or inside, one of
+    ``approved_roots`` (the configured backup directory and operator-approved extra drives).
+    UNC/network shares are refused so a dump cannot be pushed to an arbitrary host.
+    """
+    value = raw.strip()
+    if not value or "\x00" in value:
+        raise InvalidDestinationDirError("destination_dir must be a non-empty absolute path")
+    if value.startswith(("\\\\", "//")):
+        raise InvalidDestinationDirError("destination_dir must be a local directory, not a share")
+    path = Path(value)
+    if not path.is_absolute():
+        raise InvalidDestinationDirError("destination_dir must be an absolute path")
+    if not path.is_dir():
+        raise InvalidDestinationDirError("destination_dir must be an existing directory")
+    resolved = path.resolve()
+    roots = [root.resolve() for root in approved_roots]
+    if not any(resolved == root or root in resolved.parents for root in roots):
+        raise InvalidDestinationDirError("destination_dir is not an approved backup location")
+    return resolved
+
+
+def read_manifest(archive_path: Path) -> dict[str, Any] | None:
+    """Read manifest.json from an archive WITHOUT hashing its payload.
+
+    The manifest is written as the first tar member, so this normally decompresses only the
+    head of the archive. Returns None when the archive or manifest cannot be read.
+    """
+    path = Path(archive_path)
+    try:
+        with tarfile.open(path, "r:gz") as tar:
+            for member in tar:
+                if member.name != "manifest.json":
+                    continue
+                handle = tar.extractfile(member)
+                if handle is None:
+                    return None
+                parsed = json.loads(handle.read().decode("utf-8"))
+                return parsed if isinstance(parsed, dict) else None
+    except (OSError, tarfile.TarError, json.JSONDecodeError, UnicodeDecodeError, EOFError):
+        return None
+    return None
+
+
+def latest_backup_info(backup_dir: Path) -> LatestBackupInfo | None:
+    """Describe the newest backup archive (by modification time) in backup_dir, or None."""
+    directory = Path(backup_dir)
+    if not directory.is_dir():
+        return None
+    archives = [p for p in directory.glob(ARCHIVE_GLOB) if p.is_file()]
+    if not archives:
+        return None
+    newest = max(archives, key=lambda p: p.stat().st_mtime)
+    stat = newest.stat()
+    manifest = read_manifest(newest)
+
+    created_at = datetime.fromtimestamp(stat.st_mtime, tz=UTC)
+    label: str | None = None
+    if manifest is not None:
+        raw_created = manifest.get("created_at")
+        if isinstance(raw_created, str):
+            try:
+                parsed_created = datetime.fromisoformat(raw_created)
+            except ValueError:
+                parsed_created = None
+            if parsed_created is not None and parsed_created.tzinfo is not None:
+                created_at = parsed_created
+        raw_label = manifest.get("label")
+        label = raw_label if isinstance(raw_label, str) else None
+
+    return LatestBackupInfo(
+        filename=newest.name,
+        created_at=created_at,
+        size_bytes=stat.st_size,
+        label=label,
+        manifest_readable=manifest is not None,
+    )
 
 
 @dataclass(frozen=True)
@@ -124,6 +284,49 @@ def dump_database(destination_file: Path, settings: Settings | None = None) -> N
         raise RuntimeError(f"Database dump failed: {err}")
 
 
+# Runtime role rights exactly as the migrations grant them. A pg_dump is taken with
+# --no-privileges, so the restored schema would otherwise give the runtime role nothing, or the
+# wrong rights if defaults were used. tests/test_migrations.py checks this table against a
+# migrated database, so the two cannot drift apart silently.
+RUNTIME_TABLE_GRANTS: dict[str, tuple[str, ...]] = {
+    "audit_logs": ("SELECT", "INSERT"),
+    "system_setup": ("SELECT", "INSERT"),
+    "users": ("SELECT", "INSERT", "UPDATE"),
+    "doctors": ("SELECT", "INSERT", "UPDATE"),
+    "login_throttle": ("SELECT", "INSERT", "UPDATE"),
+    "sessions": ("SELECT", "INSERT", "UPDATE", "DELETE"),
+    "alembic_version": ("SELECT",),
+    "clinic_settings": ("SELECT", "INSERT", "UPDATE"),
+    "consultation_fees": ("SELECT", "INSERT", "UPDATE"),
+    "urn_sequences": ("SELECT", "INSERT", "UPDATE"),
+    "patients": ("SELECT", "INSERT", "UPDATE"),
+    "daily_token_sequences": ("SELECT", "INSERT", "UPDATE", "DELETE"),
+    "appointments": ("SELECT", "INSERT", "UPDATE", "DELETE"),
+    "clinical_encounters": ("SELECT", "INSERT", "UPDATE", "DELETE"),
+    "clinical_addenda": ("SELECT", "INSERT", "UPDATE", "DELETE"),
+    "treatment_plans": ("SELECT", "INSERT", "UPDATE", "DELETE"),
+    "treatment_sessions": ("SELECT", "INSERT", "UPDATE", "DELETE"),
+    "treatment_session_addenda": ("SELECT", "INSERT", "UPDATE", "DELETE"),
+    "prescriptions": ("SELECT", "INSERT", "UPDATE", "DELETE"),
+    "prescription_items": ("SELECT", "INSERT", "UPDATE", "DELETE"),
+    "receipt_sequences": ("SELECT", "INSERT", "UPDATE", "DELETE"),
+    "payments": ("SELECT", "INSERT", "UPDATE", "DELETE"),
+    "security_settings": ("SELECT", "UPDATE"),
+    "backup_settings": ("SELECT", "UPDATE"),
+    "backup_runs": ("SELECT", "INSERT", "UPDATE"),
+}
+
+
+def runtime_grant_sql(app_user: str) -> str:
+    """SQL that gives the runtime role exactly the rights RUNTIME_TABLE_GRANTS lists."""
+    statements = [
+        f'GRANT {", ".join(privileges)} ON "{table}" TO "{app_user}";'
+        for table, privileges in RUNTIME_TABLE_GRANTS.items()
+    ]
+    statements.append(f'GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO "{app_user}";')
+    return "\n".join(statements)
+
+
 def restore_database_sql(sql_file: Path, settings: Settings | None = None) -> None:
     """Wipe schema public and execute SQL dump using psql with owner credentials."""
     cfg = settings or get_settings()
@@ -137,11 +340,7 @@ def restore_database_sql(sql_file: Path, settings: Settings | None = None) -> No
     DROP SCHEMA IF EXISTS public CASCADE;
     CREATE SCHEMA public;
     GRANT ALL ON SCHEMA public TO {cfg.db_owner_user};
-    GRANT ALL ON SCHEMA public TO {cfg.db_app_user};
-    ALTER DEFAULT PRIVILEGES FOR ROLE {cfg.db_owner_user} IN SCHEMA public
-        GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO {cfg.db_app_user};
-    ALTER DEFAULT PRIVILEGES FOR ROLE {cfg.db_owner_user} IN SCHEMA public
-        GRANT USAGE, SELECT ON SEQUENCES TO {cfg.db_app_user};
+    GRANT USAGE ON SCHEMA public TO {cfg.db_app_user};
     """
     reset_cmd = [
         psql_bin,
@@ -196,12 +395,8 @@ def restore_database_sql(sql_file: Path, settings: Settings | None = None) -> No
         err = apply_res.stderr.strip() or apply_res.stdout.strip()
         raise RestoreError(f"Restoring SQL dump failed: {err}")
 
-    # Step 3: Re-grant table privileges to application role
-    regrant_sql = f"""
-    GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO {cfg.db_app_user};
-    GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO {cfg.db_app_user};
-    """
-    regrant_cmd = [
+    # Step 3: Restore the runtime role's rights, which the dump does not carry
+    grant_cmd = [
         psql_bin,
         "-v",
         "ON_ERROR_STOP=1",
@@ -214,18 +409,18 @@ def restore_database_sql(sql_file: Path, settings: Settings | None = None) -> No
         "-d",
         cfg.db_name,
         "-c",
-        regrant_sql,
+        runtime_grant_sql(cfg.db_app_user),
     ]
-    regrant_res = subprocess.run(  # noqa: S603
-        regrant_cmd,
+    grant_res = subprocess.run(  # noqa: S603
+        grant_cmd,
         env=env,
         capture_output=True,
         text=True,
         check=False,
     )
-    if regrant_res.returncode != 0:
-        err = regrant_res.stderr.strip() or regrant_res.stdout.strip()
-        raise RestoreError(f"Re-granting schema permissions failed: {err}")
+    if grant_res.returncode != 0:
+        err = grant_res.stderr.strip() or grant_res.stdout.strip()
+        raise RestoreError(f"Restoring runtime role rights failed: {err}")
 
 
 def create_backup(
@@ -244,12 +439,13 @@ def create_backup(
         Path to the generated .tar.gz backup archive.
     """
     cfg = settings or get_settings()
+    safe_label = validate_label(label)
     target_dir = Path(destination_dir) if destination_dir else cfg.backup_dir
     target_dir.mkdir(parents=True, exist_ok=True)
 
     now = datetime.now(UTC)
     timestamp_str = now.strftime("%Y%m%d_%H%M%S")
-    label_prefix = f"_{label.strip()}" if label and label.strip() else ""
+    label_prefix = f"_{safe_label}" if safe_label else ""
     archive_filename = f"kalyan_backup_{timestamp_str}{label_prefix}.tar.gz"
     final_archive_path = target_dir / archive_filename
 
@@ -291,7 +487,7 @@ def create_backup(
             database_dump_bytes=db_size,
             photos_count=len(photos_manifest),
             photos_manifest=photos_manifest,
-            label=label,
+            label=safe_label,
         )
         manifest_path = payload_dir / "manifest.json"
         manifest_path.write_text(json.dumps(manifest.to_dict(), indent=2), encoding="utf-8")
@@ -387,11 +583,16 @@ def restore_backup(
 
     Steps:
     1. Cryptographically verify the archive. If corrupted or missing, abort before any changes.
-    2. Automatically take a pre-restore backup snapshot of the active system state.
+    2. ALWAYS take a pre-restore backup snapshot of the active system state.
     3. Wipe database schema and apply SQL dump from archive.
     4. Synchronize patient photos into settings.photos_dir.
     5. Return restoration execution summary.
+
+    ``create_prerestore_snapshot`` is retained only for call-site compatibility; passing False
+    raises ValueError because the safety snapshot is mandatory.
     """
+    if not create_prerestore_snapshot:
+        raise ValueError("The pre-restore safety snapshot is mandatory and cannot be disabled")
     cfg = settings or get_settings()
     path = Path(archive_path)
 
@@ -400,14 +601,12 @@ def restore_backup(
     if not is_valid or not manifest_data:
         raise BackupCorruptedError(f"Restore rejected: archive failed integrity checks: {err_msg}")
 
-    # 2. Capture automatic pre-restore safety snapshot
-    prerestore_path: Path | None = None
-    if create_prerestore_snapshot:
-        prerestore_path = create_backup(
-            destination_dir=cfg.backup_dir,
-            label="prerestore",
-            settings=cfg,
-        )
+    # 2. Capture mandatory pre-restore safety snapshot (aborts restore if it cannot be taken)
+    prerestore_path = create_backup(
+        destination_dir=cfg.backup_dir,
+        label="prerestore",
+        settings=cfg,
+    )
 
     # 3. Extract and restore
     with tempfile.TemporaryDirectory() as extract_dir_str:
@@ -435,7 +634,7 @@ def restore_backup(
     return {
         "status": "SUCCESS",
         "archive_restored": str(path.resolve()),
-        "prerestore_snapshot": str(prerestore_path.resolve()) if prerestore_path else None,
+        "prerestore_snapshot": str(prerestore_path.resolve()),
         "database_restored": True,
         "photos_restored_count": photos_restored,
         "manifest": manifest_data,

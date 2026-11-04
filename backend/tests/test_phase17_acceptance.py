@@ -193,7 +193,7 @@ def test_disaster_recovery_rehearsal(
     restore_res = restore_backup(
         archive_path,
         settings=settings,
-        create_prerestore_snapshot=False,
+        create_prerestore_snapshot=True,
     )
     assert restore_res["status"] == "SUCCESS"
 

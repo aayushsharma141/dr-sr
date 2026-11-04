@@ -1,11 +1,21 @@
 import type {
+  ActiveSessionOut,
   AuditLogListResponse,
   BackupArchiveInfo,
   BackupArchiveListResponse,
   BackupCreateRequest,
+  BackupVerifyResponse,
   IntegrityReportOut,
+  LoginHistoryEntry,
+  PasswordPolicyOut,
   RestoreRequest,
   RestoreResultOut,
+  RevokeSessionOut,
+  RevokeSessionRequest,
+  RevokeUserSessionsOut,
+  RolePermissionsOut,
+  SecurityPolicyOut,
+  SystemStatusOut,
 } from './types'
 import type {
   PaymentCreate,
@@ -64,6 +74,13 @@ import {
 } from '@tanstack/react-query'
 import { ApiError, apiFetch, setCsrfToken } from './client'
 import type {
+  BackupRunOut,
+  BackupSettingsOut,
+  BackupSettingsUpdate,
+  BillingConfigurationOut,
+  SecurityPolicyUpdate,
+} from './types'
+import type {
   ActionRequest,
   AreaOverview,
   Me,
@@ -82,6 +99,15 @@ export const queryClient = new QueryClient({
     },
   },
 })
+
+/**
+ * Every audited admin mutation changes the admin overview (recent admin actions, counters,
+ * alerts) and the audit trail, so both are refreshed after it succeeds.
+ */
+function invalidateAdminSummaries(qc: QueryClient) {
+  qc.invalidateQueries({ queryKey: ['overview', 'admin'] })
+  qc.invalidateQueries({ queryKey: ['audit-logs'] })
+}
 
 export function useMe() {
   return useQuery({
@@ -194,7 +220,7 @@ export function useCreateUser() {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['users'] })
-      qc.invalidateQueries({ queryKey: ['overview', 'admin'] })
+      invalidateAdminSummaries(qc)
     },
   })
 }
@@ -217,6 +243,7 @@ export function useUpdateUser() {
     onSuccess: (updatedUser) => {
       qc.setQueryData(['users', updatedUser.id], updatedUser)
       qc.invalidateQueries({ queryKey: ['users'] })
+      invalidateAdminSummaries(qc)
     },
   })
 }
@@ -239,7 +266,9 @@ export function useDeactivateUser() {
     onSuccess: (updatedUser) => {
       qc.setQueryData(['users', updatedUser.id], updatedUser)
       qc.invalidateQueries({ queryKey: ['users'] })
-      qc.invalidateQueries({ queryKey: ['overview', 'admin'] })
+      // A deactivated owner's sessions stop counting as active.
+      qc.invalidateQueries({ queryKey: ['sessions'] })
+      invalidateAdminSummaries(qc)
     },
   })
 }
@@ -262,7 +291,8 @@ export function useReactivateUser() {
     onSuccess: (updatedUser) => {
       qc.setQueryData(['users', updatedUser.id], updatedUser)
       qc.invalidateQueries({ queryKey: ['users'] })
-      qc.invalidateQueries({ queryKey: ['overview', 'admin'] })
+      qc.invalidateQueries({ queryKey: ['sessions'] })
+      invalidateAdminSummaries(qc)
     },
   })
 }
@@ -276,18 +306,17 @@ export function useResetUserPassword() {
     }: {
       id: number
       payload: ActionRequest
-    }): Promise<{ temporary_password: string }> => {
-      return await apiFetch<{ temporary_password: string }>(
-        `/users/${id}/reset-password`,
-        {
-          method: 'POST',
-          body: payload,
-        },
-      )
+    }): Promise<UserCreatedOut> => {
+      return await apiFetch<UserCreatedOut>(`/users/${id}/reset-password`, {
+        method: 'POST',
+        body: payload,
+      })
     },
     onSuccess: (_, vars) => {
       qc.invalidateQueries({ queryKey: ['users', vars.id] })
       qc.invalidateQueries({ queryKey: ['users'] })
+      qc.invalidateQueries({ queryKey: ['sessions'] })
+      invalidateAdminSummaries(qc)
     },
   })
 }
@@ -310,7 +339,116 @@ export function useUnlockUser() {
     onSuccess: (updatedUser) => {
       qc.setQueryData(['users', updatedUser.id], updatedUser)
       qc.invalidateQueries({ queryKey: ['users'] })
+      invalidateAdminSummaries(qc)
     },
+  })
+}
+
+/** GET /users/{id}/login-history: latest 50 security events for one user (user:read + audit:read). */
+export function useLoginHistory(userId: number | null) {
+  return useQuery({
+    queryKey: ['users', userId, 'login-history'],
+    queryFn: () => apiFetch<LoginHistoryEntry[]>(`/users/${userId}/login-history`),
+    enabled: userId !== null && userId > 0,
+  })
+}
+
+/** POST /users/{id}/revoke-sessions: ends every active session of a user (caller's current one is kept). */
+export function useRevokeUserSessions() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, payload }: { id: number; payload: RevokeSessionRequest }) =>
+      apiFetch<RevokeUserSessionsOut>(`/users/${id}/revoke-sessions`, {
+        method: 'POST',
+        body: payload,
+      }),
+    onSuccess: (_, vars) => {
+      qc.invalidateQueries({ queryKey: ['sessions'] })
+      qc.invalidateQueries({ queryKey: ['users', vars.id, 'login-history'] })
+      invalidateAdminSummaries(qc)
+    },
+  })
+}
+
+// ---------------------------------------------------------------------------
+// Admin modules 02 / 09: role catalogue, sessions, security policy
+// ---------------------------------------------------------------------------
+
+/** GET /roles/permissions: read-only catalogue derived from ROLE_PERMISSIONS. */
+export function useRolePermissions() {
+  return useQuery({
+    queryKey: ['roles', 'permissions'],
+    queryFn: () => apiFetch<RolePermissionsOut>('/roles/permissions'),
+    staleTime: 1000 * 60 * 10,
+  })
+}
+
+/** GET /sessions[?user_id]: active sessions, most recently active first. */
+export function useActiveSessions(userId?: number | null) {
+  const qs = userId ? `?user_id=${userId}` : ''
+  return useQuery({
+    queryKey: ['sessions', { userId: userId ?? null }],
+    queryFn: () => apiFetch<ActiveSessionOut[]>(`/sessions${qs}`),
+  })
+}
+
+/** POST /sessions/{id}/revoke. 404 session_not_found, 409 cannot_revoke_current_session. */
+export function useRevokeSession() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, payload }: { id: number; payload: RevokeSessionRequest }) =>
+      apiFetch<RevokeSessionOut>(`/sessions/${id}/revoke`, {
+        method: 'POST',
+        body: payload,
+      }),
+    onSuccess: (data) => {
+      qc.invalidateQueries({ queryKey: ['sessions'] })
+      qc.invalidateQueries({ queryKey: ['users', data.user_id, 'login-history'] })
+      invalidateAdminSummaries(qc)
+    },
+  })
+}
+
+/** GET /security/policy: effective, environment-sourced, read-only security policy. */
+export function useSecurityPolicy() {
+  return useQuery({
+    queryKey: ['security', 'policy'],
+    queryFn: () => apiFetch<SecurityPolicyOut>('/security/policy'),
+  })
+}
+
+/** PATCH /security/policy: stores tighter values; takes effect on the next request. */
+export function useUpdateSecurityPolicy() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (payload: SecurityPolicyUpdate) =>
+      apiFetch<SecurityPolicyOut>('/security/policy', { method: 'PATCH', body: payload }),
+    onSuccess: (data) => {
+      queryClient.setQueryData(['security', 'policy'], data)
+      queryClient.invalidateQueries({ queryKey: ['security', 'password-policy'] })
+      queryClient.invalidateQueries({ queryKey: ['audit-logs'] })
+    },
+  })
+}
+
+/** GET /security/password-policy: available to every authenticated user, including forced change. */
+export function usePasswordPolicy() {
+  return useQuery({
+    queryKey: ['security', 'password-policy'],
+    queryFn: () => apiFetch<PasswordPolicyOut>('/security/password-policy'),
+    staleTime: 1000 * 60 * 10,
+  })
+}
+
+// ---------------------------------------------------------------------------
+// Admin module 12: system health
+// ---------------------------------------------------------------------------
+
+/** GET /system/status: runtime, schema revision, database and storage status. */
+export function useSystemStatus() {
+  return useQuery({
+    queryKey: ['system', 'status'],
+    queryFn: () => apiFetch<SystemStatusOut>('/system/status'),
   })
 }
 
@@ -360,6 +498,12 @@ export function useClinicSettings() {
   })
 }
 
+/**
+ * PATCH /settings. Changing receipt_sequence_cycle after receipts exist in the current cycle
+ * fails with 409 receipt_cycle_change_requires_confirmation (extra fields:
+ * ReceiptCycleConfirmationExtra) until it is resent with confirm_receipt_cycle_change: true
+ * and a non-blank change_reason.
+ */
 export function useUpdateClinicSettings() {
   const qc = useQueryClient()
   return useMutation({
@@ -370,6 +514,7 @@ export function useUpdateClinicSettings() {
       }),
     onSuccess: (data) => {
       qc.setQueryData(['clinic-settings'], data)
+      invalidateAdminSummaries(qc)
     },
   })
 }
@@ -445,6 +590,7 @@ export function useCreateDoctor() {
       }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['doctors'] })
+      invalidateAdminSummaries(qc)
     },
   })
 }
@@ -459,10 +605,15 @@ export function useUpdateDoctor() {
       }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['doctors'] })
+      invalidateAdminSummaries(qc)
     },
   })
 }
 
+/**
+ * GET /fees. activeOnly=false sends include_inactive=true (all fees, ordered by id);
+ * activeOnly=true returns active fees only.
+ */
 export function useFees(activeOnly: boolean = false) {
   return useQuery({
     queryKey: ['fees', { activeOnly }],
@@ -481,10 +632,12 @@ export function useCreateFee() {
       }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['fees'] })
+      invalidateAdminSummaries(qc)
     },
   })
 }
 
+/** PATCH /fees/{id}. body.version_id is required; a stale one gives 409 version_conflict. */
 export function useUpdateFee() {
   const qc = useQueryClient()
   return useMutation({
@@ -495,6 +648,7 @@ export function useUpdateFee() {
       }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['fees'] })
+      invalidateAdminSummaries(qc)
     },
   })
 }
@@ -917,7 +1071,7 @@ export function useReversePayment() {
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['payments'] })
-      queryClient.invalidateQueries({ queryKey: ['billing', 'pending-dues'] })
+      queryClient.invalidateQueries({ queryKey: ['billing'] })
       queryClient.invalidateQueries({ queryKey: ['treatment-plans'] })
       queryClient.invalidateQueries({ queryKey: ['timeline'] })
     },
@@ -965,6 +1119,15 @@ export function useAuditLogs(params?: {
   })
 }
 
+/** GET /audit-logs/actions: sorted catalogue of audit action names (for the action filter). */
+export function useAuditActions() {
+  return useQuery({
+    queryKey: ['audit-logs', 'actions'],
+    queryFn: () => apiFetch<string[]>('/api/audit-logs/actions'),
+    staleTime: 1000 * 60 * 10,
+  })
+}
+
 export function useBackups() {
   return useQuery({
     queryKey: ['operations', 'backups'],
@@ -982,10 +1145,85 @@ export function useCreateBackup() {
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['operations', 'backups'] })
+      invalidateAdminSummaries(queryClient)
+    },
+    onError: () => {
+      // A failed backup writes a BACKUP_FAILED audit row and changes the overview alerts.
+      invalidateAdminSummaries(queryClient)
     },
   })
 }
 
+/**
+ * POST /operations/backups/{filename}/verify: re-hashes one archive against its manifest.
+ * Read-only on the server (not audited), so nothing is invalidated. 422 invalid_archive_filename.
+ */
+export function useBackupSettings() {
+  return useQuery({
+    queryKey: ['operations', 'backup-settings'],
+    queryFn: () => apiFetch<BackupSettingsOut>('/api/operations/backup-settings'),
+  })
+}
+
+export function useUpdateBackupSettings() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (payload: BackupSettingsUpdate) =>
+      apiFetch<BackupSettingsOut>('/api/operations/backup-settings', {
+        method: 'PATCH',
+        body: payload,
+      }),
+    onSuccess: (data) => {
+      queryClient.setQueryData(['operations', 'backup-settings'], data)
+      queryClient.invalidateQueries({ queryKey: ['audit-logs'] })
+    },
+  })
+}
+
+export function useBackupRuns() {
+  return useQuery({
+    queryKey: ['operations', 'backup-runs'],
+    queryFn: () => apiFetch<BackupRunOut[]>('/api/operations/backup-runs'),
+  })
+}
+
+export function useBillingConfiguration() {
+  return useQuery({
+    queryKey: ['billing', 'configuration'],
+    queryFn: () => apiFetch<BillingConfigurationOut>('/api/billing/configuration'),
+  })
+}
+
+export interface LedgerFilter {
+  q: string
+  status: 'all' | 'active' | 'reversed'
+}
+
+export function useLedger(filter: LedgerFilter) {
+  return useQuery({
+    queryKey: ['billing', 'ledger', filter],
+    queryFn: () => {
+      const params = new URLSearchParams({ status: filter.status })
+      if (filter.q) params.set('q', filter.q)
+      return apiFetch<PaymentOut[]>(`/api/billing/ledger?${params.toString()}`)
+    },
+  })
+}
+
+export function useVerifyBackup() {
+  return useMutation({
+    mutationFn: (filename: string) =>
+      apiFetch<BackupVerifyResponse>(
+        `/api/operations/backups/${encodeURIComponent(filename)}/verify`,
+        { method: 'POST' },
+      ),
+  })
+}
+
+/**
+ * POST /operations/restore. Requires confirmation_phrase 'RESTORE' and a 10-500 character
+ * reason; the pre-restore snapshot is always taken. A failed restore is audited as well.
+ */
 export function useRestoreBackup() {
   const queryClient = useQueryClient()
   return useMutation({
@@ -996,6 +1234,10 @@ export function useRestoreBackup() {
       }),
     onSuccess: () => {
       queryClient.invalidateQueries()
+    },
+    onError: () => {
+      // 400 backup_corrupted / 500 restore_failed commit a BACKUP_RESTORE_FAILED audit row.
+      invalidateAdminSummaries(queryClient)
     },
   })
 }

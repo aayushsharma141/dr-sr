@@ -498,6 +498,11 @@ def test_rbac_matrix_cell(
         target_entity = target_user
         resolved_path = row.path.replace("{id}", str(target_user.id))
 
+    if "{filename}" in resolved_path:
+        resolved_path = resolved_path.replace("{filename}", "dummy.tar.gz")
+    if "{session_id}" in resolved_path:
+        resolved_path = resolved_path.replace("{session_id}", "999999")
+
     body = row.body_factory(target_entity) if row.body_factory else None
     if "photo" in row.path and row.method == "POST":
         resp = client.request(

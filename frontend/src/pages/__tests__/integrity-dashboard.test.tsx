@@ -45,6 +45,10 @@ const sampleReport = {
 }
 
 vi.mock('../../api/queries', () => ({
+  useMe: () => ({
+    data: { id: 1, username: 'admin', role: 'ADMIN', full_name: 'Admin User' },
+    isPending: false,
+  }),
   useIntegrityCheck: () => ({
     data: sampleReport,
     isPending: false,

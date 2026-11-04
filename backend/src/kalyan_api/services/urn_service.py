@@ -2,7 +2,7 @@
 
 Guarantees:
 - Format: KH-YYYY-XXXX (e.g., KH-2026-0001).
-- Sequence counter scoped per calendar year.
+- Sequence counter scoped per calendar year, evaluated in IST (Asia/Kolkata).
 - Row-level lock via ON CONFLICT DO UPDATE on urn_sequences guarantees race-free
   sequential allocation even under high concurrency.
 """
@@ -14,9 +14,13 @@ from kalyan_api import clock
 
 
 def allocate_next_urn(session: Session, year: int | None = None) -> str:
-    """Allocate the next sequential URN for the given calendar year atomically."""
+    """Allocate the next sequential URN for the given calendar year atomically.
+
+    The default year is the IST business year (clock.ist_today()), not the UTC year, so a
+    patient registered at 00:30 IST on 1 January receives a URN in the new year.
+    """
     if year is None:
-        year = clock.utcnow().year
+        year = clock.ist_today().year
 
     query = text("""
         INSERT INTO urn_sequences (year, last_seq)

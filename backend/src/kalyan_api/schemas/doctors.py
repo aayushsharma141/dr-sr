@@ -57,6 +57,7 @@ class FeeOut(BaseModel):
     name: str
     fee_paise: int
     is_active: bool
+    version_id: int
     created_at: datetime
     updated_at: datetime
 
@@ -78,3 +79,4 @@ class FeeUpdate(BaseModel):
     name: str = Field(min_length=2, max_length=120)
     fee_paise: int = Field(ge=0)
     is_active: bool = True
+    version_id: int = Field(ge=1)

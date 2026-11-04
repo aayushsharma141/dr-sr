@@ -68,14 +68,13 @@ describe('legibility guard (UX-04)', () => {
    */
   const PENDING: Record<string, { max: number; reason: string }> = {
     // Existing code on main that Phase 18 did not touch: fixing it needs its own review.
-    'components/AppShell.tsx': { max: 12, reason: '12 sub-12px classes in the shell (sidebar and header). Existing main code.' },
+
     'pages/AppointmentsReception.tsx': { max: 2, reason: '1 sub-12px class, 1 grey. Existing main code.' },
     'pages/PatientsDirectory.tsx': { max: 4, reason: '4 grey 300/400 classes. Existing main code.' },
     'pages/PendingDuesPage.tsx': { max: 4, reason: '2 grey, 2 semantic colours. Existing main code.' },
     'pages/PatientDetail.tsx': { max: 1, reason: '1 sub-12px class in the payments table header (11px). The four grey section labels were fixed to neutral-600. Existing main code.' },
     // Held by client decisions.
     'components/VasTrendChart.tsx': { max: 4, reason: 'SVG font sizes (3) and 1 class: needs a visual review before changing. Held by the client.' },
-    'pages/admin/AuditViewerPage.tsx': { max: 5, reason: 'Dark log panel uses light grey on near-black on purpose; needs a surface exception or a restyle. Held by the client.' },
     'pages/admin/BackupManagerPage.tsx': { max: 1, reason: 'Label chip at line 187: change rejected (it became larger than the filename beside it). Held by the client.' },
     'pages/TreatmentPlanWorkspace.tsx': { max: 2, reason: 'Addendum header and status badge: changes rejected for visual hierarchy. Held by the client.' },
   }

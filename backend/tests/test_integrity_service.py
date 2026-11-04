@@ -1,6 +1,7 @@
 """Tests for clinical and financial integrity check engine (BAK-03, Plan 16-04)."""
 
 from pathlib import Path
+from sqlalchemy import create_engine, text
 
 from kalyan_api.config import get_settings
 from kalyan_api.db.session import session_scope
@@ -21,7 +22,7 @@ def test_integrity_audit_clean_database(db_session):
                 f.unlink()
     with session_scope(settings) as session:
         report = run_integrity_audit(session, settings)
-        assert report.total_checks == 5
+        assert report.total_checks == 6
         assert report.is_healthy is True
         assert report.failed_checks == 0
         assert all(c.passed for c in report.checks)
@@ -36,8 +37,12 @@ def test_integrity_audit_detects_orphan_and_missing_photos(tmp_path: Path):
     orphan_file = settings.photos_dir / "untracked_orphan_img.jpg"
     orphan_file.write_bytes(b"ORPHAN_IMAGE_DATA")
 
+    owner_engine = create_engine(settings.owner_url, isolation_level="AUTOCOMMIT")
+    with owner_engine.connect() as conn:
+        conn.execute(text("DELETE FROM patients WHERE urn LIKE 'KHM-2026-88888%'"))
+
     with session_scope(settings) as session:
-        # 2. Create patient with missing photo path
+        # 2. Ensure clean patient with missing photo path
         p = Patient(
             urn="KHM-2026-88888",
             full_name="Photo Missing Patient",
@@ -53,16 +58,19 @@ def test_integrity_audit_detects_orphan_and_missing_photos(tmp_path: Path):
         session.add(p)
         session.commit()
 
-        # Run check
-        res = check_photo_storage_integrity(session, settings)
-        assert res.passed is False
-        issues = [d["issue"] for d in res.discrepancies]
-        assert "missing_photo_file" in issues
-        assert "orphan_photo_file" in issues
+        try:
+            # Run check
+            res = check_photo_storage_integrity(session, settings)
+            assert res.passed is False
+            issues = [d["issue"] for d in res.discrepancies]
+            assert "missing_photo_file" in issues
+            assert "orphan_photo_file" in issues
+        finally:
+            p.photo_path = None
+            session.commit()
 
-        # Cleanup
-        session.delete(p)
-        session.commit()
+    with owner_engine.connect() as conn:
+        conn.execute(text("DELETE FROM patients WHERE urn LIKE 'KHM-2026-88888%'"))
 
     if orphan_file.exists():
         orphan_file.unlink()

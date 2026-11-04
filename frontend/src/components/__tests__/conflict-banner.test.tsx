@@ -15,7 +15,9 @@ const INITIAL_USER: UserOut = {
   is_active: true,
   must_change_password: false,
   is_locked: false,
+  locked_until: null,
   last_login_at: null,
+  password_changed_at: null,
   created_at: '2026-10-31T00:00:00Z',
   version_id: 1,
 }
@@ -118,7 +120,7 @@ describe('D-08 ConflictBanner & 409 Handling', () => {
     })
 
     // Click "Edit"
-    const editBtn = screen.getByRole('button', { name: /^edit$/i })
+    const editBtn = screen.getByRole('button', { name: /^edit reception_staff$/i })
     await user.click(editBtn)
 
     // Edit modal should open with current name
@@ -205,7 +207,7 @@ describe('D-08 ConflictBanner & 409 Handling', () => {
       expect(screen.getByText('reception_staff')).toBeInTheDocument()
     })
 
-    const editBtn = screen.getByRole('button', { name: /^edit$/i })
+    const editBtn = screen.getByRole('button', { name: /^edit reception_staff$/i })
     await user.click(editBtn)
 
     const saveBtn = screen.getByRole('button', { name: /save changes/i })

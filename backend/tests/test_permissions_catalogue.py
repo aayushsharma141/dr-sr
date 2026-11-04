@@ -110,6 +110,12 @@ def test_golden_role_permissions_snapshot() -> None:
                 Permission.BACKUP_RUN,
                 Permission.BACKUP_RESTORE,
                 Permission.INTEGRITY_RUN,
+                Permission.SESSION_READ,
+                Permission.SESSION_REVOKE,
+                Permission.SECURITY_READ,
+                Permission.SECURITY_WRITE,
+                Permission.BACKUP_CONFIGURE,
+                Permission.SYSTEM_READ,
             }
         ),
         Role.RECEPTION: frozenset(

@@ -11,6 +11,16 @@ vi.mock('../../api/queries', () => ({
   }),
 }))
 
+vi.mock('../../api/branding', () => ({
+  useClinicBranding: () => ({
+    trustNameEn: 'Sri Vashishtha Kalyan Trust',
+    trustNameHi: 'श्री वशिष्ठ कल्याण ट्रस्ट',
+    hospitalName: 'Kalyan Hospital',
+    address: 'Station Road, Ara',
+    locationLine: 'Ara, Bhojpur, Bihar',
+  }),
+}))
+
 function renderShell(role: 'ADMIN' | 'RECEPTION' | 'DOCTOR', route = '/') {
   return render(
     <MemoryRouter initialEntries={[route]}>
@@ -54,17 +64,16 @@ describe('AppShell clinical navigation hierarchy', () => {
     renderShell('ADMIN', '/admin/backups')
 
     const primaryNavigation = screen.getByRole('navigation', { name: 'Primary navigation' })
-    expect(within(primaryNavigation).getByRole('link', { name: 'Master Data' })).toHaveAttribute('href', '/admin/doctors')
-    expect(within(primaryNavigation).getByRole('link', { name: 'Users & Permissions' })).toHaveAttribute('href', '/admin/users')
+    expect(within(primaryNavigation).getByRole('link', { name: 'Doctor & Clinical Configuration' })).toHaveAttribute('href', '/admin/doctors')
+    expect(within(primaryNavigation).getByRole('link', { name: 'User & Authority' })).toHaveAttribute('href', '/admin/users')
     expect(within(primaryNavigation).getByRole('link', { name: 'Audit & Compliance' })).toHaveAttribute('href', '/admin/audit')
-    expect(within(primaryNavigation).getByRole('link', { name: 'Backup & Restore' })).toHaveAttribute('aria-current', 'page')
-    expect(within(primaryNavigation).getByRole('link', { name: 'System Integrity' })).toHaveAttribute('href', '/admin/integrity')
-    expect(within(primaryNavigation).getByRole('link', { name: 'Settings' })).toHaveAttribute('href', '/admin/settings')
-    expect(screen.queryByRole('navigation', { name: 'Administration sections' })).not.toBeInTheDocument()
-    expect(screen.getAllByRole('link', { name: 'Backup & Restore' })).toHaveLength(1)
+    expect(within(primaryNavigation).getByRole('link', { name: 'Backup, Restore & Data' })).toHaveAttribute('aria-current', 'page')
+    expect(within(primaryNavigation).getByRole('link', { name: 'Hospital Configuration' })).toHaveAttribute('href', '/admin/settings')
+    expect(screen.getByRole('navigation', { name: 'Administration sections' })).toBeInTheDocument()
+    expect(within(primaryNavigation).getAllByRole('link', { name: 'Backup, Restore & Data' })).toHaveLength(1)
+    expect(within(primaryNavigation).getByRole('link', { name: 'Patient Records' })).toHaveAttribute('href', '/reception/patients')
+    expect(within(primaryNavigation).getByRole('link', { name: 'Appointments' })).toHaveAttribute('href', '/reception/appointments?tab=today')
     expect(screen.queryByRole('link', { name: 'Patient Registration' })).not.toBeInTheDocument()
-    expect(screen.queryByRole('link', { name: 'Patient Records' })).not.toBeInTheDocument()
-    expect(screen.queryByRole('link', { name: 'Appointments' })).not.toBeInTheDocument()
     expect(screen.queryByRole('link', { name: 'Physiotherapy Treatment' })).not.toBeInTheDocument()
   })
 
