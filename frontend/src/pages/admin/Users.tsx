@@ -9,7 +9,7 @@ import {
   useUsers,
 } from '../../api/queries'
 import { ApiError, apiFetch } from '../../api/client'
-import { AppShell } from '../../components/AppShell'
+import { AdminPageLayout } from '../../components/AdminPageLayout'
 import { ConflictBanner } from '../../components/ConflictBanner'
 import type { Role, UserCreatedOut, UserOut } from '../../api/types'
 
@@ -197,24 +197,8 @@ export function Users() {
   }
 
   return (
-    <AppShell name="System Administrator" role="ADMIN">
+    <AdminPageLayout title="User Management" description="Create staff accounts, assign roles, manage access status and handle account recovery." actions={<button type="button" onClick={openCreateDialog} className="inline-flex min-h-11 items-center justify-center rounded-lg bg-[#8E1C3D] px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-[#74152F] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#8E1C3D]">Create User</button>}>
       <div className="space-y-6">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div>
-            <h2 className="text-2xl font-bold text-neutral-900">User Management</h2>
-            <p className="text-sm text-neutral-600 mt-1">
-              Configure system user accounts, roles, access status, and password resets.
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={openCreateDialog}
-            className="px-4 py-2 bg-red-900 text-white rounded font-medium hover:bg-red-800 min-h-[44px] min-w-[44px] focus-visible:outline-2 focus-visible:outline-red-800 cursor-pointer self-start sm:self-auto"
-          >
-            Create User
-          </button>
-        </div>
-
         {isPending && (
           <div className="p-8 text-center bg-white rounded border border-neutral-200">
             <p role="status" className="text-neutral-600">Loading user accounts...</p>
@@ -605,6 +589,6 @@ export function Users() {
           </div>
         )}
       </div>
-    </AppShell>
+    </AdminPageLayout>
   )
 }

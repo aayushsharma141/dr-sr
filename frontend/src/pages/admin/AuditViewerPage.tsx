@@ -1,6 +1,5 @@
 import { useState } from 'react'
-import { Link } from 'react-router'
-import { AppShell } from '../../components/AppShell'
+import { AdminPageLayout } from '../../components/AdminPageLayout'
 import { useAuditLogs } from '../../api/queries'
 import type { AuditLogOut } from '../../api/types'
 
@@ -26,31 +25,8 @@ export function AuditViewerPage() {
   }
 
   return (
-    <AppShell name="Admin" role="ADMIN">
+    <AdminPageLayout title="Audit & Compliance" description="Review the append-only record of administrative, operational and security events." actions={<button type="button" onClick={() => refetch()} className="inline-flex min-h-11 items-center justify-center rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#8E1C3D]">Refresh Logs</button>}>
       <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <div className="flex items-center gap-2 text-sm text-neutral-500 mb-1">
-              <Link to="/admin" className="hover:underline">
-                Admin
-              </Link>
-              <span>/</span>
-              <span>Audit Log Viewer</span>
-            </div>
-            <h1 className="text-2xl font-bold text-neutral-900">System Audit Log</h1>
-            <p className="text-sm text-neutral-600 mt-1">
-              Immutable, append-only operational and security event log (AUD-02)
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={() => refetch()}
-            className="px-4 py-2 bg-neutral-100 hover:bg-neutral-200 text-neutral-800 text-sm font-medium rounded cursor-pointer"
-          >
-            Refresh Logs
-          </button>
-        </div>
-
         {/* Filters */}
         <div className="bg-white p-4 rounded-lg border border-neutral-200 shadow-xs grid grid-cols-1 sm:grid-cols-4 gap-4">
           <div>
@@ -275,6 +251,6 @@ export function AuditViewerPage() {
           )}
         </div>
       </div>
-    </AppShell>
+    </AdminPageLayout>
   )
 }

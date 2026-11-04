@@ -42,21 +42,14 @@
 
 The following routes still need a visual consistency pass. This change did not rewrite their page-level layouts:
 
-- [ ] `/admin/settings`
-- [ ] `/admin/doctors`
-- [ ] `/admin/users`
-- [ ] `/admin/audit`
-- [ ] `/admin/backups`
-- [ ] `/admin/integrity`
+- [x] `/admin/settings`
+- [x] `/admin/doctors`
+- [x] `/admin/users`
+- [x] `/admin/audit`
+- [x] `/admin/backups`
+- [x] `/admin/integrity`
 
-For each page, standardize:
-- One H1 and a short explanatory subtitle.
-- Consistent breadcrumb placement and page gutters.
-- Consistent card, table, form, button, badge and alert variants.
-- Consistent field labels, helper text, validation and empty states.
-- Consistent loading, error and success states.
-- No nested page-level scrollbars unless a data grid genuinely requires one.
-- Destructive actions must remain visually distinct and require appropriate confirmation.
+For the six routes above, the shared `AdminPageLayout` now standardizes the page-level H1, breadcrumb, subtitle, responsive action slot, content width and vertical rhythm. Existing page-specific forms, tables, controls, loading/error states and confirmations remain in place. See `docs/ADMIN-PAGE-STANDARDIZATION.md` for the implementation inventory and remaining verification.
 
 ### P1 — Improve dashboard information architecture
 

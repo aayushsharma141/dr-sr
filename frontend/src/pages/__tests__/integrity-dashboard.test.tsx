@@ -71,7 +71,7 @@ describe('IntegrityDashboard', () => {
       </QueryClientProvider>
     )
 
-    expect(screen.getByText('System Integrity Diagnostic')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { level: 1, name: 'System Integrity' })).toBeInTheDocument()
     expect(screen.getByText('All System Invariants Intact & Verified')).toBeInTheDocument()
     expect(screen.getByText('Financial Ledger & Package Invariants')).toBeInTheDocument()
     expect(screen.getByText('Patient URN Uniqueness')).toBeInTheDocument()
