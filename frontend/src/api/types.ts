@@ -62,6 +62,7 @@ export interface DoctorOverview {
   name: string
   role: string
   doctor_id: number
+  department_id: number | null
   doctor_name_en: string
 }
 
