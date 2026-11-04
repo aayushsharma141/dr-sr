@@ -38,6 +38,7 @@ class AppointmentRead(BaseModel):
     patient_name: str
     patient_mobile: str
     doctor_id: int
+    department_id: int | None = None
     doctor_name_en: str
     doctor_name_hi: str | None = None
     appointment_date: date
