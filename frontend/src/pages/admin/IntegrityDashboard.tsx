@@ -1,5 +1,4 @@
-import { Link } from 'react-router'
-import { AppShell } from '../../components/AppShell'
+import { AdminPageLayout } from '../../components/AdminPageLayout'
 import { useIntegrityCheck } from '../../api/queries'
 import type { IntegrityCheckItemOut } from '../../api/types'
 
@@ -7,32 +6,8 @@ export function IntegrityDashboard() {
   const { data, isPending, isError, error, refetch, isFetching } = useIntegrityCheck()
 
   return (
-    <AppShell name="Admin" role="ADMIN">
+    <AdminPageLayout title="System Integrity" description="Run the system’s invariant checks and review any detected data consistency discrepancies." actions={<button type="button" disabled={isFetching} onClick={() => refetch()} className="inline-flex min-h-11 items-center justify-center rounded-lg bg-[#8E1C3D] px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-[#74152F] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#8E1C3D] disabled:cursor-not-allowed disabled:opacity-50">{isFetching ? "Running checks…" : "Run Integrity Check"}</button>}>
       <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <div className="flex items-center gap-2 text-sm text-neutral-500 mb-1">
-              <Link to="/admin" className="hover:underline">
-                Admin
-              </Link>
-              <span>/</span>
-              <span>Integrity Diagnostic</span>
-            </div>
-            <h1 className="text-2xl font-bold text-neutral-900">System Integrity Diagnostic</h1>
-            <p className="text-sm text-neutral-600 mt-1">
-              5-pillar invariant audit across financial ledgers, URNs, receipts, session progress, and photos (BAK-03)
-            </p>
-          </div>
-          <button
-            type="button"
-            disabled={isFetching}
-            onClick={() => refetch()}
-            className="px-4 py-2 bg-red-800 hover:bg-red-900 text-white text-sm font-semibold rounded cursor-pointer disabled:opacity-50 shadow-xs"
-          >
-            {isFetching ? 'Auditing System Invariants...' : 'Run Integrity Diagnostic'}
-          </button>
-        </div>
-
         {isPending && <div className="p-8 text-center text-neutral-500">Executing system integrity checks...</div>}
         {isError && (
           <div className="p-8 text-center text-red-600">
@@ -116,6 +91,6 @@ export function IntegrityDashboard() {
           </>
         )}
       </div>
-    </AppShell>
+    </AdminPageLayout>
   )
 }
