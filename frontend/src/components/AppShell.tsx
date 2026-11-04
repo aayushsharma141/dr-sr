@@ -2,7 +2,6 @@ import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router'
 import { useLogout } from '../api/queries'
 import type { Role } from '../api/types'
-import { AdminNavTabs } from './AdminNavTabs'
 
 interface AppShellProps {
   name: string
@@ -61,7 +60,7 @@ const NAVIGATION: NavigationItem[] = [
     description: 'Search and inspect patient records',
     path: '/reception/patients',
     icon: 'folder',
-    roles: ALL_ROLES,
+    roles: ['RECEPTION', 'DOCTOR'],
   },
   {
     key: 'physiotherapy',
@@ -97,9 +96,17 @@ const NAVIGATION: NavigationItem[] = [
   },
   {
     key: 'reports',
-    label: 'Reports',
-    description: 'System integrity and operational reports',
+    label: 'System Integrity',
+    description: 'Clinical, financial and storage integrity checks',
     path: '/admin/integrity',
+    icon: 'chart',
+    roles: ADMIN_ONLY,
+  },
+  {
+    key: 'audit',
+    label: 'Audit & Compliance',
+    description: 'Security and operational event history',
+    path: '/admin/audit',
     icon: 'chart',
     roles: ADMIN_ONLY,
   },
@@ -241,8 +248,6 @@ export function AppShell({ name, role, children }: AppShellProps) {
     () => NAVIGATION.filter((item) => item.roles.includes(role)),
     [role],
   )
-  const showAdminTabs = role === 'ADMIN' && location.pathname.startsWith('/admin/')
-  const adminTabs = showAdminTabs ? <AdminNavTabs /> : null
 
   const handleSignOut = async () => {
     try {
@@ -260,8 +265,9 @@ export function AppShell({ name, role, children }: AppShellProps) {
           const active = isNavigationItemActive(item, location.pathname, location.search, role)
           const sectionLabel =
             index === 1
-              ? role === 'RECEPTION' ? 'RECEPTION DESK' : 'PATIENT & CLINICAL WORKFLOW'
-              : role === 'ADMIN' && item.key === 'reports' ? 'ADMINISTRATION & SAFETY'
+              ? role === 'ADMIN' ? 'HOSPITAL ADMINISTRATION'
+                : role === 'RECEPTION' ? 'RECEPTION DESK' : 'PATIENT & CLINICAL WORKFLOW'
+              : role === 'ADMIN' && item.key === 'reports' ? 'SECURITY & COMPLIANCE'
                 : null
           return (
             <div key={item.key}>
@@ -407,7 +413,6 @@ export function AppShell({ name, role, children }: AppShellProps) {
         <div className="hidden md:flex">{renderSidebar()}</div>
         <main className="min-w-0 flex-1 px-3 py-4 sm:px-5 sm:py-5 xl:px-7">
           <div className="mx-auto w-full max-w-[1600px] space-y-4">
-            {adminTabs}
             {children}
           </div>
           <footer className="mx-auto mt-8 flex max-w-[1600px] flex-wrap items-center justify-between gap-2 border-t border-slate-200 pt-3 text-[11px] text-slate-500">
