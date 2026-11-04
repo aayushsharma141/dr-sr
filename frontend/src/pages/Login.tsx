@@ -120,7 +120,7 @@ export function Login() {
               />
             </div>
             <div className="min-w-0">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[#E8D7A4]">
+              <p className="text-xs font-semibold uppercase tracking-[0.24em] text-[#E8D7A4]">
                 Sri Vashishtha Kalyan Trust
               </p>
               <p className="mt-1 text-xl font-semibold tracking-tight">Kalyan Hospital</p>
@@ -150,7 +150,7 @@ export function Login() {
                   key={item.label}
                   className="rounded-xl border border-white/15 bg-white/[0.06] px-3 py-3 backdrop-blur-sm"
                 >
-                  <p className="text-[11px] font-medium text-white/60">{item.label}</p>
+                  <p className="text-xs font-medium text-white/60">{item.label}</p>
                   <p className="mt-1 text-sm font-semibold text-white">{item.detail}</p>
                 </div>
               ))}
@@ -183,7 +183,7 @@ export function Login() {
           <div className="w-full max-w-[440px]">
             <div className="rounded-[26px] border border-[#E1E7E1] bg-white p-7 shadow-[0_24px_70px_rgba(28,46,36,0.09)] sm:p-9">
               <div className="mb-8">
-                <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-[#E6D8DE] bg-[#FBF5F7] px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-[#7A1B3C]">
+                <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-[#E6D8DE] bg-[#FBF5F7] px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.18em] text-[#7A1B3C]">
                   <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-[#9E1B42]" />
                   Authorized staff access
                 </div>
@@ -352,10 +352,10 @@ export function Login() {
               <p className="text-xs font-medium text-[#64736D]">
                 Kalyan Hospital · Ara, Bhojpur, Bihar
               </p>
-              <p className="max-w-sm text-[11px] leading-5 text-[#8A968E]">
+              <p className="max-w-sm text-xs leading-5 text-[#8A968E]">
                 This application runs on the hospital's local network. Internet access is not required for normal use.
               </p>
-              <p className="mt-2 text-[10px] font-medium uppercase tracking-[0.15em] text-[#A1AAA4]">
+              <p className="mt-2 text-xs font-medium uppercase tracking-[0.15em] text-[#A1AAA4]">
                 For authorized hospital staff only
               </p>
             </div>
