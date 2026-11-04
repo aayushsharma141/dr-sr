@@ -1,7 +1,11 @@
 import { render, screen } from '@testing-library/react'
 import { MemoryRouter } from 'react-router'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { AdminPageLayout } from '../AdminPageLayout'
+
+vi.mock('../../api/queries', () => ({
+  useLogout: () => ({ mutateAsync: vi.fn().mockResolvedValue(undefined), isPending: false }),
+}))
 
 describe('AdminPageLayout', () => {
   it('renders a consistent administration breadcrumb, heading, description and actions', () => {
