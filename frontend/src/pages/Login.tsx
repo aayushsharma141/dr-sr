@@ -200,7 +200,7 @@ export function Login() {
                   role="status"
                   className="mb-5 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900"
                 >
-                  Administrator account created. Please sign in.
+                  Administrator created. Please sign in.
                 </div>
               )}
 
@@ -209,7 +209,7 @@ export function Login() {
                   role="status"
                   className="mb-5 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950"
                 >
-                  Initial setup is already complete. Sign in with an administrator-created account.
+                  Setup wizard is closed. Administrator already exists.
                 </div>
               )}
 
@@ -218,22 +218,21 @@ export function Login() {
                   role="status"
                   className="mb-5 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950"
                 >
-                  Your session ended after 30 minutes of inactivity. Sign in to continue.
+                  You were signed out after 30 minutes of inactivity
                 </div>
               )}
 
               {setupStatus?.setup_required && (
                 <div
                   role="status"
-                  className="mb-5 rounded-xl border border-[#D7E4F2] bg-[#F2F7FC] px-4 py-3 text-sm text-[#21486B]"
+                  className="mb-5 rounded-xl border border-[#D7E4F2] bg-[#F2F7FC] px-4 py-3 text-sm text-[#21486B] flex flex-col gap-1"
                 >
-                  <p className="font-semibold">Initial setup is required</p>
-                  <p className="mt-1">Create the first administrator account before signing in.</p>
+                  <p>No administrator exists yet - open the setup wizard</p>
                   <Link
                     to="/setup"
-                    className="mt-2 inline-flex min-h-9 items-center font-semibold underline underline-offset-4 hover:text-[#14334F]"
+                    className="font-semibold underline underline-offset-4 hover:text-[#14334F] inline-block"
                   >
-                    Open setup wizard
+                    Setup Wizard
                   </Link>
                 </div>
               )}
