@@ -1,7 +1,7 @@
 import { useState, useEffect, type FormEvent } from 'react'
 import { useClinicSettings, useUpdateClinicSettings, useMe } from '../api/queries'
 import { ApiError } from '../api/client'
-import { AppShell } from '../components/AppShell'
+import { AdminPageLayout } from '../components/AdminPageLayout'
 import { ConflictBanner } from '../components/ConflictBanner'
 import type { ClinicSettingsUpdate } from '../api/types'
 
@@ -109,17 +109,8 @@ export function Settings() {
   }
 
   return (
-    <AppShell name={me?.full_name ?? 'Admin'} role={me?.role ?? 'ADMIN'}>
+    <AdminPageLayout name={me?.full_name ?? 'Admin'} title="Clinic Settings" description="Manage the hospital identity, bilingual contact details, receipt numbering and print configuration.">
       <div className="space-y-6 max-w-4xl mx-auto">
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-2xl font-bold text-neutral-900 tracking-tight">Clinic Settings</h2>
-            <p className="text-sm text-neutral-500">
-              Manage bilingual clinic identity, addresses, and print configuration
-            </p>
-          </div>
-        </div>
-
         {isConflict && (
           <ConflictBanner onReload={handleReload} isReloading={isReloading} />
         )}
@@ -323,6 +314,6 @@ export function Settings() {
           </form>
         )}
       </div>
-    </AppShell>
+    </AdminPageLayout>
   )
 }
