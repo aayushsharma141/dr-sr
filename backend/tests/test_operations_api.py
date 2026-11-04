@@ -20,7 +20,7 @@ def test_operations_api_role_restrictions(
     assert client.get("/api/operations/integrity").status_code == 401
     assert client.post("/api/operations/backups", json={}).status_code == 401
     assert (
-        client.post("/api/operations/restore", json={"archive_filename": "foo"}).status_code == 401
+        client.post("/api/operations/restore", json={"archive_filename": "foo", "confirmation_phrase": "RESTORE-DATABASE-OVERWRITE", "justification": "Authorised recovery test"}).status_code == 401
     )
 
     # 2. Reception -> 403
@@ -70,10 +70,27 @@ def test_operations_admin_lifecycle(
     assert list_data["total_count"] >= 1
     assert any(b["filename"] == backup_data["filename"] for b in list_data["backups"])
 
+    # 4. Invalid confirmation phrase must be rejected before restore starts
+    invalid_restore = admin_c.post(
+        "/api/operations/restore",
+        json={
+            "archive_filename": backup_data["filename"],
+            "create_prerestore_snapshot": False,
+            "confirmation_phrase": "RESTORE",
+            "justification": "Testing invalid restore confirmation",
+        },
+    )
+    assert invalid_restore.status_code == 422
+
     # 4. Restore using the freshly created backup
     restore_res = admin_c.post(
         "/api/operations/restore",
-        json={"archive_filename": backup_data["filename"], "create_prerestore_snapshot": False},
+        json={
+            "archive_filename": backup_data["filename"],
+            "create_prerestore_snapshot": False,
+            "confirmation_phrase": "RESTORE-DATABASE-OVERWRITE",
+            "justification": "Restore test archive after verified API backup lifecycle",
+        },
     )
     assert restore_res.status_code == 200
     restore_data = restore_res.json()
