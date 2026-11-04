@@ -27,12 +27,13 @@
 - `frontend/src/components/AppShell.tsx`
 - `frontend/src/pages/AreaHome.tsx`
 - `frontend/src/components/__tests__/app-shell.test.tsx`
+- Deleted: `frontend/src/components/AdminNavTabs.tsx`
 
 ## 4. Remaining work for the repository owner
 
 ### P0 — Verify and complete the navigation cleanup
 
-- [ ] Check whether `frontend/src/components/AdminNavTabs.tsx` has any remaining references. It is no longer imported by `AppShell.tsx`; delete the file if repository-wide search confirms it is unused.
+- [x] Confirmed the component had no remaining imports and deleted `frontend/src/components/AdminNavTabs.tsx`.
 - [ ] Search the running frontend for the old vertical secondary sidebar. If it still appears, identify which component/build artifact renders it; the checked-in `AdminNavTabs.tsx` inspected for this change does not match that screenshot.
 - [ ] Confirm the ADMIN route menu against the agreed role-permission matrix. This change hides patient records and appointments from the ADMIN sidebar; it does not remove or alter their route guards.
 - [ ] Decide whether ADMIN should retain the `Billing & Payments` shortcut to `/reception/dues`, and whether it should be renamed to distinguish financial administration from reception collections.
