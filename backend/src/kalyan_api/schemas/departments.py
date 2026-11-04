@@ -29,5 +29,5 @@ class DepartmentOut(BaseModel):
 
 class DoctorDepartmentAssignment(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    department_ids: list[int] = Field(min_length=1, max_length=30)
+    department_ids: list[int] = Field(max_length=30)
     version_id: int = Field(ge=1)
