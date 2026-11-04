@@ -7,6 +7,7 @@ Guarantees:
 - Doctor dashboard isolation verifies doctor A and doctor B only observe their own identities.
 """
 
+import secrets
 import uuid
 from datetime import UTC, datetime
 from typing import Any
@@ -24,11 +25,13 @@ from support.matrix import (
     check_matrix_completeness,
 )
 
+from kalyan_api import clock
 from kalyan_api.config import Settings
 from kalyan_api.core.permissions import Permission
 from kalyan_api.core.policy import require
 from kalyan_api.models import (
     Appointment,
+    AuthSession,
     ClinicalEncounter,
     ClinicSettings,
     ConsultationFee,
@@ -47,6 +50,7 @@ FORBIDDEN_SECRET_KEYS: tuple[str, ...] = (
     "current_password",
     "new_password",
     "token",
+    "token_hash",
 )
 
 MATRIX_CASES: list[tuple[MatrixRow, str]] = [
@@ -440,6 +444,28 @@ def test_rbac_matrix_cell(
             resolved_path = row.path.replace("{id}", str(enc.id))
         else:
             target_entity = type("TargetEnc", (), {"patient_id": pat.id, "appointment_id": None})()
+
+    elif "{session_id}" in row.path:
+        # Revocation target: an active session owned by a different (non-caller) user
+        owner = make_user(
+            db_session, test_settings, "RECEPTION", f"mat_sess_{uuid.uuid4().hex[:6]}"
+        )
+        now = clock.utcnow()
+        target_session = AuthSession(
+            token_hash=secrets.token_hex(32),
+            user_id=owner.id,
+            csrf_token=secrets.token_hex(32),
+            created_at=now,
+            last_seen_at=now,
+        )
+        db_session.add(target_session)
+        db_session.flush()
+        target_entity = target_session
+        resolved_path = row.path.replace("{session_id}", str(target_session.id))
+
+    elif "{filename}" in row.path:
+        # Non-existent archive: ADMIN receives 422 invalid_archive_filename without disk I/O
+        resolved_path = row.path.replace("{filename}", "non_existent.tar.gz")
 
     elif "{id}" in row.path:
         is_active = "reactivate" not in row.path

@@ -2,7 +2,7 @@
 
 import secrets
 
-from sqlalchemy import func, select, update
+from sqlalchemy import and_, func, or_, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -12,7 +12,7 @@ from kalyan_api.core.errors import ApiError, require_version
 from kalyan_api.core.password_policy import PasswordPolicyError, validate_password_policy
 from kalyan_api.core.permissions import Role
 from kalyan_api.core.security import build_hasher, hash_password
-from kalyan_api.models import AuthSession, Doctor, User
+from kalyan_api.models import AuditLog, AuthSession, Doctor, User
 from kalyan_api.schemas.users import UserCreate, UserUpdate
 from kalyan_api.services import audit_service
 from kalyan_api.services.audit_service import AuditAction, AuditContext
@@ -223,6 +223,7 @@ def deactivate_user(
     ctx: AuditContext,
     user_id: int,
     version_id: int,
+    reason: str | None = None,
 ) -> User:
     """Deactivate user, revoke active sessions, and record audit event."""
     user = get_user(session, user_id)
@@ -278,6 +279,7 @@ def deactivate_user(
         user.id,
         before={"is_active": True},
         after={"is_active": False},
+        reason=reason,
     )
 
     return user
@@ -288,6 +290,7 @@ def reactivate_user(
     ctx: AuditContext,
     user_id: int,
     version_id: int,
+    reason: str | None = None,
 ) -> User:
     """Reactivate a previously deactivated user account."""
     user = get_user(session, user_id)
@@ -310,6 +313,7 @@ def reactivate_user(
         user.id,
         before={"is_active": False},
         after={"is_active": True},
+        reason=reason,
     )
 
     return user
@@ -321,6 +325,7 @@ def reset_password(
     user_id: int,
     version_id: int,
     settings: Settings,
+    reason: str | None = None,
 ) -> tuple[User, str]:
     """Admin resets user password, issues a temporary password, and revokes sessions."""
     user = get_user(session, user_id)
@@ -336,6 +341,7 @@ def reset_password(
             message="Administrators cannot reset their own password via admin API",
         )
 
+    old_must_change = user.must_change_password
     temp_pwd = generate_temp_password(settings, username=user.username, full_name=user.full_name)
     hasher = build_hasher(settings)
     user.password_hash = hash_password(hasher, temp_pwd)
@@ -358,7 +364,9 @@ def reset_password(
         AuditAction.USER_PASSWORD_RESET,
         "USER",
         user.id,
+        before={"must_change_password": old_must_change},
         after={"must_change_password": True},
+        reason=reason,
     )
 
     return user, temp_pwd
@@ -369,6 +377,7 @@ def unlock_user(
     ctx: AuditContext,
     user_id: int,
     version_id: int,
+    reason: str | None = None,
 ) -> User:
     """Reset lockout counters and release account cooldown (D-07)."""
     user = get_user(session, user_id)
@@ -402,6 +411,76 @@ def unlock_user(
         user.id,
         before={"failed_login_count": old_count, "locked_until": old_locked},
         after={"failed_login_count": 0, "locked_until": None},
+        reason=reason,
     )
 
     return user
+
+
+LOGIN_HISTORY_LIMIT = 50
+
+# Actions recorded against entity USER/<user_id> that describe sign-in and account security.
+LOGIN_HISTORY_USER_ACTIONS: tuple[AuditAction, ...] = (
+    AuditAction.AUTH_LOGIN_SUCCEEDED,
+    AuditAction.AUTH_LOGIN_FAILED,
+    AuditAction.AUTH_ACCOUNT_LOCKED,
+    AuditAction.AUTH_LOGIN_THROTTLED,
+    AuditAction.AUTH_LOGOUT,
+    AuditAction.AUTH_PASSWORD_CHANGED,
+    AuditAction.AUTH_PASSWORD_CHANGE_FAILED,
+    AuditAction.USER_UNLOCKED,
+    AuditAction.USER_PASSWORD_RESET,
+    AuditAction.USER_SESSIONS_REVOKED,
+)
+
+# Only these scalar after/before keys are surfaced as login-history details (never secrets).
+LOGIN_HISTORY_DETAIL_KEYS: tuple[str, ...] = (
+    "reason",
+    "failed_login_count",
+    "locked_until",
+    "session_id",
+    "must_change_password",
+    "revoked_count",
+    "kept_current_session",
+    "attempt_count",
+)
+
+
+def login_history(
+    session: Session, user_id: int, limit: int = LOGIN_HISTORY_LIMIT
+) -> list[AuditLog]:
+    """Return the latest sign-in and account-security audit rows concerning one user.
+
+    Includes AUTH_* events, unlocks, password resets and session revocations recorded against
+    entity USER/<user_id>, plus SESSION_REVOKED rows whose target user is ``user_id``.
+    """
+    user_entity = and_(
+        AuditLog.entity_type == "USER",
+        AuditLog.entity_id == str(user_id),
+        AuditLog.action.in_([a.value for a in LOGIN_HISTORY_USER_ACTIONS]),
+    )
+    revoked_session = and_(
+        AuditLog.action == AuditAction.SESSION_REVOKED.value,
+        AuditLog.entity_type == "SESSION",
+        AuditLog.after_data["user_id"].astext == str(user_id),
+    )
+    stmt = (
+        select(AuditLog)
+        .where(or_(user_entity, revoked_session))
+        .order_by(AuditLog.occurred_at.desc(), AuditLog.id.desc())
+        .limit(limit)
+    )
+    return list(session.scalars(stmt).all())
+
+
+def login_history_details(entry: AuditLog) -> dict[str, str | int | bool | None]:
+    """Extract allow-listed scalar details from an audit row's after (else before) payload."""
+    details: dict[str, str | int | bool | None] = {}
+    for payload in (entry.before_data, entry.after_data):
+        if not isinstance(payload, dict):
+            continue
+        for key in LOGIN_HISTORY_DETAIL_KEYS:
+            value = payload.get(key)
+            if key in payload and (value is None or isinstance(value, (str, int, bool))):
+                details[key] = value
+    return details

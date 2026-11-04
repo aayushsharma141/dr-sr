@@ -28,6 +28,11 @@ const sampleBackups = {
 }
 
 vi.mock('../../api/queries', () => ({
+  useMe: () => ({
+    data: { full_name: 'Test Admin', role: 'ADMIN', permissions: [] },
+    isPending: false,
+    isError: false,
+  }),
   useBackups: () => ({
     data: sampleBackups,
     isPending: false,
@@ -41,6 +46,10 @@ vi.mock('../../api/queries', () => ({
   }),
   useRestoreBackup: () => ({
     mutateAsync: mocks.restoreMutate,
+    isPending: false,
+  }),
+  useVerifyBackup: () => ({
+    mutateAsync: vi.fn(),
     isPending: false,
   }),
   useLogout: () => ({
@@ -80,9 +89,31 @@ describe('BackupManagerPage', () => {
     fireEvent.click(restoreBtn)
 
     expect(screen.getByText('⚠ Confirm System Restoration')).toBeInTheDocument()
-    expect(
-      screen.getByText(/Automatic Pre-Restore Safety Snapshot Guarantee/i)
-    ).toBeInTheDocument()
+    expect(screen.getByText('A safety backup is always taken first.')).toBeInTheDocument()
+  })
+
+  it('keeps Restore disabled until the RESTORE phrase and a reason are entered', () => {
+    render(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter>
+          <BackupManagerPage />
+        </MemoryRouter>
+      </QueryClientProvider>
+    )
+
+    fireEvent.click(screen.getByText('Restore System'))
+    const submit = screen.getByRole('button', { name: 'Yes, Execute Safe Restore' })
+    expect(submit).toBeDisabled()
+
+    fireEvent.change(document.getElementById('restore-phrase') as HTMLElement, {
+      target: { value: 'RESTORE' },
+    })
+    expect(submit).toBeDisabled()
+
+    fireEvent.change(document.getElementById('restore-reason') as HTMLElement, {
+      target: { value: 'Restore after disk failure' },
+    })
+    expect(submit).toBeEnabled()
   })
 })
 
@@ -133,6 +164,12 @@ describe('BackupManagerPage failures are persistent inline alerts (UX-03)', () =
     renderPage()
 
     fireEvent.click(screen.getByText('Restore System'))
+    fireEvent.change(document.getElementById('restore-phrase') as HTMLElement, {
+      target: { value: 'RESTORE' },
+    })
+    fireEvent.change(document.getElementById('restore-reason') as HTMLElement, {
+      target: { value: 'Restore after disk failure' },
+    })
     fireEvent.click(screen.getByRole('button', { name: 'Yes, Execute Safe Restore' }))
 
     const alert = await screen.findByRole('alert')

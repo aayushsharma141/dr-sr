@@ -10,7 +10,7 @@ from kalyan_api.config import Settings
 from kalyan_api.db.session import get_session
 from kalyan_api.main import create_app
 from kalyan_api.models import AuditLog, User
-from kalyan_api.routers.auth import GENERIC_INVALID_CREDENTIALS_MSG
+from kalyan_api.routers.auth import invalid_credentials_message
 from tests.conftest import TEST_PASSWORD, make_user
 
 
@@ -111,7 +111,7 @@ def test_byte_identical_failure_responses_prevent_enumeration(
 
     data = res_unknown.json()
     assert data["code"] == "invalid_credentials"
-    assert data["message"] == GENERIC_INVALID_CREDENTIALS_MSG
+    assert data["message"] == invalid_credentials_message(test_settings.lockout_minutes)
 
 
 def test_login_rejects_extra_fields_with_422(client: TestClient) -> None:
@@ -199,3 +199,25 @@ def test_login_auditing_and_token_omission(
     )
     assert cookie_token not in serialized_audit
     assert TEST_PASSWORD not in serialized_audit
+
+
+def test_invalid_credentials_message_follows_configured_lockout_minutes(
+    test_settings: Settings, db_session: Session
+) -> None:
+    """The generic 401 text quotes settings.lockout_minutes instead of a hardcoded period."""
+    custom = test_settings.model_copy(update={"lockout_minutes": 20})
+    app = create_app(custom)
+
+    def _override_get_session():
+        with db_session.begin_nested():
+            yield db_session
+
+    app.dependency_overrides[get_session] = _override_get_session
+    c = TestClient(app, base_url="http://testserver", headers={"Origin": "http://testserver"})
+    res = c.post("/api/auth/login", json={"username": "nobody_here", "password": "Whatever123!"})
+    assert res.status_code == 401
+    message = res.json()["message"]
+    assert message == invalid_credentials_message(20)
+    assert "Wait 20 minutes" in message
+    assert "15" not in message
+    assert invalid_credentials_message(1).endswith("Wait 1 minute or ask an administrator.")

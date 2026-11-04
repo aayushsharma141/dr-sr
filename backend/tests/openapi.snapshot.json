@@ -5,6 +5,18 @@
         "additionalProperties": false,
         "description": "Payload for lifecycle actions requiring optimistic concurrency validation.",
         "properties": {
+          "reason": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
           "version_id": {
             "minimum": 1.0,
             "title": "Version Id",
@@ -15,6 +27,94 @@
           "version_id"
         ],
         "title": "ActionRequest",
+        "type": "object"
+      },
+      "ActiveSessionOut": {
+        "additionalProperties": false,
+        "description": "A currently valid login session with its owner and expiry horizon.",
+        "properties": {
+          "absolute_expires_at": {
+            "format": "date-time",
+            "title": "Absolute Expires At",
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "full_name": {
+            "title": "Full Name",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "idle_expires_at": {
+            "format": "date-time",
+            "title": "Idle Expires At",
+            "type": "string"
+          },
+          "ip_address": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ip Address"
+          },
+          "is_current": {
+            "title": "Is Current",
+            "type": "boolean"
+          },
+          "last_seen_at": {
+            "format": "date-time",
+            "title": "Last Seen At",
+            "type": "string"
+          },
+          "role": {
+            "title": "Role",
+            "type": "string"
+          },
+          "user_agent": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "User Agent"
+          },
+          "user_id": {
+            "title": "User Id",
+            "type": "integer"
+          },
+          "username": {
+            "title": "Username",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "user_id",
+          "username",
+          "full_name",
+          "role",
+          "ip_address",
+          "user_agent",
+          "created_at",
+          "last_seen_at",
+          "idle_expires_at",
+          "absolute_expires_at",
+          "is_current"
+        ],
+        "title": "ActiveSessionOut",
         "type": "object"
       },
       "AddendumCreate": {
@@ -78,18 +178,105 @@
         "additionalProperties": false,
         "description": "Admin dashboard summary metrics and account totals.",
         "properties": {
+          "alerts": {
+            "items": {
+              "$ref": "#/components/schemas/OverviewAlertOut"
+            },
+            "title": "Alerts",
+            "type": "array"
+          },
+          "appointments_today": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "title": "Appointments Today",
+            "type": "object"
+          },
           "area": {
             "default": "admin",
             "title": "Area",
             "type": "string"
           },
+          "business_date": {
+            "format": "date",
+            "title": "Business Date",
+            "type": "string"
+          },
+          "collections_today": {
+            "$ref": "#/components/schemas/CollectionsTodayOut"
+          },
+          "doctors_today": {
+            "items": {
+              "$ref": "#/components/schemas/DoctorTodayOut"
+            },
+            "title": "Doctors Today",
+            "type": "array"
+          },
+          "failed_logins_24h": {
+            "title": "Failed Logins 24H",
+            "type": "integer"
+          },
+          "last_backup": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LastBackupOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "last_backup_failure_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Backup Failure At"
+          },
+          "last_integrity_check": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LastIntegrityCheckOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "locked_accounts": {
+            "title": "Locked Accounts",
+            "type": "integer"
+          },
           "name": {
             "title": "Name",
             "type": "string"
           },
+          "outstanding_dues_paise": {
+            "title": "Outstanding Dues Paise",
+            "type": "integer"
+          },
+          "recent_admin_actions": {
+            "items": {
+              "$ref": "#/components/schemas/RecentAdminActionOut"
+            },
+            "title": "Recent Admin Actions",
+            "type": "array"
+          },
+          "registrations_today": {
+            "title": "Registrations Today",
+            "type": "integer"
+          },
           "role": {
             "title": "Role",
             "type": "string"
+          },
+          "storage": {
+            "$ref": "#/components/schemas/StorageFreeOut"
           },
           "user_counts": {
             "additionalProperties": {
@@ -102,7 +289,21 @@
         "required": [
           "name",
           "role",
-          "user_counts"
+          "user_counts",
+          "business_date",
+          "registrations_today",
+          "appointments_today",
+          "doctors_today",
+          "collections_today",
+          "outstanding_dues_paise",
+          "locked_accounts",
+          "failed_logins_24h",
+          "recent_admin_actions",
+          "last_backup",
+          "last_backup_failure_at",
+          "last_integrity_check",
+          "storage",
+          "alerts"
         ],
         "title": "AdminOverviewResponse",
         "type": "object"
@@ -614,35 +815,63 @@
         "type": "object"
       },
       "BackupCreateRequest": {
+        "additionalProperties": false,
         "description": "Payload to trigger an ad-hoc backup.",
         "properties": {
           "destination_dir": {
             "anyOf": [
               {
+                "maxLength": 1024,
                 "type": "string"
               },
               {
                 "type": "null"
               }
             ],
-            "description": "Optional custom directory path on server (e.g. secondary disk)",
+            "description": "Optional absolute path to an EXISTING directory on the server (e.g. a secondary disk). Relative or missing paths are rejected with 422.",
             "title": "Destination Dir"
           },
           "label": {
             "anyOf": [
               {
                 "maxLength": 50,
+                "pattern": "^[A-Za-z0-9_-]*$",
                 "type": "string"
               },
               {
                 "type": "null"
               }
             ],
-            "description": "Optional label for the archive",
+            "description": "Optional label for the archive (letters, digits, '_' and '-' only)",
             "title": "Label"
           }
         },
         "title": "BackupCreateRequest",
+        "type": "object"
+      },
+      "BackupVerifyResponse": {
+        "additionalProperties": false,
+        "description": "Result of re-hashing a single archive against its manifest.",
+        "properties": {
+          "details": {
+            "title": "Details",
+            "type": "string"
+          },
+          "filename": {
+            "title": "Filename",
+            "type": "string"
+          },
+          "valid": {
+            "title": "Valid",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "filename",
+          "valid",
+          "details"
+        ],
+        "title": "BackupVerifyResponse",
         "type": "object"
       },
       "ChangePasswordRequest": {
@@ -798,7 +1027,7 @@
       },
       "ClinicSettingsUpdate": {
         "additionalProperties": false,
-        "description": "Payload for updating clinic settings with optimistic concurrency.",
+        "description": "Payload for updating clinic settings with optimistic concurrency.\n\nconfirm_receipt_cycle_change / change_reason are a safety confirmation only: they are\nrequired when receipt_sequence_cycle changes after receipts were already issued in the\ncurrent cycle (enforced in the router, which can see the ledger).",
         "properties": {
           "address_1": {
             "maxLength": 255,
@@ -817,6 +1046,23 @@
               }
             ],
             "title": "Address 2"
+          },
+          "change_reason": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Change Reason"
+          },
+          "confirm_receipt_cycle_change": {
+            "default": false,
+            "title": "Confirm Receipt Cycle Change",
+            "type": "boolean"
           },
           "consultation_validity_days": {
             "maximum": 365.0,
@@ -851,6 +1097,7 @@
           "phone": {
             "maxLength": 64,
             "minLength": 5,
+            "pattern": "^[0-9 +\\-/,()]+$",
             "title": "Phone",
             "type": "string"
           },
@@ -923,6 +1170,44 @@
           "version_id"
         ],
         "title": "ClinicSettingsUpdate",
+        "type": "object"
+      },
+      "CollectionsTodayOut": {
+        "additionalProperties": false,
+        "description": "Today's ledger activity, reported without applying any netting rule.\n\n- payments_count / gross_paise / by_method: payments CREATED today (IST), including any\n  that were later reversed.\n- reversals_count / reversed_paise: payments REVERSED today (IST), whatever day they were\n  originally collected.",
+        "properties": {
+          "by_method": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "title": "By Method",
+            "type": "object"
+          },
+          "gross_paise": {
+            "title": "Gross Paise",
+            "type": "integer"
+          },
+          "payments_count": {
+            "title": "Payments Count",
+            "type": "integer"
+          },
+          "reversals_count": {
+            "title": "Reversals Count",
+            "type": "integer"
+          },
+          "reversed_paise": {
+            "title": "Reversed Paise",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "payments_count",
+          "gross_paise",
+          "reversals_count",
+          "reversed_paise",
+          "by_method"
+        ],
+        "title": "CollectionsTodayOut",
         "type": "object"
       },
       "DoctorCreate": {
@@ -1239,6 +1524,46 @@
           "total_active"
         ],
         "title": "DoctorQueueResponse",
+        "type": "object"
+      },
+      "DoctorTodayOut": {
+        "additionalProperties": false,
+        "description": "Today's queue snapshot for one active doctor (IST business day).",
+        "properties": {
+          "appointments_today": {
+            "title": "Appointments Today",
+            "type": "integer"
+          },
+          "doctor_id": {
+            "title": "Doctor Id",
+            "type": "integer"
+          },
+          "done": {
+            "title": "Done",
+            "type": "integer"
+          },
+          "in_consultation": {
+            "title": "In Consultation",
+            "type": "integer"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "waiting": {
+            "title": "Waiting",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "doctor_id",
+          "name",
+          "appointments_today",
+          "waiting",
+          "in_consultation",
+          "done"
+        ],
+        "title": "DoctorTodayOut",
         "type": "object"
       },
       "DoctorUpdate": {
@@ -1668,6 +1993,10 @@
             "format": "date-time",
             "title": "Updated At",
             "type": "string"
+          },
+          "version_id": {
+            "title": "Version Id",
+            "type": "integer"
           }
         },
         "required": [
@@ -1675,6 +2004,7 @@
           "name",
           "fee_paise",
           "is_active",
+          "version_id",
           "created_at",
           "updated_at"
         ],
@@ -1700,11 +2030,17 @@
             "minLength": 2,
             "title": "Name",
             "type": "string"
+          },
+          "version_id": {
+            "minimum": 1.0,
+            "title": "Version Id",
+            "type": "integer"
           }
         },
         "required": [
           "name",
-          "fee_paise"
+          "fee_paise",
+          "version_id"
         ],
         "title": "FeeUpdate",
         "type": "object"
@@ -1723,7 +2059,7 @@
         "type": "object"
       },
       "IntegrityCheckItemOut": {
-        "description": "Status of an individual integrity check.",
+        "description": "Status of an individual integrity check.\n\n``severity`` describes how a non-passing result is classified: ERROR findings make the\nreport unhealthy; WARNING findings are reported but do not.",
         "properties": {
           "details": {
             "title": "Details",
@@ -1744,6 +2080,15 @@
           "passed": {
             "title": "Passed",
             "type": "boolean"
+          },
+          "severity": {
+            "default": "ERROR",
+            "enum": [
+              "ERROR",
+              "WARNING"
+            ],
+            "title": "Severity",
+            "type": "string"
           }
         },
         "required": [
@@ -1783,6 +2128,11 @@
           "total_checks": {
             "title": "Total Checks",
             "type": "integer"
+          },
+          "warning_checks": {
+            "default": 0,
+            "title": "Warning Checks",
+            "type": "integer"
           }
         },
         "required": [
@@ -1794,6 +2144,182 @@
           "checks"
         ],
         "title": "IntegrityReportOut",
+        "type": "object"
+      },
+      "LastBackupOut": {
+        "additionalProperties": false,
+        "description": "Newest archive in the backup directory (manifest read only, archive not re-hashed).",
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "filename": {
+            "title": "Filename",
+            "type": "string"
+          },
+          "label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Label"
+          },
+          "manifest_readable": {
+            "title": "Manifest Readable",
+            "type": "boolean"
+          },
+          "size_bytes": {
+            "title": "Size Bytes",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "filename",
+          "created_at",
+          "size_bytes",
+          "label",
+          "manifest_readable"
+        ],
+        "title": "LastBackupOut",
+        "type": "object"
+      },
+      "LastIntegrityCheckOut": {
+        "additionalProperties": false,
+        "description": "Latest INTEGRITY_CHECK_RUN audit row.",
+        "properties": {
+          "is_healthy": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Is Healthy"
+          },
+          "occurred_at": {
+            "format": "date-time",
+            "title": "Occurred At",
+            "type": "string"
+          },
+          "outcome": {
+            "title": "Outcome",
+            "type": "string"
+          }
+        },
+        "required": [
+          "occurred_at",
+          "outcome",
+          "is_healthy"
+        ],
+        "title": "LastIntegrityCheckOut",
+        "type": "object"
+      },
+      "LoginHistoryEntry": {
+        "additionalProperties": false,
+        "description": "One authentication or account-security event concerning a user (secrets never included).",
+        "properties": {
+          "action": {
+            "title": "Action",
+            "type": "string"
+          },
+          "actor_username": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Actor Username"
+          },
+          "details": {
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "title": "Details",
+            "type": "object"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "ip_address": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ip Address"
+          },
+          "occurred_at": {
+            "format": "date-time",
+            "title": "Occurred At",
+            "type": "string"
+          },
+          "outcome": {
+            "title": "Outcome",
+            "type": "string"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "user_agent": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "User Agent"
+          }
+        },
+        "required": [
+          "id",
+          "occurred_at",
+          "action",
+          "outcome",
+          "actor_username",
+          "ip_address",
+          "user_agent",
+          "reason",
+          "details"
+        ],
+        "title": "LoginHistoryEntry",
         "type": "object"
       },
       "LoginRequest": {
@@ -1882,6 +2408,51 @@
           "version_id"
         ],
         "title": "MeResponse",
+        "type": "object"
+      },
+      "OverviewAlertOut": {
+        "additionalProperties": false,
+        "description": "Factual condition worth an administrator's attention (no invented thresholds).",
+        "properties": {
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          },
+          "severity": {
+            "title": "Severity",
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "severity",
+          "message"
+        ],
+        "title": "OverviewAlertOut",
+        "type": "object"
+      },
+      "PasswordPolicyOut": {
+        "additionalProperties": false,
+        "description": "Password length bounds a user must satisfy when choosing a new password.",
+        "properties": {
+          "max_length": {
+            "title": "Max Length",
+            "type": "integer"
+          },
+          "min_length": {
+            "title": "Min Length",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "min_length",
+          "max_length"
+        ],
+        "title": "PasswordPolicyOut",
         "type": "object"
       },
       "PatientCreate": {
@@ -2597,6 +3168,31 @@
         "title": "PendingDueOut",
         "type": "object"
       },
+      "PermissionInfo": {
+        "additionalProperties": false,
+        "description": "A granular permission key with its display group and plain-English label.",
+        "properties": {
+          "group": {
+            "title": "Group",
+            "type": "string"
+          },
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          }
+        },
+        "required": [
+          "key",
+          "group",
+          "label"
+        ],
+        "title": "PermissionInfo",
+        "type": "object"
+      },
       "PrescriptionCreate": {
         "additionalProperties": false,
         "description": "Schema for doctor creating a prescription.",
@@ -2990,6 +3586,68 @@
         "title": "PrescriptionSummary",
         "type": "object"
       },
+      "RecentAdminActionOut": {
+        "additionalProperties": false,
+        "description": "One audit row written by an ADMIN actor.",
+        "properties": {
+          "action": {
+            "title": "Action",
+            "type": "string"
+          },
+          "actor_username": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Actor Username"
+          },
+          "entity_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Entity Id"
+          },
+          "entity_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Entity Type"
+          },
+          "occurred_at": {
+            "format": "date-time",
+            "title": "Occurred At",
+            "type": "string"
+          },
+          "outcome": {
+            "title": "Outcome",
+            "type": "string"
+          }
+        },
+        "required": [
+          "occurred_at",
+          "actor_username",
+          "action",
+          "entity_type",
+          "entity_id",
+          "outcome"
+        ],
+        "title": "RecentAdminActionOut",
+        "type": "object"
+      },
       "ReceptionOverviewResponse": {
         "additionalProperties": false,
         "description": "Reception dashboard summary.",
@@ -3016,22 +3674,38 @@
         "type": "object"
       },
       "RestoreRequest": {
-        "description": "Payload to trigger restoration from a backup archive.",
+        "additionalProperties": false,
+        "description": "Payload to trigger restoration from a backup archive.\n\nBackward compatibility: ``create_prerestore_snapshot`` is still accepted, but only the value\n``true`` (or omission). Sending ``false`` is rejected with 422 because the pre-restore safety\nsnapshot is mandatory.",
         "properties": {
           "archive_filename": {
-            "description": "Filename of the backup archive in the backup directory",
+            "description": "Bare filename of the backup archive in the configured backup directory",
+            "maxLength": 255,
+            "minLength": 1,
             "title": "Archive Filename",
             "type": "string"
           },
+          "confirmation_phrase": {
+            "description": "Must be exactly 'RESTORE'",
+            "title": "Confirmation Phrase",
+            "type": "string"
+          },
           "create_prerestore_snapshot": {
+            "const": true,
             "default": true,
-            "description": "Automatically take safety snapshot before restore",
+            "description": "Deprecated: the pre-restore safety snapshot is always taken",
             "title": "Create Prerestore Snapshot",
             "type": "boolean"
+          },
+          "reason": {
+            "description": "Why the restore is being performed (10-500 characters); stored on the audit row",
+            "title": "Reason",
+            "type": "string"
           }
         },
         "required": [
-          "archive_filename"
+          "archive_filename",
+          "confirmation_phrase",
+          "reason"
         ],
         "title": "RestoreRequest",
         "type": "object"
@@ -3088,6 +3762,77 @@
         "title": "RestoreResultOut",
         "type": "object"
       },
+      "RevokeSessionOut": {
+        "additionalProperties": false,
+        "description": "Result of revoking a single session.",
+        "properties": {
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "revoked_at": {
+            "format": "date-time",
+            "title": "Revoked At",
+            "type": "string"
+          },
+          "user_id": {
+            "title": "User Id",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "user_id",
+          "revoked_at"
+        ],
+        "title": "RevokeSessionOut",
+        "type": "object"
+      },
+      "RevokeSessionRequest": {
+        "additionalProperties": false,
+        "description": "Payload for revoking a single session or every session of one user.",
+        "properties": {
+          "reason": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          }
+        },
+        "title": "RevokeSessionRequest",
+        "type": "object"
+      },
+      "RevokeUserSessionsOut": {
+        "additionalProperties": false,
+        "description": "Result of revoking every active session of a user.",
+        "properties": {
+          "kept_current_session": {
+            "title": "Kept Current Session",
+            "type": "boolean"
+          },
+          "revoked_count": {
+            "title": "Revoked Count",
+            "type": "integer"
+          },
+          "user_id": {
+            "title": "User Id",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "user_id",
+          "revoked_count",
+          "kept_current_session"
+        ],
+        "title": "RevokeUserSessionsOut",
+        "type": "object"
+      },
       "Role": {
         "description": "System roles authorized across Kalyan Hospital platform.",
         "enum": [
@@ -3097,6 +3842,63 @@
         ],
         "title": "Role",
         "type": "string"
+      },
+      "RoleInfo": {
+        "additionalProperties": false,
+        "description": "A fixed system role with its display label.",
+        "properties": {
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "role": {
+            "title": "Role",
+            "type": "string"
+          }
+        },
+        "required": [
+          "role",
+          "label"
+        ],
+        "title": "RoleInfo",
+        "type": "object"
+      },
+      "RolePermissionsOut": {
+        "additionalProperties": false,
+        "description": "Role catalogue, permission catalogue, and the role-to-permission grant table.",
+        "properties": {
+          "grants": {
+            "additionalProperties": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "title": "Grants",
+            "type": "object"
+          },
+          "permissions": {
+            "items": {
+              "$ref": "#/components/schemas/PermissionInfo"
+            },
+            "title": "Permissions",
+            "type": "array"
+          },
+          "roles": {
+            "items": {
+              "$ref": "#/components/schemas/RoleInfo"
+            },
+            "title": "Roles",
+            "type": "array"
+          }
+        },
+        "required": [
+          "roles",
+          "permissions",
+          "grants"
+        ],
+        "title": "RolePermissionsOut",
+        "type": "object"
       },
       "RoleUserCounts": {
         "additionalProperties": false,
@@ -3114,6 +3916,68 @@
           }
         },
         "title": "RoleUserCounts",
+        "type": "object"
+      },
+      "SecurityPolicyOut": {
+        "additionalProperties": false,
+        "description": "Currently effective authentication and session security settings.",
+        "properties": {
+          "editable": {
+            "const": false,
+            "title": "Editable",
+            "type": "boolean"
+          },
+          "lockout_minutes": {
+            "title": "Lockout Minutes",
+            "type": "integer"
+          },
+          "lockout_threshold": {
+            "title": "Lockout Threshold",
+            "type": "integer"
+          },
+          "password_max_length": {
+            "title": "Password Max Length",
+            "type": "integer"
+          },
+          "password_min_length": {
+            "title": "Password Min Length",
+            "type": "integer"
+          },
+          "session_absolute_hours": {
+            "title": "Session Absolute Hours",
+            "type": "integer"
+          },
+          "session_idle_minutes": {
+            "title": "Session Idle Minutes",
+            "type": "integer"
+          },
+          "source": {
+            "const": "environment",
+            "title": "Source",
+            "type": "string"
+          },
+          "throttle_max_failures": {
+            "title": "Throttle Max Failures",
+            "type": "integer"
+          },
+          "throttle_window_minutes": {
+            "title": "Throttle Window Minutes",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "session_idle_minutes",
+          "session_absolute_hours",
+          "lockout_threshold",
+          "lockout_minutes",
+          "throttle_max_failures",
+          "throttle_window_minutes",
+          "password_min_length",
+          "password_max_length",
+          "source",
+          "editable"
+        ],
+        "title": "SecurityPolicyOut",
         "type": "object"
       },
       "SetupAdminRequest": {
@@ -3153,6 +4017,184 @@
           "password"
         ],
         "title": "SetupAdminRequest",
+        "type": "object"
+      },
+      "StorageFreeOut": {
+        "additionalProperties": false,
+        "description": "Free bytes on the volumes holding photos (data) and backups; null if not measurable.",
+        "properties": {
+          "backup_free_bytes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Backup Free Bytes"
+          },
+          "data_free_bytes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Data Free Bytes"
+          }
+        },
+        "required": [
+          "data_free_bytes",
+          "backup_free_bytes"
+        ],
+        "title": "StorageFreeOut",
+        "type": "object"
+      },
+      "StorageVolumeOut": {
+        "additionalProperties": false,
+        "description": "Capacity of the volume holding one configured data directory.",
+        "properties": {
+          "free_bytes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Free Bytes"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "path_label": {
+            "title": "Path Label",
+            "type": "string"
+          },
+          "total_bytes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total Bytes"
+          }
+        },
+        "required": [
+          "label",
+          "path_label",
+          "total_bytes",
+          "free_bytes"
+        ],
+        "title": "StorageVolumeOut",
+        "type": "object"
+      },
+      "SystemStatusOut": {
+        "additionalProperties": false,
+        "description": "Runtime, schema, database and storage status of the LAN server.",
+        "properties": {
+          "app_version": {
+            "title": "App Version",
+            "type": "string"
+          },
+          "code_head_revision": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Code Head Revision"
+          },
+          "db_connections": {
+            "title": "Db Connections",
+            "type": "integer"
+          },
+          "db_revision": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Db Revision"
+          },
+          "db_size_bytes": {
+            "title": "Db Size Bytes",
+            "type": "integer"
+          },
+          "environment": {
+            "title": "Environment",
+            "type": "string"
+          },
+          "frontend_served": {
+            "title": "Frontend Served",
+            "type": "boolean"
+          },
+          "postgres_version": {
+            "title": "Postgres Version",
+            "type": "string"
+          },
+          "process_started_at": {
+            "format": "date-time",
+            "title": "Process Started At",
+            "type": "string"
+          },
+          "revision_matches": {
+            "title": "Revision Matches",
+            "type": "boolean"
+          },
+          "server_time_ist": {
+            "format": "date-time",
+            "title": "Server Time Ist",
+            "type": "string"
+          },
+          "server_time_utc": {
+            "format": "date-time",
+            "title": "Server Time Utc",
+            "type": "string"
+          },
+          "storage": {
+            "items": {
+              "$ref": "#/components/schemas/StorageVolumeOut"
+            },
+            "title": "Storage",
+            "type": "array"
+          },
+          "uptime_seconds": {
+            "title": "Uptime Seconds",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "app_version",
+          "environment",
+          "db_revision",
+          "code_head_revision",
+          "revision_matches",
+          "postgres_version",
+          "db_size_bytes",
+          "db_connections",
+          "server_time_utc",
+          "server_time_ist",
+          "process_started_at",
+          "uptime_seconds",
+          "storage",
+          "frontend_served"
+        ],
+        "title": "SystemStatusOut",
         "type": "object"
       },
       "TimelineItemOut": {
@@ -3828,9 +4870,33 @@
             ],
             "title": "Last Login At"
           },
+          "locked_until": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Locked Until"
+          },
           "must_change_password": {
             "title": "Must Change Password",
             "type": "boolean"
+          },
+          "password_changed_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Password Changed At"
           },
           "role": {
             "title": "Role",
@@ -3858,7 +4924,9 @@
           "is_active",
           "must_change_password",
           "is_locked",
+          "locked_until",
           "last_login_at",
+          "password_changed_at",
           "created_at",
           "version_id",
           "temporary_password"
@@ -3914,9 +4982,33 @@
             ],
             "title": "Last Login At"
           },
+          "locked_until": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Locked Until"
+          },
           "must_change_password": {
             "title": "Must Change Password",
             "type": "boolean"
+          },
+          "password_changed_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Password Changed At"
           },
           "role": {
             "title": "Role",
@@ -3940,7 +5032,9 @@
           "is_active",
           "must_change_password",
           "is_locked",
+          "locked_until",
           "last_login_at",
+          "password_changed_at",
           "created_at",
           "version_id"
         ],
@@ -4505,6 +5599,32 @@
           }
         },
         "summary": "List Audit Logs",
+        "tags": [
+          "audit"
+        ]
+      }
+    },
+    "/api/audit-logs/actions": {
+      "get": {
+        "description": "Return the sorted AuditAction catalogue for the audit viewer's action filter.",
+        "operationId": "list_audit_actions_api_audit_logs_actions_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "title": "Response List Audit Actions Api Audit Logs Actions Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "List Audit Actions",
         "tags": [
           "audit"
         ]
@@ -5075,8 +6195,20 @@
     },
     "/api/fees": {
       "get": {
-        "description": "List available consultation fee schedules.",
+        "description": "List consultation fee schedules; deactivated ones only when include_inactive is set.",
         "operationId": "list_fees_api_fees_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "include_inactive",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "Include Inactive",
+              "type": "boolean"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "content": {
@@ -5091,6 +6223,16 @@
               }
             },
             "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
           }
         },
         "summary": "List Fees",
@@ -5143,7 +6285,7 @@
     },
     "/api/fees/{id}": {
       "patch": {
-        "description": "Modify a consultation fee rate.",
+        "description": "Modify a consultation fee rate with optimistic concurrency control (SEC-06).",
         "operationId": "update_fee_api_fees__id__patch",
         "parameters": [
           {
@@ -5281,6 +6423,49 @@
         ]
       }
     },
+    "/api/operations/backups/{filename}/verify": {
+      "post": {
+        "description": "Cryptographically re-verify a single archive in the backup directory (read-only).",
+        "operationId": "verify_backup_api_operations_backups__filename__verify_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "filename",
+            "required": true,
+            "schema": {
+              "title": "Filename",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BackupVerifyResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Re-hash one backup archive against its manifest (BAK-01)",
+        "tags": [
+          "operations"
+        ]
+      }
+    },
     "/api/operations/integrity": {
       "get": {
         "description": "Run full diagnostic audit on database constraints, ledger balances, and files.",
@@ -5305,7 +6490,7 @@
     },
     "/api/operations/restore": {
       "post": {
-        "description": "Verify archive and execute safe restore with automatic pre-snapshot.",
+        "description": "Verify archive and execute safe restore with a mandatory pre-restore snapshot.",
         "operationId": "trigger_restore_api_operations_restore_post",
         "requestBody": {
           "content": {
@@ -6016,7 +7201,7 @@
     },
     "/api/payments/{id}/receipt": {
       "get": {
-        "description": "Fetch payment receipt specifically for reprint with audit check (BIL-04).",
+        "description": "Fetch a payment receipt for reprint and record a RECEIPT_REPRINTED audit row (BIL-04).\n\nThe audit row is written in the same transaction as the read; an unknown payment id\nraises 404 before anything is audited.",
         "operationId": "reprint_receipt_api_payments__id__receipt_get",
         "parameters": [
           {
@@ -6293,6 +7478,180 @@
         ]
       }
     },
+    "/api/roles/permissions": {
+      "get": {
+        "description": "Return the fixed roles, every permission, and which permissions each role holds.",
+        "operationId": "get_role_permissions_api_roles_permissions_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RolePermissionsOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Get Role Permissions",
+        "tags": [
+          "roles"
+        ]
+      }
+    },
+    "/api/security/password-policy": {
+      "get": {
+        "description": "Return the password length bounds enforced on password changes.",
+        "operationId": "get_password_policy_api_security_password_policy_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PasswordPolicyOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Get Password Policy",
+        "tags": [
+          "security"
+        ]
+      }
+    },
+    "/api/security/policy": {
+      "get": {
+        "description": "Return the effective session, lockout, throttle and password-length settings.",
+        "operationId": "get_security_policy_api_security_policy_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SecurityPolicyOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Get Security Policy",
+        "tags": [
+          "security"
+        ]
+      }
+    },
+    "/api/sessions": {
+      "get": {
+        "description": "List currently active login sessions, most recently active first.",
+        "operationId": "list_sessions_api_sessions_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "user_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "User Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ActiveSessionOut"
+                  },
+                  "title": "Response List Sessions Api Sessions Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Sessions",
+        "tags": [
+          "sessions"
+        ]
+      }
+    },
+    "/api/sessions/{session_id}/revoke": {
+      "post": {
+        "description": "Sign out one active session of any user other than the caller's current session.",
+        "operationId": "revoke_session_api_sessions__session_id__revoke_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "title": "Session Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RevokeSessionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RevokeSessionOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Revoke Session",
+        "tags": [
+          "sessions"
+        ]
+      }
+    },
     "/api/settings": {
       "get": {
         "description": "Retrieve current clinic configuration.",
@@ -6414,6 +7773,28 @@
         "summary": "Get Setup Status",
         "tags": [
           "setup"
+        ]
+      }
+    },
+    "/api/system/status": {
+      "get": {
+        "description": "Return server runtime, schema, database and storage status (read-only).",
+        "operationId": "get_system_status_api_system_status_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SystemStatusOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Get System Status",
+        "tags": [
+          "system"
         ]
       }
     },
@@ -7025,6 +8406,53 @@
         ]
       }
     },
+    "/api/users/{id}/login-history": {
+      "get": {
+        "description": "Latest 50 sign-in, lockout, unlock, password-reset and session-revocation events.",
+        "operationId": "get_user_login_history_api_users__id__login_history_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "title": "Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/LoginHistoryEntry"
+                  },
+                  "title": "Response Get User Login History Api Users  Id  Login History Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get User Login History",
+        "tags": [
+          "users"
+        ]
+      }
+    },
     "/api/users/{id}/reactivate": {
       "post": {
         "description": "Reactivate a previously deactivated user account.",
@@ -7126,6 +8554,59 @@
           }
         },
         "summary": "Reset User Password",
+        "tags": [
+          "users"
+        ]
+      }
+    },
+    "/api/users/{id}/revoke-sessions": {
+      "post": {
+        "description": "Sign out every active session of a user; the caller's own current session is kept.",
+        "operationId": "revoke_user_sessions_api_users__id__revoke_sessions_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "title": "Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RevokeSessionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RevokeUserSessionsOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Revoke User Sessions",
         "tags": [
           "users"
         ]

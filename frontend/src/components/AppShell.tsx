@@ -2,7 +2,15 @@ import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router'
 import { useLogout } from '../api/queries'
 import type { Role } from '../api/types'
-import { AdminNavTabs } from './AdminNavTabs'
+import {
+  ADMIN_MODULE_GROUPS,
+  ADMIN_MODULES,
+  findAdminModuleForPath,
+  navigableAdminModules,
+  ownedAdminPaths,
+  type AdminModule,
+} from '../admin/modules'
+import { AdminSubnav } from './AdminSubnav'
 
 interface AppShellProps {
   name: string
@@ -24,6 +32,8 @@ type NavigationIcon =
   | 'backup'
   | 'settings'
   | 'audit'
+  | 'shield'
+  | 'server'
 
 interface NavigationItem {
   key: string
@@ -32,12 +42,27 @@ interface NavigationItem {
   path: string
   icon: NavigationIcon
   roles: Role[]
+  /** Admin module entries: every page the module owns marks the entry active. */
+  activePaths?: string[]
+  /** Admin module entries: section heading shown above the first entry of each group. */
+  sectionStart?: string
 }
 
 const ALL_ROLES: Role[] = ['ADMIN', 'RECEPTION', 'DOCTOR']
 const ADMIN_RECEPTION: Role[] = ['ADMIN', 'RECEPTION']
 const ADMIN_ONLY: Role[] = ['ADMIN']
 const DOCTOR_ONLY: Role[] = ['DOCTOR']
+
+// Declared before NAVIGATION: adminModuleNavigation() reads it while NAVIGATION initialises.
+const ADMIN_MODULE_ICONS: Record<string, NavigationIcon> = {
+  'user-authority': 'users',
+  'hospital-configuration': 'settings',
+  'doctor-clinical': 'database',
+  'security-access': 'shield',
+  'audit-compliance': 'audit',
+  'backup-data': 'backup',
+  'system-health': 'server',
+}
 
 const NAVIGATION: NavigationItem[] = [
   {
@@ -96,55 +121,39 @@ const NAVIGATION: NavigationItem[] = [
     icon: 'rupee',
     roles: ADMIN_RECEPTION,
   },
-  {
-    key: 'reports',
-    label: 'Reports',
-    description: 'System integrity and operational reports',
-    path: '/admin/integrity',
-    icon: 'chart',
-    roles: ADMIN_ONLY,
-  },
-  {
-    key: 'audit-log',
-    label: 'Audit Log Viewer',
-    description: 'Filter immutable security and operational event trail',
-    path: '/admin/audit',
-    icon: 'audit',
-    roles: ADMIN_ONLY,
-  },
-  {
-    key: 'master-data',
-    label: 'Master Data',
-    description: 'Doctors and fee schedules',
-    path: '/admin/doctors',
-    icon: 'database',
-    roles: ADMIN_ONLY,
-  },
-  {
-    key: 'users',
-    label: 'Users & Permissions',
-    description: 'Accounts, roles and access controls',
-    path: '/admin/users',
-    icon: 'users',
-    roles: ADMIN_ONLY,
-  },
-  {
-    key: 'backup',
-    label: 'Backup & Restore',
-    description: 'Local backup archives and recovery',
-    path: '/admin/backups',
-    icon: 'backup',
-    roles: ADMIN_ONLY,
-  },
-  {
-    key: 'settings',
-    label: 'Settings',
-    description: 'Clinic identity and system configuration',
-    path: '/admin/settings',
-    icon: 'settings',
-    roles: ADMIN_ONLY,
-  },
+  ...adminModuleNavigation(),
 ]
+
+/**
+ * Sidebar entries for ADMIN, generated from the admin module registry so labels match the
+ * sub-navigation and breadcrumbs. Only modules that own an /admin/* page get an entry: the
+ * dashboard is the Dashboard entry, and modules whose settings live on other modules' pages
+ * (06 Billing, 08 Print) are reached through those pages and the admin sub-navigation.
+ */
+function adminModuleNavigation(): NavigationItem[] {
+  const items: NavigationItem[] = []
+  for (const group of ADMIN_MODULE_GROUPS) {
+    let first = true
+    for (const module of navigableAdminModules(group.id)) {
+      const owned = ownedAdminPaths(module).filter((p) => p.startsWith('/admin/'))
+      if (owned.length === 0) continue
+      items.push({
+        key: `admin-${module.id}`,
+        label: module.title,
+        description: module.description,
+        path: owned[0],
+        icon: ADMIN_MODULE_ICONS[module.id] ?? 'chart',
+        roles: ADMIN_ONLY,
+        activePaths: owned,
+        sectionStart: first ? group.label.toUpperCase() : undefined,
+      })
+      first = false
+    }
+  }
+  return items
+}
+
+const ADMIN_DASHBOARD: AdminModule | undefined = ADMIN_MODULES.find((m) => m.id === 'dashboard')
 
 function dashboardPath(role: Role) {
   if (role === 'ADMIN') return '/admin'
@@ -182,7 +191,8 @@ function isNavigationItemActive(
     )
   }
 
-  return pathname === item.path || pathname.startsWith(`${item.path}/`)
+  const paths = item.activePaths ?? [item.path]
+  return paths.some((p) => pathname === p || pathname.startsWith(`${p}/`))
 }
 
 function NavIcon({ name }: { name: NavigationIcon }) {
@@ -287,6 +297,21 @@ function NavIcon({ name }: { name: NavigationIcon }) {
           <path d="M8 3h8" />
         </svg>
       )
+    case 'shield':
+      return (
+        <svg {...shared}>
+          <path d="M12 3 4.5 6v5.5c0 4.6 3.1 8.3 7.5 9.5 4.4-1.2 7.5-4.9 7.5-9.5V6z" />
+          <path d="m9 12 2.2 2.2L15.5 10" />
+        </svg>
+      )
+    case 'server':
+      return (
+        <svg {...shared}>
+          <rect x="3" y="4" width="18" height="7" rx="1.5" />
+          <rect x="3" y="13" width="18" height="7" rx="1.5" />
+          <path d="M7 7.5h.01M7 16.5h.01M11 7.5h6M11 16.5h6" />
+        </svg>
+      )
     case 'settings':
       return (
         <svg {...shared}>
@@ -311,7 +336,11 @@ function formatClock(date: Date) {
 function Breadcrumbs({ pathname, role }: { pathname: string; role: Role }) {
   const homePath = dashboardPath(role)
   const homeLabel =
-    role === 'ADMIN' ? 'Admin Overview' : role === 'DOCTOR' ? 'Doctor Station' : 'Reception Desk'
+    role === 'ADMIN'
+      ? (ADMIN_DASHBOARD?.title ?? 'Administration Dashboard')
+      : role === 'DOCTOR'
+        ? 'Doctor Station'
+        : 'Reception Desk'
 
   const crumbs: { label: string; href?: string }[] = [{ label: homeLabel, href: homePath }]
 
@@ -341,17 +370,16 @@ function Breadcrumbs({ pathname, role }: { pathname: string; role: Role }) {
     crumbs.push({ label: 'Consultation Queue', href: '/doctor' })
     crumbs.push({ label: 'New Prescription' })
   } else if (pathname.startsWith('/admin/')) {
-    crumbs.push({ label: 'Administration', href: '/admin' })
-    const section = pathname.split('/')[2]
-    const labelMap: Record<string, string> = {
-      doctors: 'Doctors & Fees',
-      users: 'Users & Roles',
-      audit: 'Audit Log Viewer',
-      backups: 'Backup & Restore',
-      integrity: 'System Integrity',
-      settings: 'Clinic Settings',
+    // Labels come from the admin module registry (owning module of this page).
+    const match = findAdminModuleForPath(pathname)
+    if (match && match.module.links.length > 1) {
+      crumbs.push({ label: match.module.title, href: match.module.links[0].path })
+      crumbs.push({ label: match.link.label })
+    } else if (match) {
+      crumbs.push({ label: match.module.title })
+    } else {
+      crumbs.push({ label: pathname.split('/')[2] })
     }
-    crumbs.push({ label: labelMap[section] || section })
   }
 
   if (crumbs.length <= 1) return null
@@ -402,8 +430,9 @@ export function AppShell({ name, role, children }: AppShellProps) {
     () => NAVIGATION.filter((item) => item.roles.includes(role)),
     [role],
   )
-  const showAdminTabs = role === 'ADMIN' && location.pathname.startsWith('/admin/')
-  const adminTabs = showAdminTabs ? <AdminNavTabs /> : null
+  const showAdminSubnav =
+    role === 'ADMIN' &&
+    (location.pathname === '/admin' || location.pathname.startsWith('/admin/'))
 
   const handleSignOut = async () => {
     try {
@@ -424,11 +453,15 @@ export function AppShell({ name, role, children }: AppShellProps) {
               ? role === 'RECEPTION'
                 ? 'RECEPTION DESK'
                 : 'PATIENT & CLINICAL WORKFLOW'
-              : role === 'ADMIN' && item.key === 'reports'
-                ? 'ADMINISTRATION & SAFETY'
-                : null
+              : (item.sectionStart ?? null)
+          // Divider before the first admin module entry.
+          const startsAdminArea =
+            item.activePaths !== undefined && visibleItems[index - 1]?.activePaths === undefined
           return (
             <div key={item.key}>
+              {startsAdminArea && (
+                <div className={`mx-2 mb-2.5 mt-2.5 border-t border-white/15 ${isDesktopSidebar ? 'hidden lg:block' : ''}`} />
+              )}
               {sectionLabel && (
                 <div
                   className={`pb-1.5 pt-3.5 text-xs font-bold uppercase tracking-wider text-rose-100 ${
@@ -437,9 +470,6 @@ export function AppShell({ name, role, children }: AppShellProps) {
                 >
                   {sectionLabel}
                 </div>
-              )}
-              {item.key === 'reports' && (
-                <div className={`mx-2 mb-2.5 mt-2.5 border-t border-white/15 ${isDesktopSidebar ? 'hidden lg:block' : ''}`} />
               )}
               <Link
                 to={href}
@@ -634,8 +664,14 @@ export function AppShell({ name, role, children }: AppShellProps) {
         <main className="min-w-0 flex-1 overflow-y-auto print:overflow-visible px-4 py-5 sm:px-6 xl:px-8">
           <div className="mx-auto w-full max-w-[1720px] space-y-5">
             <Breadcrumbs pathname={location.pathname} role={role} />
-            {adminTabs}
-            {children}
+            {showAdminSubnav ? (
+              <div className="flex flex-col gap-5 lg:flex-row lg:items-start">
+                <AdminSubnav />
+                <div className="min-w-0 flex-1 space-y-5">{children}</div>
+              </div>
+            ) : (
+              children
+            )}
           </div>
           <footer className="mx-auto mt-8 flex max-w-[1720px] flex-wrap items-center justify-between gap-2 border-t border-slate-200 pt-3.5 pb-6 text-xs text-slate-600 font-medium">
             <span>Kalyan Hospital · Local clinical workspace</span>

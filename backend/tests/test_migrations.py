@@ -9,11 +9,71 @@ from kalyan_api.db.migrate import alembic_config
 
 
 def test_single_head(test_settings: Settings) -> None:
-    """ScriptDirectory has exactly one linear head revision: 0005."""
+    """ScriptDirectory has exactly one linear head revision: 0006."""
     cfg = alembic_config(test_settings.owner_url)
     script = ScriptDirectory.from_config(cfg)
     heads = script.get_heads()
-    assert heads == ["0005"]
+    assert heads == ["0006"]
+    head = script.get_revision("0006")
+    assert head is not None
+    assert head.down_revision == "0005"
+
+
+def _consultation_fee_version_column(owner_engine: Engine) -> tuple[str, str | None] | None:
+    with owner_engine.connect() as conn:
+        row = conn.execute(
+            text("""
+                SELECT is_nullable, column_default
+                FROM information_schema.columns
+                WHERE table_schema = 'public'
+                  AND table_name = 'consultation_fees'
+                  AND column_name = 'version_id'
+            """)
+        ).first()
+    if row is None:
+        return None
+    return (str(row.is_nullable), row.column_default)
+
+
+def test_0006_consultation_fee_version_column_up_down(
+    test_settings: Settings, owner_engine: Engine, app_engine: Engine
+) -> None:
+    """0006 adds consultation_fees.version_id (NOT NULL DEFAULT 1); downgrade drops it cleanly.
+
+    Ends back at head so the shared session database is left migrated.
+    """
+    cfg = alembic_config(test_settings.owner_url)
+
+    column = _consultation_fee_version_column(owner_engine)
+    assert column is not None
+    assert column[0] == "NO"
+    assert column[1] is not None and column[1].strip("()") == "1"
+
+    try:
+        command.downgrade(cfg, "0005")
+        assert _consultation_fee_version_column(owner_engine) is None
+    finally:
+        command.upgrade(cfg, "head")
+
+    restored = _consultation_fee_version_column(owner_engine)
+    assert restored is not None
+    assert restored[0] == "NO"
+
+    # Grants on consultation_fees are unchanged by the round trip (no DELETE for kalyan_app)
+    with app_engine.connect() as conn:
+        privileges = {
+            row.privilege_type
+            for row in conn.execute(
+                text("""
+                    SELECT privilege_type
+                    FROM information_schema.role_table_grants
+                    WHERE grantee = 'kalyan_app'
+                      AND table_schema = 'public'
+                      AND table_name = 'consultation_fees'
+                """)
+            )
+        }
+    assert privileges == {"SELECT", "INSERT", "UPDATE"}
 
 
 def test_migrations_match_models(migrated_db: dict[str, int], test_settings: Settings) -> None:

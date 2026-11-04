@@ -112,11 +112,13 @@ def _create_fee_payload(_target: Any = None) -> dict[str, Any]:
     }
 
 
-def _patch_fee_payload(_target: Any = None) -> dict[str, Any]:
+def _patch_fee_payload(target: Any = None) -> dict[str, Any]:
+    ver = target.version_id if target and hasattr(target, "version_id") else 1
     return {
         "name": "Fee Matrix Updated",
         "fee_paise": 30000,
         "is_active": True,
+        "version_id": ver,
     }
 
 
@@ -263,7 +265,15 @@ def _create_backup_payload(_target: Any = None) -> dict[str, Any]:
 
 
 def _restore_payload(_target: Any = None) -> dict[str, Any]:
-    return {"archive_filename": "non_existent.tar.gz", "create_prerestore_snapshot": False}
+    return {
+        "archive_filename": "non_existent.tar.gz",
+        "confirmation_phrase": "RESTORE",
+        "reason": "RBAC matrix probe restore",
+    }
+
+
+def _revoke_session_payload(_target: Any = None) -> dict[str, Any]:
+    return {"reason": "RBAC matrix probe revoke"}
 
 
 MATRIX: list[MatrixRow] = [
@@ -1067,7 +1077,7 @@ MATRIX: list[MatrixRow] = [
         body_factory=_restore_payload,
         expected={
             "anonymous": 401,
-            "admin": 404,  # non-existent file returns 404
+            "admin": 422,  # non-existent archive -> invalid_archive_filename
             "reception": 403,
             "doctor_a": 403,
             "doctor_b": 403,
@@ -1080,6 +1090,127 @@ MATRIX: list[MatrixRow] = [
         expected={
             "anonymous": 401,
             "admin": 200,
+            "reception": 403,
+            "doctor_a": 403,
+            "doctor_b": 403,
+        },
+    ),
+    # Admin Panel: authority, security center, system health and governance
+    MatrixRow(
+        method="GET",
+        path="/api/roles/permissions",
+        body_factory=None,
+        expected={
+            "anonymous": 401,
+            "admin": 200,
+            "reception": 403,
+            "doctor_a": 403,
+            "doctor_b": 403,
+        },
+    ),
+    MatrixRow(
+        method="GET",
+        path="/api/sessions",
+        body_factory=None,
+        expected={
+            "anonymous": 401,
+            "admin": 200,
+            "reception": 403,
+            "doctor_a": 403,
+            "doctor_b": 403,
+        },
+    ),
+    MatrixRow(
+        method="POST",
+        path="/api/sessions/{session_id}/revoke",
+        body_factory=_revoke_session_payload,
+        expected={
+            "anonymous": 401,
+            "admin": 200,
+            "reception": 403,
+            "doctor_a": 403,
+            "doctor_b": 403,
+        },
+    ),
+    MatrixRow(
+        method="POST",
+        path="/api/users/{id}/revoke-sessions",
+        body_factory=_revoke_session_payload,
+        expected={
+            "anonymous": 401,
+            "admin": 200,
+            "reception": 403,
+            "doctor_a": 403,
+            "doctor_b": 403,
+        },
+    ),
+    MatrixRow(
+        method="GET",
+        path="/api/users/{id}/login-history",
+        body_factory=None,
+        expected={
+            "anonymous": 401,
+            "admin": 200,
+            "reception": 403,
+            "doctor_a": 403,
+            "doctor_b": 403,
+        },
+    ),
+    MatrixRow(
+        method="GET",
+        path="/api/security/policy",
+        body_factory=None,
+        expected={
+            "anonymous": 401,
+            "admin": 200,
+            "reception": 403,
+            "doctor_a": 403,
+            "doctor_b": 403,
+        },
+    ),
+    MatrixRow(
+        method="GET",
+        path="/api/security/password-policy",
+        body_factory=None,
+        expected={
+            "anonymous": 401,
+            "admin": 200,
+            "reception": 200,
+            "doctor_a": 200,
+            "doctor_b": 200,
+        },
+    ),
+    MatrixRow(
+        method="GET",
+        path="/api/system/status",
+        body_factory=None,
+        expected={
+            "anonymous": 401,
+            "admin": 200,
+            "reception": 403,
+            "doctor_a": 403,
+            "doctor_b": 403,
+        },
+    ),
+    MatrixRow(
+        method="GET",
+        path="/api/audit-logs/actions",
+        body_factory=None,
+        expected={
+            "anonymous": 401,
+            "admin": 200,
+            "reception": 403,
+            "doctor_a": 403,
+            "doctor_b": 403,
+        },
+    ),
+    MatrixRow(
+        method="POST",
+        path="/api/operations/backups/{filename}/verify",
+        body_factory=None,
+        expected={
+            "anonymous": 401,
+            "admin": 422,
             "reception": 403,
             "doctor_a": 403,
             "doctor_b": 403,

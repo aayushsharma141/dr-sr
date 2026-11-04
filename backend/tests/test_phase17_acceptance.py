@@ -190,12 +190,11 @@ def test_disaster_recovery_rehearsal(
         session.commit()
 
     # 6. Execute full restore
-    restore_res = restore_backup(
-        archive_path,
-        settings=settings,
-        create_prerestore_snapshot=False,
-    )
+    # The pre-restore safety snapshot is mandatory and always taken (BAK-02 hardening).
+    restore_res = restore_backup(archive_path, settings=settings)
     assert restore_res["status"] == "SUCCESS"
+    assert restore_res["prerestore_snapshot"] is not None
+    assert Path(restore_res["prerestore_snapshot"]).exists()
 
     # 7. Verify restored data
     with session_scope(settings) as session:

@@ -67,6 +67,9 @@ class Settings(BaseSettings):
     # Backup storage location (BAK-01)
     backup_dir: Path = BACKEND_DIR / "var" / "backups"
 
+    # Operator-approved extra backup drives; manual backups may only target these or backup_dir
+    backup_destinations: list[Path] = []
+
     model_config = SettingsConfigDict(
         env_prefix="KALYAN_",
         env_file=str(ENV_FILE_PATH) if ENV_FILE_PATH.exists() else None,

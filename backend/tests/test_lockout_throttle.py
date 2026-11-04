@@ -14,7 +14,7 @@ from sqlalchemy.orm import Session
 from kalyan_api.config import Settings
 from kalyan_api.core import security
 from kalyan_api.models import AuditLog, User
-from kalyan_api.routers.auth import GENERIC_INVALID_CREDENTIALS_MSG
+from kalyan_api.routers.auth import invalid_credentials_message
 from kalyan_api.services import auth_service
 from tests.conftest import TEST_PASSWORD, make_user
 
@@ -250,7 +250,9 @@ def test_byte_identical_bodies_and_constant_verification_counts(
     assert res_unknown.content == res_wrong_pw.content
     assert res_unknown.content == res_locked.content
     assert res_unknown.json()["code"] == "invalid_credentials"
-    assert res_unknown.json()["message"] == GENERIC_INVALID_CREDENTIALS_MSG
+    assert res_unknown.json()["message"] == invalid_credentials_message(
+        test_settings.lockout_minutes
+    )
 
 
 def test_per_ip_throttle_blocks_burst_after_twenty_failures(

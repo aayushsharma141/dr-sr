@@ -4,7 +4,10 @@ Guarantees:
 - GET /api/settings is readable by all authenticated users (ADMIN, RECEPTION, DOCTOR).
 - PATCH /api/settings is restricted exclusively to ADMIN.
 - Updates require version_id match and return 409 version_conflict on stale writes.
-- Mutations are audited with before/after state in the same transaction.
+- Changing receipt_sequence_cycle after receipts were issued in the current cycle is refused
+  with 409 receipt_cycle_change_requires_confirmation unless explicitly confirmed with a reason.
+- Mutations are audited with complete before/after state (every mutable field) in the same
+  transaction.
 """
 
 from fastapi import APIRouter, Depends, Request
@@ -19,8 +22,29 @@ from kalyan_api.models import ClinicSettings
 from kalyan_api.schemas.settings import ClinicSettingsOut, ClinicSettingsUpdate
 from kalyan_api.services import audit_service
 from kalyan_api.services.audit_service import AuditAction
+from kalyan_api.services.receipt_service import (
+    current_cycle_key,
+    receipts_issued_in_current_cycle,
+)
 
 router = APIRouter(prefix="/settings", tags=["settings"])
+
+# Every mutable clinic settings column plus the optimistic-lock version (audit before/after).
+_SETTINGS_AUDIT_FIELDS: tuple[str, ...] = (
+    "name_en",
+    "name_hi",
+    "address_1",
+    "address_2",
+    "phone",
+    "email",
+    "receipt_sequence_cycle",
+    "print_header_en",
+    "print_header_hi",
+    "print_footer_en",
+    "print_footer_hi",
+    "consultation_validity_days",
+    "version_id",
+)
 
 
 @router.get(
@@ -56,14 +80,25 @@ def update_clinic_settings(
 
     require_version(settings, payload.version_id, "clinic_settings")
 
-    before_state = {
-        "name_en": settings.name_en,
-        "name_hi": settings.name_hi,
-        "receipt_sequence_cycle": settings.receipt_sequence_cycle,
-        "phone": settings.phone,
-        "consultation_validity_days": settings.consultation_validity_days,
-        "version_id": settings.version_id,
-    }
+    cycle_changed = payload.receipt_sequence_cycle != settings.receipt_sequence_cycle
+    if cycle_changed:
+        issued = receipts_issued_in_current_cycle(session, settings.receipt_sequence_cycle)
+        if issued > 0 and not payload.confirm_receipt_cycle_change:
+            raise ApiError(
+                status_code=409,
+                code="receipt_cycle_change_requires_confirmation",
+                message=(
+                    f"{issued} receipt(s) have already been issued in the current "
+                    f"{settings.receipt_sequence_cycle} cycle. Changing the receipt numbering "
+                    "cycle now requires explicit confirmation and a reason."
+                ),
+                current_cycle=settings.receipt_sequence_cycle,
+                current_cycle_key=current_cycle_key(settings.receipt_sequence_cycle),
+                requested_cycle=payload.receipt_sequence_cycle,
+                receipts_issued=issued,
+            )
+
+    before_state = audit_service.snapshot(settings, _SETTINGS_AUDIT_FIELDS)
 
     settings.name_en = payload.name_en
     settings.name_hi = payload.name_hi
@@ -80,14 +115,9 @@ def update_clinic_settings(
 
     session.flush()
 
-    after_state = {
-        "name_en": settings.name_en,
-        "name_hi": settings.name_hi,
-        "receipt_sequence_cycle": settings.receipt_sequence_cycle,
-        "phone": settings.phone,
-        "consultation_validity_days": settings.consultation_validity_days,
-        "version_id": settings.version_id,
-    }
+    after_state = audit_service.snapshot(settings, _SETTINGS_AUDIT_FIELDS)
+
+    reason = payload.change_reason.strip() if payload.change_reason else None
 
     ctx = build_audit_context(request, principal)
     audit_service.record(
@@ -98,6 +128,7 @@ def update_clinic_settings(
         "1",
         before=before_state,
         after=after_state,
+        reason=reason or None,
     )
 
     return ClinicSettingsOut.model_validate(settings)

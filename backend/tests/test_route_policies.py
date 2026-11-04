@@ -44,6 +44,16 @@ MUST_EXIST: set[tuple[str, str]] = {
     ("POST", "/api/users/{id}/reactivate"),
     ("POST", "/api/users/{id}/reset-password"),
     ("POST", "/api/users/{id}/unlock"),
+    ("POST", "/api/users/{id}/revoke-sessions"),
+    ("GET", "/api/users/{id}/login-history"),
+    ("GET", "/api/roles/permissions"),
+    ("GET", "/api/sessions"),
+    ("POST", "/api/sessions/{session_id}/revoke"),
+    ("GET", "/api/security/policy"),
+    ("GET", "/api/security/password-policy"),
+    ("GET", "/api/system/status"),
+    ("GET", "/api/audit-logs/actions"),
+    ("POST", "/api/operations/backups/{filename}/verify"),
 }
 
 

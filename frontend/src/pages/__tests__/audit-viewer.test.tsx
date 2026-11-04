@@ -31,6 +31,16 @@ const sampleAuditLogs = {
 }
 
 vi.mock('../../api/queries', () => ({
+  useMe: () => ({
+    data: { full_name: 'Test Admin', role: 'ADMIN', permissions: [] },
+    isPending: false,
+    isError: false,
+  }),
+  useAuditActions: () => ({
+    data: [],
+    isPending: false,
+    isError: false,
+  }),
   useAuditLogs: () => ({
     data: sampleAuditLogs,
     isPending: false,
@@ -75,6 +85,6 @@ describe('AuditViewerPage', () => {
     fireEvent.click(inspectBtn)
 
     expect(screen.getByText(/Audit Entry #101/)).toBeInTheDocument()
-    expect(screen.getByText(/nurse_joy/)).toBeInTheDocument()
+    expect(screen.getAllByText(/nurse_joy/).length).toBeGreaterThan(0)
   })
 })

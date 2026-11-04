@@ -18,8 +18,19 @@ from kalyan_api.core.policy import require
 from kalyan_api.db.session import SessionDep
 from kalyan_api.models import AuditLog
 from kalyan_api.schemas.audit import AuditLogListResponse, AuditLogOut
+from kalyan_api.services.audit_service import AuditAction
 
 router = APIRouter(tags=["audit"])
+
+
+@router.get(
+    "/audit-logs/actions",
+    response_model=list[str],
+    dependencies=[Depends(require(Permission.AUDIT_READ))],
+)
+def list_audit_actions() -> list[str]:
+    """Return the sorted AuditAction catalogue for the audit viewer's action filter."""
+    return sorted(action.value for action in AuditAction)
 
 
 @router.get(

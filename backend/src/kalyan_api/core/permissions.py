@@ -73,6 +73,12 @@ class Permission(StrEnum):
     BACKUP_RESTORE = "backup:restore"
     INTEGRITY_RUN = "integrity:run"
 
+    # Admin Panel expansion: authority, security center and system health
+    SESSION_READ = "session:read"
+    SESSION_REVOKE = "session:revoke"
+    SECURITY_READ = "security:read"
+    SYSTEM_READ = "system:read"
+
 
 # Authoritative role-to-permissions catalog
 ROLE_PERMISSIONS: dict[Role, frozenset[Permission]] = {
@@ -102,6 +108,10 @@ ROLE_PERMISSIONS: dict[Role, frozenset[Permission]] = {
             Permission.BACKUP_RUN,
             Permission.BACKUP_RESTORE,
             Permission.INTEGRITY_RUN,
+            Permission.SESSION_READ,
+            Permission.SESSION_REVOKE,
+            Permission.SECURITY_READ,
+            Permission.SYSTEM_READ,
         }
     ),
     Role.RECEPTION: frozenset(

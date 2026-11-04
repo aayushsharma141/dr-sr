@@ -232,15 +232,23 @@ def test_consultation_fees_crud_and_rbac(
         names = [f["name"] for f in resp.json()]
         assert "General OPD Visit" in names
 
+    assert created_fee["version_id"] == 1
+
     # Admin updates fee rate
     update_resp = admin_c.patch(
         f"/api/fees/{fee_id}",
-        json={"name": "General OPD Visit (Revised)", "fee_paise": 35000, "is_active": True},
+        json={
+            "name": "General OPD Visit (Revised)",
+            "fee_paise": 35000,
+            "is_active": True,
+            "version_id": 1,
+        },
     )
     assert update_resp.status_code == 200
     updated_fee = update_resp.json()
     assert updated_fee["name"] == "General OPD Visit (Revised)"
     assert updated_fee["fee_paise"] == 35000
+    assert updated_fee["version_id"] == 2
 
     # Verify audit event FEE_UPDATED
     audit_updated = db_session.scalar(
@@ -252,3 +260,131 @@ def test_consultation_fees_crud_and_rbac(
     assert audit_updated is not None
     assert audit_updated.before_data["fee_paise"] == 30000
     assert audit_updated.after_data["fee_paise"] == 35000
+
+
+def test_fee_update_requires_current_version(
+    login_client: Any,
+    admin_user: User,
+    db_session: Session,
+) -> None:
+    """PATCH /api/fees/{id} enforces version_id (SEC-06): missing -> 422, stale -> 409."""
+    admin_c = login_client(admin_user)
+    created = admin_c.post("/api/fees", json={"name": "Physio Session", "fee_paise": 50000})
+    assert created.status_code == 201
+    fee_id = created.json()["id"]
+
+    # version_id is mandatory on update
+    missing = admin_c.patch(
+        f"/api/fees/{fee_id}",
+        json={"name": "Physio Session", "fee_paise": 55000, "is_active": True},
+    )
+    assert missing.status_code == 422
+    assert missing.json()["code"] == "validation_error"
+
+    # First writer wins
+    first = admin_c.patch(
+        f"/api/fees/{fee_id}",
+        json={"name": "Physio Session", "fee_paise": 55000, "is_active": True, "version_id": 1},
+    )
+    assert first.status_code == 200
+    assert first.json()["version_id"] == 2
+
+    # Second writer with the stale version is rejected and nothing changes
+    stale = admin_c.patch(
+        f"/api/fees/{fee_id}",
+        json={"name": "Physio Session", "fee_paise": 1, "is_active": True, "version_id": 1},
+    )
+    assert stale.status_code == 409
+    body = stale.json()
+    assert body["code"] == "version_conflict"
+    assert body["entity"] == "consultation_fee"
+
+    listed = admin_c.get("/api/fees").json()
+    current = next(f for f in listed if f["id"] == fee_id)
+    assert current["fee_paise"] == 55000
+    assert current["version_id"] == 2
+
+    audits = db_session.scalars(
+        select(AuditLog).where(
+            AuditLog.action == "FEE_UPDATED",
+            AuditLog.entity_id == str(fee_id),
+        )
+    ).all()
+    assert len(audits) == 1
+
+
+def test_fee_deactivate_list_inactive_and_reactivate(
+    login_client: Any,
+    admin_user: User,
+    reception_user: User,
+    db_session: Session,
+) -> None:
+    """Deactivated fees are hidden by default, listed with include_inactive, and reactivatable."""
+    admin_c = login_client(admin_user)
+    rec_c = login_client(reception_user)
+    created = admin_c.post("/api/fees", json={"name": "Night Visit", "fee_paise": 80000})
+    assert created.status_code == 201
+    fee_id = created.json()["id"]
+
+    deactivated = admin_c.patch(
+        f"/api/fees/{fee_id}",
+        json={"name": "Night Visit", "fee_paise": 80000, "is_active": False, "version_id": 1},
+    )
+    assert deactivated.status_code == 200
+    assert deactivated.json()["is_active"] is False
+
+    # Default listing (used by reception billing) hides the inactive fee
+    default_ids = [f["id"] for f in rec_c.get("/api/fees").json()]
+    assert fee_id not in default_ids
+
+    # include_inactive=true surfaces it with its current version for reactivation
+    all_fees = admin_c.get("/api/fees", params={"include_inactive": "true"})
+    assert all_fees.status_code == 200
+    inactive = next(f for f in all_fees.json() if f["id"] == fee_id)
+    assert inactive["is_active"] is False
+    assert inactive["version_id"] == 2
+
+    reactivated = admin_c.patch(
+        f"/api/fees/{fee_id}",
+        json={
+            "name": "Night Visit",
+            "fee_paise": 80000,
+            "is_active": True,
+            "version_id": inactive["version_id"],
+        },
+    )
+    assert reactivated.status_code == 200
+    assert reactivated.json()["is_active"] is True
+    assert reactivated.json()["version_id"] == 3
+    assert fee_id in [f["id"] for f in rec_c.get("/api/fees").json()]
+
+    # Audit before/after carry every mutable field plus version
+    latest = db_session.scalars(
+        select(AuditLog)
+        .where(AuditLog.action == "FEE_UPDATED", AuditLog.entity_id == str(fee_id))
+        .order_by(AuditLog.id.desc())
+    ).first()
+    assert latest is not None
+    assert latest.before_data == {
+        "name": "Night Visit",
+        "fee_paise": 80000,
+        "is_active": False,
+        "version_id": 2,
+    }
+    assert latest.after_data == {
+        "name": "Night Visit",
+        "fee_paise": 80000,
+        "is_active": True,
+        "version_id": 3,
+    }
+
+    created_audit = db_session.scalar(
+        select(AuditLog).where(AuditLog.action == "FEE_CREATED", AuditLog.entity_id == str(fee_id))
+    )
+    assert created_audit is not None
+    assert created_audit.after_data == {
+        "name": "Night Visit",
+        "fee_paise": 80000,
+        "is_active": True,
+        "version_id": 1,
+    }

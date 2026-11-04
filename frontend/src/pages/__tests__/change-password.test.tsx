@@ -329,4 +329,119 @@ describe('ChangePassword Screen & Contract', () => {
       expect(screen.getByTestId('login-page')).toBeInTheDocument()
     })
   })
+  it('reads the length rule from the password policy API and blocks a too-short password', async () => {
+    const mockFetch = vi.fn().mockImplementation((url: string) => {
+      if (url.includes('/api/auth/me')) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          headers: new Headers({ 'content-type': 'application/json' }),
+          text: () => Promise.resolve(JSON.stringify(MUST_CHANGE_ME)),
+        })
+      }
+      if (url.includes('/api/security/password-policy')) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          headers: new Headers({ 'content-type': 'application/json' }),
+          text: () => Promise.resolve(JSON.stringify({ min_length: 12, max_length: 64 })),
+        })
+      }
+      return Promise.reject(new Error(`Unhandled: ${url}`))
+    })
+    vi.stubGlobal('fetch', mockFetch)
+
+    const user = userEvent.setup()
+    const router = createChangePasswordRouter()
+    render(
+      <QueryClientProvider client={testQueryClient}>
+        <RouterProvider router={router} />
+      </QueryClientProvider>,
+    )
+
+    expect(await screen.findByText('Must be 12 to 64 characters long.')).toBeInTheDocument()
+
+    // 10 characters: long enough for the old hardcoded 8, too short for this server's policy.
+    await user.type(screen.getByLabelText('Current password'), 'CurrentPassword123!')
+    await user.type(screen.getByLabelText('New password'), 'Abcdef123!')
+    await user.type(screen.getByLabelText('Confirm new password'), 'Abcdef123!')
+    await user.click(screen.getByRole('button', { name: /change password/i }))
+
+    expect(screen.getByText('Password must be at least 12 characters long')).toBeInTheDocument()
+    expect(screen.getByLabelText('New password')).toHaveAttribute('aria-invalid', 'true')
+    expect(mockFetch).not.toHaveBeenCalledWith(
+      expect.stringContaining('/api/auth/change-password'),
+      expect.anything(),
+    )
+  })
+
+  it('blocks a password longer than the policy maximum', async () => {
+    const mockFetch = vi.fn().mockImplementation((url: string) => {
+      if (url.includes('/api/auth/me')) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          headers: new Headers({ 'content-type': 'application/json' }),
+          text: () => Promise.resolve(JSON.stringify(MUST_CHANGE_ME)),
+        })
+      }
+      if (url.includes('/api/security/password-policy')) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          headers: new Headers({ 'content-type': 'application/json' }),
+          text: () => Promise.resolve(JSON.stringify({ min_length: 8, max_length: 16 })),
+        })
+      }
+      return Promise.reject(new Error(`Unhandled: ${url}`))
+    })
+    vi.stubGlobal('fetch', mockFetch)
+
+    const user = userEvent.setup()
+    const router = createChangePasswordRouter()
+    render(
+      <QueryClientProvider client={testQueryClient}>
+        <RouterProvider router={router} />
+      </QueryClientProvider>,
+    )
+
+    await screen.findByText('Must be 8 to 16 characters long.')
+    await user.type(screen.getByLabelText('Current password'), 'CurrentPassword123!')
+    await user.type(screen.getByLabelText('New password'), 'ThisIsMuchTooLong123!')
+    await user.type(screen.getByLabelText('Confirm new password'), 'ThisIsMuchTooLong123!')
+    await user.click(screen.getByRole('button', { name: /change password/i }))
+
+    expect(screen.getByText('Password must be at most 16 characters long')).toBeInTheDocument()
+    expect(mockFetch).not.toHaveBeenCalledWith(
+      expect.stringContaining('/api/auth/change-password'),
+      expect.anything(),
+    )
+  })
+
+  it('does not invent a length rule when the policy cannot be loaded', async () => {
+    const mockFetch = vi.fn().mockImplementation((url: string) => {
+      if (url.includes('/api/auth/me')) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          headers: new Headers({ 'content-type': 'application/json' }),
+          text: () => Promise.resolve(JSON.stringify(MUST_CHANGE_ME)),
+        })
+      }
+      return Promise.reject(new Error(`Unhandled: ${url}`))
+    })
+    vi.stubGlobal('fetch', mockFetch)
+
+    const router = createChangePasswordRouter()
+    render(
+      <QueryClientProvider client={testQueryClient}>
+        <RouterProvider router={router} />
+      </QueryClientProvider>,
+    )
+
+    expect(
+      await screen.findByText('The password rules could not be loaded. The server checks the length when you submit.'),
+    ).toBeInTheDocument()
+    expect(screen.queryByText(/at least 8/)).not.toBeInTheDocument()
+  })
 })

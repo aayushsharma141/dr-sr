@@ -101,3 +101,23 @@ def test_corrupted_backup_rejected_before_db_mutation(tmp_path: Path):
 
     with pytest.raises(BackupCorruptedError, match="Restore rejected"):
         restore_backup(fake_archive, settings=settings)
+
+
+def test_restore_refuses_to_skip_prerestore_snapshot(tmp_path: Path):
+    """The pre-restore safety snapshot is mandatory: disabling it fails before any work."""
+    archive = tmp_path / "kalyan_backup_whatever.tar.gz"
+    archive.write_bytes(b"irrelevant: rejected before verification")
+
+    with pytest.raises(ValueError, match="mandatory"):
+        restore_backup(archive, settings=get_settings(), create_prerestore_snapshot=False)
+
+
+def test_corrupted_backup_takes_no_snapshot(tmp_path: Path):
+    """Verification runs before the snapshot, so a rejected archive leaves no prerestore file."""
+    settings = get_settings().model_copy(update={"backup_dir": tmp_path / "backups"})
+    fake_archive = tmp_path / "corrupted_backup.tar.gz"
+    fake_archive.write_bytes(b"NOT_A_VALID_TAR_ARCHIVE_DATA")
+
+    with pytest.raises(BackupCorruptedError):
+        restore_backup(fake_archive, settings=settings)
+    assert not settings.backup_dir.exists() or not list(settings.backup_dir.glob("*prerestore*"))

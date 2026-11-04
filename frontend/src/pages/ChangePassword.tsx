@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from 'react'
 import { useNavigate } from 'react-router'
-import { useChangePassword, useLogout, useMe } from '../api/queries'
+import { useChangePassword, useLogout, useMe, usePasswordPolicy } from '../api/queries'
 import { ApiError } from '../api/client'
 import { ROLE_HOME } from '../auth/roles'
 
@@ -9,6 +9,8 @@ export function ChangePassword() {
   const { data: me, refetch: refetchMe } = useMe()
   const changePasswordMutation = useChangePassword()
   const logoutMutation = useLogout()
+  const passwordPolicy = usePasswordPolicy()
+  const policy = passwordPolicy.data
 
   const [currentPassword, setCurrentPassword] = useState('')
   const [newPassword, setNewPassword] = useState('')
@@ -41,8 +43,14 @@ export function ChangePassword() {
       return
     }
 
-    if (newPassword.length < 8) {
-      setNewPasswordError('Password must be at least 8 characters long')
+    // Length rules come from the server (GET /security/password-policy). If they could not be
+    // loaded, the server still enforces them on submit and its password_policy error is shown.
+    if (policy && newPassword.length < policy.min_length) {
+      setNewPasswordError(`Password must be at least ${policy.min_length} characters long`)
+      return
+    }
+    if (policy && newPassword.length > policy.max_length) {
+      setNewPasswordError(`Password must be at most ${policy.max_length} characters long`)
       return
     }
 
@@ -156,8 +164,12 @@ export function ChangePassword() {
               aria-describedby="new-pwd-hint new-pwd-error"
               className="w-full px-3 py-2 border border-neutral-300 rounded min-h-[44px] text-neutral-900 focus-visible:outline-2 focus-visible:outline-red-800"
             />
-            <p id="new-pwd-hint" className="mt-1 text-xs text-neutral-500">
-              Must be at least 8 characters long.
+            <p id="new-pwd-hint" className="mt-1 text-sm text-neutral-600">
+              {policy
+                ? `Must be ${policy.min_length} to ${policy.max_length} characters long.`
+                : passwordPolicy.isPending
+                  ? 'Loading password rules...'
+                  : 'The password rules could not be loaded. The server checks the length when you submit.'}
             </p>
             {newPasswordError && (
               <p id="new-pwd-error" role="alert" className="mt-1 text-xs text-red-700">

@@ -36,7 +36,7 @@ from kalyan_api.schemas.billing import (
     PaymentReversalCreate,
     PendingDueOut,
 )
-from kalyan_api.services import audit_service
+from kalyan_api.services import audit_service, billing_service
 from kalyan_api.services.audit_service import AuditAction
 from kalyan_api.services.receipt_service import allocate_next_receipt_number
 
@@ -189,9 +189,35 @@ def record_payment(
     response_model=PaymentOut,
     dependencies=[Depends(require(Permission.RECEIPT_REPRINT))],
 )
-def reprint_receipt(id: int, session: SessionDep) -> PaymentOut:
-    """Fetch payment receipt specifically for reprint with audit check (BIL-04)."""
-    return get_payment(id=id, session=session)
+def reprint_receipt(
+    id: int,
+    session: SessionDep,
+    request: Request,
+    principal: Principal = Depends(current_principal),
+) -> PaymentOut:
+    """Fetch a payment receipt for reprint and record a RECEIPT_REPRINTED audit row (BIL-04).
+
+    The audit row is written in the same transaction as the read; an unknown payment id
+    raises 404 before anything is audited.
+    """
+    payment_out = get_payment(id=id, session=session)
+
+    ctx = build_audit_context(request, principal)
+    audit_service.record(
+        session,
+        ctx,
+        action=AuditAction.RECEIPT_REPRINTED,
+        entity_type="payment",
+        entity_id=str(payment_out.id),
+        after={
+            "receipt_number": payment_out.receipt_number,
+            "patient_id": payment_out.patient_id,
+            "amount_paise": payment_out.amount_paise,
+            "is_reversed": payment_out.is_reversed,
+        },
+    )
+
+    return payment_out
 
 
 @router.get(
@@ -258,42 +284,7 @@ def list_patient_payments(patient_id: int, session: SessionDep) -> list[PaymentO
 )
 def list_pending_dues(session: SessionDep) -> list[PendingDueOut]:
     """List active treatment packages with outstanding pending balances (BIL-03)."""
-    # Query active plans
-    stmt = (
-        select(TreatmentPlan)
-        .where(TreatmentPlan.status == "ACTIVE")
-        .options(selectinload(TreatmentPlan.patient))
-        .order_by(TreatmentPlan.created_at.desc())
-    )
-    active_plans = session.execute(stmt).scalars().all()
-
-    dues: list[PendingDueOut] = []
-    for plan in active_plans:
-        paid_stmt = select(func.coalesce(func.sum(Payment.amount_paise), 0)).where(
-            Payment.treatment_plan_id == plan.id,
-            Payment.is_reversed.is_(False),
-        )
-        paid_paise: int = session.scalar(paid_stmt) or 0
-        balance_paise = plan.agreed_price_paise - paid_paise
-
-        if balance_paise > 0:
-            dues.append(
-                PendingDueOut(
-                    treatment_plan_id=plan.id,
-                    patient_id=plan.patient_id,
-                    patient_urn=plan.patient.urn if plan.patient else "",
-                    patient_name=plan.patient.full_name if plan.patient else "",
-                    plan_name=plan.plan_name,
-                    condition_diagnosis=plan.condition_diagnosis,
-                    agreed_price_paise=plan.agreed_price_paise,
-                    paid_paise=paid_paise,
-                    balance_paise=balance_paise,
-                    total_sessions=plan.total_sessions,
-                    completed_sessions=plan.completed_sessions,
-                )
-            )
-
-    return dues
+    return billing_service.compute_pending_dues(session)
 
 
 @router.post(

@@ -11,13 +11,121 @@ import {
 import { ApiError } from '../api/client'
 import { AppShell } from '../components/AppShell'
 import { ConflictBanner } from '../components/ConflictBanner'
+import { InlineAlert } from '../components/InlineAlert'
 import { Modal } from '../components/Modal'
 import type { DoctorOut, DoctorCreate, DoctorUpdate, FeeOut } from '../api/types'
+
+interface DoctorForm {
+  name_en: string
+  name_hi: string
+  qualification: string
+  registration_number: string
+  fee_rupees: string
+  is_active: boolean
+}
+
+interface FeeForm {
+  name: string
+  fee_rupees: string
+  is_active: boolean
+}
+
+const EMPTY_DOCTOR_FORM: DoctorForm = {
+  name_en: '',
+  name_hi: '',
+  qualification: '',
+  registration_number: '',
+  fee_rupees: '500',
+  is_active: true,
+}
+
+const EMPTY_FEE_FORM: FeeForm = { name: '', fee_rupees: '500', is_active: true }
+
+function doctorToForm(doc: DoctorOut): DoctorForm {
+  return {
+    name_en: doc.name_en,
+    name_hi: doc.name_hi ?? '',
+    qualification: doc.qualification ?? '',
+    registration_number: doc.registration_number ?? '',
+    fee_rupees: String(doc.default_fee_paise / 100),
+    is_active: doc.is_active,
+  }
+}
+
+function feeToForm(fee: FeeOut): FeeForm {
+  return { name: fee.name, fee_rupees: String(fee.fee_paise / 100), is_active: fee.is_active }
+}
+
+function doctorFormsEqual(a: DoctorForm, b: DoctorForm): boolean {
+  return (
+    a.name_en === b.name_en &&
+    a.name_hi === b.name_hi &&
+    a.qualification === b.qualification &&
+    a.registration_number === b.registration_number &&
+    a.fee_rupees === b.fee_rupees &&
+    a.is_active === b.is_active
+  )
+}
+
+function feeFormsEqual(a: FeeForm, b: FeeForm): boolean {
+  return a.name === b.name && a.fee_rupees === b.fee_rupees && a.is_active === b.is_active
+}
+
+/** Rupees typed by the user to integer paise; null when not a non-negative amount with at most 2 decimals. */
+function rupeesToPaise(value: string): number | null {
+  const trimmed = value.trim()
+  if (!/^\d+(\.\d{1,2})?$/.test(trimmed)) return null
+  return Math.round(Number(trimmed) * 100)
+}
+
+function formatRupees(paise: number): string {
+  return `₹${(paise / 100).toFixed(2)}`
+}
+
+/** Readable messages from an error, including the per-field messages of a 422 validation_error. */
+function errorMessages(err: unknown, fallback: string): string[] {
+  if (!(err instanceof Error)) return [fallback]
+  if (err instanceof ApiError && err.status === 422 && Array.isArray(err.extra.fields)) {
+    const details = err.extra.fields.flatMap((item: unknown) => {
+      if (typeof item !== 'object' || item === null) return []
+      const rec = item as Record<string, unknown>
+      const loc = Array.isArray(rec.loc) ? rec.loc.map(String).filter((l) => l !== 'body') : []
+      const message = (typeof rec.message === 'string' ? rec.message : 'Invalid value').replace(/^Value error, /, '')
+      return [loc.length > 0 ? `${loc.join('.')}: ${message}` : message]
+    })
+    return [err.message, ...details]
+  }
+  return [err.message || fallback]
+}
+
+const INPUT_CLASS =
+  'w-full px-3 py-2 border border-neutral-300 rounded min-h-11 text-neutral-900 bg-white focus-visible:outline-2 focus-visible:outline-[#8E1C3D]'
+const PRIMARY_BUTTON =
+  'px-4 py-2 text-sm font-semibold text-white bg-[#8E1C3D] hover:bg-[#5D0B26] rounded min-h-11 min-w-11 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#8E1C3D] disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed'
+const SECONDARY_BUTTON =
+  'px-4 py-2 text-sm font-medium text-neutral-800 bg-white border border-neutral-300 hover:bg-neutral-100 rounded min-h-11 min-w-11 focus-visible:outline-2 focus-visible:outline-[#8E1C3D] disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed'
+const ROW_BUTTON =
+  'px-3 py-2 text-sm font-medium text-neutral-800 bg-neutral-100 hover:bg-neutral-200 rounded min-h-11 min-w-11 focus-visible:outline-2 focus-visible:outline-[#8E1C3D] disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed'
+
+function StatusBadge({ active }: { active: boolean }) {
+  return (
+    <span
+      className={`inline-block px-2 py-0.5 text-sm font-semibold rounded-full ${
+        active ? 'bg-green-100 text-green-900' : 'bg-neutral-200 text-neutral-800'
+      }`}
+    >
+      {active ? 'Active' : 'Inactive'}
+    </span>
+  )
+}
+
+type DiscardTarget = 'doctor' | 'fee'
 
 export function Doctors() {
   const { data: me } = useMe()
   const { data: doctors, isPending: doctorsLoading, refetch: refetchDoctors } = useDoctors()
-  const { data: fees, isPending: feesLoading } = useFees()
+  // All fees (active and inactive); "Show inactive" only filters what is displayed.
+  const { data: fees, isPending: feesLoading, refetch: refetchFees } = useFees()
 
   const createDoctorMutation = useCreateDoctor()
   const updateDoctorMutation = useUpdateDoctor()
@@ -27,51 +135,74 @@ export function Doctors() {
   // Doctor modal state
   const [doctorModalOpen, setDoctorModalOpen] = useState(false)
   const [editingDoctor, setEditingDoctor] = useState<DoctorOut | null>(null)
-  const [docNameEn, setDocNameEn] = useState('')
-  const [docNameHi, setDocNameHi] = useState('')
-  const [docQualification, setDocQualification] = useState('')
-  const [docRegNo, setDocRegNo] = useState('')
-  const [docDefaultFeeRupees, setDocDefaultFeeRupees] = useState(500)
-  const [docIsActive, setDocIsActive] = useState(true)
-  const [docVersionId, setDocVersionId] = useState(1)
-  const [docError, setDocError] = useState<string | null>(null)
+  const [docForm, setDocForm] = useState<DoctorForm>(EMPTY_DOCTOR_FORM)
+  const [docInitial, setDocInitial] = useState<DoctorForm>(EMPTY_DOCTOR_FORM)
+  const [docErrors, setDocErrors] = useState<string[]>([])
   const [docConflict, setDocConflict] = useState(false)
   const [docReloading, setDocReloading] = useState(false)
 
   // Fee modal state
   const [feeModalOpen, setFeeModalOpen] = useState(false)
   const [editingFee, setEditingFee] = useState<FeeOut | null>(null)
-  const [feeName, setFeeName] = useState('')
-  const [feeRupees, setFeeRupees] = useState(500)
-  const [feeIsActive, setFeeIsActive] = useState(true)
-  const [feeError, setFeeError] = useState<string | null>(null)
+  const [feeForm, setFeeForm] = useState<FeeForm>(EMPTY_FEE_FORM)
+  const [feeInitial, setFeeInitial] = useState<FeeForm>(EMPTY_FEE_FORM)
+  const [feeErrors, setFeeErrors] = useState<string[]>([])
+  const [feeConflict, setFeeConflict] = useState(false)
+  const [feeReloading, setFeeReloading] = useState(false)
+
+  // Fee list state
+  const [showInactiveFees, setShowInactiveFees] = useState(false)
+  const [reactivatingFeeId, setReactivatingFeeId] = useState<number | null>(null)
+  const [feeListConflict, setFeeListConflict] = useState(false)
+  const [feeListReloading, setFeeListReloading] = useState(false)
+  const [feeListError, setFeeListError] = useState<string | null>(null)
+  const [feeListSuccess, setFeeListSuccess] = useState<string | null>(null)
+
+  const [discardTarget, setDiscardTarget] = useState<DiscardTarget | null>(null)
+
+  const docDirty = doctorModalOpen && !doctorFormsEqual(docForm, docInitial)
+  const feeDirty = feeModalOpen && !feeFormsEqual(feeForm, feeInitial)
+  const docSaving = createDoctorMutation.isPending || updateDoctorMutation.isPending
+  const feeSaving = createFeeMutation.isPending || updateFeeMutation.isPending
+
+  const allFees = fees ?? []
+  const inactiveFeeCount = allFees.filter((f) => !f.is_active).length
+  const visibleFees = showInactiveFees ? allFees : allFees.filter((f) => f.is_active)
+
+  // ---------------------------------------------------------------- doctors
+
+  const setDocField = <K extends keyof DoctorForm>(key: K, value: DoctorForm[K]) =>
+    setDocForm((prev) => ({ ...prev, [key]: value }))
+
+  const loadDoctorForm = (form: DoctorForm) => {
+    setDocForm(form)
+    setDocInitial(form)
+  }
 
   const openCreateDoctor = () => {
     setEditingDoctor(null)
-    setDocNameEn('')
-    setDocNameHi('')
-    setDocQualification('')
-    setDocRegNo('')
-    setDocDefaultFeeRupees(500)
-    setDocIsActive(true)
-    setDocVersionId(1)
-    setDocError(null)
+    loadDoctorForm(EMPTY_DOCTOR_FORM)
+    setDocErrors([])
     setDocConflict(false)
     setDoctorModalOpen(true)
   }
 
   const openEditDoctor = (doc: DoctorOut) => {
     setEditingDoctor(doc)
-    setDocNameEn(doc.name_en)
-    setDocNameHi(doc.name_hi || '')
-    setDocQualification(doc.qualification || '')
-    setDocRegNo(doc.registration_number || '')
-    setDocDefaultFeeRupees(doc.default_fee_paise / 100)
-    setDocIsActive(doc.is_active)
-    setDocVersionId(doc.version_id)
-    setDocError(null)
+    loadDoctorForm(doctorToForm(doc))
+    setDocErrors([])
     setDocConflict(false)
     setDoctorModalOpen(true)
+  }
+
+  const closeDoctorModal = () => {
+    setDoctorModalOpen(false)
+    setDiscardTarget(null)
+  }
+
+  const requestCloseDoctorModal = () => {
+    if (docDirty) setDiscardTarget('doctor')
+    else closeDoctorModal()
   }
 
   const handleReloadDoctor = async () => {
@@ -81,15 +212,10 @@ export function Doctors() {
       const refreshedList = await refetchDoctors()
       const freshDoc = refreshedList.data?.find((d) => d.id === editingDoctor.id)
       if (freshDoc) {
-        setDocNameEn(freshDoc.name_en)
-        setDocNameHi(freshDoc.name_hi || '')
-        setDocQualification(freshDoc.qualification || '')
-        setDocRegNo(freshDoc.registration_number || '')
-        setDocDefaultFeeRupees(freshDoc.default_fee_paise / 100)
-        setDocIsActive(freshDoc.is_active)
-        setDocVersionId(freshDoc.version_id)
+        loadDoctorForm(doctorToForm(freshDoc))
         setEditingDoctor(freshDoc)
       }
+      setDocErrors([])
       setDocConflict(false)
     } finally {
       setDocReloading(false)
@@ -98,129 +224,213 @@ export function Doctors() {
 
   const handleDoctorSubmit = async (e: FormEvent) => {
     e.preventDefault()
-    setDocError(null)
+    setDocErrors([])
+
+    const feePaise = rupeesToPaise(docForm.fee_rupees)
+    if (feePaise === null) {
+      setDocErrors(['Enter the default fee in rupees, for example 500 or 450.50.'])
+      return
+    }
 
     if (editingDoctor) {
       const body: DoctorUpdate = {
-        name_en: docNameEn.trim(),
-        name_hi: docNameHi.trim() || null,
-        qualification: docQualification.trim() || null,
-        registration_number: docRegNo.trim() || null,
-        default_fee_paise: Math.round(docDefaultFeeRupees * 100),
-        is_active: docIsActive,
-        version_id: docVersionId,
+        name_en: docForm.name_en.trim(),
+        name_hi: docForm.name_hi.trim() || null,
+        qualification: docForm.qualification.trim() || null,
+        registration_number: docForm.registration_number.trim() || null,
+        default_fee_paise: feePaise,
+        is_active: docForm.is_active,
+        version_id: editingDoctor.version_id,
       }
 
       try {
         await updateDoctorMutation.mutateAsync({ id: editingDoctor.id, body })
-        setDoctorModalOpen(false)
+        closeDoctorModal()
       } catch (err) {
         if (err instanceof ApiError && err.status === 409) {
           setDocConflict(true)
         } else {
-          setDocError(err instanceof Error ? err.message : 'Failed to update doctor profile')
+          setDocErrors(errorMessages(err, 'Failed to update doctor profile'))
         }
       }
     } else {
       const body: DoctorCreate = {
-        name_en: docNameEn.trim(),
-        name_hi: docNameHi.trim() || null,
-        qualification: docQualification.trim() || null,
-        registration_number: docRegNo.trim() || null,
-        default_fee_paise: Math.round(docDefaultFeeRupees * 100),
+        name_en: docForm.name_en.trim(),
+        name_hi: docForm.name_hi.trim() || null,
+        qualification: docForm.qualification.trim() || null,
+        registration_number: docForm.registration_number.trim() || null,
+        default_fee_paise: feePaise,
       }
 
       try {
         await createDoctorMutation.mutateAsync(body)
-        setDoctorModalOpen(false)
+        closeDoctorModal()
       } catch (err) {
-        setDocError(err instanceof Error ? err.message : 'Failed to create doctor profile')
+        setDocErrors(errorMessages(err, 'Failed to create doctor profile'))
       }
     }
   }
 
+  // ------------------------------------------------------------------- fees
+
+  const setFeeField = <K extends keyof FeeForm>(key: K, value: FeeForm[K]) =>
+    setFeeForm((prev) => ({ ...prev, [key]: value }))
+
+  const loadFeeForm = (form: FeeForm) => {
+    setFeeForm(form)
+    setFeeInitial(form)
+  }
+
   const openCreateFee = () => {
     setEditingFee(null)
-    setFeeName('')
-    setFeeRupees(500)
-    setFeeIsActive(true)
-    setFeeError(null)
+    loadFeeForm(EMPTY_FEE_FORM)
+    setFeeErrors([])
+    setFeeConflict(false)
     setFeeModalOpen(true)
   }
 
   const openEditFee = (fee: FeeOut) => {
     setEditingFee(fee)
-    setFeeName(fee.name)
-    setFeeRupees(fee.fee_paise / 100)
-    setFeeIsActive(fee.is_active)
-    setFeeError(null)
+    loadFeeForm(feeToForm(fee))
+    setFeeErrors([])
+    setFeeConflict(false)
     setFeeModalOpen(true)
+  }
+
+  const closeFeeModal = () => {
+    setFeeModalOpen(false)
+    setDiscardTarget(null)
+  }
+
+  const requestCloseFeeModal = () => {
+    if (feeDirty) setDiscardTarget('fee')
+    else closeFeeModal()
+  }
+
+  const handleReloadFee = async () => {
+    if (!editingFee) return
+    setFeeReloading(true)
+    try {
+      const refreshed = await refetchFees()
+      const freshFee = refreshed.data?.find((f) => f.id === editingFee.id)
+      if (freshFee) {
+        loadFeeForm(feeToForm(freshFee))
+        setEditingFee(freshFee)
+      }
+      setFeeErrors([])
+      setFeeConflict(false)
+    } finally {
+      setFeeReloading(false)
+    }
   }
 
   const handleFeeSubmit = async (e: FormEvent) => {
     e.preventDefault()
-    setFeeError(null)
+    setFeeErrors([])
+
+    const feePaise = rupeesToPaise(feeForm.fee_rupees)
+    if (feePaise === null) {
+      setFeeErrors(['Enter the fee in rupees, for example 300 or 250.50.'])
+      return
+    }
 
     if (editingFee) {
       try {
         await updateFeeMutation.mutateAsync({
           id: editingFee.id,
           body: {
-            name: feeName.trim(),
-            fee_paise: Math.round(feeRupees * 100),
-            is_active: feeIsActive,
+            name: feeForm.name.trim(),
+            fee_paise: feePaise,
+            is_active: feeForm.is_active,
+            version_id: editingFee.version_id,
           },
         })
-        setFeeModalOpen(false)
+        closeFeeModal()
       } catch (err) {
-        setFeeError(err instanceof Error ? err.message : 'Failed to update fee schedule')
+        if (err instanceof ApiError && err.status === 409) {
+          setFeeConflict(true)
+        } else {
+          setFeeErrors(errorMessages(err, 'Failed to update fee schedule'))
+        }
       }
     } else {
       try {
-        await createFeeMutation.mutateAsync({
-          name: feeName.trim(),
-          fee_paise: Math.round(feeRupees * 100),
-        })
-        setFeeModalOpen(false)
+        await createFeeMutation.mutateAsync({ name: feeForm.name.trim(), fee_paise: feePaise })
+        closeFeeModal()
       } catch (err) {
-        setFeeError(err instanceof Error ? err.message : 'Failed to create fee schedule')
+        setFeeErrors(errorMessages(err, 'Failed to create fee schedule'))
       }
     }
+  }
+
+  const handleReactivateFee = async (fee: FeeOut) => {
+    setFeeListError(null)
+    setFeeListSuccess(null)
+    setReactivatingFeeId(fee.id)
+    try {
+      await updateFeeMutation.mutateAsync({
+        id: fee.id,
+        body: { name: fee.name, fee_paise: fee.fee_paise, is_active: true, version_id: fee.version_id },
+      })
+      setFeeListConflict(false)
+      setFeeListSuccess(`Fee rate "${fee.name}" is active again.`)
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 409) {
+        setFeeListConflict(true)
+      } else {
+        setFeeListError(errorMessages(err, 'Failed to reactivate fee rate').join(' '))
+      }
+    } finally {
+      setReactivatingFeeId(null)
+    }
+  }
+
+  const handleReloadFeeList = async () => {
+    setFeeListReloading(true)
+    try {
+      await refetchFees()
+      setFeeListConflict(false)
+    } finally {
+      setFeeListReloading(false)
+    }
+  }
+
+  const confirmDiscard = () => {
+    if (discardTarget === 'doctor') closeDoctorModal()
+    else if (discardTarget === 'fee') closeFeeModal()
   }
 
   return (
     <AppShell name={me?.full_name ?? 'Admin'} role={me?.role ?? 'ADMIN'}>
       <div className="space-y-8 max-w-6xl mx-auto">
         {/* Doctors Section */}
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
+        <section aria-labelledby="doctors-heading" className="space-y-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
-              <h2 className="text-2xl font-bold text-neutral-900 tracking-tight">Doctor Profiles</h2>
-              <p className="text-sm text-neutral-500">Manage doctor credentials, qualifications, and default fees</p>
+              <h2 id="doctors-heading" className="text-2xl font-bold text-neutral-900 tracking-tight">
+                Doctor Profiles
+              </h2>
+              <p className="text-sm text-neutral-600">Manage doctor credentials, qualifications, and default fees</p>
             </div>
-            <button
-              type="button"
-              onClick={openCreateDoctor}
-              className="px-4 py-2 text-sm font-medium text-white bg-red-900 hover:bg-red-800 rounded min-h-[44px] min-w-[44px] focus-visible:outline-2 focus-visible:outline-red-800 cursor-pointer"
-            >
+            <button type="button" onClick={openCreateDoctor} className={PRIMARY_BUTTON}>
               Add Doctor
             </button>
           </div>
 
           {doctorsLoading ? (
-            <p className="text-sm text-neutral-500 py-6 text-center">Loading doctors...</p>
+            <p className="text-sm text-neutral-600 py-6 text-center">Loading doctors...</p>
           ) : (
-            <div className="bg-white rounded-lg border border-neutral-200 overflow-hidden shadow-xs">
+            <div className="bg-white rounded-lg border border-neutral-200 overflow-x-auto shadow-xs">
               <table className="w-full text-left text-sm text-neutral-800">
-                <thead className="bg-neutral-50 border-b border-neutral-200 text-xs font-semibold text-neutral-600 uppercase tracking-wider">
+                <thead className="bg-neutral-50 border-b border-neutral-200 text-xs font-semibold text-neutral-700 uppercase tracking-wider">
                   <tr>
-                    <th className="px-4 py-3">Doctor Name</th>
-                    <th className="px-4 py-3">Hindi Name</th>
-                    <th className="px-4 py-3">Qualification</th>
-                    <th className="px-4 py-3">Registration No</th>
-                    <th className="px-4 py-3">Default Fee</th>
-                    <th className="px-4 py-3">Status</th>
-                    <th className="px-4 py-3 text-right">Actions</th>
+                    <th scope="col" className="px-4 py-3">Doctor Name</th>
+                    <th scope="col" className="px-4 py-3">Hindi Name</th>
+                    <th scope="col" className="px-4 py-3">Qualification</th>
+                    <th scope="col" className="px-4 py-3">Registration No</th>
+                    <th scope="col" className="px-4 py-3 text-right">Default Fee</th>
+                    <th scope="col" className="px-4 py-3">Status</th>
+                    <th scope="col" className="px-4 py-3 text-right">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-neutral-200">
@@ -228,24 +438,23 @@ export function Doctors() {
                     doctors.map((doc) => (
                       <tr key={doc.id} className="hover:bg-neutral-50">
                         <td className="px-4 py-3 font-medium text-neutral-900">{doc.name_en}</td>
-                        <td className="px-4 py-3 text-neutral-700">{doc.name_hi || '-'}</td>
+                        <td className="px-4 py-3 text-neutral-700" lang={doc.name_hi ? 'hi' : undefined}>
+                          {doc.name_hi || '-'}
+                        </td>
                         <td className="px-4 py-3 text-neutral-700">{doc.qualification || '-'}</td>
-                        <td className="px-4 py-3 font-mono text-xs text-neutral-600">{doc.registration_number || '-'}</td>
-                        <td className="px-4 py-3 font-medium text-neutral-900">₹{(doc.default_fee_paise / 100).toFixed(2)}</td>
+                        <td className="px-4 py-3 font-mono text-neutral-700">{doc.registration_number || '-'}</td>
+                        <td className="px-4 py-3 text-right font-medium tabular-nums text-neutral-900">
+                          {formatRupees(doc.default_fee_paise)}
+                        </td>
                         <td className="px-4 py-3">
-                          <span
-                            className={`inline-block px-2 py-0.5 text-xs font-semibold rounded-full ${
-                              doc.is_active ? 'bg-green-100 text-green-800' : 'bg-neutral-200 text-neutral-700'
-                            }`}
-                          >
-                            {doc.is_active ? 'Active' : 'Inactive'}
-                          </span>
+                          <StatusBadge active={doc.is_active} />
                         </td>
                         <td className="px-4 py-3 text-right">
                           <button
                             type="button"
                             onClick={() => openEditDoctor(doc)}
-                            className="px-3 py-1.5 text-xs font-medium text-neutral-700 bg-neutral-100 hover:bg-neutral-200 rounded min-h-[36px] min-w-[36px] focus-visible:outline-2 focus-visible:outline-red-800 cursor-pointer"
+                            aria-label={`Edit ${doc.name_en}`}
+                            className={ROW_BUTTON}
                           >
                             Edit
                           </button>
@@ -254,7 +463,7 @@ export function Doctors() {
                     ))
                   ) : (
                     <tr>
-                      <td colSpan={7} className="px-4 py-6 text-center text-neutral-500">
+                      <td colSpan={7} className="px-4 py-6 text-center text-neutral-600">
                         No doctors registered yet.
                       </td>
                     </tr>
@@ -263,67 +472,104 @@ export function Doctors() {
               </table>
             </div>
           )}
-        </div>
+        </section>
 
         {/* Consultation Fees Section */}
-        <div className="space-y-4 pt-6 border-t border-neutral-200">
-          <div className="flex items-center justify-between">
+        <section aria-labelledby="fees-heading" className="space-y-4 pt-6 border-t border-neutral-200">
+          <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
-              <h2 className="text-2xl font-bold text-neutral-900 tracking-tight">Consultation Fee Schedules</h2>
-              <p className="text-sm text-neutral-500">Configure standard fee rates used across departments and billing</p>
+              <h2 id="fees-heading" className="text-2xl font-bold text-neutral-900 tracking-tight">
+                Consultation Fee Schedules
+              </h2>
+              <p className="text-sm text-neutral-600">Configure standard fee rates used across departments and billing</p>
             </div>
-            <button
-              type="button"
-              onClick={openCreateFee}
-              className="px-4 py-2 text-sm font-medium text-white bg-red-900 hover:bg-red-800 rounded min-h-[44px] min-w-[44px] focus-visible:outline-2 focus-visible:outline-red-800 cursor-pointer"
-            >
-              Add Fee Rate
-            </button>
+            <div className="flex flex-wrap items-center gap-3">
+              <label
+                htmlFor="fees-show-inactive"
+                className="inline-flex min-h-11 cursor-pointer items-center gap-2 text-sm font-medium text-neutral-800"
+              >
+                <input
+                  id="fees-show-inactive"
+                  type="checkbox"
+                  checked={showInactiveFees}
+                  onChange={(e) => setShowInactiveFees(e.target.checked)}
+                  className="h-5 w-5 rounded border-neutral-400 accent-[#8E1C3D]"
+                />
+                Show inactive ({inactiveFeeCount})
+              </label>
+              <button type="button" onClick={openCreateFee} className={PRIMARY_BUTTON}>
+                Add Fee Rate
+              </button>
+            </div>
           </div>
 
+          {feeListConflict && <ConflictBanner onReload={handleReloadFeeList} isReloading={feeListReloading} />}
+          {feeListError && (
+            <InlineAlert tone="error" onDismiss={() => setFeeListError(null)}>
+              {feeListError}
+            </InlineAlert>
+          )}
+          {feeListSuccess && (
+            <InlineAlert tone="success" onDismiss={() => setFeeListSuccess(null)}>
+              {feeListSuccess}
+            </InlineAlert>
+          )}
+
           {feesLoading ? (
-            <p className="text-sm text-neutral-500 py-6 text-center">Loading fees...</p>
+            <p className="text-sm text-neutral-600 py-6 text-center">Loading fees...</p>
           ) : (
-            <div className="bg-white rounded-lg border border-neutral-200 overflow-hidden shadow-xs">
+            <div className="bg-white rounded-lg border border-neutral-200 overflow-x-auto shadow-xs">
               <table className="w-full text-left text-sm text-neutral-800">
-                <thead className="bg-neutral-50 border-b border-neutral-200 text-xs font-semibold text-neutral-600 uppercase tracking-wider">
+                <thead className="bg-neutral-50 border-b border-neutral-200 text-xs font-semibold text-neutral-700 uppercase tracking-wider">
                   <tr>
-                    <th className="px-4 py-3">Schedule Name</th>
-                    <th className="px-4 py-3">Rate (INR)</th>
-                    <th className="px-4 py-3">Status</th>
-                    <th className="px-4 py-3 text-right">Actions</th>
+                    <th scope="col" className="px-4 py-3">Schedule Name</th>
+                    <th scope="col" className="px-4 py-3 text-right">Rate (INR)</th>
+                    <th scope="col" className="px-4 py-3">Status</th>
+                    <th scope="col" className="px-4 py-3 text-right">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-neutral-200">
-                  {fees && fees.length > 0 ? (
-                    fees.map((fee) => (
-                      <tr key={fee.id} className="hover:bg-neutral-50">
+                  {visibleFees.length > 0 ? (
+                    visibleFees.map((fee) => (
+                      <tr key={fee.id} className={fee.is_active ? 'hover:bg-neutral-50' : 'bg-neutral-50'}>
                         <td className="px-4 py-3 font-medium text-neutral-900">{fee.name}</td>
-                        <td className="px-4 py-3 font-semibold text-neutral-900">₹{(fee.fee_paise / 100).toFixed(2)}</td>
-                        <td className="px-4 py-3">
-                          <span
-                            className={`inline-block px-2 py-0.5 text-xs font-semibold rounded-full ${
-                              fee.is_active ? 'bg-green-100 text-green-800' : 'bg-neutral-200 text-neutral-700'
-                            }`}
-                          >
-                            {fee.is_active ? 'Active' : 'Inactive'}
-                          </span>
+                        <td className="px-4 py-3 text-right font-semibold tabular-nums text-neutral-900">
+                          {formatRupees(fee.fee_paise)}
                         </td>
-                        <td className="px-4 py-3 text-right">
-                          <button
-                            type="button"
-                            onClick={() => openEditFee(fee)}
-                            className="px-3 py-1.5 text-xs font-medium text-neutral-700 bg-neutral-100 hover:bg-neutral-200 rounded min-h-[36px] min-w-[36px] focus-visible:outline-2 focus-visible:outline-red-800 cursor-pointer"
-                          >
-                            Edit
-                          </button>
+                        <td className="px-4 py-3">
+                          <StatusBadge active={fee.is_active} />
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="flex justify-end gap-2">
+                            {!fee.is_active && (
+                              <button
+                                type="button"
+                                onClick={() => handleReactivateFee(fee)}
+                                disabled={reactivatingFeeId !== null}
+                                aria-label={`Reactivate ${fee.name}`}
+                                className={ROW_BUTTON}
+                              >
+                                {reactivatingFeeId === fee.id ? 'Reactivating...' : 'Reactivate'}
+                              </button>
+                            )}
+                            <button
+                              type="button"
+                              onClick={() => openEditFee(fee)}
+                              aria-label={`Edit ${fee.name}`}
+                              className={ROW_BUTTON}
+                            >
+                              Edit
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     ))
                   ) : (
                     <tr>
-                      <td colSpan={4} className="px-4 py-6 text-center text-neutral-500">
-                        No fee schedules configured yet.
+                      <td colSpan={4} className="px-4 py-6 text-center text-neutral-600">
+                        {allFees.length === 0
+                          ? 'No fee schedules configured yet.'
+                          : 'No active fee schedules. Tick "Show inactive" to see deactivated rates.'}
                       </td>
                     </tr>
                   )}
@@ -331,20 +577,27 @@ export function Doctors() {
               </table>
             </div>
           )}
-        </div>
+        </section>
 
         {/* Doctor Modal */}
         {doctorModalOpen && (
-          <Modal open title={editingDoctor ? 'Edit Doctor Profile' : 'Add Doctor Profile'} onClose={() => setDoctorModalOpen(false)} busy={createDoctorMutation.isPending || updateDoctorMutation.isPending} className="max-w-lg">
+          <Modal
+            open
+            title={editingDoctor ? 'Edit Doctor Profile' : 'Add Doctor Profile'}
+            onClose={requestCloseDoctorModal}
+            dismiss={docDirty ? 'none' : 'closerequest'}
+            busy={docSaving}
+            className="max-w-lg"
+          >
+            <div className="space-y-4">
+              {docConflict && <ConflictBanner onReload={handleReloadDoctor} isReloading={docReloading} />}
 
-              {docConflict && (
-                <ConflictBanner onReload={handleReloadDoctor} isReloading={docReloading} />
-              )}
-
-              {docError && (
-                <div role="alert" className="p-3 bg-red-50 border border-red-200 rounded text-sm text-red-900">
-                  {docError}
-                </div>
+              {docErrors.length > 0 && (
+                <InlineAlert tone="error">
+                  {docErrors.map((m, i) => (
+                    <p key={i}>{m}</p>
+                  ))}
+                </InlineAlert>
               )}
 
               <form onSubmit={handleDoctorSubmit} className="space-y-4">
@@ -357,9 +610,10 @@ export function Doctors() {
                     data-autofocus
                     type="text"
                     required
-                    value={docNameEn}
-                    onChange={(e) => setDocNameEn(e.target.value)}
-                    className="w-full px-3 py-2 border border-neutral-300 rounded min-h-[44px] text-neutral-900 focus-visible:outline-2 focus-visible:outline-red-800"
+                    maxLength={120}
+                    value={docForm.name_en}
+                    onChange={(e) => setDocField('name_en', e.target.value)}
+                    className={INPUT_CLASS}
                   />
                 </div>
 
@@ -370,9 +624,10 @@ export function Doctors() {
                   <input
                     id="doc-name-hi"
                     type="text"
-                    value={docNameHi}
-                    onChange={(e) => setDocNameHi(e.target.value)}
-                    className="w-full px-3 py-2 border border-neutral-300 rounded min-h-[44px] text-neutral-900 focus-visible:outline-2 focus-visible:outline-red-800"
+                    lang="hi"
+                    value={docForm.name_hi}
+                    onChange={(e) => setDocField('name_hi', e.target.value)}
+                    className={INPUT_CLASS}
                   />
                 </div>
 
@@ -383,9 +638,9 @@ export function Doctors() {
                   <input
                     id="doc-qualification"
                     type="text"
-                    value={docQualification}
-                    onChange={(e) => setDocQualification(e.target.value)}
-                    className="w-full px-3 py-2 border border-neutral-300 rounded min-h-[44px] text-neutral-900 focus-visible:outline-2 focus-visible:outline-red-800"
+                    value={docForm.qualification}
+                    onChange={(e) => setDocField('qualification', e.target.value)}
+                    className={INPUT_CLASS}
                   />
                 </div>
 
@@ -396,9 +651,9 @@ export function Doctors() {
                   <input
                     id="doc-reg-no"
                     type="text"
-                    value={docRegNo}
-                    onChange={(e) => setDocRegNo(e.target.value)}
-                    className="w-full px-3 py-2 border border-neutral-300 rounded min-h-[44px] text-neutral-900 focus-visible:outline-2 focus-visible:outline-red-800"
+                    value={docForm.registration_number}
+                    onChange={(e) => setDocField('registration_number', e.target.value)}
+                    className={INPUT_CLASS}
                   />
                 </div>
 
@@ -409,23 +664,24 @@ export function Doctors() {
                   <input
                     id="doc-default-fee"
                     type="number"
+                    inputMode="decimal"
                     required
                     min={0}
-                    step={10}
-                    value={docDefaultFeeRupees}
-                    onChange={(e) => setDocDefaultFeeRupees(Number(e.target.value))}
-                    className="w-full px-3 py-2 border border-neutral-300 rounded min-h-[44px] text-neutral-900 focus-visible:outline-2 focus-visible:outline-red-800"
+                    step="0.01"
+                    value={docForm.fee_rupees}
+                    onChange={(e) => setDocField('fee_rupees', e.target.value)}
+                    className={INPUT_CLASS}
                   />
                 </div>
 
                 {editingDoctor && (
-                  <div className="flex items-center gap-2 pt-2">
+                  <div className="flex min-h-11 items-center gap-2">
                     <input
                       id="doc-active"
                       type="checkbox"
-                      checked={docIsActive}
-                      onChange={(e) => setDocIsActive(e.target.checked)}
-                      className="w-4 h-4 text-red-900 rounded border-neutral-300 focus:ring-red-800"
+                      checked={docForm.is_active}
+                      onChange={(e) => setDocField('is_active', e.target.checked)}
+                      className="h-5 w-5 rounded border-neutral-400 accent-[#8E1C3D]"
                     />
                     <label htmlFor="doc-active" className="text-sm font-medium text-neutral-800">
                       Active doctor profile
@@ -434,33 +690,37 @@ export function Doctors() {
                 )}
 
                 <div className="flex justify-end gap-3 pt-4 border-t border-neutral-200">
-                  <button
-                    type="button"
-                    onClick={() => setDoctorModalOpen(false)}
-                    className="px-4 py-2 text-sm font-medium text-neutral-700 bg-neutral-100 hover:bg-neutral-200 rounded min-h-[44px] min-w-[44px] focus-visible:outline-2 focus-visible:outline-neutral-800 cursor-pointer"
-                  >
+                  <button type="button" onClick={requestCloseDoctorModal} disabled={docSaving} className={SECONDARY_BUTTON}>
                     Cancel
                   </button>
-                  <button
-                    type="submit"
-                    disabled={createDoctorMutation.isPending || updateDoctorMutation.isPending}
-                    className="px-4 py-2 text-sm font-medium text-white bg-red-900 hover:bg-red-800 rounded min-h-[44px] min-w-[44px] focus-visible:outline-2 focus-visible:outline-red-800 disabled:opacity-50 cursor-pointer"
-                  >
-                    {createDoctorMutation.isPending || updateDoctorMutation.isPending ? 'Saving...' : 'Save Doctor'}
+                  <button type="submit" disabled={docSaving} className={PRIMARY_BUTTON}>
+                    {docSaving ? 'Saving...' : 'Save Doctor'}
                   </button>
                 </div>
               </form>
-        </Modal>
+            </div>
+          </Modal>
         )}
 
         {/* Fee Modal */}
         {feeModalOpen && (
-          <Modal open title={editingFee ? 'Edit Fee Rate' : 'Add Fee Rate'} onClose={() => setFeeModalOpen(false)} busy={createFeeMutation.isPending || updateFeeMutation.isPending} className="max-w-md">
+          <Modal
+            open
+            title={editingFee ? 'Edit Fee Rate' : 'Add Fee Rate'}
+            onClose={requestCloseFeeModal}
+            dismiss={feeDirty ? 'none' : 'closerequest'}
+            busy={feeSaving}
+            className="max-w-md"
+          >
+            <div className="space-y-4">
+              {feeConflict && <ConflictBanner onReload={handleReloadFee} isReloading={feeReloading} />}
 
-              {feeError && (
-                <div role="alert" className="p-3 bg-red-50 border border-red-200 rounded text-sm text-red-900">
-                  {feeError}
-                </div>
+              {feeErrors.length > 0 && (
+                <InlineAlert tone="error">
+                  {feeErrors.map((m, i) => (
+                    <p key={i}>{m}</p>
+                  ))}
+                </InlineAlert>
               )}
 
               <form onSubmit={handleFeeSubmit} className="space-y-4">
@@ -473,9 +733,10 @@ export function Doctors() {
                     data-autofocus
                     type="text"
                     required
-                    value={feeName}
-                    onChange={(e) => setFeeName(e.target.value)}
-                    className="w-full px-3 py-2 border border-neutral-300 rounded min-h-[44px] text-neutral-900 focus-visible:outline-2 focus-visible:outline-red-800"
+                    maxLength={120}
+                    value={feeForm.name}
+                    onChange={(e) => setFeeField('name', e.target.value)}
+                    className={INPUT_CLASS}
                   />
                 </div>
 
@@ -486,23 +747,24 @@ export function Doctors() {
                   <input
                     id="fee-amount"
                     type="number"
+                    inputMode="decimal"
                     required
                     min={0}
-                    step={10}
-                    value={feeRupees}
-                    onChange={(e) => setFeeRupees(Number(e.target.value))}
-                    className="w-full px-3 py-2 border border-neutral-300 rounded min-h-[44px] text-neutral-900 focus-visible:outline-2 focus-visible:outline-red-800"
+                    step="0.01"
+                    value={feeForm.fee_rupees}
+                    onChange={(e) => setFeeField('fee_rupees', e.target.value)}
+                    className={INPUT_CLASS}
                   />
                 </div>
 
                 {editingFee && (
-                  <div className="flex items-center gap-2 pt-2">
+                  <div className="flex min-h-11 items-center gap-2">
                     <input
                       id="fee-active"
                       type="checkbox"
-                      checked={feeIsActive}
-                      onChange={(e) => setFeeIsActive(e.target.checked)}
-                      className="w-4 h-4 text-red-900 rounded border-neutral-300 focus:ring-red-800"
+                      checked={feeForm.is_active}
+                      onChange={(e) => setFeeField('is_active', e.target.checked)}
+                      className="h-5 w-5 rounded border-neutral-400 accent-[#8E1C3D]"
                     />
                     <label htmlFor="fee-active" className="text-sm font-medium text-neutral-800">
                       Active rate
@@ -511,24 +773,44 @@ export function Doctors() {
                 )}
 
                 <div className="flex justify-end gap-3 pt-4 border-t border-neutral-200">
-                  <button
-                    type="button"
-                    onClick={() => setFeeModalOpen(false)}
-                    className="px-4 py-2 text-sm font-medium text-neutral-700 bg-neutral-100 hover:bg-neutral-200 rounded min-h-[44px] min-w-[44px] focus-visible:outline-2 focus-visible:outline-neutral-800 cursor-pointer"
-                  >
+                  <button type="button" onClick={requestCloseFeeModal} disabled={feeSaving} className={SECONDARY_BUTTON}>
                     Cancel
                   </button>
-                  <button
-                    type="submit"
-                    disabled={createFeeMutation.isPending || updateFeeMutation.isPending}
-                    className="px-4 py-2 text-sm font-medium text-white bg-red-900 hover:bg-red-800 rounded min-h-[44px] min-w-[44px] focus-visible:outline-2 focus-visible:outline-red-800 disabled:opacity-50 cursor-pointer"
-                  >
-                    {createFeeMutation.isPending || updateFeeMutation.isPending ? 'Saving...' : 'Save Rate'}
+                  <button type="submit" disabled={feeSaving} className={PRIMARY_BUTTON}>
+                    {feeSaving ? 'Saving...' : 'Save Rate'}
                   </button>
                 </div>
               </form>
-        </Modal>
+            </div>
+          </Modal>
         )}
+
+        <Modal
+          open={discardTarget !== null}
+          onClose={() => setDiscardTarget(null)}
+          variant="warning"
+          dismiss="none"
+          title="Discard unsaved changes?"
+          description={
+            discardTarget === 'fee'
+              ? 'The changes to this fee rate have not been saved and will be lost.'
+              : 'The changes to this doctor profile have not been saved and will be lost.'
+          }
+          className="max-w-md"
+        >
+          <div className="flex justify-end gap-3 pt-2">
+            <button type="button" data-autofocus onClick={() => setDiscardTarget(null)} className={SECONDARY_BUTTON}>
+              Keep editing
+            </button>
+            <button
+              type="button"
+              onClick={confirmDiscard}
+              className="px-4 py-2 text-sm font-semibold text-white bg-red-800 hover:bg-red-900 rounded min-h-11 min-w-11 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-800 cursor-pointer"
+            >
+              Discard changes
+            </button>
+          </div>
+        </Modal>
       </div>
     </AppShell>
   )

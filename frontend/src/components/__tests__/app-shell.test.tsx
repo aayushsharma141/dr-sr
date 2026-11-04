@@ -35,8 +35,8 @@ describe('AppShell clinical navigation hierarchy', () => {
 
     expect(screen.queryByRole('link', { name: 'Physiotherapy Treatment' })).not.toBeInTheDocument()
     expect(screen.queryByRole('link', { name: 'Follow-up & Visits' })).not.toBeInTheDocument()
-    expect(screen.queryByRole('link', { name: 'Reports' })).not.toBeInTheDocument()
-    expect(screen.queryByRole('link', { name: 'Users & Permissions' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'Audit & Compliance' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'User & Authority' })).not.toBeInTheDocument()
   })
 
   it('shows doctor clinical workflows and activates the follow-up deep link', () => {
@@ -47,24 +47,102 @@ describe('AppShell clinical navigation hierarchy', () => {
     expect(screen.getByRole('link', { name: 'Follow-up & Visits' })).toHaveAttribute('aria-current', 'page')
     expect(screen.queryByRole('link', { name: 'Patient Registration' })).not.toBeInTheDocument()
     expect(screen.queryByRole('link', { name: 'Billing & Payments' })).not.toBeInTheDocument()
-    expect(screen.queryByRole('link', { name: 'Users & Permissions' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'User & Authority' })).not.toBeInTheDocument()
   })
 
-  it('shows all six administration sub-navigation destinations for ADMIN', () => {
+  it('shows the grouped administration sub-navigation from the module registry for ADMIN', () => {
     renderShell('ADMIN', '/admin/backups')
 
     const adminNavigation = screen.getByRole('navigation', { name: 'Administration sections' })
-    expect(within(adminNavigation).getByRole('link', { name: 'Doctors & Fees' })).toHaveAttribute('href', '/admin/doctors')
-    expect(within(adminNavigation).getByRole('link', { name: 'Users & Roles' })).toHaveAttribute('href', '/admin/users')
-    expect(within(adminNavigation).getByRole('link', { name: 'Audit Logs' })).toHaveAttribute('href', '/admin/audit')
-    expect(within(adminNavigation).getByRole('link', { name: 'Backup & Restore' })).toHaveAttribute('aria-current', 'page')
-    expect(within(adminNavigation).getByRole('link', { name: 'System Integrity' })).toHaveAttribute('href', '/admin/integrity')
-    expect(within(adminNavigation).getByRole('link', { name: 'Clinic Settings' })).toHaveAttribute('href', '/admin/settings')
+    const hospital = within(adminNavigation).getByRole('region', { name: 'Hospital Administration' })
+    const system = within(adminNavigation).getByRole('region', { name: 'System Administration' })
 
-    expect(screen.getByRole('link', { name: 'Reports' })).toHaveAttribute('href', '/admin/integrity')
-    expect(screen.getByRole('link', { name: 'Master Data' })).toHaveAttribute('href', '/admin/doctors')
+    // Hospital Administration: 01, 03, 04, 06 (three links), 08. 05 and 07 are fixed: not shown.
+    expect(within(hospital).getByRole('link', { name: 'Administration Dashboard' })).toHaveAttribute('href', '/admin')
+    expect(within(hospital).getByRole('link', { name: 'Hospital Configuration' })).toHaveAttribute('href', '/admin/settings')
+    expect(within(hospital).getByRole('link', { name: 'Doctor & Clinical Configuration' })).toHaveAttribute('href', '/admin/doctors')
+    expect(within(hospital).getByRole('link', { name: 'Consultation fees' })).toHaveAttribute('href', '/admin/doctors')
+    expect(within(hospital).getByRole('link', { name: 'Receipt numbering cycle' })).toHaveAttribute('href', '/admin/settings')
+    expect(within(hospital).getByRole('link', { name: 'Pending dues' })).toHaveAttribute('href', '/reception/dues')
+    expect(within(hospital).getByRole('link', { name: 'Prescription & Print' })).toHaveAttribute('href', '/admin/settings')
+    expect(within(adminNavigation).queryByText('Appointment & Workflow Settings')).not.toBeInTheDocument()
+    expect(within(adminNavigation).queryByText('Physiotherapy Configuration')).not.toBeInTheDocument()
+
+    // System Administration: 02 (two links), 09, 10, 11 (two links), 12.
+    expect(within(system).getByRole('link', { name: 'User accounts' })).toHaveAttribute('href', '/admin/users')
+    expect(within(system).getByRole('link', { name: 'Roles & permissions' })).toHaveAttribute('href', '/admin/roles')
+    expect(within(system).getByRole('link', { name: 'Security & Access' })).toHaveAttribute('href', '/admin/security')
+    expect(within(system).getByRole('link', { name: 'Audit & Compliance' })).toHaveAttribute('href', '/admin/audit')
+    expect(within(system).getByRole('link', { name: 'Backup & restore' })).toHaveAttribute('aria-current', 'page')
+    expect(within(system).getByRole('link', { name: 'Data integrity' })).toHaveAttribute('href', '/admin/integrity')
+    expect(within(system).getByRole('link', { name: 'System Health & Maintenance' })).toHaveAttribute('href', '/admin/system')
+
+    // Exactly one sub-navigation entry is current.
+    expect(
+      within(adminNavigation).getAllByRole('link').filter((l) => l.getAttribute('aria-current') === 'page'),
+    ).toHaveLength(1)
+
     expect(screen.queryByRole('link', { name: 'Patient Registration' })).not.toBeInTheDocument()
     expect(screen.queryByRole('link', { name: 'Physiotherapy Treatment' })).not.toBeInTheDocument()
+  })
+
+  it('marks only the owning module current for a page shared by several modules', () => {
+    renderShell('ADMIN', '/admin/settings')
+
+    const adminNavigation = screen.getByRole('navigation', { name: 'Administration sections' })
+    const current = within(adminNavigation)
+      .getAllByRole('link')
+      .filter((l) => l.getAttribute('aria-current') === 'page')
+    expect(current).toHaveLength(1)
+    expect(current[0]).toHaveAccessibleName('Hospital Configuration')
+    expect(within(adminNavigation).getByRole('link', { name: 'Receipt numbering cycle' })).not.toHaveAttribute('aria-current')
+    expect(within(adminNavigation).getByRole('link', { name: 'Prescription & Print' })).not.toHaveAttribute('aria-current')
+  })
+
+  it('drives the ADMIN sidebar entries and breadcrumbs from the module registry', () => {
+    renderShell('ADMIN', '/admin/roles')
+
+    const primary = screen.getAllByRole('navigation', { name: 'Primary navigation' })[0]
+    expect(within(primary).getByRole('link', { name: 'User & Authority' })).toHaveAttribute('href', '/admin/users')
+    // Module 02 owns both /admin/users and /admin/roles.
+    expect(within(primary).getByRole('link', { name: 'User & Authority' })).toHaveAttribute('aria-current', 'page')
+    expect(within(primary).getByRole('link', { name: 'Hospital Configuration' })).toHaveAttribute('href', '/admin/settings')
+    expect(within(primary).getByRole('link', { name: 'Doctor & Clinical Configuration' })).toHaveAttribute('href', '/admin/doctors')
+    expect(within(primary).getByRole('link', { name: 'Security & Access' })).toHaveAttribute('href', '/admin/security')
+    expect(within(primary).getByRole('link', { name: 'Audit & Compliance' })).toHaveAttribute('href', '/admin/audit')
+    expect(within(primary).getByRole('link', { name: 'Backup, Restore & Data' })).toHaveAttribute('href', '/admin/backups')
+    expect(within(primary).getByRole('link', { name: 'System Health & Maintenance' })).toHaveAttribute('href', '/admin/system')
+    expect(within(primary).queryByRole('link', { name: 'Users & Permissions' })).not.toBeInTheDocument()
+    expect(within(primary).queryByRole('link', { name: 'Reports' })).not.toBeInTheDocument()
+    expect(within(primary).queryByRole('link', { name: 'Master Data' })).not.toBeInTheDocument()
+
+    const breadcrumbs = screen.getByRole('navigation', { name: 'Breadcrumbs' })
+    expect(within(breadcrumbs).getByRole('link', { name: 'Administration Dashboard' })).toHaveAttribute('href', '/admin')
+    expect(within(breadcrumbs).getByRole('link', { name: 'User & Authority' })).toHaveAttribute('href', '/admin/users')
+    expect(within(breadcrumbs).getByText('Roles & permissions')).toHaveAttribute('aria-current', 'location')
+  })
+
+  it('shows the administration sub-navigation on the admin dashboard and never for other roles', () => {
+    renderShell('ADMIN', '/admin')
+    const adminNavigation = screen.getByRole('navigation', { name: 'Administration sections' })
+    expect(within(adminNavigation).getByRole('link', { name: 'Administration Dashboard' })).toHaveAttribute('aria-current', 'page')
+    cleanup()
+
+    renderShell('RECEPTION', '/reception/dues')
+    expect(screen.queryByRole('navigation', { name: 'Administration sections' })).not.toBeInTheDocument()
+  })
+
+  it('collapses the administration sub-navigation behind a toggle on narrow widths', async () => {
+    const user = userEvent.setup()
+    renderShell('ADMIN', '/admin/audit')
+
+    const toggle = screen.getByRole('button', { name: 'All modules' })
+    expect(toggle).toHaveAttribute('aria-expanded', 'false')
+    expect(screen.getByRole('navigation', { name: 'Administration sections' })).toHaveClass('hidden', 'lg:block')
+
+    await user.click(toggle)
+    expect(screen.getByRole('button', { name: 'Hide modules' })).toHaveAttribute('aria-expanded', 'true')
+    expect(screen.getByRole('navigation', { name: 'Administration sections' })).toHaveClass('block')
   })
 
   it('opens a keyboard-accessible mobile navigation drawer', async () => {

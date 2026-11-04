@@ -12,8 +12,9 @@ from sqlalchemy.orm import Session
 
 from kalyan_api.config import Settings
 from kalyan_api.core.errors import ApiError
-from kalyan_api.models import AuditLog, Doctor, User
-from kalyan_api.services.audit_service import AuditContext
+from kalyan_api.models import AuditLog, AuthSession, Doctor, User
+from kalyan_api.services import audit_service
+from kalyan_api.services.audit_service import AuditAction, AuditContext
 from kalyan_api.services.user_service import deactivate_user
 from tests.conftest import TEST_PASSWORD, make_user
 from tests.test_route_policies import walk_routes
@@ -667,3 +668,251 @@ def test_admin_unlock_lifecycle(
     )
     assert clean_unlock.status_code == 409
     assert clean_unlock.json()["code"] == "state_unchanged"
+
+
+def test_user_out_exposes_lock_and_credential_change_times(
+    login_client: Any,
+    admin_user: User,
+    db_session: Session,
+    test_settings: Settings,
+    clock: dict[str, Any],
+) -> None:
+    """UserOut carries locked_until (only while locked) and password_changed_at."""
+    admin_c = login_client(admin_user)
+    target = make_user(db_session, test_settings, "RECEPTION", "out_fields_target")
+
+    fresh = admin_c.get(f"/api/users/{target.id}").json()
+    assert fresh["locked_until"] is None
+    assert fresh["password_changed_at"] is None
+    assert "password_hash" not in fresh
+
+    lock_until = clock["t"] + timedelta(minutes=15)
+    target.failed_login_count = 5
+    target.locked_until = lock_until
+    db_session.flush()
+    locked = admin_c.get(f"/api/users/{target.id}").json()
+    assert locked["is_locked"] is True
+    assert locked["locked_until"] is not None
+    assert locked["locked_until"].startswith(lock_until.strftime("%Y-%m-%dT%H:%M"))
+
+    # An expired lock is reported as not locked with no locked_until
+    clock["t"] += timedelta(minutes=16)
+    expired = admin_c.get(f"/api/users/{target.id}").json()
+    assert expired["is_locked"] is False
+    assert expired["locked_until"] is None
+
+    # password_changed_at is set after the user changes their password
+    target.failed_login_count = 0
+    target.locked_until = None
+    db_session.flush()
+    user_c = login_client(target)
+    change = user_c.post(
+        "/api/auth/change-password",
+        json={"current_password": TEST_PASSWORD, "new_password": "BrandNewSecret#2026"},
+    )
+    assert change.status_code == 200
+    changed = login_client(admin_user).get(f"/api/users/{target.id}").json()
+    assert changed["password_changed_at"] is not None
+
+    listed = login_client(admin_user).get("/api/users").json()
+    assert all("password_changed_at" in u and "locked_until" in u for u in listed)
+
+
+def test_lifecycle_actions_store_optional_reason_in_audit(
+    login_client: Any,
+    admin_user: User,
+    db_session: Session,
+    test_settings: Settings,
+) -> None:
+    """deactivate, reactivate, reset-password and unlock accept an optional audited reason."""
+    admin_c = login_client(admin_user)
+    target = make_user(db_session, test_settings, "RECEPTION", "reason_target")
+
+    def _latest(action: str) -> AuditLog:
+        row = db_session.scalar(
+            select(AuditLog)
+            .where(AuditLog.action == action, AuditLog.entity_id == str(target.id))
+            .order_by(AuditLog.id.desc())
+        )
+        assert row is not None
+        return row
+
+    too_long = admin_c.post(
+        f"/api/users/{target.id}/deactivate",
+        json={"version_id": target.version_id, "reason": "x" * 501},
+    )
+    assert too_long.status_code == 422
+
+    res = admin_c.post(
+        f"/api/users/{target.id}/deactivate",
+        json={"version_id": target.version_id, "reason": "Resigned"},
+    )
+    assert res.status_code == 200
+    assert _latest("USER_DEACTIVATED").reason == "Resigned"
+
+    res = admin_c.post(
+        f"/api/users/{target.id}/reactivate",
+        json={"version_id": res.json()["version_id"], "reason": "Rejoined"},
+    )
+    assert res.status_code == 200
+    assert _latest("USER_REACTIVATED").reason == "Rejoined"
+
+    res = admin_c.post(
+        f"/api/users/{target.id}/reset-password",
+        json={"version_id": res.json()["version_id"], "reason": "Forgot password"},
+    )
+    assert res.status_code == 200
+    reset_row = _latest("USER_PASSWORD_RESET")
+    assert reset_row.reason == "Forgot password"
+    assert reset_row.before_data == {"must_change_password": False}
+    assert reset_row.after_data == {"must_change_password": True}
+
+    db_session.refresh(target)
+    target.failed_login_count = 5
+    db_session.flush()
+    db_session.refresh(target)
+    res = admin_c.post(
+        f"/api/users/{target.id}/unlock",
+        json={"version_id": target.version_id, "reason": "  Verified by phone  "},
+    )
+    assert res.status_code == 200
+    assert _latest("USER_UNLOCKED").reason == "Verified by phone"
+
+    # Reason remains optional (backward compatible)
+    res = admin_c.post(
+        f"/api/users/{target.id}/deactivate", json={"version_id": res.json()["version_id"]}
+    )
+    assert res.status_code == 200
+    assert _latest("USER_DEACTIVATED").reason is None
+
+
+def test_login_history_lists_security_events_for_user(
+    app: FastAPI,
+    login_client: Any,
+    admin_user: User,
+    db_session: Session,
+    test_settings: Settings,
+) -> None:
+    """History holds the user's auth, unlock, reset and revocation events only, newest first."""
+    admin_c = login_client(admin_user)
+    target = make_user(db_session, test_settings, "RECEPTION", "history_target")
+    other = make_user(db_session, test_settings, "RECEPTION", "history_other")
+    anon_c = TestClient(app, base_url="http://testserver", headers={"Origin": "http://testserver"})
+
+    # Successful login, then admin revokes that session
+    login_client(target)
+    login_client(other)
+    target_sid = db_session.scalar(
+        select(AuthSession.id).where(
+            AuthSession.user_id == target.id, AuthSession.revoked_at.is_(None)
+        )
+    )
+    revoke = admin_c.post(f"/api/sessions/{target_sid}/revoke", json={"reason": "Stale terminal"})
+    assert revoke.status_code == 200
+
+    # Wrong passwords up to the threshold lock the account
+    for _ in range(test_settings.lockout_threshold):
+        anon_c.post(
+            "/api/auth/login", json={"username": target.username, "password": "WrongPass!999x"}
+        )
+    version = admin_c.get(f"/api/users/{target.id}").json()["version_id"]
+    unlock = admin_c.post(
+        f"/api/users/{target.id}/unlock", json={"version_id": version, "reason": "Called desk"}
+    )
+    assert unlock.status_code == 200
+    bulk = admin_c.post(f"/api/users/{target.id}/revoke-sessions", json={"reason": "Precaution"})
+    assert bulk.status_code == 200
+    reset = admin_c.post(
+        f"/api/users/{target.id}/reset-password",
+        json={"version_id": unlock.json()["version_id"]},
+    )
+    assert reset.status_code == 200
+    temp_password = reset.json()["temporary_password"]
+    # A non-security update must not appear in login history
+    rename = admin_c.patch(
+        f"/api/users/{target.id}",
+        json={"version_id": reset.json()["version_id"], "full_name": "History Renamed"},
+    )
+    assert rename.status_code == 200
+
+    res = admin_c.get(f"/api/users/{target.id}/login-history")
+    assert res.status_code == 200
+    entries = res.json()
+    assert temp_password not in res.text
+    actions = [e["action"] for e in entries]
+    assert actions == [
+        "USER_PASSWORD_RESET",
+        "USER_SESSIONS_REVOKED",
+        "USER_UNLOCKED",
+        "AUTH_ACCOUNT_LOCKED",
+        *["AUTH_LOGIN_FAILED"] * test_settings.lockout_threshold,
+        "SESSION_REVOKED",
+        "AUTH_LOGIN_SUCCEEDED",
+    ]
+    assert "USER_UPDATED" not in actions
+    for entry in entries:
+        assert set(entry.keys()) == {
+            "id",
+            "occurred_at",
+            "action",
+            "outcome",
+            "actor_username",
+            "ip_address",
+            "user_agent",
+            "reason",
+            "details",
+        }
+        for key in entry["details"]:
+            assert "password" not in key or key == "must_change_password"
+            assert "token" not in key
+
+    by_action = {e["action"]: e for e in entries}
+    assert by_action["SESSION_REVOKED"]["reason"] == "Stale terminal"
+    assert by_action["SESSION_REVOKED"]["actor_username"] == admin_user.username
+    assert by_action["USER_UNLOCKED"]["reason"] == "Called desk"
+    assert by_action["USER_SESSIONS_REVOKED"]["reason"] == "Precaution"
+    assert by_action["USER_SESSIONS_REVOKED"]["details"]["revoked_count"] == 0
+    assert by_action["AUTH_ACCOUNT_LOCKED"]["details"]["failed_login_count"] == (
+        test_settings.lockout_threshold
+    )
+    assert by_action["AUTH_ACCOUNT_LOCKED"]["outcome"] == "FAILURE"
+    assert by_action["USER_PASSWORD_RESET"]["details"]["must_change_password"] is True
+    assert by_action["AUTH_LOGIN_SUCCEEDED"]["details"]["session_id"] == str(target_sid)
+
+    # Another user's history does not include the target's events
+    other_hist = admin_c.get(f"/api/users/{other.id}/login-history").json()
+    assert [e["action"] for e in other_hist] == ["AUTH_LOGIN_SUCCEEDED"]
+
+
+def test_login_history_limit_authorization_and_404(
+    client: TestClient,
+    login_client: Any,
+    admin_user: User,
+    reception_user: User,
+    doctor_a_user: User,
+    db_session: Session,
+) -> None:
+    """Latest 50 rows only; RECEPTION/DOCTOR 403; anonymous 401; unknown user 404."""
+    ctx = AuditContext.system("test:history")
+    for i in range(55):
+        audit_service.record(
+            db_session,
+            ctx,
+            AuditAction.AUTH_LOGIN_FAILED,
+            "USER",
+            reception_user.id,
+            after={"failed_login_count": i},
+            outcome="FAILURE",
+        )
+    admin_c = login_client(admin_user)
+    res = admin_c.get(f"/api/users/{reception_user.id}/login-history")
+    assert res.status_code == 200
+    entries = res.json()
+    assert len(entries) == 50
+    assert entries[0]["details"]["failed_login_count"] == 54
+
+    assert admin_c.get("/api/users/99999999/login-history").status_code == 404
+    path = f"/api/users/{reception_user.id}/login-history"
+    assert client.get(path).status_code == 401
+    assert login_client(reception_user).get(path).status_code == 403
+    assert login_client(doctor_a_user).get(path).status_code == 403

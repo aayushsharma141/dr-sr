@@ -154,6 +154,7 @@ def test_phase16_complete_gate(
     # 5. Integrity Engine Invariant Audit
     with session_scope(settings) as session:
         report = run_integrity_audit(session=session, settings=settings)
-        assert report.total_checks == 5
+        # 5 ERROR-level checks + the WARNING-level URN gap check (OD-12 undecided)
+        assert report.total_checks == 6
         assert report.is_healthy is True
         assert report.failed_checks == 0

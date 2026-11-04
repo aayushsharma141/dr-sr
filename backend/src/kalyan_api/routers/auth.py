@@ -24,10 +24,14 @@ from kalyan_api.services.audit_service import AuditAction, Outcome
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
-GENERIC_INVALID_CREDENTIALS_MSG = (
-    "Invalid username or password, or the account is temporarily locked. "
-    "Wait 15 minutes or ask an administrator."
-)
+
+def invalid_credentials_message(lockout_minutes: int) -> str:
+    """Generic login failure text (no user enumeration) quoting the configured lockout period."""
+    unit = "minute" if lockout_minutes == 1 else "minutes"
+    return (
+        "Invalid username or password, or the account is temporarily locked. "
+        f"Wait {lockout_minutes} {unit} or ask an administrator."
+    )
 
 
 class LoginRequest(BaseModel):
@@ -186,7 +190,7 @@ def login(
             status_code=401,
             content={
                 "code": "invalid_credentials",
-                "message": GENERIC_INVALID_CREDENTIALS_MSG,
+                "message": invalid_credentials_message(settings.lockout_minutes),
             },
         )
 
@@ -197,7 +201,7 @@ def login(
             status_code=401,
             content={
                 "code": "invalid_credentials",
-                "message": GENERIC_INVALID_CREDENTIALS_MSG,
+                "message": invalid_credentials_message(settings.lockout_minutes),
             },
         )
     user_agent = request.headers.get("User-Agent")

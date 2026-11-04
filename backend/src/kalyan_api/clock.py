@@ -17,8 +17,8 @@ def utcnow() -> datetime:
 
 
 def ist_now() -> datetime:
-    """Return current timezone-aware IST datetime."""
-    return datetime.now(IST)
+    """Return current timezone-aware IST datetime, derived from the single utcnow() seam."""
+    return utcnow().astimezone(IST)
 
 
 def ist_today() -> date:
