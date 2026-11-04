@@ -29,7 +29,7 @@ def test_operations_api_role_restrictions(
     assert rec_c.get("/api/operations/integrity").status_code == 403
     assert rec_c.post("/api/operations/backups", json={}).status_code == 403
     assert (
-        rec_c.post("/api/operations/restore", json={"archive_filename": "foo"}).status_code == 403
+        rec_c.post("/api/operations/restore", json={"archive_filename": "foo", "confirmation_phrase": "RESTORE-DATABASE-OVERWRITE", "justification": "Authorised recovery test"}).status_code == 403
     )
 
     # 3. Doctor -> 403
@@ -82,7 +82,7 @@ def test_operations_admin_lifecycle(
     )
     assert invalid_restore.status_code == 422
 
-    # 4. Restore using the freshly created backup
+    # 5. Restore using the freshly created backup
     restore_res = admin_c.post(
         "/api/operations/restore",
         json={
