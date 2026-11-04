@@ -69,7 +69,7 @@ describe('BackupManagerPage', () => {
 
     expect(screen.getByRole('heading', { name: 'Backup & Recovery' })).toBeInTheDocument()
     expect(screen.getByText('kalyan_backup_20261102_100000.tar.gz')).toBeInTheDocument()
-    expect(screen.getByText('Integrity passed')).toBeInTheDocument()
+    expect(screen.getAllByText('Integrity passed').length).toBeGreaterThanOrEqual(1)
     expect(screen.getByText('1.00 MB')).toBeInTheDocument()
     expect(screen.queryByText(/BAK-01|BAK-02|fail-closed/i)).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Restore System' })).not.toBeInTheDocument()
@@ -96,8 +96,8 @@ describe('BackupManagerPage', () => {
 
   it('requires the confirmation phrase and a reason before restore can proceed', () => {
     renderPage()
-    fireEvent.click(screen.getByText('More actions'))
-    fireEvent.click(screen.getByRole('button', { name: /Restore this archive/ }))
+    fireEvent.click(screen.getAllByText('More actions')[0])
+    fireEvent.click(screen.getAllByRole('button', { name: /Restore this archive/ })[0])
 
     expect(screen.getByRole('dialog')).toBeInTheDocument()
     expect(screen.getByLabelText('Reason for restoration *')).toBeRequired()
