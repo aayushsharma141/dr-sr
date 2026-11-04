@@ -546,43 +546,52 @@ function ModuleCard({ module }: { module: AdminModule }) {
   const isFixed = module.status === 'fixed'
   return (
     <li
-      className={`flex flex-col rounded-lg border p-4 ${
-        isFixed ? 'border-dashed border-slate-300 bg-slate-50' : 'border-slate-200 bg-white shadow-xs'
+      className={`flex flex-col justify-between rounded-lg border p-4 transition-shadow ${
+        isFixed ? 'border-dashed border-slate-300 bg-slate-50' : 'border-slate-200 bg-white shadow-xs hover:shadow-sm'
       }`}
     >
-      <p className="flex items-baseline gap-2">
-        <span className="font-mono text-sm text-slate-600" aria-hidden="true">
-          {module.number}
-        </span>
-        <span className="font-bold text-slate-900">{module.title}</span>
-      </p>
-      <p className="mt-1 text-sm text-slate-700">{module.description}</p>
-      {isFixed ? (
-        <div className="mt-3 rounded border border-amber-300 bg-amber-50 p-2 text-sm text-amber-900">
-          <p className="font-semibold">Awaiting client decision</p>
-          {module.statusReason && <p>{module.statusReason}</p>}
-        </div>
-      ) : (
-        <>
-          {module.status === 'partial' && module.statusReason && (
-            <p className="mt-2 text-sm text-slate-700">
-              <span className="font-semibold">Partial: </span>
-              {module.statusReason}
-            </p>
+      <div>
+        <div className="flex items-center justify-between gap-2">
+          <h4 className="font-bold text-slate-900">{module.title}</h4>
+          {module.status === 'fixed' && (
+            <span className="inline-flex items-center rounded bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-800">
+              Pending Decision
+            </span>
           )}
-          <ul className="mt-3 flex flex-wrap gap-2">
-            {module.links.map((link) => (
-              <li key={link.path}>
-                <Link
-                  to={link.path}
-                  className="inline-flex min-h-11 items-center rounded-lg border border-slate-300 px-3 text-sm font-semibold text-[#8E1C3D] hover:border-[#8E1C3D] hover:bg-[#FFF8E7] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#8E1C3D]"
-                >
-                  {link.label}
-                </Link>
-              </li>
-            ))}
-          </ul>
-        </>
+          {module.status === 'partial' && (
+            <span className="inline-flex items-center rounded bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-700">
+              Partial
+            </span>
+          )}
+        </div>
+        <p className="mt-1.5 text-sm text-slate-600 leading-relaxed">{module.description}</p>
+        {isFixed && (
+          <div className="mt-3 rounded border border-amber-300 bg-amber-50 p-2.5 text-xs text-amber-900">
+            <p className="font-semibold">Awaiting client decision</p>
+            {module.statusReason && <p className="mt-0.5">{module.statusReason}</p>}
+          </div>
+        )}
+        {!isFixed && module.status === 'partial' && module.statusReason && (
+          <div className="mt-3 rounded border border-slate-200 bg-slate-50 p-2.5 text-xs text-slate-700">
+            <span className="font-semibold">Note: </span>
+            {module.statusReason}
+          </div>
+        )}
+      </div>
+
+      {!isFixed && module.actions.length > 0 && (
+        <ul className="mt-4 flex flex-wrap gap-2 pt-2 border-t border-slate-100">
+          {module.actions.map((action) => (
+            <li key={action.path}>
+              <Link
+                to={action.path}
+                className="inline-flex min-h-9 items-center rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-bold text-[#8E1C3D] hover:border-[#8E1C3D] hover:bg-[#FFF8E7] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#8E1C3D] transition-colors"
+              >
+                {action.label}
+              </Link>
+            </li>
+          ))}
+        </ul>
       )}
     </li>
   )
@@ -590,14 +599,21 @@ function ModuleCard({ module }: { module: AdminModule }) {
 
 function ModuleGrid() {
   return (
-    <section aria-labelledby="admin-modules-heading" className="space-y-4">
-      <h3 id="admin-modules-heading" className={SECTION_HEADING}>
-        Administration Modules
-      </h3>
+    <section aria-labelledby="admin-modules-heading" className="space-y-6">
+      <div className="border-b border-slate-200 pb-2">
+        <h3 id="admin-modules-heading" className="text-lg font-bold text-slate-900">
+          Administration Modules
+        </h3>
+        <p className="text-xs text-slate-500 mt-0.5">
+          Core clinic management, security, operations and governance modules
+        </p>
+      </div>
       {ADMIN_MODULE_GROUPS.map((group) => (
-        <div key={group.id}>
-          <h4 className="mb-2 text-sm font-bold uppercase tracking-wide text-[#8E1C3D]">{group.label}</h4>
-          <ul className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+        <div key={group.id} className="space-y-3">
+          <h4 className="text-xs font-bold uppercase tracking-wider text-[#8E1C3D]">
+            {group.label}
+          </h4>
+          <ul className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {adminModulesInGroup(group.id).map((m) => (
               <ModuleCard key={m.id} module={m} />
             ))}
