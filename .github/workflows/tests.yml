@@ -48,6 +48,144 @@ jobs:
       - name: Run automated tests
         run: pytest
 
+  backend:
+    name: backend
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres_ci_password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/requirements.lock.txt
+
+      - name: Initialize PostgreSQL Roles and Database
+        env:
+          PGPASSWORD: postgres_ci_password
+        run: |
+          psql -h 127.0.0.1 -p 5432 -U postgres -v ON_ERROR_STOP=1 <<'SQL'
+          CREATE ROLE kalyan_owner WITH LOGIN PASSWORD 'kalyan_owner_ci_pass';
+          CREATE ROLE kalyan_app WITH LOGIN PASSWORD 'kalyan_app_ci_pass';
+          CREATE DATABASE kalyan_test WITH OWNER kalyan_owner ENCODING 'UTF8';
+          ALTER DATABASE kalyan_test SET timezone TO 'Asia/Kolkata';
+          REVOKE ALL ON DATABASE kalyan_test FROM PUBLIC;
+          GRANT CONNECT ON DATABASE kalyan_test TO kalyan_owner;
+          GRANT CONNECT ON DATABASE kalyan_test TO kalyan_app;
+          GRANT TEMPORARY ON DATABASE kalyan_test TO kalyan_app;
+          SQL
+
+      - name: Install backend dependencies
+        working-directory: backend
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.lock.txt
+          pip install -e ".[dev]"
+
+      - name: Verify migration lifecycle and schema drift
+        working-directory: backend
+        env:
+          KALYAN_ENV: test
+          KALYAN_DB_HOST: 127.0.0.1
+          KALYAN_DB_PORT: 5432
+          KALYAN_DB_NAME: kalyan_test
+          KALYAN_TEST_DB_NAME: kalyan_test
+          KALYAN_DB_OWNER_USER: kalyan_owner
+          KALYAN_DB_OWNER_PASSWORD: kalyan_owner_ci_pass
+          KALYAN_DB_APP_USER: kalyan_app
+          KALYAN_DB_APP_PASSWORD: kalyan_app_ci_pass
+        run: |
+          python - <<'PY'
+          import sys
+          from alembic import command
+          from alembic.script import ScriptDirectory
+          from sqlalchemy import create_engine, text, inspect
+          from kalyan_api.config import get_settings
+          from kalyan_api.db.migrate import alembic_config
+
+          settings = get_settings()
+          cfg = alembic_config(settings.owner_url)
+          script = ScriptDirectory.from_config(cfg)
+          heads = script.get_heads()
+          print(f"Alembic heads: {heads}")
+          assert heads == ["0009"], f"Expected single head ['0009'], got {heads}"
+
+          owner_engine = create_engine(settings.owner_url, isolation_level="AUTOCOMMIT")
+          with owner_engine.connect() as conn:
+              conn.execute(text("DROP SCHEMA IF EXISTS public CASCADE; CREATE SCHEMA public;"))
+
+          print("Step 1: Upgrade to 0009 (head)...")
+          command.upgrade(cfg, "0009")
+
+          with owner_engine.connect() as conn:
+              ver = conn.execute(text("SELECT version_num FROM alembic_version;")).scalar()
+              assert ver == "0009", f"Expected revision 0009, got {ver}"
+              inspector = inspect(conn)
+              tables = set(inspector.get_table_names())
+              assert "departments" in tables
+              assert "doctor_departments" in tables
+              appt_cols = {c["name"] for c in inspector.get_columns("appointments")}
+              assert "department_id" in appt_cols
+          print("Upgrade to 0009 verified.")
+
+          print("Step 2: Downgrade to 0008...")
+          command.downgrade(cfg, "0008")
+
+          with owner_engine.connect() as conn:
+              ver = conn.execute(text("SELECT version_num FROM alembic_version;")).scalar()
+              assert ver == "0008", f"Expected revision 0008, got {ver}"
+              inspector = inspect(conn)
+              tables = set(inspector.get_table_names())
+              assert "departments" in tables
+              assert "doctor_departments" in tables
+              appt_cols = {c["name"] for c in inspector.get_columns("appointments")}
+              assert "department_id" not in appt_cols
+          print("Downgrade to 0008 verified.")
+
+          print("Step 3: Re-upgrade to 0009...")
+          command.upgrade(cfg, "0009")
+
+          with owner_engine.connect() as conn:
+              ver = conn.execute(text("SELECT version_num FROM alembic_version;")).scalar()
+              assert ver == "0009", f"Expected revision 0009, got {ver}"
+              inspector = inspect(conn)
+              appt_cols = {c["name"] for c in inspector.get_columns("appointments")}
+              assert "department_id" in appt_cols
+          print("Re-upgrade to 0009 verified.")
+
+          print("Step 4: Check model/migration drift with alembic check...")
+          command.check(cfg)
+          print("Alembic check passed cleanly: No drift detected.")
+          PY
+
+      - name: Run complete backend pytest suite
+        working-directory: backend
+        env:
+          KALYAN_ENV: test
+          KALYAN_DB_HOST: 127.0.0.1
+          KALYAN_DB_PORT: 5432
+          KALYAN_DB_NAME: kalyan_test
+          KALYAN_TEST_DB_NAME: kalyan_test
+          KALYAN_DB_OWNER_USER: kalyan_owner
+          KALYAN_DB_OWNER_PASSWORD: kalyan_owner_ci_pass
+          KALYAN_DB_APP_USER: kalyan_app
+          KALYAN_DB_APP_PASSWORD: kalyan_app_ci_pass
+        run: pytest
 
   frontend:
     name: frontend
