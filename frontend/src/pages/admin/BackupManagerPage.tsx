@@ -1,6 +1,5 @@
 import { useState } from 'react'
-import { Link } from 'react-router'
-import { AppShell } from '../../components/AppShell'
+import { AdminPageLayout } from '../../components/AdminPageLayout'
 import { useBackups, useCreateBackup, useRestoreBackup } from '../../api/queries'
 import type { BackupArchiveInfo } from '../../api/types'
 
@@ -48,31 +47,8 @@ export function BackupManagerPage() {
   }
 
   return (
-    <AppShell name="Admin" role="ADMIN">
+    <AdminPageLayout title="Backup & Recovery" description="Create and inspect backup archives. Restore operations replace active system data and require deliberate confirmation." actions={<button type="button" onClick={() => refetch()} className="inline-flex min-h-11 items-center justify-center rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#8E1C3D]">Refresh Archives</button>}>
       <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <div className="flex items-center gap-2 text-sm text-neutral-500 mb-1">
-              <Link to="/admin" className="hover:underline">
-                Admin
-              </Link>
-              <span>/</span>
-              <span>Backup & Recovery</span>
-            </div>
-            <h1 className="text-2xl font-bold text-neutral-900">Backup & Recovery Manager</h1>
-            <p className="text-sm text-neutral-600 mt-1">
-              Checksummed PostgreSQL dumps + patient photo bundles with fail-closed integrity checks (BAK-01, BAK-02)
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={() => refetch()}
-            className="px-4 py-2 bg-neutral-100 hover:bg-neutral-200 text-neutral-800 text-sm font-medium rounded cursor-pointer"
-          >
-            Refresh Bundles
-          </button>
-        </div>
-
         {/* Status notification */}
         {restoreStatus && (
           <div className="p-4 bg-amber-50 border border-amber-300 rounded-lg text-sm text-amber-900 flex justify-between items-center">
@@ -260,6 +236,6 @@ export function BackupManagerPage() {
           </div>
         )}
       </div>
-    </AppShell>
+    </AdminPageLayout>
   )
 }
