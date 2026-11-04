@@ -13,3 +13,4 @@ node_modules/
 coverage/
 backend/var/
 var/
+graphify-out/
