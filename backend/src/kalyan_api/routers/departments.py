@@ -49,6 +49,14 @@ def list_department_doctors(department_id: int, session: SessionDep) -> list[dic
     doctors = session.scalars(select(Doctor).join(Doctor.departments).where(Department.id == department_id, Department.is_active.is_(True), Doctor.is_active.is_(True)).order_by(Doctor.name_en)).all()
     return [{"id": d.id, "name_en": d.name_en, "name_hi": d.name_hi, "qualification": d.qualification, "default_fee_paise": d.default_fee_paise} for d in doctors]
 
+@router.get("/doctors/{doctor_id}/departments", response_model=list[DepartmentOut], dependencies=[Depends(require(Permission.DOCTOR_READ))])
+def list_doctor_departments(doctor_id: int, session: SessionDep) -> list[DepartmentOut]:
+    doctor = session.get(Doctor, doctor_id)
+    if doctor is None:
+        raise ApiError(status_code=404, code="doctor_not_found", message="Doctor not found.")
+    return [DepartmentOut.model_validate(row) for row in sorted(doctor.departments, key=lambda item: item.name_en)]
+
+
 @router.put("/doctors/{doctor_id}/departments", response_model=list[DepartmentOut], dependencies=[Depends(require(Permission.DOCTOR_MANAGE))])
 def assign_doctor_departments(doctor_id: int, payload: DoctorDepartmentAssignment, request: Request, session: SessionDep, principal: Principal = Depends(current_principal)) -> list[DepartmentOut]:
     doctor = session.scalar(select(Doctor).where(Doctor.id == doctor_id).with_for_update())
