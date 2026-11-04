@@ -407,6 +407,14 @@ export function useDepartmentDoctors(departmentId: number | null) {
   })
 }
 
+export function useDoctorDepartments(doctorId: number | null) {
+  return useQuery({
+    queryKey: ['doctors', doctorId, 'departments'],
+    queryFn: () => apiFetch<DepartmentOut[]>(`/doctors/${doctorId}/departments`),
+    enabled: doctorId !== null,
+  })
+}
+
 export function useAssignDoctorDepartments() {
   const qc = useQueryClient()
   return useMutation({
