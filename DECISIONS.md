@@ -33,6 +33,9 @@
 ### ADR-22 — Legacy desktop is reference, not v3 runtime
 **Status:** Proposed. Preserve PySide6/SQLite code; reuse only reviewed business rules, assets, print layouts and tests. Migration only if real data exists and client approves.
 
+### ADR-23 — Reception coverage, doctor queues and payment ownership
+**Status:** User-confirmed product decision (2026-11-04). Reception handles intake and OPD routing for all configured hospital departments and specialties. Each doctor maintains an independent daily appointment/queue/token sequence. Reception is the sole payment-collection role: RECEPTION may create/post payments; ADMIN may read and perform authorized reversals but must not post collections; DOCTOR has no payment-write permission. This does not include full IPD, pharmacy, laboratory or specialty-specific clinical modules. Department/specialty membership must be represented explicitly in clinic configuration and enforced when assigning a doctor.
+
 ## Open decisions — do not silently assume
 
 | ID | Decision | Recommendation | Status |
