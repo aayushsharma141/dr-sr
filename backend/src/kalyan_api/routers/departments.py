@@ -35,7 +35,6 @@ def update_department(department_id: int, payload: DepartmentUpdate, request: Re
     require_version(row, payload.version_id, "department")
     before = {"name_en": row.name_en, "name_hi": row.name_hi, "description": row.description, "is_active": row.is_active}
     row.name_en, row.name_hi, row.description, row.is_active = payload.name_en.strip(), payload.name_hi, payload.description, payload.is_active
-    row.version_id += 1
     session.flush()
     after = {"name_en": row.name_en, "name_hi": row.name_hi, "description": row.description, "is_active": row.is_active}
     audit_service.record(session, build_audit_context(request, principal), action=AuditAction.DEPARTMENT_UPDATED, entity_type="DEPARTMENT", entity_id=row.id, before=before, after=after)
@@ -71,7 +70,6 @@ def assign_doctor_departments(doctor_id: int, payload: DoctorDepartmentAssignmen
         raise ApiError(status_code=422, code="invalid_department", message="All assigned departments must exist and be active.")
     before_ids = sorted(d.id for d in doctor.departments)
     doctor.departments = departments
-    doctor.version_id += 1
     session.flush()
     audit_service.record(session, build_audit_context(request, principal), action=AuditAction.DOCTOR_DEPARTMENTS_UPDATED, entity_type="DOCTOR", entity_id=doctor.id, before={"department_ids": before_ids}, after={"department_ids": ids})
     return [DepartmentOut.model_validate(d) for d in departments]
