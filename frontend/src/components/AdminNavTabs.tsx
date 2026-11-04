@@ -2,6 +2,7 @@ import { Link, useLocation } from 'react-router'
 
 const ADMIN_TABS = [
   { label: 'Doctors & Fees', path: '/admin/doctors', shortLabel: 'Doctors' },
+  { label: 'Departments', path: '/admin/departments', shortLabel: 'Departments' },
   { label: 'Users & Roles', path: '/admin/users', shortLabel: 'Users' },
   { label: 'Audit Logs', path: '/admin/audit', shortLabel: 'Audit' },
   { label: 'Backup & Restore', path: '/admin/backups', shortLabel: 'Backups' },
