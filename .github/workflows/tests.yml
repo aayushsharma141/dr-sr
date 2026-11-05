@@ -49,6 +49,77 @@ jobs:
         run: pytest
 
 
+  backend:
+    name: backend
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        # bootstrap.sql uses LOCALE_PROVIDER builtin, which needs PostgreSQL 17 or newer.
+        image: postgres:18
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    env:
+      # Throwaway credentials for the service container above.
+      KALYAN_DB_HOST: 127.0.0.1
+      KALYAN_DB_PORT: "5432"
+      KALYAN_DB_NAME: kalyan_test
+      KALYAN_DB_OWNER_USER: kalyan_owner
+      KALYAN_DB_OWNER_PASSWORD: ciownerpassword
+      KALYAN_DB_APP_USER: kalyan_app
+      KALYAN_DB_APP_PASSWORD: ciapppassword
+      KALYAN_EXTRA_ALLOWED_ORIGINS: http://localhost:5173
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/requirements.lock.txt
+      - name: Install PostgreSQL 18 client tools
+        # pg_dump refuses a server newer than itself, and the runner's own version is older.
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes postgresql-common
+          sudo /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y
+          sudo apt-get install --yes postgresql-client-18
+          echo "/usr/lib/postgresql/18/bin" >> "$GITHUB_PATH"
+      - name: Create database roles and databases
+        env:
+          PGPASSWORD: postgres
+        # bootstrap.sql prompts for passwords, so those lines are replaced with ALTER ROLE.
+        run: |
+          sed -e '/^\\echo/d' -e '/^\\password/d' backend/db/bootstrap.sql \
+            | psql -h 127.0.0.1 -U postgres -v ON_ERROR_STOP=1
+          psql -h 127.0.0.1 -U postgres -v ON_ERROR_STOP=1 \
+            -c "ALTER ROLE kalyan_owner PASSWORD '$KALYAN_DB_OWNER_PASSWORD'" \
+            -c "ALTER ROLE kalyan_app PASSWORD '$KALYAN_DB_APP_PASSWORD'"
+      - name: Install backend dependencies
+        working-directory: backend
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.lock.txt
+          pip install --no-deps -e .
+      - name: Run Ruff
+        working-directory: backend
+        run: ruff check .
+      - name: Run backend tests
+        working-directory: backend
+        env:
+          KALYAN_PHOTOS_DIR: ${{ runner.temp }}/kalyan/photos
+          KALYAN_BACKUP_DIR: ${{ runner.temp }}/kalyan/backups
+        run: pytest
+
+
   frontend:
     name: frontend
     runs-on: ubuntu-latest
