@@ -1836,6 +1836,7 @@
               "type": "integer"
             },
             "maxItems": 30,
+            "minItems": 1,
             "title": "Department Ids",
             "type": "array"
           },

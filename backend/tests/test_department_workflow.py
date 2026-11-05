@@ -160,3 +160,22 @@ def test_booking_waits_for_an_in_flight_department_deactivation(app_engine: Engi
         with Session(app_engine) as cleanup:
             cleanup.execute(delete(Department).where(Department.id == department_id))
             cleanup.commit()
+
+
+def test_doctor_must_keep_at_least_one_department(
+    login_client: Any, admin_user: User, db_session: Session
+) -> None:
+    """Clearing every specialty would leave the doctor unbookable, so the save is refused."""
+    doctor, first, _second = _membership_fixture(db_session)
+    doctor.departments = [first]
+    db_session.flush()
+    admin = login_client(admin_user)
+
+    cleared = admin.put(
+        f"/api/doctors/{doctor.id}/departments",
+        json={"department_ids": [], "version_id": doctor.version_id},
+    )
+    assert cleared.status_code == 422, cleared.text
+
+    db_session.refresh(doctor)
+    assert [d.id for d in doctor.departments] == [first.id]
