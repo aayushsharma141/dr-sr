@@ -1,6 +1,6 @@
 """Functional tests for appointment booking REST API endpoints (APT-01)."""
 
-from kalyan_api.models import Patient
+from kalyan_api.models import Department, Patient
 
 
 def test_book_appointment_lifecycle(login_client, reception_user, doctor_a_user, db_session):
@@ -20,6 +20,8 @@ def test_book_appointment_lifecycle(login_client, reception_user, doctor_a_user,
 
     doctor_id = doctor_a_user.doctor_id
     assert doctor_id is not None
+    assert len(doctor_a_user.doctor.departments) > 0
+    dept = doctor_a_user.doctor.departments[0]
 
     # 2. Log in as reception
     client = login_client(reception_user)
@@ -30,6 +32,7 @@ def test_book_appointment_lifecycle(login_client, reception_user, doctor_a_user,
         json={
             "patient_id": patient.id,
             "doctor_id": doctor_id,
+            "department_id": dept.id,
             "appointment_date": "2026-11-05",
             "notes": "First checkup",
         },
@@ -40,6 +43,7 @@ def test_book_appointment_lifecycle(login_client, reception_user, doctor_a_user,
     assert data1["status"] == "BOOKED"
     assert data1["patient_urn"] == "KH-2026-8801"
     assert data1["doctor_id"] == doctor_id
+    assert data1["department_id"] == dept.id
     appt1_id = data1["id"]
 
     # 4. Book second appointment for same doctor & day (creates another patient)
@@ -60,6 +64,7 @@ def test_book_appointment_lifecycle(login_client, reception_user, doctor_a_user,
         json={
             "patient_id": patient2.id,
             "doctor_id": doctor_id,
+            "department_id": dept.id,
             "appointment_date": "2026-11-05",
             "notes": "Followup",
         },
@@ -67,6 +72,7 @@ def test_book_appointment_lifecycle(login_client, reception_user, doctor_a_user,
     assert resp2.status_code == 201, resp2.text
     data2 = resp2.json()
     assert data2["token_number"] == 2
+    assert data2["department_id"] == dept.id
 
     # 5. List appointments
     list_resp = client.get("/api/appointments?appointment_date=2026-11-05")
@@ -84,12 +90,19 @@ def test_book_appointment_validations(login_client, reception_user, db_session):
     """Validation gates: nonexistent patient and inactive doctor."""
     client = login_client(reception_user)
 
+    dept = db_session.query(Department).filter_by(name_en="Physiotherapy / General OPD").first()
+    if not dept:
+        dept = Department(name_en="Physiotherapy / General OPD", is_active=True)
+        db_session.add(dept)
+        db_session.flush()
+
     # Nonexistent patient
     resp = client.post(
         "/api/appointments",
         json={
             "patient_id": 999999,
             "doctor_id": 1,
+            "department_id": dept.id,
             "appointment_date": "2026-11-05",
         },
     )
@@ -114,8 +127,56 @@ def test_book_appointment_validations(login_client, reception_user, db_session):
         json={
             "patient_id": patient.id,
             "doctor_id": 999999,
+            "department_id": dept.id,
             "appointment_date": "2026-11-05",
         },
     )
     assert resp2.status_code == 404
     assert resp2.json()["code"] == "doctor_not_found"
+
+
+def test_booking_rejects_inactive_department(
+    login_client, reception_user, doctor_a_user, db_session
+):
+    """Inactive departments remain assigned but cannot receive new bookings."""
+    from kalyan_api.models import Appointment
+
+    patient = Patient(
+        urn="KH-2026-8899",
+        full_name="Inactive Department Patient",
+        guardian_name="Guardian",
+        gender="M",
+        age_years=32,
+        mobile="9876543299",
+        address="Ara",
+    )
+    db_session.add(patient)
+    db_session.flush()
+
+    doctor = doctor_a_user.doctor
+    assert doctor is not None
+    assert doctor.departments
+    department = doctor.departments[0]
+    department.is_active = False
+    db_session.flush()
+
+    # Deactivation must not silently remove the existing doctor membership.
+    assert department in doctor.departments
+
+    client = login_client(reception_user)
+    response = client.post(
+        "/api/appointments",
+        json={
+            "patient_id": patient.id,
+            "doctor_id": doctor.id,
+            "department_id": department.id,
+            "appointment_date": "2026-11-06",
+        },
+    )
+
+    assert response.status_code == 422
+    assert response.json()["code"] == "department_inactive"
+    assert response.json()["message"] == (
+        "Selected department is inactive and cannot accept new appointments."
+    )
+    assert db_session.query(Appointment).filter_by(patient_id=patient.id).count() == 0

@@ -144,10 +144,45 @@ def _patch_patient_payload(target: Any = None) -> dict[str, Any]:
     }
 
 
+def _create_department_payload(target: Any = None) -> dict[str, Any]:
+    return {
+        "name_en": f"New Dept {uuid.uuid4().hex[:6]}",
+        "name_hi": "विभाग",
+        "description": "Matrix created department",
+    }
+
+
+def _patch_department_payload(target: Any = None) -> dict[str, Any]:
+    ver = target.version_id if target and hasattr(target, "version_id") else 1
+    return {
+        "name_en": f"Updated Dept {uuid.uuid4().hex[:6]}",
+        "is_active": True,
+        "version_id": ver,
+    }
+
+
+def _assign_doctor_departments_payload(target: Any = None) -> dict[str, Any]:
+    ver = target.version_id if target and hasattr(target, "version_id") else 1
+    dept_id = (
+        target.departments[0].id
+        if (target and hasattr(target, "departments") and target.departments)
+        else 1
+    )
+    return {
+        "department_ids": [dept_id],
+        "version_id": ver,
+    }
+
+
+def _revoke_session_payload(target: Any = None) -> dict[str, Any]:
+    return {"reason": "Administrative security test revocation"}
+
+
 def _create_appointment_payload(target: Any = None) -> dict[str, Any]:
     return {
         "patient_id": getattr(target, "patient_id", 1),
         "doctor_id": getattr(target, "doctor_id", 1),
+        "department_id": getattr(target, "department_id", 1),
         "appointment_date": "2026-11-01",
         "notes": "Matrix appointment notes",
     }
@@ -301,6 +336,80 @@ def _patch_security_policy_payload(target: Any = None) -> dict[str, Any]:
 
 
 MATRIX: list[MatrixRow] = [
+    # Admin Panel (Module 02, 06, 09, 10, 12)
+    # Departments (All Specialties)
+    MatrixRow(
+        method="GET",
+        path="/api/departments",
+        body_factory=None,
+        expected={
+            "anonymous": 401,
+            "admin": 200,
+            "reception": 200,
+            "doctor_a": 200,
+            "doctor_b": 200,
+        },
+    ),
+    MatrixRow(
+        method="POST",
+        path="/api/departments",
+        body_factory=_create_department_payload,
+        expected={
+            "anonymous": 401,
+            "admin": 201,
+            "reception": 403,
+            "doctor_a": 403,
+            "doctor_b": 403,
+        },
+    ),
+    MatrixRow(
+        method="PATCH",
+        path="/api/departments/{department_id}",
+        body_factory=_patch_department_payload,
+        expected={
+            "anonymous": 401,
+            "admin": 200,
+            "reception": 403,
+            "doctor_a": 403,
+            "doctor_b": 403,
+        },
+    ),
+    MatrixRow(
+        method="GET",
+        path="/api/departments/{department_id}/doctors",
+        body_factory=None,
+        expected={
+            "anonymous": 401,
+            "admin": 200,
+            "reception": 200,
+            "doctor_a": 200,
+            "doctor_b": 200,
+        },
+    ),
+    MatrixRow(
+        method="GET",
+        path="/api/doctors/{doctor_id}/departments",
+        body_factory=None,
+        expected={
+            "anonymous": 401,
+            "admin": 200,
+            "reception": 200,
+            "doctor_a": 200,
+            "doctor_b": 200,
+        },
+    ),
+    MatrixRow(
+        method="PUT",
+        path="/api/doctors/{doctor_id}/departments",
+        body_factory=_assign_doctor_departments_payload,
+        expected={
+            "anonymous": 401,
+            "admin": 200,
+            "reception": 403,
+            "doctor_a": 403,
+            "doctor_b": 403,
+        },
+    ),
     # Billing and Timeline (Phase 15)
     MatrixRow(
         method="POST",
@@ -308,7 +417,7 @@ MATRIX: list[MatrixRow] = [
         body_factory=_create_payment_payload,
         expected={
             "anonymous": 401,
-            "admin": 201,
+            "admin": 403,
             "reception": 201,
             "doctor_a": 403,
             "doctor_b": 403,

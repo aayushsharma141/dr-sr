@@ -138,8 +138,13 @@ def test_restore_endpoint_restores_a_real_backup(
     assert photo.read_bytes() == PHOTO_BYTES
     with Session(app_engine) as db:
         added = db.scalar(select(Patient).where(Patient.urn == URN_ADDED_AFTER_BACKUP))
+        # Scoped to this archive: the audit row commits on its own session, so other tests that
+        # stub restore_backup leave their rows in the test database.
         restored_audit = db.scalars(
-            select(AuditLog).where(AuditLog.action == "BACKUP_RESTORED")
+            select(AuditLog).where(
+                AuditLog.action == "BACKUP_RESTORED",
+                AuditLog.entity_id == archive,
+            )
         ).all()
     assert added is None
     assert len(restored_audit) == 1

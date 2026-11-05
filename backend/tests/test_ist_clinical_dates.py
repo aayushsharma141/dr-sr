@@ -8,7 +8,7 @@ from datetime import UTC, datetime
 
 import pytest
 
-from kalyan_api.models import Patient, TreatmentPlan
+from kalyan_api.models import Department, Doctor, Patient, TreatmentPlan
 from kalyan_api.routers.timeline import _doctor_title
 
 AFTER_IST_MIDNIGHT = datetime(2026, 11, 5, 19, 30, tzinfo=UTC)  # 01:00 IST, 6 Nov 2026
@@ -42,12 +42,20 @@ def test_doctor_queue_shows_todays_ist_appointments(
 ):
     """An appointment booked for the IST date appears in the doctor's queue after midnight."""
     patient = _patient(db_session, "0011")
+    # Bookings name a department, and the doctor must belong to it.
+    department = Department(name_en="IST Test Department")
+    db_session.add(department)
+    db_session.flush()
+    doctor = db_session.get(Doctor, doctor_a_user.doctor_id)
+    doctor.departments = [department]
+    db_session.flush()
     reception_client = login_client(reception_user)
     booked = reception_client.post(
         "/api/appointments",
         json={
             "patient_id": patient.id,
             "doctor_id": doctor_a_user.doctor_id,
+            "department_id": department.id,
             "appointment_date": "2026-11-06",
         },
     )

@@ -314,6 +314,8 @@ RUNTIME_TABLE_GRANTS: dict[str, tuple[str, ...]] = {
     "security_settings": ("SELECT", "UPDATE"),
     "backup_settings": ("SELECT", "UPDATE"),
     "backup_runs": ("SELECT", "INSERT", "UPDATE"),
+    "departments": ("SELECT", "INSERT", "UPDATE", "DELETE"),
+    "doctor_departments": ("SELECT", "INSERT", "UPDATE", "DELETE"),
 }
 
 

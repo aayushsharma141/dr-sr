@@ -24,8 +24,8 @@ def test_operations_api_role_restrictions(
             "/api/operations/restore",
             json={
                 "archive_filename": "foo",
-                "confirmation_phrase": "RESTORE-DATABASE-OVERWRITE",
-                "justification": "Authorised recovery test",
+                "confirmation_phrase": "RESTORE",
+                "reason": "Authorised recovery test",
             },
         ).status_code
         == 401
@@ -41,8 +41,8 @@ def test_operations_api_role_restrictions(
             "/api/operations/restore",
             json={
                 "archive_filename": "foo",
-                "confirmation_phrase": "RESTORE-DATABASE-OVERWRITE",
-                "justification": "Authorised recovery test",
+                "confirmation_phrase": "RESTORE",
+                "reason": "Authorised recovery test",
             },
         ).status_code
         == 403
@@ -58,8 +58,8 @@ def test_operations_api_role_restrictions(
             "/api/operations/restore",
             json={
                 "archive_filename": "foo",
-                "confirmation_phrase": "RESTORE-DATABASE-OVERWRITE",
-                "justification": "Authorised recovery test",
+                "confirmation_phrase": "RESTORE",
+                "reason": "Authorised recovery test",
             },
         ).status_code
         == 403
@@ -101,8 +101,8 @@ def test_operations_admin_lifecycle(
         json={
             "archive_filename": backup_data["filename"],
             "create_prerestore_snapshot": True,
-            "confirmation_phrase": "WRONG_PHRASE",
-            "reason": "Testing invalid restore confirmation",
+            "confirmation_phrase": "INVALID_CONFIRMATION",
+            "reason": "Testing invalid restore confirmation phrase",
         },
     )
     assert invalid_restore.status_code == 422
