@@ -108,14 +108,19 @@ def test_corrupted_backup_rejected_before_db_mutation(tmp_path: Path):
         restore_backup(fake_archive, settings=settings)
 
 
+@pytest.mark.parametrize("ambient_pgoptions", [None, "-c application_name=kalyan_operator"])
 def test_blocked_schema_reset_fails_and_keeps_the_database(
+    ambient_pgoptions: str | None,
     test_settings: Settings,
     owner_engine: Engine,
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ):
     """A lock held elsewhere must end the restore with an error and change nothing."""
-    monkeypatch.delenv("PGOPTIONS", raising=False)
+    if ambient_pgoptions is None:
+        monkeypatch.delenv("PGOPTIONS", raising=False)
+    else:
+        monkeypatch.setenv("PGOPTIONS", ambient_pgoptions)
     monkeypatch.setattr(backup_service, "RESTORE_LOCK_TIMEOUT_MS", 1000)
     dump_file = tmp_path / "db.sql"
     dump_database(dump_file, test_settings)

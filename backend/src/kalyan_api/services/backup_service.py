@@ -341,7 +341,9 @@ def restore_database_sql(sql_file: Path, settings: Settings | None = None) -> No
 
     env = os.environ.copy()
     env["PGPASSWORD"] = cfg.db_owner_password
-    env.setdefault("PGOPTIONS", f"-c lock_timeout={RESTORE_LOCK_TIMEOUT_MS}")
+    pgoptions = env.get("PGOPTIONS", "")
+    if "lock_timeout" not in pgoptions:
+        env["PGOPTIONS"] = f"{pgoptions} -c lock_timeout={RESTORE_LOCK_TIMEOUT_MS}".strip()
 
     # Step 1: Drop and recreate clean public schema to ensure clean slate
     reset_sql = f"""
