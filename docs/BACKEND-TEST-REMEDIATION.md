@@ -45,6 +45,13 @@
   2. In `test_phase16_gate.py`, separated the HTTP Audit Log test (`test_phase16_audit_log_gate`) from the physical backup/restore test (`test_phase16_backup_restore_gate`), ensuring no uncommitted savepoints are active during the physical restore drill.
   3. In `test_integrity_service.py`, used `db_session` with automatic rollback rather than manual DML deletes (which `kalyan_app` lacks table privileges for).
 
+### 2.8 Correction: restore endpoint regression (found in review of PR #20)
+- **What went wrong:** The first version of this work removed `_release_request_transaction(session)` from `trigger_restore`, which changed production behaviour despite the target in section 1. The line releases the request's read locks before `psql` runs `DROP SCHEMA`.
+- **Effect:** A real restore through `POST /api/operations/restore` hung on a lock held by its own request connection. `psql` has no timeout, so nothing ended the wait. This was reproduced on `kalyan_test`. The suite could not see it because the API test mocks `restore_backup`, and the service-level restore tests have no request transaction holding locks.
+- **Real cause of the test failure:** `session.commit()` closes the `begin_nested()` context in the `app` fixture, giving `Can't operate on closed transaction inside context manager`. That is a harness limitation, not a production problem.
+- **Fix:** The production line is restored. The lifecycle test stubs only the release step and asserts that it runs before `restore_backup`, so removing the line now fails the test.
+- **Verified:** A real restore through the endpoint returned 200 in about 1 second with the line, and hung without it.
+
 ---
 
 ## 3. Verification Commands & Outcomes

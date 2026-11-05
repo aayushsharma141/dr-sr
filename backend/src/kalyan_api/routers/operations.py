@@ -452,6 +452,7 @@ def trigger_restore(
     ctx = build_audit_context(request, principal)
     archive_path = _resolve_archive_or_422(settings, payload.archive_filename)
 
+    _release_request_transaction(session)
 
     try:
         result = restore_backup(
