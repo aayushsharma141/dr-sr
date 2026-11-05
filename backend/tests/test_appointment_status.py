@@ -211,9 +211,17 @@ def test_status_update_conflict(login_client, reception_user, doctor_a_user, db_
     assert resp2.json()["code"] == "version_conflict"
 
 
-def test_doctor_queue_retrieval(login_client, reception_user, doctor_a_user, db_session):
+def test_doctor_queue_retrieval(login_client, reception_user, doctor_a_user, db_session, monkeypatch):
     """Doctor retrieves today's consultation queue segmented by status."""
-    today = clock.utcnow().date()
+    # 18:45 UTC is already the next calendar day in India (00:15 IST).
+    from datetime import UTC, datetime
+
+    monkeypatch.setattr(
+        clock,
+        "utcnow",
+        lambda: datetime(2026, 11, 5, 18, 45, tzinfo=UTC),
+    )
+    today = clock.ist_today()
     doc_id = doctor_a_user.doctor_id
 
     # Create 3 patients and appointments
