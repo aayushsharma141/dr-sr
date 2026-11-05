@@ -133,3 +133,50 @@ def test_book_appointment_validations(login_client, reception_user, db_session):
     )
     assert resp2.status_code == 404
     assert resp2.json()["code"] == "doctor_not_found"
+
+
+def test_booking_rejects_inactive_department(
+    login_client, reception_user, doctor_a_user, db_session
+):
+    """Inactive departments remain assigned but cannot receive new bookings."""
+    from kalyan_api.models import Appointment
+
+    patient = Patient(
+        urn="KH-2026-8899",
+        full_name="Inactive Department Patient",
+        guardian_name="Guardian",
+        gender="M",
+        age_years=32,
+        mobile="9876543299",
+        address="Ara",
+    )
+    db_session.add(patient)
+    db_session.flush()
+
+    doctor = doctor_a_user.doctor
+    assert doctor is not None
+    assert doctor.departments
+    department = doctor.departments[0]
+    department.is_active = False
+    db_session.flush()
+
+    # Deactivation must not silently remove the existing doctor membership.
+    assert department in doctor.departments
+
+    client = login_client(reception_user)
+    response = client.post(
+        "/api/appointments",
+        json={
+            "patient_id": patient.id,
+            "doctor_id": doctor.id,
+            "department_id": department.id,
+            "appointment_date": "2026-11-06",
+        },
+    )
+
+    assert response.status_code == 422
+    assert response.json()["code"] == "department_inactive"
+    assert response.json()["message"] == (
+        "Selected department is inactive and cannot accept new appointments."
+    )
+    assert db_session.query(Appointment).filter_by(patient_id=patient.id).count() == 0
