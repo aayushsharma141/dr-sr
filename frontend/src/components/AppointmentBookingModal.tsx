@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Modal } from './Modal'
 import { useDoctors, usePatients, useBookAppointment } from '../api/queries'
 import type { PatientOut, DoctorOut } from '../api/types'
+import { istToday } from '../format'
 
 interface AppointmentBookingModalProps {
   isOpen: boolean
@@ -21,9 +22,7 @@ export function AppointmentBookingModal({
     initialPatient || null,
   )
   const [selectedDoctorId, setSelectedDoctorId] = useState<number | ''>('')
-  const [appointmentDate, setAppointmentDate] = useState(
-    new Date().toISOString().split('T')[0],
-  )
+  const [appointmentDate, setAppointmentDate] = useState(istToday)
   const [notes, setNotes] = useState('')
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
   const [allocatedToken, setAllocatedToken] = useState<number | null>(null)
@@ -122,7 +121,7 @@ export function AppointmentBookingModal({
 
             {/* Patient Selector */}
             <div>
-              <label className="block text-xs font-semibold text-neutral-700 uppercase mb-1">
+              <label htmlFor="patient-search" className="block text-xs font-semibold text-neutral-700 uppercase mb-1">
                 Patient
               </label>
               {selectedPatient ? (
@@ -143,6 +142,7 @@ export function AppointmentBookingModal({
               ) : (
                 <div className="space-y-2">
                   <input
+                    id="patient-search"
                     data-autofocus
                     type="text"
                     value={patientSearch}
@@ -154,17 +154,18 @@ export function AppointmentBookingModal({
                   {searchResults && searchResults.length > 0 && (
                     <div className="max-h-40 overflow-y-auto border border-neutral-200 rounded divide-y divide-neutral-100 bg-white">
                       {searchResults.slice(0, 5).map((p: PatientOut) => (
-                        <div
+                        <button
+                          type="button"
                           key={p.id}
                           onClick={() => handleSelectPatient(p)}
-                          className="p-2 text-sm hover:bg-neutral-50 cursor-pointer flex justify-between items-center"
+                          className="w-full p-2 text-left text-sm hover:bg-neutral-50 cursor-pointer flex justify-between items-center"
                         >
                           <div>
                             <span className="font-semibold text-neutral-900">{p.full_name}</span>
                             <span className="text-xs text-neutral-500 ml-2">({p.urn})</span>
                           </div>
                           <span className="text-xs font-mono text-neutral-600">{p.mobile}</span>
-                        </div>
+                        </button>
                       ))}
                     </div>
                   )}

@@ -55,6 +55,7 @@ export const PendingDuesPage: React.FC = () => {
       <div className="flex items-center gap-4">
         <input
           type="text"
+          aria-label="Search pending dues"
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
           placeholder="Search by patient name, URN, or package..."

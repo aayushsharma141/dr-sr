@@ -14,6 +14,7 @@ import {
   useMe,
 } from '../api/queries'
 import type { AddendumRead, EncounterSummary } from '../api/types'
+import { withDoctorTitle } from '../format'
 
 export function ClinicalEncounterWorkspace() {
   const { id } = useParams<{ id?: string }>()
@@ -423,7 +424,7 @@ export function ClinicalEncounterWorkspace() {
                   {addenda.map((ad: AddendumRead, idx: number) => (
                     <div key={ad.id} className="p-4 bg-amber-50/50 rounded-lg border border-amber-200 space-y-1">
                       <div className="flex justify-between text-xs text-amber-900 font-semibold">
-                        <span>Addendum #{idx + 1} &bull; Dr. {ad.doctor_name}</span>
+                        <span>Addendum #{idx + 1} &bull; {withDoctorTitle(ad.doctor_name)}</span>
                         <span className="font-mono">{new Date(ad.created_at).toLocaleString()}</span>
                       </div>
                       <p className="text-sm text-neutral-800 whitespace-pre-wrap">{ad.addendum_text}</p>
