@@ -75,6 +75,21 @@
 - [ ] **UX-07**: The HTTPS-for-webcam decision is recorded and either implemented (trusted local certificate) or documented as upload-only with a clear on-screen explanation.
 - [ ] **UX-08**: Typecheck, lint, frontend tests and headless one-page print checks pass, with a manual-check sheet for printer, screen reader and display scaling.
 
+### Doctor Workspace
+
+Added 2026-11-05 from the exploration in `.planning/notes/doctor-workspace-direction.md`.
+
+- [ ] **DWS-01**: One appointment has at most one encounter, enforced by the database; starting a consultation again opens the existing encounter.
+- [ ] **DWS-02**: Doctor saves an incomplete encounter as a draft, with auto-save; the screen shows "saved" only after the server confirms, the draft reopens after an interruption, and unfinished drafts are listed on the doctor's dashboard.
+- [ ] **DWS-03**: Each encounter records whether it is New or Follow-up, using the appointment visit type from PR #12, and the patient's actual arrival time is stored when reception checks them in.
+- [ ] **DWS-04**: Doctors read all clinical records and edit only their own, with cross-doctor reads audited and the rule enforced in one central place. Reception and Admin stay denied (D-04). Blocked until the EG-6 change is signed off (see `.planning/todos/pending/doctor-access-signoff-and-eye-doctor-setup.md`).
+- [ ] **DWS-05**: The consultation loads a versioned, developer-set template for Physiotherapy or Ophthalmology from the appointment's department (PR #17), approved by that specialty's doctors before use; each encounter keeps the version it used, responses are validated on the server, and a new version never changes old records.
+- [ ] **DWS-06**: Doctor records vitals with units during the consultation, and BMI is calculated from the stored height and weight.
+- [ ] **DWS-07**: Doctor builds the encounter's prescription inside the consultation, as a draft that must be authorised before it prints; an authorised prescription cannot be overwritten, and a correction cancels it with a reason and reissues it, leaving one active prescription. The diagnosis is entered once for the encounter, and the printout keeps its static Hindi labels.
+- [ ] **DWS-08**: Doctor records a follow-up recommendation with date, reason and assigned doctor, kept separate from the appointment booked for it and linked to that appointment. Doctor or reception can book it, reception sees only the date and doctor, and an unbooked recommendation stays overdue until booked or closed with a reason.
+- [ ] **DWS-09**: After finalising, the doctor prints a patient-copy consultation summary on one A4 page using the approved letterhead, with static Hindi labels and no medicines listed.
+- [ ] **DWS-10**: An account can be logged in on one PC at a time, for all roles. A second login is refused after the password is checked, with an audited option to end the other session and log in. This changes the EG-10 default of multiple concurrent sessions.
+
 ## v2 Requirements
 
 Deferred; tracked but not in the current roadmap.
@@ -92,6 +107,14 @@ Deferred; tracked but not in the current roadmap.
 - **FUT-01**: LAN HTTPS with in-browser webcam capture.
 - **FUT-02**: Document and scan attachments.
 - **FUT-03**: SQLite-to-PostgreSQL import of v2.0 data, only if real data exists.
+
+### Doctor Workspace, deferred (2026-11-05)
+
+- **DWF-01**: Admin template editor (Phase 19 templates are developer-set).
+- **DWF-02**: Treatment, investigation and referral orders.
+- **DWF-03**: Weekly appointment calendar and multiple active prescriptions per encounter.
+- **DWF-04**: Extra clinical history tables, clinical reports and notifications.
+- **DWF-05**: Medicine catalogue.
 
 ## Out of Scope
 
@@ -163,12 +186,22 @@ Deferred; tracked but not in the current roadmap.
 | UX-06 | Phase 18 | Pending |
 | UX-07 | Phase 18 | Pending |
 | UX-08 | Phase 18 | Pending |
+| DWS-01 | Phase 19 | Pending |
+| DWS-02 | Phase 19 | Pending |
+| DWS-03 | Phase 19 | Pending |
+| DWS-04 | Phase 19 | Pending (blocked on EG-6 sign-off) |
+| DWS-05 | Phase 19 | Pending |
+| DWS-06 | Phase 19 | Pending |
+| DWS-07 | Phase 19 | Pending |
+| DWS-08 | Phase 19 | Pending |
+| DWS-09 | Phase 19 | Pending |
+| DWS-10 | Phase 19 | Pending |
 
 **Coverage:**
-- v1 requirements: 45 total
-- Mapped to phases: 45
+- v1 requirements: 55 total
+- Mapped to phases: 55
 - Unmapped: 0
 
 ---
 *Requirements defined: 2026-10-30*
-*Last updated: 2026-10-30 after scoping from the user's Final Plan*
+*Last updated: 2026-11-05 after adding the Doctor Workspace requirements (DWS-01 to DWS-10)*
