@@ -42,6 +42,16 @@ def test_settings() -> Settings:
     return settings
 
 
+@pytest.fixture(scope="session", autouse=True)
+def configure_test_environment(test_settings: Settings) -> None:
+    """Ensure environment points to the test database and clear cached settings."""
+    os.environ["KALYAN_DB_NAME"] = test_settings.db_name
+    os.environ["KALYAN_ENV"] = "test"
+    from kalyan_api.config import get_settings
+
+    get_settings.cache_clear()
+
+
 @pytest.fixture(scope="session")
 def migrated_db(test_settings: Settings) -> dict[str, int]:
     """Wipe public schema, run alembic migrations from head, and assert zero seed rows."""

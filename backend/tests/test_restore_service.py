@@ -30,7 +30,10 @@ def test_restore_database_and_photos(tmp_path: Path):
     with session_scope(settings) as session:
         # Check if exists or delete
         existing = session.query(Patient).filter(Patient.urn == test_urn).first()
-        if not existing:
+        if existing:
+            session.delete(existing)
+            session.commit()
+        if True:
             p = Patient(
                 urn=test_urn,
                 full_name="Restore Test Patient Original",
