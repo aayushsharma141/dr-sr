@@ -107,18 +107,28 @@ def test_operations_admin_lifecycle(
     )
     assert invalid_restore.status_code == 422
 
-    # 5. Restore using freshly created backup (mock subprocess restore to keep test DB intact)
-    monkeypatch.setattr(
-        "kalyan_api.routers.operations.restore_backup",
-        lambda **kwargs: {
+    # 5. Restore using freshly created backup (mock subprocess restore to keep test DB intact).
+    # The real release commits the request session, which this suite's begin_nested() override
+    # cannot survive, so it is stubbed. The order matters: if the request transaction is still
+    # open when restore runs, its locks block psql's DROP SCHEMA and the restore hangs.
+    calls: list[str] = []
+
+    def fake_restore_backup(**kwargs: Any) -> dict[str, Any]:
+        calls.append("restore")
+        return {
             "status": "SUCCESS",
             "archive_restored": backup_data["filename"],
             "database_restored": True,
             "photos_restored_count": 0,
             "prerestore_snapshot": "kalyan_snapshot_prerestore_test.tar.gz",
             "manifest": {"created_at": "2026-11-04T12:00:00Z", "label": "test"},
-        },
+        }
+
+    monkeypatch.setattr(
+        "kalyan_api.routers.operations._release_request_transaction",
+        lambda session: calls.append("release"),
     )
+    monkeypatch.setattr("kalyan_api.routers.operations.restore_backup", fake_restore_backup)
     restore_res = admin_c.post(
         "/api/operations/restore",
         json={
@@ -132,3 +142,4 @@ def test_operations_admin_lifecycle(
     restore_data = restore_res.json()
     assert restore_data["status"] == "SUCCESS"
     assert restore_data["database_restored"] is True
+    assert calls == ["release", "restore"]
