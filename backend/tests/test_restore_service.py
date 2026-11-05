@@ -3,14 +3,19 @@
 from pathlib import Path
 
 import pytest
+from sqlalchemy import Engine, text
 
-from kalyan_api.config import get_settings
+from kalyan_api.config import Settings, get_settings
 from kalyan_api.db.session import session_scope
 from kalyan_api.models import Patient
+from kalyan_api.services import backup_service
 from kalyan_api.services.backup_service import (
     BackupCorruptedError,
+    RestoreError,
     create_backup,
+    dump_database,
     restore_backup,
+    restore_database_sql,
 )
 
 
@@ -101,3 +106,29 @@ def test_corrupted_backup_rejected_before_db_mutation(tmp_path: Path):
 
     with pytest.raises(BackupCorruptedError, match="Restore rejected"):
         restore_backup(fake_archive, settings=settings)
+
+
+def test_blocked_schema_reset_fails_and_keeps_the_database(
+    test_settings: Settings,
+    owner_engine: Engine,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    """A lock held elsewhere must end the restore with an error and change nothing."""
+    monkeypatch.delenv("PGOPTIONS", raising=False)
+    monkeypatch.setattr(backup_service, "RESTORE_LOCK_TIMEOUT_MS", 1000)
+    dump_file = tmp_path / "db.sql"
+    dump_database(dump_file, test_settings)
+    table_oid = text("SELECT 'users'::regclass::oid")
+
+    with owner_engine.connect() as holder:
+        oid_before = holder.scalar(table_oid)
+        # Drops the lock if the timeout stops working, so that fails the test without a hang.
+        holder.execute(text("SET LOCAL idle_in_transaction_session_timeout = '10s'"))
+        holder.execute(text("LOCK TABLE users IN ACCESS SHARE MODE"))
+        with pytest.raises(RestoreError, match="schema reset failed"):
+            restore_database_sql(dump_file, test_settings)
+        holder.rollback()
+
+    with owner_engine.connect() as conn:
+        assert conn.scalar(table_oid) == oid_before

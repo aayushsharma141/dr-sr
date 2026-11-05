@@ -317,6 +317,13 @@ RUNTIME_TABLE_GRANTS: dict[str, tuple[str, ...]] = {
 }
 
 
+# How long psql may wait for another connection's locks during a restore. Without a limit a blocked
+# DROP SCHEMA waits forever. Application statements stop at 30 seconds (statement_timeout in
+# db/session.py), so this outlasts any healthy request. The reset runs as one transaction, so a
+# timeout leaves the database as it was.
+RESTORE_LOCK_TIMEOUT_MS = 30_000
+
+
 def runtime_grant_sql(app_user: str) -> str:
     """SQL that gives the runtime role exactly the rights RUNTIME_TABLE_GRANTS lists."""
     statements = [
@@ -334,6 +341,7 @@ def restore_database_sql(sql_file: Path, settings: Settings | None = None) -> No
 
     env = os.environ.copy()
     env["PGPASSWORD"] = cfg.db_owner_password
+    env.setdefault("PGOPTIONS", f"-c lock_timeout={RESTORE_LOCK_TIMEOUT_MS}")
 
     # Step 1: Drop and recreate clean public schema to ensure clean slate
     reset_sql = f"""

@@ -25,7 +25,8 @@ from kalyan_api.models import AuditLog, Patient
 from kalyan_api.services.backup_service import dump_database, restore_database_sql
 
 # Far below pytest's 60 seconds: a blocked DROP SCHEMA then fails as a clean 500 rather than
-# stalling until pytest-timeout, which on Windows ends the whole run.
+# stalling until pytest-timeout, which on Windows ends the whole run. It overrides the longer
+# default in backup_service, and holds even if that default is ever lost.
 BLOCKED_RESTORE_PGOPTIONS = "-c lock_timeout=5000"
 
 ADMIN_USERNAME = "real_restore_admin"
