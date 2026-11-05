@@ -4,6 +4,7 @@ from datetime import date
 
 from fastapi import APIRouter, Depends, Query, Request
 from sqlalchemy import select
+from sqlalchemy.orm import Session
 
 from kalyan_api import clock
 from kalyan_api.core.errors import ApiError, require_version
@@ -31,6 +32,18 @@ from kalyan_api.services.audit_service import AuditAction
 
 router = APIRouter(prefix="/appointments", tags=["appointments"])
 doctor_router = APIRouter(prefix="/doctor", tags=["doctor"])
+
+
+def lock_department_for_booking(session: Session, department_id: int) -> Department | None:
+    """Read the department under a row lock, so a concurrent deactivation cannot slip past.
+
+    Deactivation locks the same row, so either this read waits for it and sees is_active=False,
+    or the deactivation waits for this booking to commit. Without the lock, a booking can read
+    the department as active while it is being deactivated and still insert the appointment.
+    """
+    return session.scalar(
+        select(Department).where(Department.id == department_id).with_for_update()
+    )
 
 
 def _to_read_schema(appt: Appointment) -> AppointmentRead:
@@ -90,7 +103,7 @@ def book_appointment(
         )
 
     # 3. Verify that the selected doctor belongs to the requested active department.
-    department = session.get(Department, payload.department_id)
+    department = lock_department_for_booking(session, payload.department_id)
     if department is None:
         raise ApiError(
             status_code=422,

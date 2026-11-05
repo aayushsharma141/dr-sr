@@ -1,15 +1,18 @@
 """Regression coverage for the all-specialties department workflow."""
 
+import threading
 from datetime import date
 from typing import Any
 
 import pytest
 from pydantic import ValidationError
+from sqlalchemy import Engine, delete, text
 from sqlalchemy.orm import Session
 
 from kalyan_api.core.permissions import ROLE_PERMISSIONS, Permission, Role
 from kalyan_api.main import create_app
 from kalyan_api.models import Appointment, Department, Doctor, User
+from kalyan_api.routers.appointments import lock_department_for_booking
 from kalyan_api.schemas.appointments import AppointmentCreate
 
 
@@ -115,3 +118,45 @@ def test_inactive_membership_can_be_kept_or_removed_but_not_added(
     assert removed.status_code == 200, removed.text
     db_session.refresh(doctor)
     assert [d.id for d in doctor.departments] == [second.id]
+
+
+def test_booking_waits_for_an_in_flight_department_deactivation(app_engine: Engine) -> None:
+    """A booking must not read a department as active while its deactivation is uncommitted."""
+    with Session(app_engine) as setup:
+        department = Department(name_en=f"Race Dept {threading.get_ident()}")
+        setup.add(department)
+        setup.commit()
+        department_id = department.id
+
+    deactivating = app_engine.connect()
+    deactivation = deactivating.begin()
+    try:
+        deactivating.execute(
+            text("UPDATE departments SET is_active = false WHERE id = :id"),
+            {"id": department_id},
+        )
+        seen: dict[str, bool] = {}
+
+        def book() -> None:
+            with Session(app_engine) as booking:
+                row = lock_department_for_booking(booking, department_id)
+                assert row is not None
+                seen["active"] = row.is_active
+                booking.commit()
+
+        worker = threading.Thread(target=book)
+        worker.start()
+        worker.join(timeout=1.0)
+        assert worker.is_alive(), "booking read the department without waiting for the deactivation"
+
+        deactivation.commit()
+        worker.join(timeout=10)
+        assert not worker.is_alive()
+        assert seen["active"] is False
+    finally:
+        if deactivation.is_active:
+            deactivation.rollback()
+        deactivating.close()
+        with Session(app_engine) as cleanup:
+            cleanup.execute(delete(Department).where(Department.id == department_id))
+            cleanup.commit()
