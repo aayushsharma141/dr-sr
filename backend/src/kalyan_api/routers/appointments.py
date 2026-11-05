@@ -91,7 +91,19 @@ def book_appointment(
 
     # 3. Verify that the selected doctor belongs to the requested active department.
     department = session.get(Department, payload.department_id)
-    if department is None or not department.is_active or department not in doctor.departments:
+    if department is None:
+        raise ApiError(
+            status_code=422,
+            code="department_not_found",
+            message="Selected department does not exist.",
+        )
+    if not department.is_active:
+        raise ApiError(
+            status_code=422,
+            code="department_inactive",
+            message="Selected department is inactive and cannot accept new appointments.",
+        )
+    if department not in doctor.departments:
         raise ApiError(
             status_code=422,
             code="doctor_department_mismatch",
