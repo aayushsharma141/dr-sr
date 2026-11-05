@@ -34,6 +34,12 @@
 **Status:** Proposed. Preserve PySide6/SQLite code; reuse only reviewed business rules, assets, print layouts and tests. Migration only if real data exists and client approves.
 
 ### ADR-23 — Reception coverage, doctor queues and payment ownership
+### ADR-24 — Department deactivation preserves doctor memberships
+**Status:** Confirmed by project owner on 2026-11-06. Deactivating a department retains existing doctor-to-department memberships. Inactive departments cannot receive new doctor assignments or new appointments. Removing an existing membership is an explicit Admin action. Historical appointment department associations remain unchanged.
+
+### ADR-25 — Inactive doctor visibility is Admin-only
+**Status:** Confirmed by project owner on 2026-11-06. Only Admin may retrieve inactive/retired doctors by requesting `include_inactive=true`. Reception and Doctor users receive active doctors only, even when they request inactive records.
+
 ## Open decisions — do not silently assume
 
 | ID | Decision | Recommendation | Status |
