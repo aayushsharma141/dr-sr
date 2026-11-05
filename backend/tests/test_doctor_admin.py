@@ -239,7 +239,7 @@ def test_consultation_fees_crud_and_rbac(
             "name": "General OPD Visit (Revised)",
             "fee_paise": 35000,
             "is_active": True,
-            "version_id": created_fee.get("version_id", 1),
+            "version_id": created_fee["version_id"],
         },
     )
     assert update_resp.status_code == 200

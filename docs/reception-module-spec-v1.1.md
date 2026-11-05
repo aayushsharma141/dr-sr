@@ -67,4 +67,4 @@ Queue events must retain timestamps and actor attribution. Prevent duplicate act
 
 ## Scope boundary
 
-All-specialty intake and routing is in the reception scope. Full IPD/bed management, pharmacy, laboratory, inventory, insurance and specialty-specific clinical forms remain excluded unless separately priced and approved.
+All-specialty intake and routing is in the reception scope. Full IPD/bed management, pharmacy, laboratory, inventory, insurance and specialty-specific clinical forms remain excluded unless separately priced and approved. Exception, decided 2026-11-05: the Physiotherapy and Ophthalmology consultation templates are included in Phase 19 within the existing budget (D-19-01 in `.planning/phases/19-universal-consultation-workspace/19-CONTEXT.md`). Forms for any other specialty stay excluded.

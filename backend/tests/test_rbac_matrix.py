@@ -29,6 +29,8 @@ from kalyan_api.core.permissions import Permission
 from kalyan_api.core.policy import require
 from kalyan_api.models import (
     Appointment,
+    AuthSession,
+    BackupSettings,
     ClinicalEncounter,
     ClinicSettings,
     ConsultationFee,
@@ -37,6 +39,7 @@ from kalyan_api.models import (
     Patient,
     Payment,
     Prescription,
+    SecuritySettings,
     SystemSetup,
     TreatmentPlan,
     TreatmentSession,
@@ -136,6 +139,38 @@ def test_rbac_matrix_cell(
 
     elif row.path == "/api/settings":
         target_entity = db_session.scalar(select(ClinicSettings).where(ClinicSettings.id == 1))
+
+    elif row.path == "/api/operations/backup-settings":
+        target_entity = db_session.scalar(select(BackupSettings).where(BackupSettings.id == 1))
+
+    elif row.path == "/api/security/policy":
+        target_entity = db_session.scalar(select(SecuritySettings).where(SecuritySettings.id == 1))
+
+    elif "{session_id}" in row.path:
+        from datetime import timedelta
+
+        other_user = make_user(
+            db_session, test_settings, "RECEPTION", f"sess_tgt_{uuid.uuid4().hex[:6]}"
+        )
+        sess = AuthSession(
+            user_id=other_user.id,
+            token_hash=f"token_hash_{uuid.uuid4().hex}",
+            csrf_token=f"csrf_{uuid.uuid4().hex}",
+            created_at=datetime.now(UTC),
+            last_seen_at=datetime.now(UTC),
+        )
+        db_session.add(sess)
+        db_session.flush()
+        resolved_path = row.path.replace("{session_id}", str(sess.id))
+
+    elif "{filename}" in row.path:
+        from kalyan_api.services.backup_service import create_backup
+
+        test_settings.backup_dir.mkdir(parents=True, exist_ok=True)
+        archive = create_backup(
+            destination_dir=test_settings.backup_dir, label="matrix_verify", settings=test_settings
+        )
+        resolved_path = row.path.replace("{filename}", archive.name)
 
     elif row.path == "/api/patients/check-duplicate":
         resolved_path = "/api/patients/check-duplicate?name=Test&mobile=9876543210"

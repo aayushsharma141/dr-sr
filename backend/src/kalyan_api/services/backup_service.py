@@ -319,110 +319,97 @@ RUNTIME_TABLE_GRANTS: dict[str, tuple[str, ...]] = {
 }
 
 
+# How long psql may wait for any one lock during a restore; without a limit a blocked statement
+# waits forever. This bounds lock waits only, so a large restore can take as long as its load
+# needs. Application statements stop at 30 seconds (statement_timeout in db/session.py), so this
+# outlasts any healthy request.
+RESTORE_LOCK_TIMEOUT_MS = 30_000
+
+# pg_dump's SET lines come before its first statement, well within this many lines.
+DUMP_HEADER_LINES = 40
+
+
 def runtime_grant_sql(app_user: str) -> str:
     """SQL that gives the runtime role exactly the rights RUNTIME_TABLE_GRANTS lists."""
     statements = [
-        f'GRANT {", ".join(privileges)} ON "{table}" TO "{app_user}";'
+        f'GRANT {", ".join(privileges)} ON public."{table}" TO "{app_user}";'
         for table, privileges in RUNTIME_TABLE_GRANTS.items()
     ]
     statements.append(f'GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO "{app_user}";')
     return "\n".join(statements)
 
 
+def _copy_dump_keeping_lock_timeout(sql_file: Path, destination: Path) -> None:
+    """Copy a plain dump without its header line that turns lock_timeout off."""
+    with sql_file.open("rb") as source, destination.open("wb") as target:
+        for _ in range(DUMP_HEADER_LINES):
+            line = source.readline()
+            if line.strip() == b"SET lock_timeout = 0;":
+                break
+            target.write(line)
+        shutil.copyfileobj(source, target)
+
+
 def restore_database_sql(sql_file: Path, settings: Settings | None = None) -> None:
-    """Wipe schema public and execute SQL dump using psql with owner credentials."""
+    """Replace schema public with a SQL dump in one transaction, using owner credentials.
+
+    Any failure rolls the whole restore back, so the database stays exactly as it was. Other
+    clients cannot see or lock the new tables until it commits, and each table being replaced
+    stays locked until then.
+    """
     cfg = settings or get_settings()
     psql_bin = find_pg_tool("psql")
 
     env = os.environ.copy()
     env["PGPASSWORD"] = cfg.db_owner_password
+    pgoptions = env.get("PGOPTIONS", "")
+    if "lock_timeout" not in pgoptions:
+        env["PGOPTIONS"] = f"{pgoptions} -c lock_timeout={RESTORE_LOCK_TIMEOUT_MS}".strip()
 
-    # Step 1: Drop and recreate clean public schema to ensure clean slate
     reset_sql = f"""
     DROP SCHEMA IF EXISTS public CASCADE;
     CREATE SCHEMA public;
     GRANT ALL ON SCHEMA public TO {cfg.db_owner_user};
     GRANT USAGE ON SCHEMA public TO {cfg.db_app_user};
     """
-    reset_cmd = [
-        psql_bin,
-        "-v",
-        "ON_ERROR_STOP=1",
-        "-h",
-        cfg.db_host,
-        "-p",
-        str(cfg.db_port),
-        "-U",
-        cfg.db_owner_user,
-        "-d",
-        cfg.db_name,
-        "-c",
-        reset_sql,
-    ]
-    reset_res = subprocess.run(  # noqa: S603
-        reset_cmd,
-        env=env,
-        capture_output=True,
-        text=True,
-        check=False,
-    )
-    if reset_res.returncode != 0:
-        err = reset_res.stderr.strip() or reset_res.stdout.strip()
-        raise RestoreError(f"Database schema reset failed: {err}")
 
-    # Step 2: Execute dump SQL
-    apply_cmd = [
-        psql_bin,
-        "-v",
-        "ON_ERROR_STOP=1",
-        "-h",
-        cfg.db_host,
-        "-p",
-        str(cfg.db_port),
-        "-U",
-        cfg.db_owner_user,
-        "-d",
-        cfg.db_name,
-        "-f",
-        str(sql_file),
-    ]
-    apply_res = subprocess.run(  # noqa: S603
-        apply_cmd,
-        env=env,
-        capture_output=True,
-        text=True,
-        check=False,
-    )
-    if apply_res.returncode != 0:
-        err = apply_res.stderr.strip() or apply_res.stdout.strip()
-        raise RestoreError(f"Restoring SQL dump failed: {err}")
+    with tempfile.TemporaryDirectory() as tmpdir_str:
+        # The dump would otherwise turn lock_timeout off for the rest of the session.
+        dump_file = Path(tmpdir_str) / "db.sql"
+        _copy_dump_keeping_lock_timeout(sql_file, dump_file)
 
-    # Step 3: Restore the runtime role's rights, which the dump does not carry
-    grant_cmd = [
-        psql_bin,
-        "-v",
-        "ON_ERROR_STOP=1",
-        "-h",
-        cfg.db_host,
-        "-p",
-        str(cfg.db_port),
-        "-U",
-        cfg.db_owner_user,
-        "-d",
-        cfg.db_name,
-        "-c",
-        runtime_grant_sql(cfg.db_app_user),
-    ]
-    grant_res = subprocess.run(  # noqa: S603
-        grant_cmd,
-        env=env,
-        capture_output=True,
-        text=True,
-        check=False,
-    )
-    if grant_res.returncode != 0:
-        err = grant_res.stderr.strip() or grant_res.stdout.strip()
-        raise RestoreError(f"Restoring runtime role rights failed: {err}")
+        # The runtime role's rights are granted last, because the dump does not carry them.
+        restore_cmd = [
+            psql_bin,
+            "-v",
+            "ON_ERROR_STOP=1",
+            "--single-transaction",
+            "-h",
+            cfg.db_host,
+            "-p",
+            str(cfg.db_port),
+            "-U",
+            cfg.db_owner_user,
+            "-d",
+            cfg.db_name,
+            "-c",
+            reset_sql,
+            "-f",
+            str(dump_file),
+            "-c",
+            runtime_grant_sql(cfg.db_app_user),
+        ]
+        result = subprocess.run(  # noqa: S603
+            restore_cmd,
+            env=env,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+
+    if result.returncode != 0:
+        err = result.stderr.strip() or result.stdout.strip()
+        raise RestoreError(f"Restoring the database failed: {err}")
 
 
 def create_backup(

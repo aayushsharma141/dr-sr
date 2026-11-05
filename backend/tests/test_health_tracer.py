@@ -137,7 +137,14 @@ def test_cli_commands_migrate_and_check_db(
         assert (
             "synchronous_commit: on" in captured_check.out or "remote_apply" in captured_check.out
         )
-        assert "0009" in captured_check.out
+        from alembic.script import ScriptDirectory
+
+        from kalyan_api.db.migrate import alembic_config
+
+        expected_head = ScriptDirectory.from_config(
+            alembic_config(test_settings.owner_url)
+        ).get_current_head()
+        assert expected_head in captured_check.out
         assert "Database health check: OK" in captured_check.out
 
         # migrate runs idempotently

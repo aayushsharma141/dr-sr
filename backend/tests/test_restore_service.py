@@ -3,14 +3,19 @@
 from pathlib import Path
 
 import pytest
+from sqlalchemy import Engine, text
 
-from kalyan_api.config import get_settings
+from kalyan_api.config import Settings, get_settings
 from kalyan_api.db.session import session_scope
 from kalyan_api.models import Patient
+from kalyan_api.services import backup_service
 from kalyan_api.services.backup_service import (
     BackupCorruptedError,
+    RestoreError,
     create_backup,
+    dump_database,
     restore_backup,
+    restore_database_sql,
 )
 
 
@@ -30,7 +35,10 @@ def test_restore_database_and_photos(tmp_path: Path):
     with session_scope(settings) as session:
         # Check if exists or delete
         existing = session.query(Patient).filter(Patient.urn == test_urn).first()
-        if not existing:
+        if existing:
+            session.delete(existing)
+            session.commit()
+        if True:
             p = Patient(
                 urn=test_urn,
                 full_name="Restore Test Patient Original",
@@ -98,3 +106,91 @@ def test_corrupted_backup_rejected_before_db_mutation(tmp_path: Path):
 
     with pytest.raises(BackupCorruptedError, match="Restore rejected"):
         restore_backup(fake_archive, settings=settings)
+
+
+@pytest.mark.parametrize("ambient_pgoptions", [None, "-c application_name=kalyan_operator"])
+def test_blocked_schema_reset_fails_and_keeps_the_database(
+    ambient_pgoptions: str | None,
+    test_settings: Settings,
+    owner_engine: Engine,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    """A lock held elsewhere must end the restore with an error and change nothing."""
+    if ambient_pgoptions is None:
+        monkeypatch.delenv("PGOPTIONS", raising=False)
+    else:
+        monkeypatch.setenv("PGOPTIONS", ambient_pgoptions)
+    monkeypatch.setattr(backup_service, "RESTORE_LOCK_TIMEOUT_MS", 1000)
+    dump_file = tmp_path / "db.sql"
+    dump_database(dump_file, test_settings)
+    table_oid = text("SELECT 'users'::regclass::oid")
+
+    with owner_engine.connect() as holder:
+        oid_before = holder.scalar(table_oid)
+        # Drops the lock if the timeout stops working, so that fails the test without a hang.
+        holder.execute(text("SET LOCAL idle_in_transaction_session_timeout = '10s'"))
+        holder.execute(text("LOCK TABLE users IN ACCESS SHARE MODE"))
+        with pytest.raises(RestoreError, match="Restoring the database failed"):
+            restore_database_sql(dump_file, test_settings)
+        holder.rollback()
+
+    with owner_engine.connect() as conn:
+        assert conn.scalar(table_oid) == oid_before
+
+
+def test_blocked_dump_apply_fails_and_keeps_the_database(
+    test_settings: Settings,
+    owner_engine: Engine,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    """A lock only the dump needs must still time out, although the dump disables lock_timeout."""
+    monkeypatch.delenv("PGOPTIONS", raising=False)
+    monkeypatch.setattr(backup_service, "RESTORE_LOCK_TIMEOUT_MS", 1000)
+    table_oid = text("SELECT 'users'::regclass::oid")
+    dump_file = tmp_path / "db.sql"
+
+    # The schema reset leaves this table alone, so the first statement to want it is the dump's.
+    with owner_engine.begin() as conn:
+        oid_before = conn.scalar(table_oid)
+        conn.execute(text("CREATE SCHEMA apply_lock_probe"))
+        conn.execute(text("CREATE TABLE apply_lock_probe.held (id integer)"))
+
+    try:
+        dump_database(dump_file, test_settings)
+        with owner_engine.connect() as holder:
+            # Drops the lock if the timeout stops working, so that fails the test without a hang.
+            holder.execute(text("SET LOCAL idle_in_transaction_session_timeout = '10s'"))
+            holder.execute(text("LOCK TABLE apply_lock_probe.held IN ACCESS SHARE MODE"))
+            with pytest.raises(RestoreError, match="Restoring the database failed"):
+                restore_database_sql(dump_file, test_settings)
+            holder.rollback()
+    finally:
+        with owner_engine.begin() as conn:
+            conn.execute(text("DROP SCHEMA apply_lock_probe CASCADE"))
+
+    with owner_engine.connect() as conn:
+        assert conn.scalar(table_oid) == oid_before
+
+
+def test_failed_dump_apply_keeps_the_database(
+    test_settings: Settings,
+    owner_engine: Engine,
+    tmp_path: Path,
+):
+    """A dump that fails after replacing the tables must leave the old database in place."""
+    table_oid = text("SELECT 'users'::regclass::oid")
+    dump_file = tmp_path / "db.sql"
+    dump_database(dump_file, test_settings)
+    with dump_file.open("a", encoding="utf-8") as dump:
+        dump.write("\nSELECT 1 / 0;\n")
+
+    with owner_engine.connect() as conn:
+        oid_before = conn.scalar(table_oid)
+
+    with pytest.raises(RestoreError, match="Restoring the database failed"):
+        restore_database_sql(dump_file, test_settings)
+
+    with owner_engine.connect() as conn:
+        assert conn.scalar(table_oid) == oid_before
