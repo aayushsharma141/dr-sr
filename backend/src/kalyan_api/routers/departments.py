@@ -3,6 +3,7 @@
 from fastapi import APIRouter, Depends, Request
 from sqlalchemy import select
 
+from kalyan_api import clock
 from kalyan_api.core.errors import ApiError, require_version
 from kalyan_api.core.permissions import Permission
 from kalyan_api.core.policy import require
@@ -179,17 +180,22 @@ def assign_doctor_departments(
         raise ApiError(
             status_code=422, code="duplicate_department", message="Department IDs must be unique."
         )
-    departments = session.scalars(
-        select(Department).where(Department.id.in_(ids), Department.is_active.is_(True))
-    ).all()
-    if len(departments) != len(ids):
+    before_ids = sorted(d.id for d in doctor.departments)
+    departments = session.scalars(select(Department).where(Department.id.in_(ids))).all()
+    # A department deactivated later must not block saving the doctor's other memberships, so
+    # an existing membership may stay. Only new memberships have to be active.
+    usable = [d for d in departments if d.is_active or d.id in before_ids]
+    if len(usable) != len(ids):
         raise ApiError(
             status_code=422,
             code="invalid_department",
             message="All assigned departments must exist and be active.",
         )
-    before_ids = sorted(d.id for d in doctor.departments)
-    doctor.departments = departments
+    if ids != before_ids:
+        doctor.departments = departments
+        # Changing only the join table leaves version_id alone, so a stale save would pass
+        # require_version. Touching a column makes the ORM update the row and bump the version.
+        doctor.updated_at = clock.utcnow()
     session.flush()
     audit_service.record(
         session,

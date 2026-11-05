@@ -11,7 +11,7 @@ export function DepartmentsPage() {
   const [name, setName] = useState('')
   const [nameHi, setNameHi] = useState('')
   const [doctorId, setDoctorId] = useState<number | null>(null)
-  const { data: assigned } = useDoctorDepartments(doctorId)
+  const { data: assigned, isError: assignmentsFailed } = useDoctorDepartments(doctorId)
   const [ids, setIds] = useState<number[]>([])
   const [notice, setNotice] = useState('')
   const [error, setError] = useState('')
@@ -19,6 +19,21 @@ export function DepartmentsPage() {
   useEffect(() => {
     if (assigned) setIds(assigned.map((item) => item.id))
   }, [assigned])
+
+  const assignmentsReady = doctorId !== null && assigned !== undefined
+  // A department deactivated later is missing from the active list, but the doctor still holds it.
+  const choices = [
+    ...departments,
+    ...(assigned ?? []).filter((item) => !departments.some((d) => d.id === item.id)),
+  ]
+
+  function chooseDoctor(value: string) {
+    // ids still holds the previous doctor's departments until the new doctor's load.
+    setIds([])
+    setNotice('')
+    setError('')
+    setDoctorId(value ? Number(value) : null)
+  }
 
   async function createDepartment(event: FormEvent) {
     event.preventDefault()
@@ -59,8 +74,9 @@ export function DepartmentsPage() {
     </section>
     <section className="space-y-3 rounded-lg border bg-white p-4">
       <h2 className="font-semibold">Assign doctor specialties</h2>
-      <label className="block text-sm">Doctor<select value={doctorId ?? ''} onChange={(e) => setDoctorId(e.target.value ? Number(e.target.value) : null)} className="mt-1 w-full rounded border p-2 sm:max-w-md"><option value="">Select doctor</option>{doctors.map((d) => <option key={d.id} value={d.id}>{d.name_en}{d.is_active ? '' : ' (Inactive)'}</option>)}</select></label>
-      {doctorId !== null && <form onSubmit={saveAssignments} className="space-y-3"><fieldset className="space-y-2"><legend className="text-sm font-medium">Departments</legend>{departments.map((d) => <label key={d.id} className="flex items-center gap-2 text-sm"><input type="checkbox" checked={ids.includes(d.id)} onChange={(e) => setIds((old) => e.target.checked ? [...old, d.id] : old.filter((id) => id !== d.id))} />{d.name_en}{d.name_hi ? ` / ${d.name_hi}` : ''}</label>)}</fieldset><button disabled={assign.isPending || !departments.length} className="rounded bg-red-900 px-4 py-2 text-sm text-white disabled:opacity-50">{assign.isPending ? 'Saving…' : 'Save assignments'}</button></form>}
+      <label className="block text-sm">Doctor<select value={doctorId ?? ''} onChange={(e) => chooseDoctor(e.target.value)} className="mt-1 w-full rounded border p-2 sm:max-w-md"><option value="">Select doctor</option>{doctors.map((d) => <option key={d.id} value={d.id}>{d.name_en}{d.is_active ? '' : ' (Inactive)'}</option>)}</select></label>
+      {doctorId !== null && !assignmentsReady && (assignmentsFailed ? <p role="alert" className="text-sm text-red-900">Could not load this doctor's departments.</p> : <p role="status" className="text-sm text-neutral-600">Loading departments…</p>)}
+      {doctorId !== null && <form onSubmit={saveAssignments} className="space-y-3"><fieldset disabled={!assignmentsReady} className="space-y-2"><legend className="text-sm font-medium">Departments</legend>{choices.map((d) => <label key={d.id} className="flex items-center gap-2 text-sm"><input type="checkbox" checked={ids.includes(d.id)} onChange={(e) => setIds((old) => e.target.checked ? [...old, d.id] : old.filter((id) => id !== d.id))} />{d.name_en}{d.name_hi ? ` / ${d.name_hi}` : ''}{d.is_active ? '' : ' (Inactive)'}</label>)}</fieldset><button disabled={assign.isPending || !assignmentsReady || !choices.length} className="rounded bg-red-900 px-4 py-2 text-sm text-white disabled:opacity-50">{assign.isPending ? 'Saving…' : 'Save assignments'}</button></form>}
     </section>
   </main></AppShell>
 }
