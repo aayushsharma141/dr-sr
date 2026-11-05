@@ -19,47 +19,57 @@ def test_operations_api_role_restrictions(
     assert client.get("/api/operations/backups").status_code == 401
     assert client.get("/api/operations/integrity").status_code == 401
     assert client.post("/api/operations/backups", json={}).status_code == 401
-    assert client.post(
-        "/api/operations/restore",
-        json={
-            "archive_filename": "foo",
-            "confirmation_phrase": "RESTORE-DATABASE-OVERWRITE",
-            "justification": "Authorised recovery test",
-        },
-    ).status_code == 401
+    assert (
+        client.post(
+            "/api/operations/restore",
+            json={
+                "archive_filename": "foo",
+                "confirmation_phrase": "RESTORE",
+                "reason": "Authorised recovery test",
+            },
+        ).status_code
+        == 401
+    )
 
     # 2. Reception -> 403
     rec_c = login_client(reception_user)
     assert rec_c.get("/api/operations/backups").status_code == 403
     assert rec_c.get("/api/operations/integrity").status_code == 403
     assert rec_c.post("/api/operations/backups", json={}).status_code == 403
-    assert rec_c.post(
-        "/api/operations/restore",
-        json={
-            "archive_filename": "foo",
-            "confirmation_phrase": "RESTORE-DATABASE-OVERWRITE",
-            "justification": "Authorised recovery test",
-        },
-    ).status_code == 403
+    assert (
+        rec_c.post(
+            "/api/operations/restore",
+            json={
+                "archive_filename": "foo",
+                "confirmation_phrase": "RESTORE",
+                "reason": "Authorised recovery test",
+            },
+        ).status_code
+        == 403
+    )
 
     # 3. Doctor -> 403
     doc_c = login_client(doctor_a_user)
     assert doc_c.get("/api/operations/backups").status_code == 403
     assert doc_c.get("/api/operations/integrity").status_code == 403
     assert doc_c.post("/api/operations/backups", json={}).status_code == 403
-    assert doc_c.post(
-        "/api/operations/restore",
-        json={
-            "archive_filename": "foo",
-            "confirmation_phrase": "RESTORE-DATABASE-OVERWRITE",
-            "justification": "Authorised recovery test",
-        },
-    ).status_code == 403
+    assert (
+        doc_c.post(
+            "/api/operations/restore",
+            json={
+                "archive_filename": "foo",
+                "confirmation_phrase": "RESTORE",
+                "reason": "Authorised recovery test",
+            },
+        ).status_code
+        == 403
+    )
 
 
 def test_operations_admin_lifecycle(
     login_client: Any,
     admin_user: User,
+    monkeypatch: Any,
 ) -> None:
     """Admin can list backups, trigger a backup, check integrity, and restore."""
     admin_c = login_client(admin_user)
@@ -97,7 +107,18 @@ def test_operations_admin_lifecycle(
     )
     assert invalid_restore.status_code == 422
 
-    # 5. Restore using the freshly created backup
+    # 5. Restore using freshly created backup (mock subprocess restore to keep test DB intact)
+    monkeypatch.setattr(
+        "kalyan_api.routers.operations.restore_backup",
+        lambda **kwargs: {
+            "status": "SUCCESS",
+            "archive_restored": backup_data["filename"],
+            "database_restored": True,
+            "photos_restored_count": 0,
+            "prerestore_snapshot": "kalyan_snapshot_prerestore_test.tar.gz",
+            "manifest": {"created_at": "2026-11-04T12:00:00Z", "label": "test"},
+        },
+    )
     restore_res = admin_c.post(
         "/api/operations/restore",
         json={

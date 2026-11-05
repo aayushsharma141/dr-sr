@@ -1,6 +1,6 @@
 """Functional tests for appointment booking REST API endpoints (APT-01)."""
 
-from kalyan_api.models import Department, Doctor, Patient
+from kalyan_api.models import Department, Patient
 
 
 def test_book_appointment_lifecycle(login_client, reception_user, doctor_a_user, db_session):

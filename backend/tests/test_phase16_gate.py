@@ -13,7 +13,7 @@ Invariants verified:
    - Captures automatic pre-restore safety snapshot.
    - Restores database schema and photos accurately.
 4. Clinical & Financial Integrity Diagnostic:
-   - Verifies 5 core system invariants (ledger, URNs, receipts, sessions, photos).
+   - Verifies 6 core system invariants (ledger, URNs, receipts, sessions, photos).
 """
 
 from pathlib import Path
@@ -34,15 +34,14 @@ from kalyan_api.services.backup_service import (
 from kalyan_api.services.integrity_service import run_integrity_audit
 
 
-def test_phase16_complete_gate(
+def test_phase16_audit_log_gate(
     client: TestClient,
     login_client: Any,
     admin_user: User,
     reception_user: User,
     doctor_a_user: User,
-    tmp_path: Path,
 ) -> None:
-    """Full Phase 16 end-to-end integration gate."""
+    """Phase 16 audit log query, redaction, and immutability invariants."""
     settings = get_settings()
     admin_c = login_client(admin_user)
     rec_c = login_client(reception_user)
@@ -76,6 +75,11 @@ def test_phase16_complete_gate(
                 with session.begin_nested():
                     session.delete(log_entry)
                     session.flush()
+
+
+def test_phase16_backup_restore_gate(tmp_path: Path) -> None:
+    """Phase 16 backup creation, bundle verification, tamper detection, and safe restore."""
+    settings = get_settings()
 
     # 2. Backup Bundle Creation & SHA-256 Manifest
     # Ensure a sample photo exists with test_ prefix so integrity check treats it as test asset

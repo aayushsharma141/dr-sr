@@ -5,7 +5,7 @@ from datetime import date
 import pytest
 from pydantic import ValidationError
 
-from kalyan_api.core.permissions import Permission, ROLE_PERMISSIONS, Role
+from kalyan_api.core.permissions import ROLE_PERMISSIONS, Permission, Role
 from kalyan_api.main import create_app
 from kalyan_api.models import Appointment, Department, Doctor
 from kalyan_api.schemas.appointments import AppointmentCreate
@@ -41,10 +41,7 @@ def test_department_routes_are_registered_with_role_permissions() -> None:
     """Reception can read/filter departments; only Admin can manage assignments."""
     from test_route_policies import walk_routes
 
-    routes = {
-        (method, path)
-        for method, path, _ in walk_routes(create_app())
-    }
+    routes = {(method, path) for method, path, _ in walk_routes(create_app())}
     assert ("GET", "/api/departments") in routes
     assert ("GET", "/api/departments/{department_id}/doctors") in routes
     assert ("POST", "/api/departments") in routes

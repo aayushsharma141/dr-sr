@@ -163,7 +163,11 @@ def _patch_department_payload(target: Any = None) -> dict[str, Any]:
 
 def _assign_doctor_departments_payload(target: Any = None) -> dict[str, Any]:
     ver = target.version_id if target and hasattr(target, "version_id") else 1
-    dept_id = target.departments[0].id if (target and hasattr(target, "departments") and target.departments) else 1
+    dept_id = (
+        target.departments[0].id
+        if (target and hasattr(target, "departments") and target.departments)
+        else 1
+    )
     return {
         "department_ids": [dept_id],
         "version_id": ver,

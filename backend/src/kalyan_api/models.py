@@ -15,8 +15,8 @@ from enum import StrEnum
 from sqlalchemy import (
     BigInteger,
     Boolean,
-    Column,
     CheckConstraint,
+    Column,
     Date,
     DateTime,
     ForeignKey,
@@ -54,14 +54,21 @@ class Base(DeclarativeBase):
 
 
 doctor_departments = Table(
-    "doctor_departments", Base.metadata,
+    "doctor_departments",
+    Base.metadata,
     Column("doctor_id", BigInteger, ForeignKey("doctors.id", ondelete="CASCADE"), primary_key=True),
-    Column("department_id", BigInteger, ForeignKey("departments.id", ondelete="RESTRICT"), primary_key=True),
+    Column(
+        "department_id",
+        BigInteger,
+        ForeignKey("departments.id", ondelete="RESTRICT"),
+        primary_key=True,
+    ),
 )
 
 
 class Department(Base):
     """Configured hospital department/specialty used for OPD routing (REC-01)."""
+
     __tablename__ = "departments"
     __table_args__ = (
         UniqueConstraint("name_en", name="uq_departments_name_en"),
@@ -71,11 +78,19 @@ class Department(Base):
     name_en: Mapped[str] = mapped_column(String(120), nullable=False)
     name_hi: Mapped[str | None] = mapped_column(String(120), nullable=True)
     description: Mapped[str | None] = mapped_column(String(500), nullable=True)
-    is_active: Mapped[bool] = mapped_column(Boolean, default=True, server_default=text("true"), nullable=False)
+    is_active: Mapped[bool] = mapped_column(
+        Boolean, default=True, server_default=text("true"), nullable=False
+    )
     version_id: Mapped[int] = mapped_column(Integer, default=1, server_default="1", nullable=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
-    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
-    doctors: Mapped[list["Doctor"]] = relationship(secondary=doctor_departments, back_populates="departments")
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
+    )
+    doctors: Mapped[list["Doctor"]] = relationship(
+        secondary=doctor_departments, back_populates="departments"
+    )
     __mapper_args__ = {"version_id_col": version_id}
 
 
@@ -108,7 +123,9 @@ class Doctor(Base):
 
     # Relationships
     user: Mapped["User"] = relationship("User", back_populates="doctor", uselist=False)
-    departments: Mapped[list["Department"]] = relationship(secondary=doctor_departments, back_populates="doctors")
+    departments: Mapped[list["Department"]] = relationship(
+        secondary=doctor_departments, back_populates="doctors"
+    )
 
     __mapper_args__ = {"version_id_col": version_id}
 

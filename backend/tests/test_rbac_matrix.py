@@ -28,11 +28,11 @@ from kalyan_api.config import Settings
 from kalyan_api.core.permissions import Permission
 from kalyan_api.core.policy import require
 from kalyan_api.models import (
-    Department,
     Appointment,
     ClinicalEncounter,
     ClinicSettings,
     ConsultationFee,
+    Department,
     Doctor,
     Patient,
     Payment,
@@ -210,7 +210,9 @@ def test_rbac_matrix_cell(
                 doc_a_id = doc_a_user.doctor_id
                 doc_a_obj = doc_a_user.doctor
             else:
-                doc_a_user = make_user(db_session, test_settings, "DOCTOR", f"mat_doc_a_{uuid.uuid4().hex[:6]}")
+                doc_a_user = make_user(
+                    db_session, test_settings, "DOCTOR", f"mat_doc_a_{uuid.uuid4().hex[:6]}"
+                )
                 doc_a_id = doc_a_user.doctor_id
                 doc_a_obj = doc_a_user.doctor
 
@@ -253,7 +255,11 @@ def test_rbac_matrix_cell(
             target_entity = appt
             resolved_path = row.path.replace("{id}", str(appt.id))
         else:
-            target_entity = type("TargetAppt", (), {"patient_id": pat.id, "doctor_id": doc_a_id, "department_id": dept.id})()
+            target_entity = type(
+                "TargetAppt",
+                (),
+                {"patient_id": pat.id, "doctor_id": doc_a_id, "department_id": dept.id},
+            )()
 
     elif "/api/patients/{patient_id}/" in row.path:
         pat = Patient(
