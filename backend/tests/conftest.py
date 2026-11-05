@@ -35,6 +35,9 @@ def test_settings() -> Settings:
     settings = Settings(
         env="test",
         db_name=test_db,
+        extra_allowed_origins=os.environ.get(
+            "KALYAN_EXTRA_ALLOWED_ORIGINS", "http://localhost:5173"
+        ),
         argon2_time_cost=1,
         argon2_memory_cost=8,
         argon2_parallelism=1,
@@ -47,6 +50,7 @@ def configure_test_environment(test_settings: Settings) -> None:
     """Ensure environment points to the test database and clear cached settings."""
     os.environ["KALYAN_DB_NAME"] = test_settings.db_name
     os.environ["KALYAN_ENV"] = "test"
+    os.environ.setdefault("KALYAN_EXTRA_ALLOWED_ORIGINS", "http://localhost:5173")
     from kalyan_api.config import get_settings
 
     get_settings.cache_clear()

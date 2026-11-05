@@ -186,6 +186,7 @@ jobs:
           KALYAN_DB_OWNER_PASSWORD: kalyan_owner_ci_pass
           KALYAN_DB_APP_USER: kalyan_app
           KALYAN_DB_APP_PASSWORD: kalyan_app_ci_pass
+          KALYAN_EXTRA_ALLOWED_ORIGINS: http://localhost:5173
         run: pytest
 
   frontend:
