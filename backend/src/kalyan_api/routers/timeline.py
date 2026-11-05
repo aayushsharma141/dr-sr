@@ -11,6 +11,8 @@ Doctor silo (D-03):
 - Admin can see the complete timeline across all departments.
 """
 
+import re
+
 from fastapi import APIRouter, Depends
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
@@ -32,6 +34,13 @@ from kalyan_api.models import (
 from kalyan_api.schemas.timeline import TimelineItemOut
 
 router = APIRouter(tags=["timeline"])
+
+_DOCTOR_TITLE = re.compile(r"dr(\.\s*|\s+)", re.IGNORECASE)
+
+
+def _doctor_title(name: str) -> str:
+    """Return the name with one "Dr." title; staff often type it into the stored name."""
+    return name if _DOCTOR_TITLE.match(name) else f"Dr. {name}"
 
 
 @router.get(
@@ -67,7 +76,7 @@ def get_patient_timeline(
                 id=f"APPOINTMENT-{appt.id}",
                 event_type="APPOINTMENT",
                 event_date=appt.created_at,
-                title=f"Token #{appt.token_number}: Appointment with Dr. {doc_name}",
+                title=f"Token #{appt.token_number}: Appointment with {_doctor_title(doc_name)}",
                 subtitle=f"Status: {appt.status}",
                 summary=appt.notes,
                 badge=appt.status,
@@ -113,8 +122,8 @@ def get_patient_timeline(
                     id=f"ENCOUNTER-{enc.id}",
                     event_type="ENCOUNTER",
                     event_date=enc.encounter_date,
-                    title=f"Clinical Consultation with Dr. {doc_name}",
-                    subtitle=f"Dr. {doc_name}",
+                    title=f"Clinical Consultation with {_doctor_title(doc_name)}",
+                    subtitle=_doctor_title(doc_name),
                     summary=" | ".join(summary_parts) if summary_parts else None,
                     badge=badge_text,
                     badge_variant=badge_var,
@@ -152,7 +161,7 @@ def get_patient_timeline(
                     id=f"PRESCRIPTION-{rx.id}",
                     event_type="PRESCRIPTION",
                     event_date=rx.created_at,
-                    title=f"Prescription by Dr. {doc_name}",
+                    title=f"Prescription by {_doctor_title(doc_name)}",
                     subtitle=f"Rx #{rx.id} · {len(rx.items)} medication(s)",
                     summary=items_summary or rx.diagnosis,
                     badge="ACTIVE",
@@ -181,7 +190,7 @@ def get_patient_timeline(
                 event_type="TREATMENT_PLAN",
                 event_date=plan.created_at,
                 title=f"Package: {plan.plan_name}",
-                subtitle=f"Dr. {doc_name} · ₹{price_rupees:,.2f}",
+                subtitle=f"{_doctor_title(doc_name)} · ₹{price_rupees:,.2f}",
                 summary=(
                     f"Diagnosis: {plan.condition_diagnosis or 'N/A'} | "
                     f"Sessions: {plan.completed_sessions}/{plan.total_sessions}"
@@ -212,7 +221,8 @@ def get_patient_timeline(
     for sess in sessions:
         doc_name = sess.doctor.name_en if sess.doctor else "Doctor"
         plan_name = sess.treatment_plan.plan_name if sess.treatment_plan else "Physiotherapy"
-        summary_txt = f"Doctor: Dr. {doc_name} | Modalities: {sess.modalities or 'Standard'}"
+        doctor_label = _doctor_title(doc_name)
+        summary_txt = f"Doctor: {doctor_label} | Modalities: {sess.modalities or 'Standard'}"
         if sess.vas_score is not None:
             summary_txt += f" | VAS: {sess.vas_score}/10"
 
@@ -222,7 +232,7 @@ def get_patient_timeline(
                 event_type="TREATMENT_SESSION",
                 event_date=sess.created_at,
                 title=f"Session #{sess.session_number}: {plan_name}",
-                subtitle=f"Dr. {doc_name}",
+                subtitle=_doctor_title(doc_name),
                 summary=summary_txt,
                 badge="COMPLETED" if sess.is_finalised else "LOGGED",
                 badge_variant="default",

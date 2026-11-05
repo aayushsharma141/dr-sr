@@ -12,6 +12,7 @@ import {
   useMe,
 } from '../api/queries'
 import type { Appointment, AppointmentStatus, DoctorOut } from '../api/types'
+import { istToday } from '../format'
 
 
 type FollowUpWindow = 'all' | 'today' | 'week' | 'overdue'
@@ -185,9 +186,7 @@ export function AppointmentsReception() {
   const canManageAppointments = me?.permissions.includes('appointment:write') === true
   const canViewFollowUps = me?.permissions.includes('prescription:read') === true
   const selectTab = (tab: 'today' | 'followup') => setSearchParams({ tab })
-  const [selectedDate, setSelectedDate] = useState(
-    new Date().toISOString().split('T')[0],
-  )
+  const [selectedDate, setSelectedDate] = useState(istToday)
   const [selectedDoctorId, setSelectedDoctorId] = useState<number | undefined>(undefined)
   const [isBookingOpen, setIsBookingOpen] = useState(false)
   const [conflictError, setConflictError] = useState<string | null>(null)
@@ -217,7 +216,7 @@ export function AppointmentsReception() {
   }
 
   const handleSetToday = () => {
-    setSelectedDate(new Date().toISOString().split('T')[0])
+    setSelectedDate(istToday())
   }
 
   const handleUpdateStatus = async (
@@ -566,6 +565,7 @@ export function AppointmentsReception() {
               </p>
               <textarea
                 data-autofocus
+                aria-label="Cancellation reason"
                 value={cancelReason}
                 onChange={(e) => setCancelReason(e.target.value)}
                 placeholder="Reason for cancellation (e.g. Patient called to reschedule)..."

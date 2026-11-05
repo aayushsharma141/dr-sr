@@ -111,7 +111,7 @@ def log_treatment_session(
             message="Treatment plan not found.",
         )
 
-    session_date = payload.session_date or clock.utcnow().date()
+    session_date = payload.session_date or clock.ist_today()
 
     sess = TreatmentSession(
         treatment_plan_id=plan.id,

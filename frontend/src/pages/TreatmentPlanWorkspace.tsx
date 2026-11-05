@@ -15,6 +15,7 @@ import {
   useMe,
 } from '../api/queries'
 import type { TreatmentPlanOut, TreatmentSessionOut } from '../api/types'
+import { withDoctorTitle } from '../format'
 
 export function TreatmentPlanWorkspace() {
   const { id } = useParams<{ id?: string }>()
@@ -492,7 +493,7 @@ export function TreatmentPlanWorkspace() {
                       <span className="text-xs text-gray-500 font-medium">
                         {new Date(sess.session_date).toLocaleDateString('en-IN')}
                       </span>
-                      <span className="text-xs text-gray-600 font-semibold">· Dr. {sess.doctor_name}</span>
+                      <span className="text-xs text-gray-600 font-semibold">· {withDoctorTitle(sess.doctor_name)}</span>
                     </div>
 
                     <div className="flex items-center gap-2">

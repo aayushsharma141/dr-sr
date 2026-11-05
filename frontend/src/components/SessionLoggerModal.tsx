@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Modal } from './Modal'
 import type { TreatmentPlanOut } from '../api/types'
 import { useLogTreatmentSession } from '../api/queries'
+import { istToday } from '../format'
 
 const MODALITY_OPTIONS = [
   'IFT (Interferential Therapy)',
@@ -32,9 +33,8 @@ function getVasDescription(score: number): { label: string; color: string } {
 
 export function SessionLoggerModal({ plan, onClose, onSuccess }: SessionLoggerModalProps) {
   const nextSessionNumber = plan.completed_sessions + 1
-  const today = new Date().toISOString().split('T')[0]
 
-  const [sessionDate, setSessionDate] = useState(today)
+  const [sessionDate, setSessionDate] = useState(istToday)
   const [vasScore, setVasScore] = useState(5)
   const [selectedModalities, setSelectedModalities] = useState<string[]>([])
   const [clinicalNotes, setClinicalNotes] = useState('')
@@ -101,6 +101,7 @@ export function SessionLoggerModal({ plan, onClose, onSuccess }: SessionLoggerMo
             </label>
             <input
               id="session-date"
+              data-autofocus
               type="date"
               value={sessionDate}
               onChange={(e) => setSessionDate(e.target.value)}

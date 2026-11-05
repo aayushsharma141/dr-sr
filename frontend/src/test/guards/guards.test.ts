@@ -143,3 +143,55 @@ describe('legibility guard (UX-04)', () => {
     }
   })
 })
+
+describe('business dates', () => {
+  it('no screen takes today from toISOString(), which is the UTC date until 05:30 IST', () => {
+    const bad = files.filter((f) => /new Date\(\)\.toISOString\(\)\.(split|slice)/.test(readFileSync(f, 'utf8'))).map(rel)
+    expect(bad).toEqual([])
+  })
+})
+
+describe('accessible names guard (UX-06)', () => {
+  /** Opening tags of the wanted elements, skipping > inside {...} and quotes (arrow functions contain >). */
+  function* tags(src: string, names: string[]) {
+    const re = new RegExp(`<(${names.join('|')})(?=[\\s/>])`, 'g')
+    let m: RegExpExecArray | null
+    while ((m = re.exec(src))) {
+      let i = m.index + m[0].length
+      let depth = 0
+      let quote: string | null = null
+      for (; i < src.length; i++) {
+        const c = src[i]
+        if (quote) {
+          if (c === quote && src[i - 1] !== '\\') quote = null
+          continue
+        }
+        if (depth === 0 && (c === '"' || c === "'")) quote = c
+        else if (c === '{') depth++
+        else if (c === '}') depth--
+        else if (c === '>' && depth === 0) break
+      }
+      yield { tag: m[1], attrs: src.slice(m.index + m[0].length, i), index: m.index }
+    }
+  }
+
+  it('every input, select and textarea has an accessible name', () => {
+    const bad: string[] = []
+    // Settings.tsx: its Field wrapper renders <label htmlFor={id}> around render-prop controls.
+    for (const f of files.filter((name) => name.endsWith('.tsx') && rel(name) !== 'pages/Settings.tsx')) {
+      const src = readFileSync(f, 'utf8')
+      const forIds = new Set(
+        [...src.matchAll(/htmlFor=(?:"([^"]+)"|\{\s*[`'"]([^`'"]+)[`'"]\s*\})/g)].map((m) => m[1] ?? m[2]),
+      )
+      for (const { tag, attrs, index } of tags(src, ['input', 'select', 'textarea'])) {
+        if (/type=["']hidden["']/.test(attrs) || /\baria-label=|\baria-labelledby=/.test(attrs) || /\{\.\.\./.test(attrs)) continue
+        const id = attrs.match(/\bid=(?:"([^"]+)"|\{[`'"]([^`'"]+)[`'"]\})/)
+        if (id && forIds.has(id[1] ?? id[2])) continue
+        const before = src.slice(0, index)
+        if (before.lastIndexOf('<label') > before.lastIndexOf('</label>')) continue // wrapped by a label
+        bad.push(`${rel(f)}:${before.split('\n').length} <${tag}>`)
+      }
+    }
+    expect(bad).toEqual([])
+  })
+})

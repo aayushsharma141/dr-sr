@@ -2,11 +2,13 @@ import { useNavigate } from 'react-router'
 import { AppShell } from '../components/AppShell'
 import { useDoctorQueue, useMe } from '../api/queries'
 import type { DoctorQueueItem } from '../api/types'
+import { withDoctorTitle } from '../format'
 
 export function DoctorDashboard() {
   const { data: me } = useMe()
   const navigate = useNavigate()
   const { data: queue, isPending, isError, error, refetch } = useDoctorQueue()
+  const doctorName = queue?.doctor_name || me?.full_name
 
   const handleStartConsultation = (item: DoctorQueueItem) => {
     navigate(`/doctor/encounters/new?patient_id=${item.patient_id}&appointment_id=${item.id}`)
@@ -22,7 +24,7 @@ export function DoctorDashboard() {
               Doctor Consultation Queue
             </h2>
             <p className="text-xs text-neutral-500 mt-1">
-              Live waiting room for Dr. {queue?.doctor_name || me?.full_name} ({queue?.queue_date || 'Today'})
+              Live waiting room for {doctorName ? withDoctorTitle(doctorName) : 'the doctor'} ({queue?.queue_date || 'Today'})
             </p>
           </div>
           <button
