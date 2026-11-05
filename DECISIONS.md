@@ -45,7 +45,7 @@
 | OD-03 | Financial reversal authority | Admin only, mandatory reason | Pending |
 | OD-04 | Receipt sequence reset | Calendar or financial year; client chooses | Pending |
 | OD-05 | Genuine v2 data exists? | Inspect before migration; demo data is not production data | Pending |
-| OD-06 | Printer | Confirm actual A4 model/driver; thermal separate | Pending |
+| OD-06 | Printer | Standard Epson A4 desktop printer on plain A4 sheet; thermal not used | Resolved |
 | OD-07 | HTTPS | Prefer HTTPS; HTTP only by explicit approval on isolated LAN | Pending |
 | OD-08 | Idle timeout and lockout thresholds | Agree during security acceptance | Pending |
 | OD-09 | Backup schedule, retention and owner | Daily scheduled plus manual pre-upgrade/restore; confirm policy | Pending |
