@@ -1,5 +1,7 @@
 # Reception Module Specification v1.1
 
+> **Note (2026-11-06):** This specification has been frozen and updated to **[Reception Module Specification v1.2](reception-module-spec-v1.2.md)**, which reconciles payment permissions, finalizes queue token monotonicity (ADR-26), and incorporates the confirmed Epson A4 printer profile (OD-06).
+
 **Project:** Kalyan Hospital — centralized offline LAN platform  
 **Decision date:** 2026-11-04  
 **Status:** User-confirmed operating decisions; detailed client operational policies remain open.

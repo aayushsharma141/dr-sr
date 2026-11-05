@@ -30,7 +30,7 @@ Assume shared/unattended workstations, direct API probing, concurrent edits, dis
 
 Every protected API endpoint, patient object and file access must enforce permissions on the backend. Frontend route guards are usability only. Fixed Admin, Reception and Doctor roles; no custom permission editor in v1. A route/permission coverage test fails if any protected endpoint has no declared policy.
 
-### Proposed role matrix — client approval pending
+### Authoritative role matrix (v3 LAN)
 
 | Capability | Admin | Reception | Doctor |
 |---|---|---|---|
@@ -40,10 +40,12 @@ Every protected API endpoint, patient object and file access must enforce permis
 | Appointments | Yes | Yes | Own queue/status |
 | Clinical notes and addenda | Read/admin | No authoring | Authorized clinician |
 | Prescription and treatment authoring | Read/admin | No | Assigned/authorized cases |
-| Record payments | Yes | Yes | No |
+| Record payments | No (D-06/REC-04) | Yes | No |
 | Authorize reversals | Yes | No | No |
 | Read audit | Yes | No | No |
 | Backup/restore | Yes | No | No |
+
+*Note: In accordance with D-06, ADR-23, and PRD REC-04, separation of duties is strictly enforced: Reception exclusively collects and posts payments (`payment:create`). Admin holds read and authorized reversal permissions (`payment:read`, `payment:reverse`) but cannot collect payments (API returns HTTP 403). Doctor has zero billing permissions.*
 
 Recommended doctor access: read clinically relevant records across doctors, write only assigned cases. Not yet client-approved.
 
