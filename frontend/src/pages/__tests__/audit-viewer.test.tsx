@@ -31,14 +31,8 @@ const sampleAuditLogs = {
 }
 
 vi.mock('../../api/queries', () => ({
-  useMe: () => ({
-    data: { id: 1, username: 'admin', role: 'ADMIN', full_name: 'Admin User' },
-    isPending: false,
-  }),
-  useAuditActions: () => ({
-    data: ['USER_CREATED', 'USER_UPDATED'],
-    isPending: false,
-  }),
+  useMe: () => ({ data: { name: 'Admin', role: 'ADMIN' }, isPending: false, isError: false }),
+  useAuditActions: () => ({ data: ['USER_CREATED'], isPending: false, isError: false }),
   useAuditLogs: () => ({
     data: sampleAuditLogs,
     isPending: false,
@@ -82,7 +76,7 @@ describe('AuditViewerPage', () => {
     const inspectBtn = screen.getByText('Inspect')
     fireEvent.click(inspectBtn)
 
-    expect(screen.getByLabelText(/Field changes for audit entry 101/i)).toBeInTheDocument()
+    expect(screen.getByText(/Audit Entry #101/)).toBeInTheDocument()
     expect(screen.getAllByText(/nurse_joy/).length).toBeGreaterThan(0)
   })
 })

@@ -4,7 +4,7 @@ on:
   pull_request:
     branches: [main]
   push:
-    branches: [main, ui/redesign-modern-clinical, ui/clinical-navigation-hierarchy]
+    branches: [main, ui/redesign-modern-clinical, ui/clinical-navigation-hierarchy, feature/reception-all-specialties]
 
 permissions:
   contents: read
@@ -127,7 +127,8 @@ jobs:
 
           owner_engine = create_engine(settings.owner_url, isolation_level="AUTOCOMMIT")
           with owner_engine.connect() as conn:
-              conn.execute(text("DROP SCHEMA IF EXISTS public CASCADE; CREATE SCHEMA public;"))
+              conn.execute(text("DROP SCHEMA IF EXISTS public CASCADE"))
+              conn.execute(text("CREATE SCHEMA public"))
 
           print("Step 1: Upgrade to 0009 (head)...")
           command.upgrade(cfg, "0009")
