@@ -21,6 +21,7 @@ Ordering notes:
 - [ ] **Phase 16: Audit Viewer, Backup/Restore & Integrity** - Audit log viewer, scheduled checksummed backups on a second drive, verified restore, integrity report.
 - [ ] **Phase 17: LAN Deployment, Printer & Acceptance** - One-time server install, auto-recovery after power cut, LAN multi-PC offline operation, real-printer sign-off, full acceptance suite.
 - [ ] **Phase 18: UI/UX Review Hardening** - Receipt printing from the app, native modal dialogs, non-blocking errors, 12px text and contrast floor, bundled Hindi font and language marking, form accessibility, webcam HTTPS decision, headless print verification.
+- [ ] **Phase 19: Universal Consultation Workspace** - One consultation for Physiotherapy and Ophthalmology: real drafts with auto-save, new and follow-up encounters, versioned specialty templates, vitals, integrated prescription, follow-up recommendations, read-all edit-own access, one login at a time and a printed summary.
 
 ## Phase Details
 
@@ -211,6 +212,31 @@ Plans:
 - [ ] 18-07-PLAN.md - Webcam HTTPS decision and implementation or upload-only (Wave 5)
 - [ ] 18-08-PLAN.md - Form accessibility, final gate and manual-check sheet (Wave 6)
 
+### Phase 19: Universal Consultation Workspace
+
+**Goal**: Doctors in both specialties work one consultation that holds the assessment, specialty template, diagnosis, prescription and follow-up together, can leave and resume it without losing saved work, and can read a patient's earlier records from other doctors.
+**Depends on**: Phase 13 and Phase 14 (extends their encounter and prescription work), and PR #17 and PR #12 merged first (departments and visit type). DWS-04 also depends on the EG-6 sign-off todo, and the Hindi labels in DWS-09 depend on Plan 18-06 (bundled font). Sequencing with the rest of Phase 18 is to be settled in planning.
+**Requirements**: DWS-01, DWS-02, DWS-03, DWS-04, DWS-05, DWS-06, DWS-07, DWS-08, DWS-09, DWS-10
+**Canonical refs**: `.planning/phases/19-universal-consultation-workspace/19-CONTEXT.md`, `.planning/notes/doctor-workspace-direction.md`, `.planning/phases/13-appointments-clinical-encounters/13-LEARNINGS.md`, `.planning/phases/14-prescriptions-treatment-plans-sessions/14-LEARNINGS.md`
+**Budget**: Must fit within the existing Rs 22,000 ceiling. No admin template editor. If it needs cutting, vitals (DWS-06) and follow-up recommendations (DWS-08) go first.
+**Success Criteria**:
+
+  1. Starting a consultation twice for one appointment opens the same encounter, and the database rejects a second one.
+  2. A doctor closes the browser partway through a consultation and returns to the same draft, and the screen never shows "saved" for work the server has not stored.
+  3. A patient seen by a physiotherapist and then the eye doctor keeps one URN, with two independent encounters, each on its own specialty template; publishing a new template version leaves both unchanged.
+  4. Once EG-6 sign-off is recorded, a doctor can read another doctor's finalised encounter but cannot edit it or add to it; the read appears in the audit log, and Reception and Admin are still denied.
+  5. A doctor creates the prescription inside the consultation, enters the diagnosis once, and authorises it; it can only print once authorised, it cannot then be overwritten, a correction cancels and reissues it, and it prints on one A4 page with its Hindi labels.
+  6. A follow-up recommendation stays traceable from the original encounter to the appointment booked for it and the follow-up encounter that results; reception sees only its date and doctor.
+  7. Physiotherapy packages, VAS session logging and package billing work unchanged, and an Ophthalmology consultation completes with no treatment plan.
+  8. After finalising, the patient-copy summary prints on one A4 page using the approved letterhead, with no medicines listed.
+  9. A second login on another PC is refused with the option to end the other session; taking over is audited, and a crashed PC never locks an account out.
+
+**Plans**: TBD
+
+Plans:
+
+- [ ] TBD (created by plan-phase)
+
 ## Backlog
 
 - [ ] **999.1 Payment reversal workflow (BIL-05 UI)**: `PaymentReversalModal` and `PatientTimeline` exist but are mounted nowhere, so an admin has no accessible screen to reverse a payment. Outside Phase 18 (UX-01..UX-08); needs its own plan: admin-only entry point from payment history, mandatory reason, accessible dialog, audit and receipt/balance refresh tests. Found in the Phase 18 research (2026-11-02).
@@ -218,7 +244,7 @@ Plans:
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 11 → 12 → 13 → 14 → 15 → 16 → 17 → 18
+Phases execute in numeric order: 11 → 12 → 13 → 14 → 15 → 16 → 17 → 18 → 19
 
 | Phase | Plans Complete | Status | Completed |
 | --- | --- | --- | --- |
@@ -230,6 +256,7 @@ Phases execute in numeric order: 11 → 12 → 13 → 14 → 15 → 16 → 17 �
 | 16. Audit Viewer, Backup/Restore & Integrity | 0/TBD | Not started | - |
 | 17. LAN Deployment, Printer & Acceptance | 0/TBD | Not started | - |
 | 18. UI/UX Review Hardening | 5/8 | In progress (04 closed with printer waiver; 05 closed with criterion 4 unmet; 06-08 pending) | - |
+| 19. Universal Consultation Workspace | 0/TBD | Not started | - |
 
 ---
 *Roadmap created: 2026-10-30*
