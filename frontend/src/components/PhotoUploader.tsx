@@ -44,6 +44,52 @@ export function passportCrop(srcWidth: number, srcHeight: number): CropRect {
 
 type CameraMode = 'idle' | 'starting' | 'live' | 'captured'
 
+/**
+ * The server's Content-Security-Policy blocks blob: images, so an <img> preview stays
+ * blank in production. Drawing on a canvas needs no policy change.
+ */
+function PhotoPreview({
+  source,
+  label,
+  className,
+  onUnreadable,
+}: {
+  source: Blob
+  label: string
+  className: string
+  onUnreadable: () => void
+}) {
+  const canvasRef = useRef<HTMLCanvasElement>(null)
+  const onUnreadableRef = useRef(onUnreadable)
+
+  useEffect(() => {
+    onUnreadableRef.current = onUnreadable
+  })
+
+  useEffect(() => {
+    let cancelled = false
+    createImageBitmap(source).then(
+      (bitmap) => {
+        const canvas = canvasRef.current
+        if (!cancelled && canvas) {
+          canvas.width = bitmap.width
+          canvas.height = bitmap.height
+          canvas.getContext('2d')?.drawImage(bitmap, 0, 0)
+        }
+        bitmap.close()
+      },
+      () => {
+        if (!cancelled) onUnreadableRef.current()
+      },
+    )
+    return () => {
+      cancelled = true
+    }
+  }, [source])
+
+  return <canvas ref={canvasRef} role="img" aria-label={label} className={className} />
+}
+
 function cameraErrorMessage(err: unknown): string {
   const name = err instanceof DOMException ? err.name : ''
   if (name === 'NotAllowedError' || name === 'SecurityError') {
@@ -69,10 +115,10 @@ function cameraUnavailableReason(): string | null {
 }
 
 export function PhotoUploader({ onPhotoSelected, disabled = false }: PhotoUploaderProps) {
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null)
+  const [preview, setPreview] = useState<Blob | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [mode, setMode] = useState<CameraMode>('idle')
-  const [capturedUrl, setCapturedUrl] = useState<string | null>(null)
+  const [capturedPreview, setCapturedPreview] = useState<Blob | null>(null)
   const inputRef = useRef<HTMLInputElement>(null)
   const videoRef = useRef<HTMLVideoElement>(null)
   const streamRef = useRef<MediaStream | null>(null)
@@ -86,7 +132,7 @@ export function PhotoUploader({ onPhotoSelected, disabled = false }: PhotoUpload
     streamRef.current = null
   }, [])
 
-  // Always release the camera and any object URLs when the component goes away.
+  // Always release the camera when the component goes away.
   useEffect(() => {
     mountedRef.current = true
     return () => {
@@ -94,18 +140,6 @@ export function PhotoUploader({ onPhotoSelected, disabled = false }: PhotoUpload
       stopCamera()
     }
   }, [stopCamera])
-
-  useEffect(() => {
-    return () => {
-      if (previewUrl) URL.revokeObjectURL(previewUrl)
-    }
-  }, [previewUrl])
-
-  useEffect(() => {
-    return () => {
-      if (capturedUrl) URL.revokeObjectURL(capturedUrl)
-    }
-  }, [capturedUrl])
 
   // Attach the stream once the <video> element exists.
   useEffect(() => {
@@ -119,7 +153,7 @@ export function PhotoUploader({ onPhotoSelected, disabled = false }: PhotoUpload
     setError(null)
     const file = e.target.files?.[0]
     if (!file) {
-      setPreviewUrl(null)
+      setPreview(null)
       onPhotoSelected(null)
       return
     }
@@ -127,7 +161,7 @@ export function PhotoUploader({ onPhotoSelected, disabled = false }: PhotoUpload
     // Validate mime type
     if (!['image/jpeg', 'image/png'].includes(file.type)) {
       setError('Only JPEG and PNG photos are supported.')
-      setPreviewUrl(null)
+      setPreview(null)
       onPhotoSelected(null)
       return
     }
@@ -135,22 +169,27 @@ export function PhotoUploader({ onPhotoSelected, disabled = false }: PhotoUpload
     // Validate size (5MB max)
     if (file.size > 5 * 1024 * 1024) {
       setError('Photo exceeds 5 MB limit. Please select a smaller photo.')
-      setPreviewUrl(null)
+      setPreview(null)
       onPhotoSelected(null)
       return
     }
 
-    setPreviewUrl(URL.createObjectURL(file))
+    setPreview(file)
     onPhotoSelected(file)
   }
 
   const handleClear = () => {
-    setPreviewUrl(null)
+    setPreview(null)
     setError(null)
     if (inputRef.current) {
       inputRef.current.value = ''
     }
     onPhotoSelected(null)
+  }
+
+  const handleUnreadablePhoto = () => {
+    handleClear()
+    setError('This photo could not be read. Choose another JPEG or PNG file.')
   }
 
   const openCamera = async () => {
@@ -183,8 +222,13 @@ export function PhotoUploader({ onPhotoSelected, disabled = false }: PhotoUpload
   const closeCamera = () => {
     stopCamera()
     capturedFileRef.current = null
-    setCapturedUrl(null)
+    setCapturedPreview(null)
     setMode('idle')
+  }
+
+  const handleUnreadableCapture = () => {
+    closeCamera()
+    setError('The photo could not be captured. Use Upload photo instead.')
   }
 
   const capture = () => {
@@ -211,7 +255,7 @@ export function PhotoUploader({ onPhotoSelected, disabled = false }: PhotoUpload
         }
         capturedFileRef.current = new File([blob], 'webcam-photo.jpg', { type: 'image/jpeg' })
         stopCamera() // release the camera as soon as the picture is taken
-        setCapturedUrl(URL.createObjectURL(blob))
+        setCapturedPreview(blob)
         setMode('captured')
       },
       'image/jpeg',
@@ -221,7 +265,7 @@ export function PhotoUploader({ onPhotoSelected, disabled = false }: PhotoUpload
 
   const retake = async () => {
     capturedFileRef.current = null
-    setCapturedUrl(null)
+    setCapturedPreview(null)
     await openCamera()
   }
 
@@ -229,10 +273,10 @@ export function PhotoUploader({ onPhotoSelected, disabled = false }: PhotoUpload
     const file = capturedFileRef.current
     if (!file) return
     if (inputRef.current) inputRef.current.value = ''
-    setPreviewUrl(URL.createObjectURL(file))
+    setPreview(file)
     onPhotoSelected(file)
     capturedFileRef.current = null
-    setCapturedUrl(null)
+    setCapturedPreview(null)
     setMode('idle')
   }
 
@@ -241,16 +285,17 @@ export function PhotoUploader({ onPhotoSelected, disabled = false }: PhotoUpload
 
   return (
     <div className="space-y-3">
-      <label className="block text-sm font-medium text-neutral-700">
+      <label htmlFor="patient-photo-input" className="block text-sm font-medium text-neutral-700">
         Patient Photograph (Optional)
       </label>
       <div className="flex items-start gap-4">
         <div className="w-24 h-32 rounded border border-neutral-300 bg-neutral-100 flex items-center justify-center overflow-hidden">
-          {previewUrl ? (
-            <img
-              src={previewUrl}
-              alt="Patient preview"
+          {preview ? (
+            <PhotoPreview
+              source={preview}
+              label="Patient preview"
               className="w-full h-full object-cover"
+              onUnreadable={handleUnreadablePhoto}
             />
           ) : (
             <span className="text-xs text-neutral-600 text-center px-1">
@@ -280,7 +325,7 @@ export function PhotoUploader({ onPhotoSelected, disabled = false }: PhotoUpload
               className="block text-sm text-neutral-600 file:mr-3 file:py-2 file:px-3 file:rounded file:border-0 file:text-xs file:font-semibold file:bg-red-50 file:text-red-900 hover:file:bg-red-100 cursor-pointer disabled:opacity-50"
             />
           </div>
-          {previewUrl && (
+          {preview && (
             <button
               type="button"
               onClick={handleClear}
@@ -314,11 +359,12 @@ export function PhotoUploader({ onPhotoSelected, disabled = false }: PhotoUpload
               className="w-full rounded bg-black"
             />
           ) : (
-            capturedUrl && (
-              <img
-                src={capturedUrl}
-                alt="Captured photo preview"
+            capturedPreview && (
+              <PhotoPreview
+                source={capturedPreview}
+                label="Captured photo preview"
                 className="mx-auto h-64 rounded bg-black object-contain"
+                onUnreadable={handleUnreadableCapture}
               />
             )
           )}

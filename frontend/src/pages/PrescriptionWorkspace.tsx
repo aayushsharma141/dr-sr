@@ -293,6 +293,7 @@ export function PrescriptionWorkspace() {
                         <input
                           type="text"
                           required
+                          aria-label={`Medicine name, row ${index + 1}`}
                           value={item.medicine_name}
                           onChange={(e) => handleItemChange(index, 'medicine_name', e.target.value)}
                           placeholder="e.g. Tab Pregabalin"
@@ -303,6 +304,7 @@ export function PrescriptionWorkspace() {
                         <input
                           type="text"
                           required
+                          aria-label={`Dosage, row ${index + 1}`}
                           value={item.dosage}
                           onChange={(e) => handleItemChange(index, 'dosage', e.target.value)}
                           placeholder="75 mg"
@@ -311,6 +313,7 @@ export function PrescriptionWorkspace() {
                       </td>
                       <td className="py-2 px-3">
                         <select
+                          aria-label={`Frequency, row ${index + 1}`}
                           value={item.frequency}
                           onChange={(e) => handleItemChange(index, 'frequency', e.target.value)}
                           className="w-full rounded border border-gray-300 p-1.5 text-xs focus:border-teal-600 focus:ring-1 focus:ring-teal-600"
@@ -328,6 +331,7 @@ export function PrescriptionWorkspace() {
                           required
                           min={1}
                           max={365}
+                          aria-label={`Days, row ${index + 1}`}
                           value={item.duration_days}
                           onChange={(e) => handleItemChange(index, 'duration_days', Number(e.target.value))}
                           className="w-full rounded border border-gray-300 p-1.5 text-xs focus:border-teal-600 focus:ring-1 focus:ring-teal-600"
@@ -336,6 +340,7 @@ export function PrescriptionWorkspace() {
                       <td className="py-2 px-3">
                         <input
                           type="text"
+                          aria-label={`Instructions, row ${index + 1}`}
                           value={item.instructions || ''}
                           onChange={(e) => handleItemChange(index, 'instructions', e.target.value)}
                           placeholder="After food, at bedtime"

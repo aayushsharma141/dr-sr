@@ -24,7 +24,7 @@ These need a person with a real browser, display or screen reader. Automated tes
   Result: NOT RUN
 - M-18-15 Dialog keyboard behaviour in real Edge (plans 02 and 03): Tab and Shift+Tab stay inside an open dialog, Esc closes it (except destructive confirmations and the temporary-password dialog), and focus returns to the control that opened it. Check payment, payment reversal, patient edit, backup restore and the session dialogs. jsdom only checks Esc and focus return.
   Result: NOT RUN
-- M-18-16 Dialog first-field focus (KNOWN ISSUE): the session logger and session addendum dialogs open with focus on the Close button, not the first field. Needs a fix and then this check.
+- M-18-16 Dialog first-field focus: the session logger and session addendum dialogs now open on their first field (fixed 2026-11-06, covered in jsdom by `session-dialogs.test.tsx`). Still needs this check in real Edge.
   Result: NOT RUN (known failing)
 - M-18-08 Screen reader (plan 08): with NVDA, confirm dialog titles are announced on open, banners and error messages (InlineAlert, payment and backup errors) are announced, and the receipt and payment history are readable.
   Result: NOT RUN
