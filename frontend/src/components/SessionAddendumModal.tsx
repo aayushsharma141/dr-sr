@@ -69,6 +69,7 @@ export function SessionAddendumModal({ session, onClose, onSuccess }: SessionAdd
             </label>
             <textarea
               id="addendum-text"
+              data-autofocus
               rows={4}
               required
               value={note}

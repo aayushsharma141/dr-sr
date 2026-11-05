@@ -39,8 +39,8 @@ describe('PhotoUploader webcam capture', () => {
     HTMLCanvasElement.prototype.toBlob = ((cb: BlobCallback) => {
       cb(new Blob(['jpeg-bytes'], { type: 'image/jpeg' }))
     }) as never
+    globalThis.createImageBitmap = vi.fn().mockResolvedValue({ width: 35, height: 45, close: vi.fn() })
     URL.createObjectURL = vi.fn(() => 'blob:preview')
-    URL.revokeObjectURL = vi.fn()
   })
 
   afterEach(() => {
@@ -60,7 +60,7 @@ describe('PhotoUploader webcam capture', () => {
     expect(getUserMedia).toHaveBeenCalledTimes(1)
 
     fireEvent.click(screen.getByRole('button', { name: 'Capture' }))
-    await screen.findByAltText('Captured photo preview')
+    await screen.findByRole('img', { name: 'Captured photo preview' })
     expect(stop).toHaveBeenCalled() // camera released once the picture is taken
     expect(onPhotoSelected).not.toHaveBeenCalled() // staff must confirm first
 
@@ -69,7 +69,8 @@ describe('PhotoUploader webcam capture', () => {
     const file = onPhotoSelected.mock.calls[0][0] as File
     expect(file.type).toBe('image/jpeg')
     expect(file.name).toBe('webcam-photo.jpg')
-    expect(screen.getByAltText('Patient preview')).toBeInTheDocument()
+    expect(screen.getByRole('img', { name: 'Patient preview' })).toBeInTheDocument()
+    expect(URL.createObjectURL).not.toHaveBeenCalled() // the CSP blocks blob: images
   })
 
   it('lets staff retake and cancel, releasing the camera each time', async () => {
@@ -82,7 +83,7 @@ describe('PhotoUploader webcam capture', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Take photo' }))
     await screen.findByLabelText('Camera preview')
     fireEvent.click(screen.getByRole('button', { name: 'Capture' }))
-    await screen.findByAltText('Captured photo preview')
+    await screen.findByRole('img', { name: 'Captured photo preview' })
 
     fireEvent.click(screen.getByRole('button', { name: 'Retake' }))
     await screen.findByLabelText('Camera preview')
@@ -124,6 +125,32 @@ describe('PhotoUploader webcam capture', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Take photo' }))
     expect(getUserMedia).not.toHaveBeenCalled()
     expect(screen.getByRole('alert')).toHaveTextContent(/HTTPS/)
+  })
+
+  it('draws an uploaded photo on a canvas without a blob URL', async () => {
+    const onPhotoSelected = vi.fn()
+    render(<PhotoUploader onPhotoSelected={onPhotoSelected} />)
+    const file = new File(['jpeg-bytes'], 'patient.jpg', { type: 'image/jpeg' })
+
+    fireEvent.change(screen.getByLabelText('Patient Photograph'), { target: { files: [file] } })
+
+    const preview = await screen.findByRole('img', { name: 'Patient preview' })
+    await waitFor(() => expect(preview).toHaveAttribute('width', '35'))
+    expect(onPhotoSelected).toHaveBeenCalledWith(file)
+    expect(URL.createObjectURL).not.toHaveBeenCalled()
+  })
+
+  it('rejects a file the browser cannot decode', async () => {
+    vi.mocked(globalThis.createImageBitmap).mockRejectedValue(new DOMException('x', 'InvalidStateError'))
+    const onPhotoSelected = vi.fn()
+    render(<PhotoUploader onPhotoSelected={onPhotoSelected} />)
+    const file = new File(['not-a-picture'], 'broken.jpg', { type: 'image/jpeg' })
+
+    fireEvent.change(screen.getByLabelText('Patient Photograph'), { target: { files: [file] } })
+
+    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent(/could not be read/i))
+    expect(onPhotoSelected).toHaveBeenLastCalledWith(null)
+    expect(screen.queryByRole('img', { name: 'Patient preview' })).not.toBeInTheDocument()
   })
 
   it('disables the camera button while the form is saving', () => {
