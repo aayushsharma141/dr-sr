@@ -71,7 +71,7 @@ export function ClinicalEncounterWorkspace() {
   const { data: patient } = usePatient(effectivePatientId)
   const { data: priorEncounter } = usePatientPriorEncounter(effectivePatientId, encounterId)
   const { data: doctorsData } = useDoctors(false)
-  const doctors: DoctorOut[] = doctorsData || []
+  const doctors: DoctorOut[] = Array.isArray(doctorsData) ? doctorsData : []
 
   // 3. Vitals & Specialty Template queries
   const { data: serverVitals } = useEncounterVitals(encounterId)
@@ -81,9 +81,11 @@ export function ClinicalEncounterWorkspace() {
 
   // 4. Prescription queries
   const { data: patientPrescriptions } = usePatientPrescriptions(effectivePatientId)
-  const activePrescription = (patientPrescriptions || []).find(
-    (p) => p.encounter_id === encounterId && p.status !== 'CANCELLED'
-  )
+  const activePrescription = Array.isArray(patientPrescriptions)
+    ? patientPrescriptions.find(
+        (p) => p.encounter_id === encounterId && p.status !== 'CANCELLED'
+      )
+    : null
   const activePrescriptionId = activePrescription?.id || null
 
   // 5. Follow-up recommendation
@@ -926,7 +928,7 @@ export function ClinicalEncounterWorkspace() {
                     rows={3}
                     value={addendumText}
                     onChange={(e) => setAddendumText(e.target.value)}
-                    placeholder="Record post-finalisation consultation addendum note..."
+                    placeholder="Record follow-up remarks, phone consultation, or post-finalisation consultation addendum note..."
                     className="w-full p-3 border border-neutral-300 rounded text-xs focus:ring-1 focus:ring-[#8E1C3D]"
                   />
                   <button
