@@ -549,6 +549,7 @@ class Appointment(Base):
     status_updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
+    check_in_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     cancellation_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_by_user_id: Mapped[int] = mapped_column(
@@ -581,12 +582,19 @@ class ClinicalEncounter(Base):
         Index("ix_encounters_doctor_id", "doctor_id"),
         Index("ix_encounters_encounter_date", "encounter_date"),
         Index("ix_encounters_appointment_id", "appointment_id"),
+        Index(
+            "uq_clinical_encounters_appointment_id",
+            "appointment_id",
+            unique=True,
+            postgresql_where=text("appointment_id IS NOT NULL"),
+        ),
     )
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
     appointment_id: Mapped[int | None] = mapped_column(
         BigInteger, ForeignKey("appointments.id", ondelete="SET NULL"), nullable=True
     )
+    department_id: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
     patient_id: Mapped[int] = mapped_column(
         BigInteger, ForeignKey("patients.id", ondelete="RESTRICT"), nullable=False
     )
@@ -596,9 +604,9 @@ class ClinicalEncounter(Base):
     encounter_date: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
-    symptoms: Mapped[str] = mapped_column(Text, nullable=False)
-    clinical_notes: Mapped[str] = mapped_column(Text, nullable=False)
-    diagnosis: Mapped[str] = mapped_column(Text, nullable=False)
+    symptoms: Mapped[str] = mapped_column(Text, default="", server_default=text("''"), nullable=True)
+    clinical_notes: Mapped[str] = mapped_column(Text, default="", server_default=text("''"), nullable=True)
+    diagnosis: Mapped[str] = mapped_column(Text, default="", server_default=text("''"), nullable=True)
     is_finalised: Mapped[bool] = mapped_column(
         Boolean, default=False, server_default=text("false"), nullable=False
     )
