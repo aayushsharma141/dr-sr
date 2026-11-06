@@ -235,13 +235,13 @@ Plans:
 
 Plans:
 
-- [ ] 19-01-PLAN.md - Prerequisites & Base Migration (PR alignment, encounter uniqueness, check-in timestamp, single-session login DWS-10) (Wave 1)
-- [ ] 19-02-PLAN.md - Specialty Clinical Templates & Vitals Engine (migration 0012, template registry, Physiotherapy/Ophthalmology seeds, BMI auto-calc, DWS-05, DWS-06) (Wave 2)
-- [ ] 19-03-PLAN.md - Prescription Lifecycle & Follow-up Recommendations (migration 0013/0014, draft->authorised->print, cancellation with reason, medicine extra fields, recommendations & reception booking, DWS-07, DWS-08) (Wave 3)
-- [ ] 19-04-PLAN.md - Centralized Scope & Cross-Doctor Reads (refactor core/scope.py, eliminate inline silo checks, audit log cross-doctor reads, preserve reception/admin denial, DWS-04) (Wave 4)
-- [ ] 19-05-PLAN.md - Universal Consultation Frontend Workspace (single-page continuous layout with jump list, prior visit copy controls, 3s debounced auto-save, vitals, specialty form, prescription authoring & auth modal, DWS-01, DWS-02, DWS-05, DWS-06, DWS-07) (Wave 5)
-- [ ] 19-06-PLAN.md - Dashboard Unfinished List & Print Summary (Doctor dashboard unfinished drafts card, consultation summary print component on letterhead without medications DWS-09, 409 session takeover dialog DWS-10) (Wave 6)
-- [ ] 19-07-PLAN.md - Integration Gate & Verification Suite (test_phase19_gate.py, end-to-end clinical workflow roundtrip, vitest suite, 85% coverage floor, OpenAPI & RBAC snapshot checks) (Wave 7)
+- [x] 19-01-PLAN.md - Prerequisites & Base Migration (PR alignment, encounter uniqueness, check-in timestamp, single-session login DWS-10) (Wave 1)
+- [x] 19-02-PLAN.md - Specialty Clinical Templates & Vitals Engine (migration 0012, template registry, Physiotherapy/Ophthalmology seeds, BMI auto-calc, DWS-05, DWS-06) (Wave 2)
+- [x] 19-03-PLAN.md - Prescription Lifecycle & Follow-up Recommendations (migration 0013/0014, draft->authorised->print, cancellation with reason, medicine extra fields, recommendations & reception booking, DWS-07, DWS-08) (Wave 3)
+- [x] 19-04-PLAN.md - Centralized Scope & Cross-Doctor Reads (refactor core/scope.py, eliminate inline silo checks, audit log cross-doctor reads, preserve reception/admin denial, DWS-04) (Wave 4)
+- [x] 19-05-PLAN.md - Universal Consultation Frontend Workspace (single-page continuous layout with jump list, prior visit copy controls, 3s debounced auto-save, vitals, specialty form, prescription authoring & auth modal, DWS-01, DWS-02, DWS-05, DWS-06, DWS-07) (Wave 5)
+- [x] 19-06-PLAN.md - Dashboard Unfinished List & Print Summary (Doctor dashboard unfinished drafts card, consultation summary print component on letterhead without medications DWS-09, 409 session takeover dialog DWS-10) (Wave 6)
+- [x] 19-07-PLAN.md - Integration Gate & Verification Suite (test_phase19_gate.py, end-to-end clinical workflow roundtrip, vitest suite, 85% coverage floor, OpenAPI & RBAC snapshot checks) (Wave 7)
 
 ## Backlog
 
@@ -254,15 +254,15 @@ Phases execute in numeric order: 11 → 12 → 13 → 14 → 15 → 16 → 17 �
 
 | Phase | Plans Complete | Status | Completed |
 | --- | --- | --- | --- |
-| 11. Decisions Gate, Foundation & Auth | 0/16 | Planned | - |
-| 12. Clinic Settings & Patient Registration | 0/TBD | Not started | - |
-| 13. Appointments & Clinical Encounters | 0/TBD | Not started | - |
-| 14. Prescriptions, Treatment Plans & Sessions | 0/TBD | Not started | - |
-| 15. Billing, Receipts & Reversals | 0/TBD | Not started | - |
-| 16. Audit Viewer, Backup/Restore & Integrity | 0/TBD | Not started | - |
-| 17. LAN Deployment, Printer & Acceptance | 0/TBD | Not started | - |
+| 11. Decisions Gate, Foundation & Auth | 16/16 | Complete | 2026-10-31 |
+| 12. Clinic Settings & Patient Registration | 8/8 | Complete | 2026-11-01 |
+| 13. Appointments & Clinical Encounters | 7/7 | Complete | 2026-11-01 |
+| 14. Prescriptions, Treatment Plans & Sessions | 7/7 | Complete | 2026-11-02 |
+| 15. Billing, Receipts & Reversals | 7/7 | Complete | 2026-11-02 |
+| 16. Audit Viewer, Backup/Restore & Integrity | 7/7 | Complete | 2026-11-04 |
+| 17. LAN Deployment, Printer & Acceptance | 5/5 | Complete | 2026-11-05 |
 | 18. UI/UX Review Hardening | 5/8 | In progress (04 closed with printer waiver; 05 closed with criterion 4 unmet; 06-08 pending) | - |
-| 19. Universal Consultation Workspace | 0/7 | Planned | - |
+| 19. Universal Consultation Workspace | 7/7 | Complete | 2026-11-06 |
 
 ---
 *Roadmap created: 2026-10-30*

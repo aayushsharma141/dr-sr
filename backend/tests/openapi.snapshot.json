@@ -392,6 +392,18 @@
             ],
             "title": "Cancellation Reason"
           },
+          "check_in_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Check In At"
+          },
           "created_at": {
             "format": "date-time",
             "title": "Created At",
@@ -1558,6 +1570,119 @@
         "title": "ClinicSettingsUpdate",
         "type": "object"
       },
+      "ClinicalTemplateRead": {
+        "description": "Specialty clinical template with optional active version.",
+        "properties": {
+          "active_version": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ClinicalTemplateVersionRead"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "department_id": {
+            "title": "Department Id",
+            "type": "integer"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "is_active": {
+            "title": "Is Active",
+            "type": "boolean"
+          },
+          "name_en": {
+            "title": "Name En",
+            "type": "string"
+          },
+          "name_hi": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name Hi"
+          }
+        },
+        "required": [
+          "id",
+          "department_id",
+          "code",
+          "name_en",
+          "is_active",
+          "created_at"
+        ],
+        "title": "ClinicalTemplateRead",
+        "type": "object"
+      },
+      "ClinicalTemplateVersionRead": {
+        "description": "Schema version details.",
+        "properties": {
+          "approved_at": {
+            "format": "date-time",
+            "title": "Approved At",
+            "type": "string"
+          },
+          "approved_by": {
+            "title": "Approved By",
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "is_active": {
+            "title": "Is Active",
+            "type": "boolean"
+          },
+          "schema_json": {
+            "additionalProperties": true,
+            "title": "Schema Json",
+            "type": "object"
+          },
+          "template_id": {
+            "title": "Template Id",
+            "type": "integer"
+          },
+          "version_number": {
+            "title": "Version Number",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "template_id",
+          "version_number",
+          "schema_json",
+          "is_active",
+          "approved_by",
+          "approved_at",
+          "created_at"
+        ],
+        "title": "ClinicalTemplateVersionRead",
+        "type": "object"
+      },
       "CollectionsTodayOut": {
         "additionalProperties": false,
         "description": "Today's ledger activity, reported without applying any netting rule.\n\n- payments_count / gross_paise / by_method: payments CREATED today (IST), including any\n  that were later reversed.\n- reversals_count / reversed_paise: payments REVERSED today (IST), whatever day they were\n  originally collected.",
@@ -1653,6 +1778,144 @@
           "name_en"
         ],
         "title": "DoctorCreate",
+        "type": "object"
+      },
+      "DoctorFollowUpResponse": {
+        "description": "Full follow-up recommendation schema for doctor inspection (includes clinical reason).",
+        "properties": {
+          "booked_appointment_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Booked Appointment Id"
+          },
+          "clinical_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Clinical Reason"
+          },
+          "closed_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Closed At"
+          },
+          "closed_by_user_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Closed By User Id"
+          },
+          "closed_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Closed Reason"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "doctor_id": {
+            "title": "Doctor Id",
+            "type": "integer"
+          },
+          "doctor_name": {
+            "title": "Doctor Name",
+            "type": "string"
+          },
+          "encounter_id": {
+            "title": "Encounter Id",
+            "type": "integer"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "patient_id": {
+            "title": "Patient Id",
+            "type": "integer"
+          },
+          "patient_name": {
+            "title": "Patient Name",
+            "type": "string"
+          },
+          "patient_urn": {
+            "title": "Patient Urn",
+            "type": "string"
+          },
+          "recommended_date": {
+            "format": "date",
+            "title": "Recommended Date",
+            "type": "string"
+          },
+          "recommended_doctor_id": {
+            "title": "Recommended Doctor Id",
+            "type": "integer"
+          },
+          "recommended_doctor_name": {
+            "title": "Recommended Doctor Name",
+            "type": "string"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          },
+          "version_id": {
+            "title": "Version Id",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "encounter_id",
+          "patient_id",
+          "patient_name",
+          "patient_urn",
+          "doctor_id",
+          "doctor_name",
+          "recommended_doctor_id",
+          "recommended_doctor_name",
+          "recommended_date",
+          "status",
+          "version_id",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "DoctorFollowUpResponse",
         "type": "object"
       },
       "DoctorOut": {
@@ -2047,7 +2310,7 @@
         "type": "object"
       },
       "EncounterCreate": {
-        "description": "Payload to record a clinical encounter (CLN-01).",
+        "description": "Payload to record a clinical encounter (CLN-01, DWS-02 draft state).",
         "properties": {
           "appointment_id": {
             "anyOf": [
@@ -2063,16 +2326,29 @@
             "title": "Appointment Id"
           },
           "clinical_notes": {
+            "default": "",
             "description": "Examination and progress notes",
             "maxLength": 10000,
-            "minLength": 2,
             "title": "Clinical Notes",
             "type": "string"
           },
+          "department_id": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Optional department/specialty ID",
+            "title": "Department Id"
+          },
           "diagnosis": {
+            "default": "",
             "description": "Clinical diagnosis or impression",
             "maxLength": 5000,
-            "minLength": 2,
             "title": "Diagnosis",
             "type": "string"
           },
@@ -2083,7 +2359,43 @@
             "type": "integer"
           },
           "symptoms": {
+            "default": "",
             "description": "Chief complaints and symptoms",
+            "maxLength": 5000,
+            "title": "Symptoms",
+            "type": "string"
+          }
+        },
+        "required": [
+          "patient_id"
+        ],
+        "title": "EncounterCreate",
+        "type": "object"
+      },
+      "EncounterFinaliseRequest": {
+        "description": "Payload to finalise an encounter requiring mandatory fields (D-19-09).",
+        "properties": {
+          "clinical_notes": {
+            "anyOf": [
+              {
+                "maxLength": 10000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Clinical Notes"
+          },
+          "diagnosis": {
+            "description": "Diagnosis (min 2 characters)",
+            "maxLength": 5000,
+            "minLength": 2,
+            "title": "Diagnosis",
+            "type": "string"
+          },
+          "symptoms": {
+            "description": "Chief complaint (min 2 characters)",
             "maxLength": 5000,
             "minLength": 2,
             "title": "Symptoms",
@@ -2091,12 +2403,10 @@
           }
         },
         "required": [
-          "patient_id",
           "symptoms",
-          "clinical_notes",
           "diagnosis"
         ],
-        "title": "EncounterCreate",
+        "title": "EncounterFinaliseRequest",
         "type": "object"
       },
       "EncounterRead": {
@@ -2128,6 +2438,17 @@
             "format": "date-time",
             "title": "Created At",
             "type": "string"
+          },
+          "department_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Department Id"
           },
           "diagnosis": {
             "title": "Diagnosis",
@@ -2280,7 +2601,6 @@
             "anyOf": [
               {
                 "maxLength": 10000,
-                "minLength": 2,
                 "type": "string"
               },
               {
@@ -2289,11 +2609,22 @@
             ],
             "title": "Clinical Notes"
           },
+          "department_id": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Department Id"
+          },
           "diagnosis": {
             "anyOf": [
               {
                 "maxLength": 5000,
-                "minLength": 2,
                 "type": "string"
               },
               {
@@ -2306,7 +2637,6 @@
             "anyOf": [
               {
                 "maxLength": 5000,
-                "minLength": 2,
                 "type": "string"
               },
               {
@@ -2429,6 +2759,101 @@
           "version_id"
         ],
         "title": "FeeUpdate",
+        "type": "object"
+      },
+      "FollowUpBookRequest": {
+        "additionalProperties": false,
+        "description": "Schema for booking an appointment from a follow-up recommendation.",
+        "properties": {
+          "appointment_date": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Optional override date (defaults to recommendation date)",
+            "title": "Appointment Date"
+          },
+          "notes": {
+            "anyOf": [
+              {
+                "maxLength": 1000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Optional appointment notes",
+            "title": "Notes"
+          }
+        },
+        "title": "FollowUpBookRequest",
+        "type": "object"
+      },
+      "FollowUpCloseRequest": {
+        "additionalProperties": false,
+        "description": "Schema for closing an unbooked follow-up recommendation.",
+        "properties": {
+          "reason": {
+            "description": "Reason for closure",
+            "maxLength": 1000,
+            "minLength": 3,
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "reason"
+        ],
+        "title": "FollowUpCloseRequest",
+        "type": "object"
+      },
+      "FollowUpRecommendationCreate": {
+        "additionalProperties": false,
+        "description": "Schema for doctor creating a follow-up recommendation.",
+        "properties": {
+          "clinical_reason": {
+            "anyOf": [
+              {
+                "maxLength": 1000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Clinical rationale (doctor-only, hidden from reception)",
+            "title": "Clinical Reason"
+          },
+          "recommended_date": {
+            "description": "Target follow-up date",
+            "format": "date",
+            "title": "Recommended Date",
+            "type": "string"
+          },
+          "recommended_doctor_id": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Target doctor ID (defaults to current doctor)",
+            "title": "Recommended Doctor Id"
+          }
+        },
+        "required": [
+          "recommended_date"
+        ],
+        "title": "FollowUpRecommendationCreate",
         "type": "object"
       },
       "HTTPValidationError": {
@@ -2710,13 +3135,19 @@
       },
       "LoginRequest": {
         "additionalProperties": false,
-        "description": "Payload for user login authentication.",
+        "description": "Payload for user login authentication with optional single-session takeover.",
         "properties": {
           "password": {
             "maxLength": 1024,
             "minLength": 1,
             "title": "Password",
             "type": "string"
+          },
+          "takeover": {
+            "default": false,
+            "description": "Whether to revoke existing active session and take over",
+            "title": "Takeover",
+            "type": "boolean"
           },
           "username": {
             "maxLength": 64,
@@ -3604,16 +4035,40 @@
         "title": "PolicyFieldLimits",
         "type": "object"
       },
+      "PrescriptionCancelRequest": {
+        "additionalProperties": false,
+        "description": "Schema for cancelling an existing prescription (D-19-15).",
+        "properties": {
+          "reason": {
+            "description": "Clinical or administrative cancellation reason",
+            "maxLength": 1000,
+            "minLength": 3,
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "reason"
+        ],
+        "title": "PrescriptionCancelRequest",
+        "type": "object"
+      },
       "PrescriptionCreate": {
         "additionalProperties": false,
-        "description": "Schema for doctor creating a prescription.",
+        "description": "Schema for doctor creating a prescription (RX-01, DWS-07).",
         "properties": {
           "diagnosis": {
-            "description": "Clinical diagnosis",
-            "maxLength": 1000,
-            "minLength": 2,
-            "title": "Diagnosis",
-            "type": "string"
+            "anyOf": [
+              {
+                "maxLength": 1000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Clinical diagnosis (inherited from encounter if omitted)",
+            "title": "Diagnosis"
           },
           "dietary_advice": {
             "anyOf": [
@@ -3665,11 +4120,10 @@
             "title": "General Advice"
           },
           "items": {
-            "description": "At least one prescribed medicine item required",
+            "description": "Prescribed medicine items",
             "items": {
               "$ref": "#/components/schemas/PrescriptionItemCreate"
             },
-            "minItems": 1,
             "title": "Items",
             "type": "array"
           },
@@ -3678,12 +4132,16 @@
             "exclusiveMinimum": 0.0,
             "title": "Patient Id",
             "type": "integer"
+          },
+          "status": {
+            "default": "AUTHORISED",
+            "description": "Prescription status: DRAFT or AUTHORISED",
+            "title": "Status",
+            "type": "string"
           }
         },
         "required": [
-          "patient_id",
-          "diagnosis",
-          "items"
+          "patient_id"
         ],
         "title": "PrescriptionCreate",
         "type": "object"
@@ -3705,6 +4163,19 @@
             "minimum": 1.0,
             "title": "Duration Days",
             "type": "integer"
+          },
+          "form": {
+            "anyOf": [
+              {
+                "maxLength": 32,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Form (e.g. Tablet, Eye Drops, Syrup)",
+            "title": "Form"
           },
           "frequency": {
             "description": "Frequency (e.g. 1-0-1, OD, BD, TDS)",
@@ -3738,6 +4209,32 @@
             "minLength": 1,
             "title": "Medicine Name",
             "type": "string"
+          },
+          "route": {
+            "anyOf": [
+              {
+                "maxLength": 32,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Route (e.g. Oral, Right Eye (OD), Left Eye (OS))",
+            "title": "Route"
+          },
+          "strength": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Strength specification (e.g. 500mg, 0.5%)",
+            "title": "Strength"
           }
         },
         "required": [
@@ -3760,6 +4257,17 @@
           "duration_days": {
             "title": "Duration Days",
             "type": "integer"
+          },
+          "form": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Form"
           },
           "frequency": {
             "title": "Frequency",
@@ -3791,6 +4299,28 @@
           "prescription_id": {
             "title": "Prescription Id",
             "type": "integer"
+          },
+          "route": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Route"
+          },
+          "strength": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Strength"
           }
         },
         "required": [
@@ -3808,6 +4338,52 @@
       "PrescriptionOut": {
         "description": "Schema for full prescription reading including items.",
         "properties": {
+          "authorised_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Authorised At"
+          },
+          "cancellation_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cancellation Reason"
+          },
+          "cancelled_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cancelled At"
+          },
+          "cancelled_by_user_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cancelled By User Id"
+          },
           "created_at": {
             "format": "date-time",
             "title": "Created At",
@@ -3874,6 +4450,11 @@
             "title": "Id",
             "type": "integer"
           },
+          "is_printable": {
+            "default": false,
+            "title": "Is Printable",
+            "type": "boolean"
+          },
           "items": {
             "items": {
               "$ref": "#/components/schemas/PrescriptionItemOut"
@@ -3893,6 +4474,10 @@
             "title": "Patient Urn",
             "type": "string"
           },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
           "updated_at": {
             "format": "date-time",
             "title": "Updated At",
@@ -3910,6 +4495,7 @@
           "patient_name",
           "doctor_id",
           "doctor_name",
+          "status",
           "diagnosis",
           "version_id",
           "created_at",
@@ -3981,6 +4567,10 @@
           "patient_urn": {
             "title": "Patient Urn",
             "type": "string"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
           }
         },
         "required": [
@@ -3990,11 +4580,94 @@
           "patient_name",
           "doctor_id",
           "doctor_name",
+          "status",
           "diagnosis",
           "items_count",
           "created_at"
         ],
         "title": "PrescriptionSummary",
+        "type": "object"
+      },
+      "PrescriptionUpdate": {
+        "additionalProperties": false,
+        "description": "Schema for updating a draft prescription.",
+        "properties": {
+          "diagnosis": {
+            "anyOf": [
+              {
+                "maxLength": 1000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Diagnosis"
+          },
+          "dietary_advice": {
+            "anyOf": [
+              {
+                "maxLength": 1000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dietary Advice"
+          },
+          "follow_up_date": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Follow Up Date"
+          },
+          "general_advice": {
+            "anyOf": [
+              {
+                "maxLength": 1000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "General Advice"
+          },
+          "items": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/PrescriptionItemCreate"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Items"
+          },
+          "version_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Expected version_id for optimistic locking",
+            "title": "Version Id"
+          }
+        },
+        "title": "PrescriptionUpdate",
         "type": "object"
       },
       "RecentAdminActionOut": {
@@ -4057,6 +4730,89 @@
           "outcome"
         ],
         "title": "RecentAdminActionOut",
+        "type": "object"
+      },
+      "ReceptionFollowUpResponse": {
+        "description": "Reception projection for follow-up scheduling (DWS-08, D-19-19).\n\nCRITICAL SECURITY & PRIVACY INVARIANT:\nclinical_reason is STRICTLY omitted from this schema and never returned to reception.",
+        "properties": {
+          "booked_appointment_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Booked Appointment Id"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "encounter_id": {
+            "title": "Encounter Id",
+            "type": "integer"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "patient_id": {
+            "title": "Patient Id",
+            "type": "integer"
+          },
+          "patient_mobile": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Patient Mobile"
+          },
+          "patient_name": {
+            "title": "Patient Name",
+            "type": "string"
+          },
+          "patient_urn": {
+            "title": "Patient Urn",
+            "type": "string"
+          },
+          "recommended_date": {
+            "format": "date",
+            "title": "Recommended Date",
+            "type": "string"
+          },
+          "recommended_doctor_id": {
+            "title": "Recommended Doctor Id",
+            "type": "integer"
+          },
+          "recommended_doctor_name": {
+            "title": "Recommended Doctor Name",
+            "type": "string"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "encounter_id",
+          "patient_id",
+          "patient_name",
+          "patient_urn",
+          "recommended_doctor_id",
+          "recommended_doctor_name",
+          "recommended_date",
+          "status",
+          "created_at"
+        ],
+        "title": "ReceptionFollowUpResponse",
         "type": "object"
       },
       "ReceptionOverviewResponse": {
@@ -4722,6 +5478,70 @@
         "title": "SystemStatusOut",
         "type": "object"
       },
+      "TemplateResponseInput": {
+        "description": "Payload to save specialty template responses for an encounter.",
+        "properties": {
+          "response_data": {
+            "additionalProperties": true,
+            "description": "Captured specialty form responses",
+            "title": "Response Data",
+            "type": "object"
+          },
+          "template_version_id": {
+            "description": "Approved template version ID",
+            "exclusiveMinimum": 0.0,
+            "title": "Template Version Id",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "template_version_id"
+        ],
+        "title": "TemplateResponseInput",
+        "type": "object"
+      },
+      "TemplateResponseRead": {
+        "description": "Encounter template response schema.",
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "encounter_id": {
+            "title": "Encounter Id",
+            "type": "integer"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "response_data": {
+            "additionalProperties": true,
+            "title": "Response Data",
+            "type": "object"
+          },
+          "template_version_id": {
+            "title": "Template Version Id",
+            "type": "integer"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "encounter_id",
+          "template_version_id",
+          "response_data",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "TemplateResponseRead",
+        "type": "object"
+      },
       "TimelineItemOut": {
         "description": "Normalized timeline item for patient chronological history.",
         "properties": {
@@ -5305,6 +6125,62 @@
         "title": "TreatmentSessionOut",
         "type": "object"
       },
+      "UnfinishedEncounterItem": {
+        "description": "Active draft clinical encounter awaiting doctor completion (D-19-24, DWS-02).",
+        "properties": {
+          "department_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Department Id"
+          },
+          "department_name": {
+            "default": "",
+            "title": "Department Name",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "is_finalised": {
+            "default": false,
+            "title": "Is Finalised",
+            "type": "boolean"
+          },
+          "patient_id": {
+            "title": "Patient Id",
+            "type": "integer"
+          },
+          "patient_name": {
+            "title": "Patient Name",
+            "type": "string"
+          },
+          "patient_urn": {
+            "title": "Patient Urn",
+            "type": "string"
+          },
+          "started_at": {
+            "format": "date-time",
+            "title": "Started At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "patient_id",
+          "patient_urn",
+          "patient_name",
+          "started_at"
+        ],
+        "title": "UnfinishedEncounterItem",
+        "type": "object"
+      },
       "UserCreate": {
         "additionalProperties": false,
         "description": "Payload for creating a new user account.",
@@ -5643,6 +6519,269 @@
           "type"
         ],
         "title": "ValidationError",
+        "type": "object"
+      },
+      "VitalObservationInput": {
+        "description": "Payload to record or update vitals for a clinical encounter.",
+        "properties": {
+          "diastolic_bp": {
+            "anyOf": [
+              {
+                "maximum": 200.0,
+                "minimum": 20.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Diastolic blood pressure mmHg (20-200)",
+            "title": "Diastolic Bp"
+          },
+          "height_cm": {
+            "anyOf": [
+              {
+                "exclusiveMaximum": 280.0,
+                "exclusiveMinimum": 20.0,
+                "type": "number"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Height in centimeters (20 < height < 280)",
+            "title": "Height Cm"
+          },
+          "pulse_bpm": {
+            "anyOf": [
+              {
+                "maximum": 260.0,
+                "minimum": 30.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Pulse rate beats per minute (30-260)",
+            "title": "Pulse Bpm"
+          },
+          "respiratory_rate": {
+            "anyOf": [
+              {
+                "maximum": 80.0,
+                "minimum": 5.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Respiratory rate breaths per minute (5-80)",
+            "title": "Respiratory Rate"
+          },
+          "spo2_percent": {
+            "anyOf": [
+              {
+                "maximum": 100.0,
+                "minimum": 40.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Oxygen saturation SpO2 percentage (40-100)",
+            "title": "Spo2 Percent"
+          },
+          "systolic_bp": {
+            "anyOf": [
+              {
+                "maximum": 300.0,
+                "minimum": 40.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Systolic blood pressure mmHg (40-300)",
+            "title": "Systolic Bp"
+          },
+          "temperature_f": {
+            "anyOf": [
+              {
+                "maximum": 110.0,
+                "minimum": 85.0,
+                "type": "number"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Body temperature in Fahrenheit (85.0-110.0)",
+            "title": "Temperature F"
+          },
+          "weight_kg": {
+            "anyOf": [
+              {
+                "exclusiveMaximum": 400.0,
+                "exclusiveMinimum": 1.0,
+                "type": "number"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Weight in kilograms (1 < weight < 400)",
+            "title": "Weight Kg"
+          }
+        },
+        "title": "VitalObservationInput",
+        "type": "object"
+      },
+      "VitalObservationResponse": {
+        "description": "Detailed vitals observations with server-calculated BMI.",
+        "properties": {
+          "bmi": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bmi"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "diastolic_bp": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Diastolic Bp"
+          },
+          "encounter_id": {
+            "title": "Encounter Id",
+            "type": "integer"
+          },
+          "height_cm": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Height Cm"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "patient_id": {
+            "title": "Patient Id",
+            "type": "integer"
+          },
+          "pulse_bpm": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pulse Bpm"
+          },
+          "respiratory_rate": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Respiratory Rate"
+          },
+          "spo2_percent": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Spo2 Percent"
+          },
+          "systolic_bp": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Systolic Bp"
+          },
+          "temperature_f": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Temperature F"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          },
+          "weight_kg": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Weight Kg"
+          }
+        },
+        "required": [
+          "id",
+          "encounter_id",
+          "patient_id",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "VitalObservationResponse",
         "type": "object"
       }
     }
@@ -6566,7 +7705,7 @@
     },
     "/api/encounters": {
       "post": {
-        "description": "Record a new clinical encounter note for a patient (CLN-01).",
+        "description": "Record a new clinical encounter note or return existing for appointment (CLN-01, DWS-01).",
         "operationId": "create_encounter_api_encounters_post",
         "requestBody": {
           "content": {
@@ -6579,7 +7718,7 @@
           "required": true
         },
         "responses": {
-          "201": {
+          "200": {
             "content": {
               "application/json": {
                 "schema": {
@@ -6606,9 +7745,129 @@
         ]
       }
     },
+    "/api/encounters/unfinished": {
+      "get": {
+        "description": "Retrieve unfinished consultation drafts for authenticated doctor (D-19-24, DWS-02).",
+        "operationId": "list_unfinished_encounters_api_encounters_unfinished_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/UnfinishedEncounterItem"
+                  },
+                  "title": "Response List Unfinished Encounters Api Encounters Unfinished Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "List Unfinished Encounters",
+        "tags": [
+          "encounters"
+        ]
+      }
+    },
+    "/api/encounters/{encounter_id}/vitals": {
+      "get": {
+        "description": "Retrieve recorded vitals and biometrics for encounter.",
+        "operationId": "get_encounter_vitals_api_encounters__encounter_id__vitals_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "encounter_id",
+            "required": true,
+            "schema": {
+              "title": "Encounter Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VitalObservationResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Encounter Vitals",
+        "tags": [
+          "vitals"
+        ]
+      },
+      "put": {
+        "description": "Upsert vitals observations and automatically calculate authoritative BMI (DWS-06).",
+        "operationId": "upsert_encounter_vitals_api_encounters__encounter_id__vitals_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "encounter_id",
+            "required": true,
+            "schema": {
+              "title": "Encounter Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VitalObservationInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VitalObservationResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Upsert Encounter Vitals",
+        "tags": [
+          "vitals"
+        ]
+      }
+    },
     "/api/encounters/{id}": {
       "get": {
-        "description": "Retrieve encounter details including addenda (CLN-01). Scoped to doctor silo (D-03).",
+        "description": "Retrieve encounter details including addenda (CLN-01, DWS-04).",
         "operationId": "get_encounter_api_encounters__id__get",
         "parameters": [
           {
@@ -6755,7 +8014,7 @@
     },
     "/api/encounters/{id}/finalise": {
       "post": {
-        "description": "Finalise encounter notes, locking them against future updates (CLN-02).",
+        "description": "Finalise encounter notes, locking them against future updates (CLN-02, D-19-09).",
         "operationId": "finalise_encounter_api_encounters__id__finalise_post",
         "parameters": [
           {
@@ -6768,6 +8027,23 @@
             }
           }
         ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/EncounterFinaliseRequest"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Payload"
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
             "content": {
@@ -6791,6 +8067,194 @@
           }
         },
         "summary": "Finalise Encounter",
+        "tags": [
+          "encounters"
+        ]
+      }
+    },
+    "/api/encounters/{id}/follow-up": {
+      "get": {
+        "description": "Retrieve full clinical follow-up recommendation with clinical reason for doctor.",
+        "operationId": "get_encounter_follow_up_api_encounters__id__follow_up_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "title": "Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DoctorFollowUpResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Encounter Follow Up",
+        "tags": [
+          "follow-ups"
+        ]
+      },
+      "post": {
+        "description": "Record a clinical follow-up recommendation for an encounter (D-19-18, D-19-20).",
+        "operationId": "create_encounter_follow_up_api_encounters__id__follow_up_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "title": "Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FollowUpRecommendationCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DoctorFollowUpResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Encounter Follow Up",
+        "tags": [
+          "follow-ups"
+        ]
+      }
+    },
+    "/api/encounters/{id}/template-response": {
+      "get": {
+        "description": "Retrieve saved specialty template responses for encounter.",
+        "operationId": "get_encounter_template_response_api_encounters__id__template_response_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "title": "Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TemplateResponseRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Encounter Template Response",
+        "tags": [
+          "encounters"
+        ]
+      },
+      "put": {
+        "description": "Save or update specialty template response for a draft encounter (D-19-09, DWS-05).",
+        "operationId": "save_encounter_template_response_api_encounters__id__template_response_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "title": "Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TemplateResponseInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TemplateResponseRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Save Encounter Template Response",
         "tags": [
           "encounters"
         ]
@@ -6937,6 +8401,112 @@
         "tags": [
           "doctors",
           "fees"
+        ]
+      }
+    },
+    "/api/follow-ups/{id}/book": {
+      "post": {
+        "description": "Convert recommendation to a scheduled appointment (D-19-18). Accessible by Doctor or Reception.",
+        "operationId": "book_follow_up_api_follow_ups__id__book_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "title": "Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FollowUpBookRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReceptionFollowUpResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Book Follow Up",
+        "tags": [
+          "follow-ups"
+        ]
+      }
+    },
+    "/api/follow-ups/{id}/close": {
+      "post": {
+        "description": "Close an unbooked recommendation with recorded reason (D-19-21).",
+        "operationId": "close_follow_up_api_follow_ups__id__close_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "title": "Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FollowUpCloseRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReceptionFollowUpResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Close Follow Up",
+        "tags": [
+          "follow-ups"
         ]
       }
     },
@@ -7596,7 +9166,7 @@
     },
     "/api/patients/{patient_id}/encounters": {
       "get": {
-        "description": "List historical encounters for a patient scoped to the authenticated doctor (D-03).",
+        "description": "List historical encounters for a patient scoped via CLINICAL_READ (DWS-04).",
         "operationId": "list_patient_encounters_api_patients__patient_id__encounters_get",
         "parameters": [
           {
@@ -7690,7 +9260,7 @@
     },
     "/api/patients/{patient_id}/prescriptions": {
       "get": {
-        "description": "List historical prescriptions for a given patient.",
+        "description": "List historical prescriptions for a given patient scoped via CLINICAL_READ (DWS-04).",
         "operationId": "list_patient_prescriptions_api_patients__patient_id__prescriptions_get",
         "parameters": [
           {
@@ -8012,7 +9582,7 @@
     },
     "/api/prescriptions": {
       "post": {
-        "description": "Issue a new structured prescription with medication lines (RX-01).",
+        "description": "Issue a new structured prescription with medication lines (RX-01, DWS-07).",
         "operationId": "create_prescription_api_prescriptions_post",
         "requestBody": {
           "content": {
@@ -8130,7 +9700,7 @@
     },
     "/api/prescriptions/{id}": {
       "get": {
-        "description": "Retrieve full prescription details including all medication lines (RX-01).",
+        "description": "Retrieve full prescription details including all medication lines (RX-01, DWS-04).",
         "operationId": "get_prescription_api_prescriptions__id__get",
         "parameters": [
           {
@@ -8168,6 +9738,265 @@
         "summary": "Get Prescription",
         "tags": [
           "prescriptions"
+        ]
+      },
+      "put": {
+        "description": "Modify an in-progress prescription draft. Authorised prescriptions return HTTP 409 (DWS-07).",
+        "operationId": "update_prescription_draft_api_prescriptions__id__put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "title": "Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PrescriptionUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PrescriptionOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Prescription Draft",
+        "tags": [
+          "prescriptions"
+        ]
+      }
+    },
+    "/api/prescriptions/{id}/authorise": {
+      "post": {
+        "description": "Transition a DRAFT prescription to AUTHORISED (DWS-07).",
+        "operationId": "authorise_prescription_api_prescriptions__id__authorise_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "title": "Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PrescriptionOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Authorise Prescription",
+        "tags": [
+          "prescriptions"
+        ]
+      }
+    },
+    "/api/prescriptions/{id}/cancel": {
+      "post": {
+        "description": "Cancel an active prescription with recorded reason and attribution (D-19-15).",
+        "operationId": "cancel_prescription_api_prescriptions__id__cancel_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "title": "Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PrescriptionCancelRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PrescriptionOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Cancel Prescription",
+        "tags": [
+          "prescriptions"
+        ]
+      }
+    },
+    "/api/reception/follow-ups": {
+      "get": {
+        "description": "Query follow-up recommendations for administrative booking (D-19-19, DWS-08).\n\nCRITICAL PRIVACY INVARIANT:\nclinical_reason is STRICTLY omitted from both query and response.",
+        "operationId": "list_reception_follow_ups_api_reception_follow_ups_get",
+        "parameters": [
+          {
+            "description": "Filter by status (PENDING, BOOKED, CLOSED)",
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by status (PENDING, BOOKED, CLOSED)",
+              "title": "Status"
+            }
+          },
+          {
+            "description": "Recommended date on or after",
+            "in": "query",
+            "name": "date_from",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Recommended date on or after",
+              "title": "Date From"
+            }
+          },
+          {
+            "description": "Recommended date on or before",
+            "in": "query",
+            "name": "date_to",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Recommended date on or before",
+              "title": "Date To"
+            }
+          },
+          {
+            "description": "Filter for overdue pending recommendations",
+            "in": "query",
+            "name": "overdue",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter for overdue pending recommendations",
+              "title": "Overdue"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ReceptionFollowUpResponse"
+                  },
+                  "title": "Response List Reception Follow Ups Api Reception Follow Ups Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Reception Follow Ups",
+        "tags": [
+          "follow-ups"
         ]
       }
     },
@@ -8550,6 +10379,118 @@
         "summary": "Get System Status",
         "tags": [
           "system"
+        ]
+      }
+    },
+    "/api/templates/active": {
+      "get": {
+        "description": "List active specialty clinical templates with active schemas.",
+        "operationId": "list_active_templates_api_templates_active_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ClinicalTemplateRead"
+                  },
+                  "title": "Response List Active Templates Api Templates Active Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "List Active Templates",
+        "tags": [
+          "templates"
+        ]
+      }
+    },
+    "/api/templates/by-department/{department_id}": {
+      "get": {
+        "description": "Retrieve active specialty clinical template and schema for department.",
+        "operationId": "get_template_by_department_api_templates_by_department__department_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "department_id",
+            "required": true,
+            "schema": {
+              "title": "Department Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClinicalTemplateRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Template By Department",
+        "tags": [
+          "templates"
+        ]
+      }
+    },
+    "/api/templates/versions/{version_id}": {
+      "get": {
+        "description": "Retrieve specific clinical template version schema.",
+        "operationId": "get_template_version_api_templates_versions__version_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "version_id",
+            "required": true,
+            "schema": {
+              "title": "Version Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClinicalTemplateVersionRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Template Version",
+        "tags": [
+          "templates"
         ]
       }
     },

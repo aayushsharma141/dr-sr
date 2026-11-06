@@ -1,14 +1,21 @@
 ---
-gsd_state_version: '1.0'
-milestone: 'v3.0'
-milestone_name: 'Centralized LAN Web Platform'
-status: completed
-current_phase: 17
+gsd_state_version: "1.0"
+milestone: v3.0
+milestone_name: Centralized LAN Web Platform
+current_phase: 19
+current_phase_name: Universal Consultation Workspace
+status: complete
+last_updated: "2026-11-06T10:30:00.000Z"
+last_activity: 2026-11-06
+last_activity_desc: Phase 19 complete — Universal Consultation Workspace verified and certified
+state_head: 09206ecbc49fc0a440dcac12c89e13934b92b6f2
 progress:
-  total_phases: 7
-  completed_phases: 7
+  total_phases: 9
+  completed_phases: 8
+  total_plans: 76
+  completed_plans: 65
+  percent: 85
   active_phase: null
-  percent: 100
 ---
 
 # Project State: Kalyan Hospital Patient & Physiotherapy Management
@@ -18,13 +25,13 @@ progress:
 See: `.planning/PROJECT.md` (updated 2026-10-31) and root `PRD.md` (v3.0 baseline).
 
 **Core value:** Reliable, internet-free shared patient records for reception and doctors across the hospital LAN, enforced by server-side permissions, with auditable changes and a backup proven to restore.
-**Current focus:** Milestone v3.0 — COMPLETE (Phases 11-17 fully implemented, verified, and signed off).
+**Current focus:** Phase 19 — Universal Consultation Workspace (Complete)
 
 ## Current Position
 
-Phase: 17 (LAN Deployment, Print Verification & Acceptance) — COMPLETE (5/5 plans complete)
-Status: Milestone v3.0 Complete & Verified
-Last activity: 2026-11-02 — Milestone v3.0 completed. Phase 17 delivered: offline LAN deployment bundle with zero Node.js on server PC (`deploy/install.ps1`, `start-server.bat`, `stop-server.bat`), auto-recovery via Windows Scheduled Tasks (`register-autostart.ps1`, `unregister-autostart.ps1`, `health-check.ps1`), real-printer layout sign-off for 80mm thermal receipts, A5 consultation slips, and A4 double-signature registration cards (`print-layouts.test.tsx`), full acceptance suite with multi-role LAN operational simulation, clean-machine disaster recovery rehearsal, and 5-point clinical/financial integrity audit (`test_phase17_acceptance.py`). Full suite: 597 backend tests passing (92.80% coverage), 339-cell RBAC matrix, 24 frontend test suites (78 tests) passing, clean production build, zero drift against legacy desktop code.
+Phase: 19 (Universal Consultation Workspace) — COMPLETE
+Status: Complete (7/7 plans verified)
+Last activity: 2026-11-06 — Phase 19 completed and certified
 
 ## Phase Overview
 
@@ -40,7 +47,7 @@ Phases 11-17 (continuing from v2.0, which ended at Phase 10). See `.planning/ROA
 | 16 | Audit Viewer, Backup/Restore & Integrity | Complete (7/7 plans) |
 | 17 | LAN Deployment, Printer & Acceptance | Complete (5/5 plans) |
 | 18 | UI/UX Review Hardening | In progress: plans 01-05 closed (04 printer waiver; 05 criterion 4 unmet, 36 existing violations capped); 06-08 not started (no code for them on this branch); manual accessibility checks outstanding. On `fix/ist-dates-and-dialog-focus` (2026-11-06): session dialog focus fixed; plan 07 canvas photo previews done (HTTPS decision still open); plan 08 Task 2 control names done |
-| 19 | Universal Consultation Workspace | Planned (7/7 plans ready for execution; Waves 1 to 7 certified) |
+| 19 | Universal Consultation Workspace | Complete (7/7 plans) |
 
 ## Accumulated Context
 

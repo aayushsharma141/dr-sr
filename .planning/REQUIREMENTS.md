@@ -79,16 +79,25 @@
 
 Added 2026-11-05 from the exploration in `.planning/notes/doctor-workspace-direction.md`.
 
-- [ ] **DWS-01**: One appointment has at most one encounter, enforced by the database; starting a consultation again opens the existing encounter.
-- [ ] **DWS-02**: Doctor saves an incomplete encounter as a draft, with auto-save; the screen shows "saved" only after the server confirms, the draft reopens after an interruption, and unfinished drafts are listed on the doctor's dashboard.
-- [ ] **DWS-03**: Each encounter records whether it is New or Follow-up, using the appointment visit type from PR #12, and the patient's actual arrival time is stored when reception checks them in.
-- [ ] **DWS-04**: Doctors read all clinical records and edit only their own, with cross-doctor reads audited and the rule enforced in one central place. Reception and Admin stay denied (D-04). Blocked until the EG-6 change is signed off (see `.planning/todos/pending/doctor-access-signoff-and-eye-doctor-setup.md`).
-- [ ] **DWS-05**: The consultation loads a versioned, developer-set template for Physiotherapy or Ophthalmology from the appointment's department (PR #17), approved by that specialty's doctors before use; each encounter keeps the version it used, responses are validated on the server, and a new version never changes old records.
-- [ ] **DWS-06**: Doctor records vitals with units during the consultation, and BMI is calculated from the stored height and weight.
-- [ ] **DWS-07**: Doctor builds the encounter's prescription inside the consultation, as a draft that must be authorised before it prints; an authorised prescription cannot be overwritten, and a correction cancels it with a reason and reissues it, leaving one active prescription. The diagnosis is entered once for the encounter, and the printout keeps its static Hindi labels.
-- [ ] **DWS-08**: Doctor records a follow-up recommendation with date, reason and assigned doctor, kept separate from the appointment booked for it and linked to that appointment. Doctor or reception can book it, reception sees only the date and doctor, and an unbooked recommendation stays overdue until booked or closed with a reason.
-- [ ] **DWS-09**: After finalising, the doctor prints a patient-copy consultation summary on one A4 page using the approved letterhead, with static Hindi labels and no medicines listed.
-- [ ] **DWS-10**: An account can be logged in on one PC at a time, for all roles. A second login is refused after the password is checked, with an audited option to end the other session and log in. This changes the EG-10 default of multiple concurrent sessions.
+- [x] **DWS-01**: One appointment has at most one encounter, enforced by the database; starting a consultation again opens the existing encounter.
+- [x] **DWS-02**: Doctor saves an incomplete encounter as a draft, with auto-save; the screen shows "saved" only after the server confirms, the draft reopens after an interruption, and unfinished drafts are listed on the doctor's dashboard.
+- [x] **DWS-03**: Each encounter records whether it is New or Follow-up, using the appointment visit type from PR #12, and the patient's actual arrival time is stored when reception checks them in.
+- [x] **DWS-04**: Doctors read all clinical records and edit only their own, with cross-doctor reads audited and the rule enforced in one central place. Reception and Admin stay denied (D-04). Blocked until the EG-6 change is signed off (see `.planning/todos/pending/doctor-access-signoff-and-eye-doctor-setup.md`).
+- [x] **DWS-05**: The consultation loads a versioned, developer-set template for Physiotherapy or Ophthalmology from the appointment's department (PR #17), approved by that specialty's doctors before use; each encounter keeps the version it used, responses are validated on the server, and a new version never changes old records.
+- [x] **DWS-06**: Doctor records vitals with units during the consultation, and BMI is calculated from the stored height and weight.
+- [x] **DWS-07**: Doctor builds the encounter's prescription inside the consultation, as a draft that must be authorised before it prints; an authorised prescription cannot be overwritten, and a correction cancels it with a reason and reissues it, leaving one active prescription. The diagnosis is entered once for the encounter, and the printout keeps its static Hindi labels.
+- [x] **DWS-08**: Doctor records a follow-up recommendation with date, reason and assigned doctor, kept separate from the appointment booked for it and linked to that appointment. Doctor or reception can book it, reception sees only the date and doctor, and an unbooked recommendation stays overdue until booked or closed with a reason.
+- [x] **DWS-09**: After finalising, the doctor prints a patient-copy consultation summary on one A4 page using the approved letterhead, with static Hindi labels and no medicines listed.
+- [x] **DWS-10**: An account can be logged in on one PC at a time, for all roles. A second login is refused after the password is checked, with an audited option to end the other session and log in. This changes the EG-10 default of multiple concurrent sessions.
+
+### Reception Post-Consultation Checkout & Cross-Specialty Workflows
+
+Added 2026-11-06 from the exploration in `.planning/notes/reception-post-consultation-hybrid-checkout.md`.
+
+- [ ] **REC-05**: Reception operates on a post-consultation checkout model where a patient checks in and receives an OPD token slip to proceed to the doctor waiting lounge; when the doctor marks the consultation as `DONE`, the system auto-generates a pending consultation charge on the visit billing account for reception checkout.
+- [ ] **REC-06**: Reception generates a single, consolidated A4 bill & payment receipt combining: (a) doctor consultation fees, (b) billable clinical procedures/services recorded by the doctor, and (c) medicines or remedies physically dispensed from the hospital counter catalogue. Clinical prescriptions do not automatically become billable line items.
+- [ ] **REC-07**: System enforces department-wise follow-up and package intelligence: Physiotherapy packages decrement sessions only upon doctor-logged session completion (`DONE`), never on reception arrival; Ophthalmology and General OPD automatically detect whether visits fall within the configurable validity window (e.g., 7 days) and apply free or discounted revisit fees.
+- [ ] **REC-08**: Internal doctor referral transfers allow transferring a patient between doctors/departments while keeping the same hospital visit container and consolidated visit ledger open, accumulating consultation charges and procedures from both doctors on the same bill, and minting a queue priority token for the receiving doctor.
 
 ## v2 Requirements
 
@@ -186,22 +195,26 @@ Deferred; tracked but not in the current roadmap.
 | UX-06 | Phase 18 | Pending |
 | UX-07 | Phase 18 | Pending |
 | UX-08 | Phase 18 | Pending |
-| DWS-01 | Phase 19 | Pending |
-| DWS-02 | Phase 19 | Pending |
-| DWS-03 | Phase 19 | Pending |
-| DWS-04 | Phase 19 | Pending (blocked on EG-6 sign-off) |
-| DWS-05 | Phase 19 | Pending |
-| DWS-06 | Phase 19 | Pending |
-| DWS-07 | Phase 19 | Pending |
-| DWS-08 | Phase 19 | Pending |
-| DWS-09 | Phase 19 | Pending |
-| DWS-10 | Phase 19 | Pending |
+| DWS-01 | Phase 19 | Complete |
+| DWS-02 | Phase 19 | Complete |
+| DWS-03 | Phase 19 | Complete |
+| DWS-04 | Phase 19 | Complete |
+| DWS-05 | Phase 19 | Complete |
+| DWS-06 | Phase 19 | Complete |
+| DWS-07 | Phase 19 | Complete |
+| DWS-08 | Phase 19 | Complete |
+| DWS-09 | Phase 19 | Complete |
+| DWS-10 | Phase 19 | Complete |
+| REC-05 | Phase 18 / Phase 20 | Pending |
+| REC-06 | Phase 18 / Phase 20 | Pending |
+| REC-07 | Phase 18 / Phase 20 | Pending |
+| REC-08 | Phase 18 / Phase 20 | Pending |
 
 **Coverage:**
-- v1 requirements: 55 total
-- Mapped to phases: 55
+- v1 requirements: 59 total
+- Mapped to phases: 59
 - Unmapped: 0
 
 ---
 *Requirements defined: 2026-10-30*
-*Last updated: 2026-11-05 after adding the Doctor Workspace requirements (DWS-01 to DWS-10)*
+*Last updated: 2026-11-06 after adding Reception Post-Consultation Checkout requirements (REC-05 to REC-08)*

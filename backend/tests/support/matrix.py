@@ -926,6 +926,18 @@ MATRIX: list[MatrixRow] = [
         },
     ),
     MatrixRow(
+        method="GET",
+        path="/api/encounters/unfinished",
+        body_factory=None,
+        expected={
+            "anonymous": 401,
+            "admin": 403,
+            "reception": 403,
+            "doctor_a": 200,
+            "doctor_b": 200,
+        },
+    ),
+    MatrixRow(
         method="PATCH",
         path="/api/encounters/{id}",
         body_factory=_patch_encounter_payload,

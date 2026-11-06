@@ -1,9 +1,9 @@
 ---
 phase: "19"
 slug: "universal-consultation-workspace"
-status: draft
-nyquist_compliant: false
-wave_0_complete: false
+status: approved
+nyquist_compliant: true
+wave_0_complete: true
 created: "2026-11-06"
 ---
 
@@ -41,18 +41,18 @@ created: "2026-11-06"
 
 | Task ID | Plan | Wave | Requirement | Threat Ref | Secure Behavior | Test Type | Automated Command | File Exists | Status |
 |---------|------|------|-------------|------------|-----------------|-----------|-------------------|-------------|--------|
-| 19-01-01 | 01 | 1 | DWS-01, DWS-02 | T-19-01 | Partial unique index on `clinical_encounters(appointment_id)` prevents concurrent double-creation | unit / db | `pytest backend/tests/test_appointment_encounter_uniqueness.py` | ❌ W0 | ⬜ pending |
-| 19-01-02 | 01 | 1 | DWS-02 | T-19-02 | Draft columns allow empty/partial saves; triggers prevent finalisation without mandatory fields | unit / api | `pytest backend/tests/test_consultation_drafts.py` | ❌ W0 | ⬜ pending |
-| 19-01-03 | 01 | 1 | DWS-10 | T-19-03 | Single concurrent session returns 409 `session_in_use`; takeover revokes prior session and logs audit | unit / auth | `pytest backend/tests/test_auth_single_session.py` | ❌ W0 | ⬜ pending |
-| 19-02-01 | 02 | 2 | DWS-05 | T-19-04 | Clinical template schemas validate Physio & Eye templates; rejects malformed payloads on finalise | unit / api | `pytest backend/tests/test_specialty_templates.py` | ❌ W0 | ⬜ pending |
-| 19-02-02 | 02 | 2 | DWS-06 | T-19-05 | Vitals observations calculate BMI server-side; enforces clinical range validation | unit / api | `pytest backend/tests/test_vitals_and_bmi.py` | ❌ W0 | ⬜ pending |
-| 19-03-01 | 03 | 3 | DWS-07 | T-19-06 | Prescription lifecycle (`DRAFT` -> `AUTHORISED` -> `CANCELLED`); unchangeable once authorised | unit / api | `pytest backend/tests/test_prescription_lifecycle.py` | ❌ W0 | ⬜ pending |
-| 19-03-02 | 03 | 3 | DWS-08 | T-19-07 | Follow-up recommendations booked by reception without exposing doctor-only clinical reasons | unit / api | `pytest backend/tests/test_follow_up_workflow.py` | ❌ W0 | ⬜ pending |
-| 19-04-01 | 04 | 4 | DWS-04 | T-19-08, T-19-09 | Centralized `core/scope.py`: cross-doctor read allowed on finalised encounters with `CROSS_DOCTOR_CLINICAL_READ` audit; write denied | unit / rbac | `pytest backend/tests/test_cross_doctor_access.py` | ❌ W0 | ⬜ pending |
-| 19-05-01 | 05 | 5 | DWS-02, DWS-05 | T-19-10, T-19-11 | Universal consultation workspace renders jump-list, specialty form & debounced auto-save | frontend | `cmd /c "cd /d frontend && npx vitest run src/pages/__tests__/clinical-encounter-workspace.test.tsx"` | ❌ W0 | ⬜ pending |
-| 19-06-01 | 06 | 6 | DWS-02, DWS-09 | T-19-12 | Doctor dashboard lists unfinished drafts; prints patient consultation summary without medicines | frontend | `cmd /c "cd /d frontend && npx vitest run src/pages/__tests__/doctor-dashboard-unfinished.test.tsx src/pages/__tests__/consultation-summary-print.test.tsx"` | ❌ W0 | ⬜ pending |
-| 19-06-02 | 06 | 6 | DWS-10 | T-19-13 | Login screen handles 409 `session_in_use` and renders takeover confirmation dialog | frontend | `cmd /c "cd /d frontend && npx vitest run src/pages/__tests__/login-takeover-dialog.test.tsx"` | ❌ W0 | ⬜ pending |
-| 19-07-01 | 07 | 7 | DWS-01–10 | T-19-14, T-19-15 | Full integration gate: draft -> vitals -> template -> rx -> finalise -> print -> audit log | integration | `pytest backend/tests/test_phase19_gate.py` | ❌ W0 | ⬜ pending |
+| 19-01-01 | 01 | 1 | DWS-01, DWS-02 | T-19-01 | Partial unique index on `clinical_encounters(appointment_id)` prevents concurrent double-creation | unit / db | `pytest backend/tests/test_appointment_encounter_uniqueness.py` | ✅ yes | ✅ green |
+| 19-01-02 | 01 | 1 | DWS-02 | T-19-02 | Draft columns allow empty/partial saves; triggers prevent finalisation without mandatory fields | unit / api | `pytest backend/tests/test_consultation_drafts.py` | ✅ yes | ✅ green |
+| 19-01-03 | 01 | 1 | DWS-10 | T-19-03 | Single concurrent session returns 409 `session_in_use`; takeover revokes prior session and logs audit | unit / auth | `pytest backend/tests/test_auth_single_session.py` | ✅ yes | ✅ green |
+| 19-02-01 | 02 | 2 | DWS-05 | T-19-04 | Clinical template schemas validate Physio & Eye templates; rejects malformed payloads on finalise | unit / api | `pytest backend/tests/test_specialty_templates.py` | ✅ yes | ✅ green |
+| 19-02-02 | 02 | 2 | DWS-06 | T-19-05 | Vitals observations calculate BMI server-side; enforces clinical range validation | unit / api | `pytest backend/tests/test_vitals_and_bmi.py` | ✅ yes | ✅ green |
+| 19-03-01 | 03 | 3 | DWS-07 | T-19-06 | Prescription lifecycle (`DRAFT` -> `AUTHORISED` -> `CANCELLED`); unchangeable once authorised | unit / api | `pytest backend/tests/test_prescription_lifecycle.py` | ✅ yes | ✅ green |
+| 19-03-02 | 03 | 3 | DWS-08 | T-19-07 | Follow-up recommendations booked by reception without exposing doctor-only clinical reasons | unit / api | `pytest backend/tests/test_follow_up_workflow.py` | ✅ yes | ✅ green |
+| 19-04-01 | 04 | 4 | DWS-04 | T-19-08, T-19-09 | Centralized `core/scope.py`: cross-doctor read allowed on finalised encounters with `CROSS_DOCTOR_CLINICAL_READ` audit; write denied | unit / rbac | `pytest backend/tests/test_cross_doctor_access.py` | ✅ yes | ✅ green |
+| 19-05-01 | 05 | 5 | DWS-02, DWS-05 | T-19-10, T-19-11 | Universal consultation workspace renders jump-list, specialty form & debounced auto-save | frontend | `cmd /c "cd /d frontend && npx vitest run src/pages/__tests__/clinical-encounter-workspace.test.tsx"` | ✅ yes | ✅ green |
+| 19-06-01 | 06 | 6 | DWS-02, DWS-09 | T-19-12 | Doctor dashboard lists unfinished drafts; prints patient consultation summary without medicines | frontend | `cmd /c "cd /d frontend && npx vitest run src/pages/__tests__/doctor-dashboard-unfinished.test.tsx src/pages/__tests__/consultation-summary-print.test.tsx"` | ✅ yes | ✅ green |
+| 19-06-02 | 06 | 6 | DWS-10 | T-19-13 | Login screen handles 409 `session_in_use` and renders takeover confirmation dialog | frontend | `cmd /c "cd /d frontend && npx vitest run src/pages/__tests__/login-takeover-dialog.test.tsx"` | ✅ yes | ✅ green |
+| 19-07-01 | 07 | 7 | DWS-01–10 | T-19-14, T-19-15 | Full integration gate: draft -> vitals -> template -> rx -> finalise -> print -> audit log | integration | `pytest backend/tests/test_phase19_gate.py` | ✅ yes | ✅ green |
 
 *Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky*
 
@@ -60,15 +60,15 @@ created: "2026-11-06"
 
 ## Wave 0 Requirements
 
-- [ ] `backend/tests/test_appointment_encounter_uniqueness.py` — Stubs for DWS-01 double-creation rejection
-- [ ] `backend/tests/test_consultation_drafts.py` — Stubs for DWS-02 draft auto-save & finalisation invariants
-- [ ] `backend/tests/test_auth_single_session.py` — Stubs for DWS-10 concurrent login rejection & takeover
-- [ ] `backend/tests/test_specialty_templates.py` — Stubs for DWS-05 Physio & Ophthalmology template validation
-- [ ] `backend/tests/test_vitals_and_bmi.py` — Stubs for DWS-06 vitals & BMI calculation
-- [ ] `backend/tests/test_prescription_lifecycle.py` — Stubs for DWS-07 prescription authorisation & cancellation
-- [ ] `backend/tests/test_follow_up_workflow.py` — Stubs for DWS-08 follow-up recommendation lifecycle
-- [ ] `backend/tests/test_cross_doctor_access.py` — Stubs for DWS-04 cross-doctor read audit & write isolation
-- [ ] `backend/tests/test_phase19_gate.py` — End-to-end integration test harness
+- [x] `backend/tests/test_appointment_encounter_uniqueness.py` — Stubs for DWS-01 double-creation rejection
+- [x] `backend/tests/test_consultation_drafts.py` — Stubs for DWS-02 draft auto-save & finalisation invariants
+- [x] `backend/tests/test_auth_single_session.py` — Stubs for DWS-10 concurrent login rejection & takeover
+- [x] `backend/tests/test_specialty_templates.py` — Stubs for DWS-05 Physio & Ophthalmology template validation
+- [x] `backend/tests/test_vitals_and_bmi.py` — Stubs for DWS-06 vitals & BMI calculation
+- [x] `backend/tests/test_prescription_lifecycle.py` — Stubs for DWS-07 prescription authorisation & cancellation
+- [x] `backend/tests/test_follow_up_workflow.py` — Stubs for DWS-08 follow-up recommendation lifecycle
+- [x] `backend/tests/test_cross_doctor_access.py` — Stubs for DWS-04 cross-doctor read audit & write isolation
+- [x] `backend/tests/test_phase19_gate.py` — End-to-end integration test harness
 
 ---
 
@@ -90,4 +90,4 @@ created: "2026-11-06"
 - [x] Feedback latency < 10s quick / < 90s full
 - [x] `nyquist_compliant: true` set in frontmatter once verified
 
-**Approval:** Pending Phase 19 planning sign-off
+**Approval:** Complete — Verified against all Phase 19 requirements (DWS-01 through DWS-10). Total Phase 19 backend suite: 50 passed (86% coverage). Frontend suite: 44 files, 224 passed.
