@@ -684,6 +684,7 @@ export interface EncounterRead {
   doctor_id: number
   doctor_name: string
   appointment_id: number | null
+  department_id?: number | null
   encounter_date: string
   symptoms: string
   clinical_notes: string
@@ -719,6 +720,9 @@ export interface PrescriptionItemCreate {
   frequency: string
   duration_days: number
   instructions?: string | null
+  strength?: string | null
+  form?: string | null
+  route?: string | null
 }
 
 export interface PrescriptionItemOut {
@@ -730,16 +734,33 @@ export interface PrescriptionItemOut {
   frequency: string
   duration_days: number
   instructions: string | null
+  strength?: string | null
+  form?: string | null
+  route?: string | null
 }
 
 export interface PrescriptionCreate {
   patient_id: number
   encounter_id?: number | null
-  diagnosis: string
+  status?: string
+  diagnosis?: string | null
   dietary_advice?: string | null
   general_advice?: string | null
   follow_up_date?: string | null
   items: PrescriptionItemCreate[]
+}
+
+export interface PrescriptionUpdate {
+  diagnosis?: string | null
+  dietary_advice?: string | null
+  general_advice?: string | null
+  follow_up_date?: string | null
+  items?: PrescriptionItemCreate[]
+  version_id?: number | null
+}
+
+export interface PrescriptionCancelRequest {
+  reason: string
 }
 
 export interface PrescriptionOut {
@@ -750,6 +771,12 @@ export interface PrescriptionOut {
   doctor_id: number
   doctor_name: string
   encounter_id: number | null
+  status: string
+  authorised_at?: string | null
+  cancelled_at?: string | null
+  cancellation_reason?: string | null
+  cancelled_by_user_id?: number | null
+  is_printable: boolean
   diagnosis: string
   dietary_advice: string | null
   general_advice: string | null
@@ -1023,3 +1050,121 @@ export interface IntegrityReportOut {
   warning_checks: number
   checks: IntegrityCheckItemOut[]
 }
+
+// Phase 19: Universal Consultation Workspace Contracts
+export interface VitalObservationInput {
+  height_cm?: number | null
+  weight_kg?: number | null
+  systolic_bp?: number | null
+  diastolic_bp?: number | null
+  pulse_bpm?: number | null
+  temperature_f?: number | null
+  respiratory_rate?: number | null
+  spo2_percent?: number | null
+}
+
+export interface VitalObservationResponse {
+  id: number
+  encounter_id: number
+  patient_id: number
+  height_cm: number | null
+  weight_kg: number | null
+  bmi: number | null
+  systolic_bp: number | null
+  diastolic_bp: number | null
+  pulse_bpm: number | null
+  temperature_f: number | null
+  respiratory_rate: number | null
+  spo2_percent: number | null
+  created_at: string
+  updated_at: string
+}
+
+export interface ClinicalTemplateVersionRead {
+  id: number
+  template_id: number
+  version_number: number
+  schema_json: Record<string, any>
+  is_active: boolean
+  approved_by: string
+  approved_at: string
+  created_at: string
+}
+
+export interface ClinicalTemplateRead {
+  id: number
+  department_id: number
+  code: string
+  name_en: string
+  name_hi?: string | null
+  is_active: boolean
+  created_at: string
+  active_version?: ClinicalTemplateVersionRead | null
+}
+
+export interface TemplateResponseInput {
+  template_version_id: number
+  response_data: Record<string, any>
+}
+
+export interface TemplateResponseRead {
+  id: number
+  encounter_id: number
+  template_version_id: number
+  response_data: Record<string, any>
+  created_at: string
+  updated_at: string
+}
+
+export interface FollowUpRecommendationCreate {
+  recommended_date: string
+  recommended_doctor_id?: number | null
+  clinical_reason?: string | null
+}
+
+export interface FollowUpCloseRequest {
+  reason: string
+}
+
+export interface FollowUpBookRequest {
+  appointment_date?: string | null
+  notes?: string | null
+}
+
+export interface DoctorFollowUpResponse {
+  id: number
+  encounter_id: number
+  patient_id: number
+  patient_name: string
+  patient_urn: string
+  doctor_id: number
+  doctor_name: string
+  recommended_doctor_id: number
+  recommended_doctor_name: string
+  recommended_date: string
+  clinical_reason?: string | null
+  status: string
+  booked_appointment_id?: number | null
+  closed_reason?: string | null
+  closed_by_user_id?: number | null
+  closed_at?: string | null
+  version_id: number
+  created_at: string
+  updated_at: string
+}
+
+export interface ReceptionFollowUpResponse {
+  id: number
+  encounter_id: number
+  patient_id: number
+  patient_name: string
+  patient_urn: string
+  patient_mobile?: string | null
+  recommended_doctor_id: number
+  recommended_doctor_name: string
+  recommended_date: string
+  status: string
+  booked_appointment_id?: number | null
+  created_at: string
+}
+

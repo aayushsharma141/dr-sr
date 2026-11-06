@@ -37,6 +37,19 @@ import type {
   PrescriptionCreate,
   PrescriptionOut,
   PrescriptionSummary,
+  PrescriptionUpdate,
+  PrescriptionCancelRequest,
+  VitalObservationInput,
+  VitalObservationResponse,
+  ClinicalTemplateRead,
+  ClinicalTemplateVersionRead,
+  TemplateResponseInput,
+  TemplateResponseRead,
+  FollowUpRecommendationCreate,
+  DoctorFollowUpResponse,
+  ReceptionFollowUpResponse,
+  FollowUpBookRequest,
+  FollowUpCloseRequest,
   TreatmentPlanCreate,
   TreatmentPlanOut,
   TreatmentPlanUpdate,
@@ -816,6 +829,172 @@ export function useAddAddendum() {
       }),
     onSuccess: (_, variables) => {
       qc.invalidateQueries({ queryKey: ['encounter', variables.id] })
+    },
+  })
+}
+
+// Phase 19: Universal Consultation Workspace Hooks
+export function useSaveEncounterDraft(id: number) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (body: EncounterUpdate) =>
+      apiFetch<EncounterRead>(`/encounters/${id}`, {
+        method: 'PATCH',
+        body,
+      }),
+    onSuccess: (data) => {
+      qc.setQueryData(['encounter', data.id], data)
+      qc.invalidateQueries({ queryKey: ['patient-encounters', data.patient_id] })
+    },
+  })
+}
+
+export function usePatientPriorEncounter(patientId: number, excludeEncounterId?: number) {
+  return useQuery({
+    queryKey: ['patient-prior-encounter', patientId, excludeEncounterId],
+    queryFn: async (): Promise<(EncounterRead & { vitals?: VitalObservationResponse | null }) | null> => {
+      const summaries = await apiFetch<EncounterSummary[]>(`/patients/${patientId}/encounters`)
+      const prior = summaries.find((s) => !excludeEncounterId || s.id !== excludeEncounterId)
+      if (!prior) return null
+      const full = await apiFetch<EncounterRead>(`/encounters/${prior.id}`)
+      let vitals: VitalObservationResponse | null = null
+      try {
+        vitals = await apiFetch<VitalObservationResponse>(`/encounters/${prior.id}/vitals`)
+      } catch {
+        vitals = null
+      }
+      return { ...full, vitals }
+    },
+    enabled: patientId > 0,
+  })
+}
+
+export function useEncounterVitals(encounterId: number) {
+  return useQuery({
+    queryKey: ['encounter-vitals', encounterId],
+    queryFn: () => apiFetch<VitalObservationResponse>(`/encounters/${encounterId}/vitals`),
+    enabled: encounterId > 0,
+    retry: false,
+  })
+}
+
+export function useSaveVitals(encounterId: number) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (body: VitalObservationInput) =>
+      apiFetch<VitalObservationResponse>(`/encounters/${encounterId}/vitals`, {
+        method: 'PUT',
+        body,
+      }),
+    onSuccess: (data) => {
+      qc.setQueryData(['encounter-vitals', encounterId], data)
+    },
+  })
+}
+
+export function useDepartmentTemplate(departmentId: number | null | undefined) {
+  return useQuery({
+    queryKey: ['department-template', departmentId],
+    queryFn: () => apiFetch<ClinicalTemplateRead>(`/templates/by-department/${departmentId}`),
+    enabled: !!departmentId && departmentId > 0,
+  })
+}
+
+export function useEncounterTemplateResponse(encounterId: number) {
+  return useQuery({
+    queryKey: ['encounter-template-response', encounterId],
+    queryFn: () => apiFetch<TemplateResponseRead>(`/encounters/${encounterId}/template-response`),
+    enabled: encounterId > 0,
+    retry: false,
+  })
+}
+
+export function useSaveEncounterTemplateResponse(encounterId: number) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (body: TemplateResponseInput) =>
+      apiFetch<TemplateResponseRead>(`/encounters/${encounterId}/template-response`, {
+        method: 'PUT',
+        body,
+      }),
+    onSuccess: (data) => {
+      qc.setQueryData(['encounter-template-response', encounterId], data)
+    },
+  })
+}
+
+export function useAuthorisePrescription() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (id: number) =>
+      apiFetch<PrescriptionOut>(`/prescriptions/${id}/authorise`, {
+        method: 'POST',
+      }),
+    onSuccess: (data) => {
+      qc.setQueryData(['prescription', data.id], data)
+      if (data.encounter_id) {
+        qc.invalidateQueries({ queryKey: ['encounter-prescription', data.encounter_id] })
+      }
+      qc.invalidateQueries({ queryKey: ['patient-prescriptions', data.patient_id] })
+    },
+  })
+}
+
+export function useCancelPrescription() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, reason }: { id: number; reason: string }) =>
+      apiFetch<PrescriptionOut>(`/prescriptions/${id}/cancel`, {
+        method: 'POST',
+        body: { reason },
+      }),
+    onSuccess: (data) => {
+      qc.setQueryData(['prescription', data.id], data)
+      if (data.encounter_id) {
+        qc.invalidateQueries({ queryKey: ['encounter-prescription', data.encounter_id] })
+      }
+      qc.invalidateQueries({ queryKey: ['patient-prescriptions', data.patient_id] })
+    },
+  })
+}
+
+export function useUpdatePrescription() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, body }: { id: number; body: PrescriptionUpdate }) =>
+      apiFetch<PrescriptionOut>(`/prescriptions/${id}`, {
+        method: 'PUT',
+        body,
+      }),
+    onSuccess: (data) => {
+      qc.setQueryData(['prescription', data.id], data)
+      if (data.encounter_id) {
+        qc.invalidateQueries({ queryKey: ['encounter-prescription', data.encounter_id] })
+      }
+      qc.invalidateQueries({ queryKey: ['patient-prescriptions', data.patient_id] })
+    },
+  })
+}
+
+export function useEncounterFollowUp(encounterId: number) {
+  return useQuery({
+    queryKey: ['encounter-follow-up', encounterId],
+    queryFn: () => apiFetch<DoctorFollowUpResponse>(`/encounters/${encounterId}/follow-up`),
+    enabled: encounterId > 0,
+    retry: false,
+  })
+}
+
+export function useCreateFollowUp(encounterId: number) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (body: FollowUpRecommendationCreate) =>
+      apiFetch<DoctorFollowUpResponse>(`/encounters/${encounterId}/follow-up`, {
+        method: 'POST',
+        body,
+      }),
+    onSuccess: (data) => {
+      qc.setQueryData(['encounter-follow-up', encounterId], data)
     },
   })
 }
