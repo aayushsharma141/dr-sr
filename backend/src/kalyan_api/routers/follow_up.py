@@ -21,6 +21,7 @@ from kalyan_api.core.principal import (
     build_audit_context,
     current_principal,
 )
+from kalyan_api.core.scope import ScopeFamily, get_scoped_or_404
 from kalyan_api.db.session import SessionDep
 from kalyan_api.models import (
     Appointment,
@@ -108,16 +109,14 @@ def create_encounter_follow_up(
             message="Only authenticated doctors can record follow-up recommendations.",
         )
 
-    encounter = session.get(ClinicalEncounter, id)
-    if not encounter:
-        raise ApiError(status_code=404, code="encounter_not_found", message="Clinical encounter not found.")
-
-    if encounter.doctor_id != principal.doctor_id:
-        raise ApiError(
-            status_code=404,
-            code="encounter_not_found",
-            message="Clinical encounter not found or not assigned to this doctor.",
-        )
+    encounter = get_scoped_or_404(
+        session,
+        ClinicalEncounter,
+        id,
+        principal,
+        family=ScopeFamily.CLINICAL_WRITE,
+        doctor_id_col=ClinicalEncounter.doctor_id,
+    )
 
     # Check if recommendation already exists for this encounter
     existing = session.execute(
@@ -200,12 +199,14 @@ def get_encounter_follow_up(
             message="Only authenticated doctors can inspect clinical follow-up details.",
         )
 
-    encounter = session.get(ClinicalEncounter, id)
-    if not encounter:
-        raise ApiError(status_code=404, code="encounter_not_found", message="Clinical encounter not found.")
-
-    if encounter.doctor_id != principal.doctor_id:
-        raise ApiError(status_code=404, code="encounter_not_found", message="Clinical encounter not found.")
+    encounter = get_scoped_or_404(
+        session,
+        ClinicalEncounter,
+        id,
+        principal,
+        family=ScopeFamily.CLINICAL_READ,
+        doctor_id_col=ClinicalEncounter.doctor_id,
+    )
 
     stmt = (
         select(FollowUpRecommendation)

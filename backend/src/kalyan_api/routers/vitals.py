@@ -10,6 +10,7 @@ from kalyan_api.core.errors import ApiError
 from kalyan_api.core.permissions import Permission
 from kalyan_api.core.policy import require
 from kalyan_api.core.principal import Principal, current_principal
+from kalyan_api.core.scope import ScopeFamily, get_scoped_or_404
 from kalyan_api.db.session import SessionDep
 from kalyan_api.models import ClinicalEncounter, VitalObservation
 from kalyan_api.schemas.vitals import VitalObservationInput, VitalObservationResponse
@@ -51,13 +52,14 @@ def get_encounter_vitals(
     principal: Principal = Depends(current_principal),
 ) -> VitalObservationResponse:
     """Retrieve recorded vitals and biometrics for encounter."""
-    enc = session.get(ClinicalEncounter, encounter_id)
-    if not enc or enc.doctor_id != principal.doctor_id:
-        raise ApiError(
-            status_code=404,
-            code="encounter_not_found",
-            message="Clinical encounter not found.",
-        )
+    enc = get_scoped_or_404(
+        session,
+        ClinicalEncounter,
+        encounter_id,
+        principal,
+        family=ScopeFamily.CLINICAL_READ,
+        doctor_id_col=ClinicalEncounter.doctor_id,
+    )
 
     vital = session.scalar(
         select(VitalObservation).where(VitalObservation.encounter_id == encounter_id)
@@ -83,13 +85,14 @@ def upsert_encounter_vitals(
     principal: Principal = Depends(current_principal),
 ) -> VitalObservationResponse:
     """Upsert vitals observations and automatically calculate authoritative BMI (DWS-06)."""
-    enc = session.get(ClinicalEncounter, encounter_id)
-    if not enc or enc.doctor_id != principal.doctor_id:
-        raise ApiError(
-            status_code=404,
-            code="encounter_not_found",
-            message="Clinical encounter not found.",
-        )
+    enc = get_scoped_or_404(
+        session,
+        ClinicalEncounter,
+        encounter_id,
+        principal,
+        family=ScopeFamily.CLINICAL_WRITE,
+        doctor_id_col=ClinicalEncounter.doctor_id,
+    )
 
     if enc.is_finalised:
         raise ApiError(

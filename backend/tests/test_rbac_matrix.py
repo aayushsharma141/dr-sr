@@ -297,8 +297,21 @@ def test_rbac_matrix_cell(
                 patient_id=pat.id,
                 doctor_id=doc_a_id,
                 diagnosis="Matrix Diagnosis",
+                status="DRAFT",
             )
             db_session.add(rx)
+            db_session.flush()
+            from kalyan_api.models import PrescriptionItem
+
+            item = PrescriptionItem(
+                prescription_id=rx.id,
+                item_order=1,
+                medicine_name="Paracetamol 500mg",
+                dosage="1 tablet",
+                frequency="TDS",
+                duration_days=5,
+            )
+            db_session.add(item)
             db_session.flush()
             target_entity = rx
             resolved_path = row.path.replace("{id}", str(rx.id))
@@ -456,7 +469,7 @@ def test_rbac_matrix_cell(
         db_session.add(pat)
         db_session.flush()
 
-        if "{id}" in row.path:
+        if "{id}" in row.path or "{encounter_id}" in row.path:
             admin_u = make_user(db_session, test_settings, "ADMIN", f"adm_{uuid.uuid4().hex[:6]}")
             is_fin = "addenda" in row.path
             enc = ClinicalEncounter(
@@ -471,10 +484,110 @@ def test_rbac_matrix_cell(
             )
             db_session.add(enc)
             db_session.flush()
+
+            if "template-response" in row.path:
+                from kalyan_api.models import ClinicalTemplate, ClinicalTemplateResponse, ClinicalTemplateVersion, Department
+                dept = db_session.scalar(select(Department).where(Department.code == "GENERAL"))
+                if not dept:
+                    dept = Department(code="GENERAL", name_en="General Medicine")
+                    db_session.add(dept)
+                    db_session.flush()
+                tmpl = db_session.scalar(select(ClinicalTemplate).where(ClinicalTemplate.code == "PHYSIO"))
+                if not tmpl:
+                    tmpl = ClinicalTemplate(department_id=dept.id, code="PHYSIO", name_en="Physio Template")
+                    db_session.add(tmpl)
+                    db_session.flush()
+                ver = db_session.scalar(select(ClinicalTemplateVersion).where(ClinicalTemplateVersion.template_id == tmpl.id))
+                if not ver:
+                    ver = ClinicalTemplateVersion(
+                        template_id=tmpl.id,
+                        version_number=1,
+                        schema_json={"fields": []},
+                        approved_by="admin",
+                    )
+                    db_session.add(ver)
+                    db_session.flush()
+                if row.method == "GET":
+                    resp_obj = ClinicalTemplateResponse(encounter_id=enc.id, template_version_id=ver.id, response_data={"findings": "Normal"})
+                    db_session.add(resp_obj)
+                    db_session.flush()
+                enc.template_version_id = ver.id
+
+            if "vitals" in row.path:
+                from kalyan_api.models import VitalObservation
+                if row.method == "GET":
+                    v = VitalObservation(encounter_id=enc.id, patient_id=pat.id, height_cm=170.0, weight_kg=70.0)
+                    db_session.add(v)
+                    db_session.flush()
+
+            if "follow-up" in row.path and row.method == "GET":
+                from kalyan_api.models import FollowUpRecommendation
+                rec = FollowUpRecommendation(
+                    encounter_id=enc.id,
+                    patient_id=pat.id,
+                    doctor_id=doc_a_id,
+                    recommended_doctor_id=doc_a_id,
+                    recommended_date=datetime.now(UTC).date(),
+                    clinical_reason="Check progress",
+                    status="PENDING",
+                )
+                db_session.add(rec)
+                db_session.flush()
+
             target_entity = enc
-            resolved_path = row.path.replace("{id}", str(enc.id))
+            resolved_path = row.path.replace("{id}", str(enc.id)).replace("{encounter_id}", str(enc.id))
         else:
             target_entity = type("TargetEnc", (), {"patient_id": pat.id, "appointment_id": None})()
+
+    elif "/api/follow-ups" in row.path:
+        doc_a_user = db_session.scalar(select(User).where(User.username.like("mat_doc_a%")))
+        doc_a_id = doc_a_user.doctor_id if doc_a_user else None
+        if not doc_a_id:
+            doc = Doctor(name_en=f"Dr. FUp {uuid.uuid4().hex[:6]}")
+            db_session.add(doc)
+            db_session.flush()
+            doc_a_id = doc.id
+
+        pat = Patient(
+            urn=f"KH-2026-{uuid.uuid4().hex[:4]}",
+            full_name="Matrix Patient",
+            guardian_name="Guardian",
+            gender="M",
+            age_years=30,
+            mobile="9876543210",
+            address="Ara",
+            district="Bhojpur",
+            state="Bihar",
+        )
+        db_session.add(pat)
+        db_session.flush()
+
+        admin_u = make_user(db_session, test_settings, "ADMIN", f"adm_{uuid.uuid4().hex[:6]}")
+        enc = ClinicalEncounter(
+            patient_id=pat.id,
+            doctor_id=doc_a_id,
+            symptoms="Back pain",
+            clinical_notes="Notes",
+            diagnosis="Diagnosis",
+            created_by_user_id=admin_u.id,
+        )
+        db_session.add(enc)
+        db_session.flush()
+
+        from kalyan_api.models import FollowUpRecommendation
+        rec = FollowUpRecommendation(
+            encounter_id=enc.id,
+            patient_id=pat.id,
+            doctor_id=doc_a_id,
+            recommended_doctor_id=doc_a_id,
+            recommended_date=datetime.now(UTC).date(),
+            clinical_reason="Routine checkup",
+            status="PENDING",
+        )
+        db_session.add(rec)
+        db_session.flush()
+        target_entity = rec
+        resolved_path = row.path.replace("{id}", str(rec.id))
 
     elif "{id}" in row.path:
         is_active = "reactivate" not in row.path
