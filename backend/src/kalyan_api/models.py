@@ -652,6 +652,12 @@ class ClinicalEncounter(Base):
         uselist=False,
         cascade="all, delete-orphan",
     )
+    follow_up_recommendation = relationship(
+        "FollowUpRecommendation",
+        back_populates="encounter",
+        uselist=False,
+        cascade="all, delete-orphan",
+    )
 
 
 class ClinicalAddendum(Base):
@@ -843,8 +849,16 @@ class TreatmentSessionAddendum(Base):
     author_user = relationship("User", lazy="joined")
 
 
+class PrescriptionStatus(StrEnum):
+    """Lifecycle statuses for medical prescriptions (DWS-07)."""
+
+    DRAFT = "DRAFT"
+    AUTHORISED = "AUTHORISED"
+    CANCELLED = "CANCELLED"
+
+
 class Prescription(Base):
-    """Doctor medical prescription record (RX-01)."""
+    """Doctor medical prescription record (RX-01, DWS-07)."""
 
     __tablename__ = "prescriptions"
     __table_args__ = (
@@ -852,6 +866,20 @@ class Prescription(Base):
         Index("ix_prescriptions_doctor_id", "doctor_id"),
         Index("ix_prescriptions_encounter_id", "encounter_id"),
         CheckConstraint("length(trim(diagnosis)) >= 2", name="ck_prescriptions_diagnosis"),
+        CheckConstraint(
+            "status IN ('DRAFT', 'AUTHORISED', 'CANCELLED')", name="ck_prescriptions_status"
+        ),
+        CheckConstraint(
+            "(status != 'CANCELLED' AND cancelled_at IS NULL AND cancellation_reason IS NULL AND cancelled_by_user_id IS NULL) "
+            "OR (status = 'CANCELLED' AND cancelled_at IS NOT NULL AND length(trim(cancellation_reason)) >= 3 AND cancelled_by_user_id IS NOT NULL)",
+            name="ck_prescriptions_cancellation",
+        ),
+        Index(
+            "uq_prescriptions_active_per_encounter",
+            "encounter_id",
+            unique=True,
+            postgresql_where=text("encounter_id IS NOT NULL AND status IN ('DRAFT', 'AUTHORISED')"),
+        ),
     )
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
@@ -868,6 +896,18 @@ class Prescription(Base):
     dietary_advice: Mapped[str | None] = mapped_column(Text, nullable=True)
     general_advice: Mapped[str | None] = mapped_column(Text, nullable=True)
     follow_up_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    status: Mapped[str] = mapped_column(
+        String(16),
+        default=PrescriptionStatus.AUTHORISED.value,
+        server_default=text("'AUTHORISED'"),
+        nullable=False,
+    )
+    authorised_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    cancelled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    cancelled_by_user_id: Mapped[int | None] = mapped_column(
+        BigInteger, ForeignKey("users.id", ondelete="RESTRICT"), nullable=True
+    )
+    cancellation_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
     version_id: Mapped[int] = mapped_column(Integer, default=1, server_default="1", nullable=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
@@ -884,6 +924,7 @@ class Prescription(Base):
     patient = relationship("Patient", lazy="joined")
     doctor = relationship("Doctor", lazy="joined")
     encounter = relationship("ClinicalEncounter", lazy="select")
+    cancelled_by_user = relationship("User", foreign_keys=[cancelled_by_user_id], lazy="joined")
     items = relationship(
         "PrescriptionItem",
         back_populates="prescription",
@@ -915,6 +956,9 @@ class PrescriptionItem(Base):
     frequency: Mapped[str] = mapped_column(String(64), nullable=False)
     duration_days: Mapped[int] = mapped_column(Integer, nullable=False)
     instructions: Mapped[str | None] = mapped_column(Text, nullable=True)
+    strength: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    form: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    route: Mapped[str | None] = mapped_column(String(32), nullable=True)
 
     prescription = relationship("Prescription", back_populates="items")
 
@@ -1185,4 +1229,82 @@ class VitalObservation(Base):
 
     encounter: Mapped["ClinicalEncounter"] = relationship("ClinicalEncounter", back_populates="vitals")
     patient: Mapped["Patient"] = relationship("Patient")
+
+
+class FollowUpStatus(StrEnum):
+    """Lifecycle statuses for follow-up recommendations (DWS-08)."""
+
+    PENDING = "PENDING"
+    BOOKED = "BOOKED"
+    CLOSED = "CLOSED"
+
+
+class FollowUpRecommendation(Base):
+    """Clinical follow-up recommendation linked to encounter and patient (DWS-08)."""
+
+    __tablename__ = "follow_up_recommendations"
+    __table_args__ = (
+        UniqueConstraint("encounter_id", name="uq_follow_up_encounter"),
+        Index("ix_follow_up_status_date", "status", "recommended_date"),
+        Index("ix_follow_up_patient", "patient_id"),
+        CheckConstraint(
+            "status IN ('PENDING', 'BOOKED', 'CLOSED')",
+            name="ck_follow_up_recommendations_status",
+        ),
+        CheckConstraint(
+            "(status != 'CLOSED' AND closed_reason IS NULL AND closed_by_user_id IS NULL AND closed_at IS NULL) "
+            "OR (status = 'CLOSED' AND closed_reason IS NOT NULL AND length(trim(closed_reason)) >= 3 AND closed_by_user_id IS NOT NULL AND closed_at IS NOT NULL)",
+            name="ck_follow_up_recommendations_closure",
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, Identity(always=False), primary_key=True)
+    encounter_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("clinical_encounters.id", ondelete="CASCADE"), nullable=False
+    )
+    patient_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("patients.id", ondelete="RESTRICT"), nullable=False
+    )
+    doctor_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("doctors.id", ondelete="RESTRICT"), nullable=False
+    )
+    recommended_doctor_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("doctors.id", ondelete="RESTRICT"), nullable=False
+    )
+    recommended_date: Mapped[date] = mapped_column(Date, nullable=False)
+    clinical_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+    status: Mapped[str] = mapped_column(
+        String(16),
+        default=FollowUpStatus.PENDING.value,
+        server_default=text("'PENDING'"),
+        nullable=False,
+    )
+    booked_appointment_id: Mapped[int | None] = mapped_column(
+        BigInteger, ForeignKey("appointments.id", ondelete="SET NULL"), nullable=True
+    )
+    closed_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+    closed_by_user_id: Mapped[int | None] = mapped_column(
+        BigInteger, ForeignKey("users.id", ondelete="RESTRICT"), nullable=True
+    )
+    closed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    version_id: Mapped[int] = mapped_column(Integer, default=1, server_default="1", nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
+
+    __mapper_args__ = {"version_id_col": version_id}
+
+    encounter = relationship("ClinicalEncounter", back_populates="follow_up_recommendation")
+    patient = relationship("Patient", lazy="joined")
+    doctor = relationship("Doctor", foreign_keys=[doctor_id], lazy="joined")
+    recommended_doctor = relationship("Doctor", foreign_keys=[recommended_doctor_id], lazy="joined")
+    booked_appointment = relationship("Appointment", foreign_keys=[booked_appointment_id], lazy="select")
+    closed_by_user = relationship("User", foreign_keys=[closed_by_user_id], lazy="joined")
+
 
