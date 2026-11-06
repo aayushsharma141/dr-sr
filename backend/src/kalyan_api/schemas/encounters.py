@@ -106,3 +106,19 @@ class EncounterSummary(BaseModel):
     is_finalised: bool
     finalised_at: datetime | None = None
     addenda_count: int = 0
+
+
+class UnfinishedEncounterItem(BaseModel):
+    """Active draft clinical encounter awaiting doctor completion (D-19-24, DWS-02)."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    patient_id: int
+    patient_urn: str
+    patient_name: str
+    department_id: int | None = None
+    department_name: str = ""
+    started_at: datetime
+    is_finalised: bool = False
+

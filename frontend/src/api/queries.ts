@@ -34,6 +34,7 @@ import type {
   EncounterRead,
   EncounterSummary,
   EncounterUpdate,
+  UnfinishedEncounter,
   PrescriptionCreate,
   PrescriptionOut,
   PrescriptionSummary,
@@ -772,6 +773,13 @@ export function useEncounter(id: number) {
   })
 }
 
+export function useUnfinishedEncounters() {
+  return useQuery({
+    queryKey: ['unfinished-encounters'],
+    queryFn: () => apiFetch<UnfinishedEncounter[]>('/encounters/unfinished'),
+  })
+}
+
 export function useCreateEncounter() {
   const qc = useQueryClient()
   return useMutation({
@@ -784,6 +792,7 @@ export function useCreateEncounter() {
       qc.invalidateQueries({ queryKey: ['patient-encounters', data.patient_id] })
       qc.invalidateQueries({ queryKey: ['doctor-queue'] })
       qc.invalidateQueries({ queryKey: ['appointments'] })
+      qc.invalidateQueries({ queryKey: ['unfinished-encounters'] })
     },
   })
 }
@@ -815,6 +824,7 @@ export function useFinaliseEncounter() {
       qc.invalidateQueries({ queryKey: ['patient-encounters', data.patient_id] })
       qc.invalidateQueries({ queryKey: ['doctor-queue'] })
       qc.invalidateQueries({ queryKey: ['appointments'] })
+      qc.invalidateQueries({ queryKey: ['unfinished-encounters'] })
     },
   })
 }
@@ -845,6 +855,7 @@ export function useSaveEncounterDraft(id: number) {
     onSuccess: (data) => {
       qc.setQueryData(['encounter', data.id], data)
       qc.invalidateQueries({ queryKey: ['patient-encounters', data.patient_id] })
+      qc.invalidateQueries({ queryKey: ['unfinished-encounters'] })
     },
   })
 }

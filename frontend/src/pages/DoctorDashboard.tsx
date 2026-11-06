@@ -1,5 +1,6 @@
 import { useNavigate } from 'react-router'
 import { AppShell } from '../components/AppShell'
+import { DoctorDashboardUnfinishedCard } from '../components/DoctorDashboardUnfinishedCard'
 import { useDoctorQueue, useMe } from '../api/queries'
 import type { DoctorQueueItem } from '../api/types'
 import { withDoctorTitle } from '../format'
@@ -37,6 +38,9 @@ export function DoctorDashboard() {
             Refresh Queue
           </button>
         </div>
+
+        {/* Doctor Incomplete Drafts Card (D-19-24, DWS-02) */}
+        <DoctorDashboardUnfinishedCard />
 
         {isPending ? (
           <div className="bg-white p-12 text-center text-neutral-500 rounded-lg border">

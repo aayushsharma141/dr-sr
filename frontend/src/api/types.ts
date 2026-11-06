@@ -709,6 +709,17 @@ export interface EncounterSummary {
   addenda_count: number
 }
 
+export interface UnfinishedEncounter {
+  id: number
+  patient_id: number
+  patient_urn: string
+  patient_name: string
+  department_id?: number | null
+  department_name?: string
+  started_at: string
+  is_finalised: boolean
+}
+
 // ==========================================
 // Phase 14: Prescriptions & Treatment Types
 // ==========================================

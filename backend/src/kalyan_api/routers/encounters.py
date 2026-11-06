@@ -38,6 +38,7 @@ from kalyan_api.schemas.encounters import (
     EncounterRead,
     EncounterSummary,
     EncounterUpdate,
+    UnfinishedEncounterItem,
 )
 from kalyan_api.schemas.templates import TemplateResponseInput, TemplateResponseRead
 from kalyan_api.services import audit_service
@@ -166,6 +167,43 @@ def create_encounter(
     )
 
     return _to_read_schema(enc)
+
+
+@router.get(
+    "/encounters/unfinished",
+    response_model=list[UnfinishedEncounterItem],
+    dependencies=[Depends(require(Permission.ENCOUNTER_READ))],
+)
+def list_unfinished_encounters(
+    session: SessionDep,
+    principal: Principal = Depends(current_principal),
+) -> list[UnfinishedEncounterItem]:
+    """Retrieve unfinished consultation drafts for authenticated doctor (D-19-24, DWS-02)."""
+    if principal.role != Role.DOCTOR or principal.doctor_id is None:
+        raise ApiError(status_code=403, code="doctor_only", message="Doctor access required.")
+
+    stmt = (
+        select(ClinicalEncounter)
+        .where(
+            ClinicalEncounter.doctor_id == principal.doctor_id,
+            ClinicalEncounter.is_finalised.is_(False),
+        )
+        .order_by(ClinicalEncounter.created_at.desc())
+    )
+    encounters = session.scalars(stmt).all()
+    return [
+        UnfinishedEncounterItem(
+            id=e.id,
+            patient_id=e.patient_id,
+            patient_urn=e.patient.urn if e.patient else "",
+            patient_name=e.patient.full_name if e.patient else "",
+            department_id=e.department_id,
+            department_name=e.department.name_en if e.department else ("Physiotherapy" if e.department_id == 1 else "Ophthalmology" if e.department_id == 2 else "General"),
+            started_at=e.created_at,
+            is_finalised=e.is_finalised,
+        )
+        for e in encounters
+    ]
 
 
 @router.get(
