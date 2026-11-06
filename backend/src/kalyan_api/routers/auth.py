@@ -19,6 +19,12 @@ from kalyan_api.core.principal import (
 )
 from kalyan_api.db.session import SessionDep
 from kalyan_api.models import AuthSession, User
+from kalyan_api.schemas.auth import (
+    ChangePasswordRequest,
+    LoginRequest,
+    MeResponse,
+    SessionConflictResponse,
+)
 from kalyan_api.services import audit_service, auth_service, throttle_service
 from kalyan_api.services.audit_service import AuditAction, Outcome
 
@@ -28,38 +34,6 @@ GENERIC_INVALID_CREDENTIALS_MSG = (
     "Invalid username or password, or the account is temporarily locked. "
     "Wait 15 minutes or ask an administrator."
 )
-
-
-class LoginRequest(BaseModel):
-    """Payload for user login authentication."""
-
-    username: str = Field(min_length=1, max_length=64)
-    password: str = Field(min_length=1, max_length=1024)
-
-    model_config = ConfigDict(extra="forbid")
-
-
-class ChangePasswordRequest(BaseModel):
-    """Payload for user password change."""
-
-    current_password: str = Field(min_length=1, max_length=1024)
-    new_password: str = Field(min_length=1, max_length=1024)
-
-    model_config = ConfigDict(extra="forbid")
-
-
-class MeResponse(BaseModel):
-    """Authenticated user profile, active permissions, and CSRF token."""
-
-    id: int
-    username: str
-    full_name: str
-    role: str
-    doctor_id: int | None
-    permissions: list[str]
-    must_change_password: bool
-    csrf_token: str
-    version_id: int
 
 
 @router.post("/login", dependencies=[Depends(public)])
@@ -200,6 +174,49 @@ def login(
                 "message": GENERIC_INVALID_CREDENTIALS_MSG,
             },
         )
+
+    # DWS-10 / Single Active Session Enforcement
+    active_sess = auth_service.find_active_user_session(session, settings, now, user.id)
+    if active_sess is not None:
+        if not body.takeover:
+            return JSONResponse(
+                status_code=409,
+                content={
+                    "code": "session_in_use",
+                    "message": "An active session already exists for this account on another device.",
+                    "active_session": {
+                        "ip": str(active_sess.ip) if active_sess.ip else None,
+                        "user_agent": active_sess.user_agent,
+                        "last_seen_at": active_sess.last_seen_at.isoformat(),
+                    },
+                },
+            )
+        else:
+            # Explicit takeover requested: revoke all previous sessions and audit SESSION_TAKEOVER
+            auth_service.revoke_all_user_sessions(session, user.id, reason="session_takeover")
+            user_takeover_ctx = build_audit_context(
+                request,
+                Principal(
+                    user_id=user.id,
+                    username=user.username,
+                    role=Role(user.role),
+                    doctor_id=user.doctor_id,
+                    permissions=frozenset(),
+                    session_id=active_sess.id,
+                    must_change_password=user.must_change_password,
+                ),
+            )
+            audit_service.record(
+                session,
+                user_takeover_ctx,
+                AuditAction.SESSION_TAKEOVER,
+                "USER",
+                user.id,
+                before={"prior_session_id": active_sess.id},
+                after={"revoked_prior_sessions": True},
+                outcome=Outcome.SUCCESS,
+            )
+
     user_agent = request.headers.get("User-Agent")
     auth_sess, raw_token = auth_service.create_session(
         session, user, client_ip=peer_ip, user_agent=user_agent

@@ -185,7 +185,7 @@ def revoke_session(session: Session, session_id: int) -> None:
     )
 
 
-def revoke_all_user_sessions(session: Session, user_id: int) -> None:
+def revoke_all_user_sessions(session: Session, user_id: int, reason: str | None = None) -> None:
     """Revoke all active sessions belonging to the specified user."""
     now = clock.utcnow()
     session.execute(
@@ -193,6 +193,19 @@ def revoke_all_user_sessions(session: Session, user_id: int) -> None:
         .where(AuthSession.user_id == user_id, AuthSession.revoked_at.is_(None))
         .values(revoked_at=now)
     )
+
+
+def find_active_user_session(
+    session: Session,
+    settings: Settings,
+    now: datetime,
+    user_id: int,
+) -> AuthSession | None:
+    """Find the single most recently active unexpired session for a user, or None."""
+    active = list_active_sessions(session, settings, now, user_id=user_id)
+    if not active:
+        return None
+    return active[0][0]
 
 
 def idle_expires_at(auth_session: AuthSession, settings: Settings) -> datetime:
