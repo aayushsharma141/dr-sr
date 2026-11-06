@@ -231,11 +231,17 @@ Plans:
   8. After finalising, the patient-copy summary prints on one A4 page using the approved letterhead, with no medicines listed.
   9. A second login on another PC is refused with the option to end the other session; taking over is audited, and a crashed PC never locks an account out.
 
-**Plans**: TBD
+**Plans**: 7 plans
 
 Plans:
 
-- [ ] TBD (created by plan-phase)
+- [ ] 19-01-PLAN.md - Prerequisites & Base Migration (PR alignment, encounter uniqueness, check-in timestamp, single-session login DWS-10) (Wave 1)
+- [ ] 19-02-PLAN.md - Specialty Clinical Templates & Vitals Engine (migration 0012, template registry, Physiotherapy/Ophthalmology seeds, BMI auto-calc, DWS-05, DWS-06) (Wave 2)
+- [ ] 19-03-PLAN.md - Prescription Lifecycle & Follow-up Recommendations (migration 0013/0014, draft->authorised->print, cancellation with reason, medicine extra fields, recommendations & reception booking, DWS-07, DWS-08) (Wave 3)
+- [ ] 19-04-PLAN.md - Centralized Scope & Cross-Doctor Reads (refactor core/scope.py, eliminate inline silo checks, audit log cross-doctor reads, preserve reception/admin denial, DWS-04) (Wave 4)
+- [ ] 19-05-PLAN.md - Universal Consultation Frontend Workspace (single-page continuous layout with jump list, prior visit copy controls, 3s debounced auto-save, vitals, specialty form, prescription authoring & auth modal, DWS-01, DWS-02, DWS-05, DWS-06, DWS-07) (Wave 5)
+- [ ] 19-06-PLAN.md - Dashboard Unfinished List & Print Summary (Doctor dashboard unfinished drafts card, consultation summary print component on letterhead without medications DWS-09, 409 session takeover dialog DWS-10) (Wave 6)
+- [ ] 19-07-PLAN.md - Integration Gate & Verification Suite (test_phase19_gate.py, end-to-end clinical workflow roundtrip, vitest suite, 85% coverage floor, OpenAPI & RBAC snapshot checks) (Wave 7)
 
 ## Backlog
 
@@ -256,7 +262,7 @@ Phases execute in numeric order: 11 → 12 → 13 → 14 → 15 → 16 → 17 �
 | 16. Audit Viewer, Backup/Restore & Integrity | 0/TBD | Not started | - |
 | 17. LAN Deployment, Printer & Acceptance | 0/TBD | Not started | - |
 | 18. UI/UX Review Hardening | 5/8 | In progress (04 closed with printer waiver; 05 closed with criterion 4 unmet; 06-08 pending) | - |
-| 19. Universal Consultation Workspace | 0/TBD | Not started | - |
+| 19. Universal Consultation Workspace | 0/7 | Planned | - |
 
 ---
 *Roadmap created: 2026-10-30*
