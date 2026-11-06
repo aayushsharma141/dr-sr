@@ -90,6 +90,15 @@ Added 2026-11-05 from the exploration in `.planning/notes/doctor-workspace-direc
 - [ ] **DWS-09**: After finalising, the doctor prints a patient-copy consultation summary on one A4 page using the approved letterhead, with static Hindi labels and no medicines listed.
 - [ ] **DWS-10**: An account can be logged in on one PC at a time, for all roles. A second login is refused after the password is checked, with an audited option to end the other session and log in. This changes the EG-10 default of multiple concurrent sessions.
 
+### Reception Post-Consultation Checkout & Cross-Specialty Workflows
+
+Added 2026-11-06 from the exploration in `.planning/notes/reception-post-consultation-hybrid-checkout.md`.
+
+- [ ] **REC-05**: Reception operates on a post-consultation checkout model where a patient checks in and receives an OPD token slip to proceed to the doctor waiting lounge; when the doctor marks the consultation as `DONE`, the system auto-generates a pending consultation charge on the visit billing account for reception checkout.
+- [ ] **REC-06**: Reception generates a single, consolidated A4 bill & payment receipt combining: (a) doctor consultation fees, (b) billable clinical procedures/services recorded by the doctor, and (c) medicines or remedies physically dispensed from the hospital counter catalogue. Clinical prescriptions do not automatically become billable line items.
+- [ ] **REC-07**: System enforces department-wise follow-up and package intelligence: Physiotherapy packages decrement sessions only upon doctor-logged session completion (`DONE`), never on reception arrival; Ophthalmology and General OPD automatically detect whether visits fall within the configurable validity window (e.g., 7 days) and apply free or discounted revisit fees.
+- [ ] **REC-08**: Internal doctor referral transfers allow transferring a patient between doctors/departments while keeping the same hospital visit container and consolidated visit ledger open, accumulating consultation charges and procedures from both doctors on the same bill, and minting a queue priority token for the receiving doctor.
+
 ## v2 Requirements
 
 Deferred; tracked but not in the current roadmap.
@@ -196,12 +205,16 @@ Deferred; tracked but not in the current roadmap.
 | DWS-08 | Phase 19 | Pending |
 | DWS-09 | Phase 19 | Pending |
 | DWS-10 | Phase 19 | Pending |
+| REC-05 | Phase 18 / Phase 20 | Pending |
+| REC-06 | Phase 18 / Phase 20 | Pending |
+| REC-07 | Phase 18 / Phase 20 | Pending |
+| REC-08 | Phase 18 / Phase 20 | Pending |
 
 **Coverage:**
-- v1 requirements: 55 total
-- Mapped to phases: 55
+- v1 requirements: 59 total
+- Mapped to phases: 59
 - Unmapped: 0
 
 ---
 *Requirements defined: 2026-10-30*
-*Last updated: 2026-11-05 after adding the Doctor Workspace requirements (DWS-01 to DWS-10)*
+*Last updated: 2026-11-06 after adding Reception Post-Consultation Checkout requirements (REC-05 to REC-08)*
