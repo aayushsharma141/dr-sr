@@ -7,7 +7,7 @@ Guarantees:
 - Modifications to finalised encounters must be appended as dated addenda.
 """
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, Request, Response
 from sqlalchemy import select
 
 from kalyan_api import clock
@@ -31,6 +31,7 @@ from kalyan_api.schemas.encounters import (
     AddendumCreate,
     AddendumRead,
     EncounterCreate,
+    EncounterFinaliseRequest,
     EncounterRead,
     EncounterSummary,
     EncounterUpdate,
@@ -64,6 +65,7 @@ def _to_read_schema(enc: ClinicalEncounter) -> EncounterRead:
         doctor_id=enc.doctor_id,
         doctor_name=enc.doctor.name_en if enc.doctor else "",
         appointment_id=enc.appointment_id,
+        department_id=enc.department_id,
         encounter_date=enc.encounter_date,
         symptoms=enc.symptoms,
         clinical_notes=enc.clinical_notes,
@@ -80,16 +82,16 @@ def _to_read_schema(enc: ClinicalEncounter) -> EncounterRead:
 @router.post(
     "/encounters",
     response_model=EncounterRead,
-    status_code=201,
     dependencies=[Depends(require(Permission.ENCOUNTER_WRITE))],
 )
 def create_encounter(
     payload: EncounterCreate,
     request: Request,
+    response: Response,
     session: SessionDep,
     principal: Principal = Depends(current_principal),
 ) -> EncounterRead:
-    """Record a new clinical encounter note for a patient (CLN-01)."""
+    """Record a new clinical encounter note or return existing for appointment (CLN-01, DWS-01)."""
     if principal.role != Role.DOCTOR or principal.doctor_id is None:
         raise ApiError(
             status_code=403,
@@ -111,14 +113,27 @@ def create_encounter(
                 code="appointment_not_found",
                 message="Appointment not found or not assigned to this doctor.",
             )
+
+        # DWS-01: Idempotency / reopening existing encounter
+        existing_enc = session.scalar(
+            select(ClinicalEncounter).where(
+                ClinicalEncounter.appointment_id == payload.appointment_id
+            )
+        )
+        if existing_enc is not None:
+            response.status_code = 200
+            return _to_read_schema(existing_enc)
+
         # Advance appointment status to IN_CONSULTATION if not already there
         if appt.status in (AppointmentStatus.BOOKED.value, AppointmentStatus.ARRIVED.value):
             appt.status = AppointmentStatus.IN_CONSULTATION.value
             appt.status_updated_at = clock.utcnow()
             appt.version_id += 1
 
+    response.status_code = 201
     enc = ClinicalEncounter(
         appointment_id=payload.appointment_id,
+        department_id=payload.department_id,
         patient_id=payload.patient_id,
         doctor_id=principal.doctor_id,
         symptoms=payload.symptoms,
@@ -245,6 +260,7 @@ def update_encounter(
         "symptoms": enc.symptoms,
         "clinical_notes": enc.clinical_notes,
         "diagnosis": enc.diagnosis,
+        "department_id": enc.department_id,
         "version_id": enc.version_id,
     }
 
@@ -254,6 +270,8 @@ def update_encounter(
         enc.clinical_notes = payload.clinical_notes
     if payload.diagnosis is not None:
         enc.diagnosis = payload.diagnosis
+    if payload.department_id is not None:
+        enc.department_id = payload.department_id
 
     enc.version_id += 1
     session.flush()
@@ -262,6 +280,7 @@ def update_encounter(
         "symptoms": enc.symptoms,
         "clinical_notes": enc.clinical_notes,
         "diagnosis": enc.diagnosis,
+        "department_id": enc.department_id,
         "version_id": enc.version_id,
     }
 
@@ -288,9 +307,10 @@ def finalise_encounter(
     id: int,
     request: Request,
     session: SessionDep,
+    payload: EncounterFinaliseRequest | None = None,
     principal: Principal = Depends(current_principal),
 ) -> EncounterRead:
-    """Finalise encounter notes, locking them against future updates (CLN-02)."""
+    """Finalise encounter notes, locking them against future updates (CLN-02, D-19-09)."""
     enc = session.get(ClinicalEncounter, id)
     if not enc or enc.doctor_id != principal.doctor_id:
         raise ApiError(
@@ -300,6 +320,33 @@ def finalise_encounter(
         )
 
     if not enc.is_finalised:
+        # If payload is provided, update encounter fields before finalising
+        if payload is not None:
+            if payload.symptoms is not None:
+                enc.symptoms = payload.symptoms
+            if payload.clinical_notes is not None:
+                enc.clinical_notes = payload.clinical_notes
+            if payload.diagnosis is not None:
+                enc.diagnosis = payload.diagnosis
+
+        # Strictly validate that chief complaint (symptoms) and diagnosis are non-empty and at least 2 chars
+        symptoms_val = (enc.symptoms or "").strip()
+        diagnosis_val = (enc.diagnosis or "").strip()
+
+        if len(symptoms_val) < 2:
+            raise ApiError(
+                status_code=422,
+                code="symptoms_required",
+                message="Chief complaint is required to finalise the consultation (minimum 2 characters).",
+            )
+
+        if len(diagnosis_val) < 2:
+            raise ApiError(
+                status_code=422,
+                code="diagnosis_required",
+                message="Diagnosis is required to finalise the consultation (minimum 2 characters).",
+            )
+
         enc.is_finalised = True
         enc.finalised_at = clock.utcnow()
         enc.version_id += 1

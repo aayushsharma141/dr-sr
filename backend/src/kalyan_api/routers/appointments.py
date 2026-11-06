@@ -48,6 +48,7 @@ def _to_read_schema(appt: Appointment) -> AppointmentRead:
         token_number=appt.token_number,
         status=appt.status,
         status_updated_at=appt.status_updated_at,
+        check_in_at=appt.check_in_at,
         cancellation_reason=appt.cancellation_reason,
         notes=appt.notes,
         version_id=appt.version_id,
@@ -246,6 +247,8 @@ def update_appointment_status(
     old_status = appt.status
     appt.status = payload.status.value
     appt.status_updated_at = clock.utcnow()
+    if payload.status == AppointmentStatus.ARRIVED and appt.check_in_at is None:
+        appt.check_in_at = clock.utcnow()
     if payload.cancellation_reason is not None:
         appt.cancellation_reason = payload.cancellation_reason
     appt.version_id += 1

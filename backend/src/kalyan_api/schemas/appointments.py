@@ -43,6 +43,7 @@ class AppointmentRead(BaseModel):
     token_number: int
     status: str
     status_updated_at: datetime
+    check_in_at: datetime | None = None
     cancellation_reason: str | None = None
     notes: str | None = None
     version_id: int
