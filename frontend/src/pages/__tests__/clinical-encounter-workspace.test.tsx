@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { cleanup, render, screen, waitFor, within } from '@testing-library/react'
+import { cleanup, render, screen, waitFor, within, fireEvent } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes } from 'react-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -450,24 +450,20 @@ describe('Clinical Encounter Workspace Test Suite', () => {
   // =========================================================================
   describe('auto-save and vitals', () => {
     it('triggers debounced auto-save ~3s after typing and shows saved timestamp badge', async () => {
-      vi.useFakeTimers()
+      vi.useFakeTimers({ shouldAdvanceTime: true })
       const mockFetch = setupDefaultFetchMocks()
       vi.stubGlobal('fetch', mockFetch)
 
       renderWorkspace(10)
 
       // Wait for initial render
-      await waitFor(() => {
-        expect(screen.getByLabelText(/Chief Complaints & Symptoms/i)).toBeInTheDocument()
-      })
-
-      const symptomsInput = screen.getByLabelText(/Chief Complaints & Symptoms/i)
+      const symptomsInput = await screen.findByLabelText(/Chief Complaints & Symptoms/i)
 
       // User types new text
-      await userEvent.type(symptomsInput, ' Persistent pain in lower lumbar area')
+      fireEvent.change(symptomsInput, { target: { value: 'Persistent pain in lower lumbar area' } })
 
       // Fast-forward 3000ms debounce
-      vi.advanceTimersByTime(3100)
+      await vi.advanceTimersByTimeAsync(3200)
 
       await waitFor(() => {
         expect(screen.getByTestId('auto-save-pill')).toHaveTextContent(/Saved to server at/i)
@@ -487,8 +483,8 @@ describe('Clinical Encounter Workspace Test Suite', () => {
       renderWorkspace(10)
 
       const symptomsInput = await screen.findByLabelText(/Chief Complaints & Symptoms/i)
-      await userEvent.type(symptomsInput, ' Added symptom on blur')
-      symptomsInput.blur()
+      fireEvent.change(symptomsInput, { target: { value: 'Added symptom on blur' } })
+      fireEvent.blur(symptomsInput)
 
       await waitFor(() => {
         expect(screen.getByTestId('auto-save-pill')).toHaveTextContent(/Saved to server at/i)
@@ -510,8 +506,8 @@ describe('Clinical Encounter Workspace Test Suite', () => {
 
       const symptomsInput = await screen.findByLabelText(/Chief Complaints & Symptoms/i)
       failSave = true
-      await userEvent.type(symptomsInput, ' Unsaved offline symptom')
-      symptomsInput.blur()
+      fireEvent.change(symptomsInput, { target: { value: 'Unsaved offline symptom' } })
+      fireEvent.blur(symptomsInput)
 
       await waitFor(() => {
         const alertPill = screen.getByRole('alert')
@@ -536,8 +532,8 @@ describe('Clinical Encounter Workspace Test Suite', () => {
       const weightInput = screen.getByLabelText(/Weight \(kg\)/i)
 
       // Enter Height = 175cm, Weight = 70kg -> BMI = 70 / (1.75^2) = 22.857 -> 22.9 (Normal)
-      await userEvent.type(heightInput, '175')
-      await userEvent.type(weightInput, '70')
+      fireEvent.change(heightInput, { target: { value: '175' } })
+      fireEvent.change(weightInput, { target: { value: '70' } })
 
       const bmiBadge = await screen.findByTestId('live-bmi-indicator')
       expect(bmiBadge).toBeInTheDocument()
@@ -545,8 +541,7 @@ describe('Clinical Encounter Workspace Test Suite', () => {
       expect(bmiBadge).toHaveTextContent(/NORMAL/i)
 
       // Change Weight = 95kg -> BMI = 95 / (1.75^2) = 31.02 -> 31.0 (Obese)
-      await userEvent.clear(weightInput)
-      await userEvent.type(weightInput, '95')
+      fireEvent.change(weightInput, { target: { value: '95' } })
 
       await waitFor(() => {
         expect(screen.getByTestId('live-bmi-indicator')).toHaveTextContent(/BMI: 31 kg\/m²|BMI: 31.0 kg\/m²/i)
