@@ -1,12 +1,16 @@
-"""Structured doctor prescriptions and medication item endpoints (RX-01).
+"""Structured doctor prescriptions and medication item endpoints (RX-01, DWS-07).
 
 Guarantees:
 - Licensed doctor authorship required for prescribing (PRESCRIPTION_WRITE).
+- Prescription authoring lifecycle: DRAFT -> AUTHORISED -> CANCELLED.
+- Modification blocked once AUTHORISED (HTTP 409).
+- Cancelling requires a clinical reason (min 3 chars).
+- At most one active (DRAFT or AUTHORISED) prescription per encounter.
 - In-transaction audit trail with item counts and clinical diagnosis.
 - Sequential medication order validation.
 """
 
-from datetime import date
+from datetime import date, datetime, timezone
 
 from fastapi import APIRouter, Depends, Query, Request
 from sqlalchemy import select
@@ -26,12 +30,15 @@ from kalyan_api.models import (
     Patient,
     Prescription,
     PrescriptionItem,
+    PrescriptionStatus,
 )
 from kalyan_api.schemas.prescriptions import (
+    PrescriptionCancelRequest,
     PrescriptionCreate,
     PrescriptionItemOut,
     PrescriptionOut,
     PrescriptionSummary,
+    PrescriptionUpdate,
 )
 from kalyan_api.services import audit_service
 from kalyan_api.services.audit_service import AuditAction
@@ -52,6 +59,9 @@ def _to_prescription_out(rx: Prescription) -> PrescriptionOut:
             frequency=it.frequency,
             duration_days=it.duration_days,
             instructions=it.instructions,
+            strength=it.strength,
+            form=it.form,
+            route=it.route,
         )
         for it in sorted_items
     ]
@@ -64,6 +74,12 @@ def _to_prescription_out(rx: Prescription) -> PrescriptionOut:
         doctor_id=rx.doctor_id,
         doctor_name=rx.doctor.name_en if rx.doctor else "",
         encounter_id=rx.encounter_id,
+        status=rx.status,
+        authorised_at=rx.authorised_at,
+        cancelled_at=rx.cancelled_at,
+        cancellation_reason=rx.cancellation_reason,
+        cancelled_by_user_id=rx.cancelled_by_user_id,
+        is_printable=(rx.status == PrescriptionStatus.AUTHORISED.value),
         diagnosis=rx.diagnosis,
         dietary_advice=rx.dietary_advice,
         general_advice=rx.general_advice,
@@ -87,7 +103,7 @@ def create_prescription(
     session: SessionDep,
     principal: Principal = Depends(current_principal),
 ) -> PrescriptionOut:
-    """Issue a new structured prescription with medication lines (RX-01)."""
+    """Issue a new structured prescription with medication lines (RX-01, DWS-07)."""
     if principal.role != Role.DOCTOR or principal.doctor_id is None:
         raise ApiError(
             status_code=403,
@@ -99,6 +115,7 @@ def create_prescription(
     if not patient or not patient.is_active:
         raise ApiError(status_code=404, code="patient_not_found", message="Patient not found.")
 
+    encounter = None
     if payload.encounter_id is not None:
         encounter = session.get(ClinicalEncounter, payload.encounter_id)
         if not encounter or encounter.doctor_id != principal.doctor_id:
@@ -107,6 +124,50 @@ def create_prescription(
                 code="encounter_not_found",
                 message="Clinical encounter not found or not assigned to this doctor.",
             )
+
+        # Enforce partial unique index: at most one active prescription per encounter (D-19-15)
+        active_rx = session.execute(
+            select(Prescription).where(
+                Prescription.encounter_id == payload.encounter_id,
+                Prescription.status.in_([
+                    PrescriptionStatus.DRAFT.value,
+                    PrescriptionStatus.AUTHORISED.value,
+                ]),
+            )
+        ).scalar_one_or_none()
+        if active_rx:
+            raise ApiError(
+                status_code=409,
+                code="active_prescription_exists",
+                message="An active prescription already exists for this encounter. Cancel it to reissue a new prescription.",
+            )
+
+    target_status = payload.status.upper() if payload.status else PrescriptionStatus.AUTHORISED.value
+    if target_status not in (PrescriptionStatus.DRAFT.value, PrescriptionStatus.AUTHORISED.value):
+        raise ApiError(
+            status_code=422,
+            code="invalid_status",
+            message="Initial prescription status must be DRAFT or AUTHORISED.",
+        )
+
+    # Inherit diagnosis from encounter if omitted (D-19-17)
+    diagnosis = payload.diagnosis.strip() if payload.diagnosis and payload.diagnosis.strip() else None
+    if not diagnosis and encounter is not None and encounter.diagnosis and encounter.diagnosis.strip():
+        diagnosis = encounter.diagnosis.strip()
+
+    if not diagnosis or len(diagnosis) < 2:
+        raise ApiError(
+            status_code=422,
+            code="diagnosis_required",
+            message="Prescription diagnosis is required (minimum 2 characters).",
+        )
+
+    if target_status == PrescriptionStatus.AUTHORISED.value and not payload.items:
+        raise ApiError(
+            status_code=422,
+            code="items_required",
+            message="At least one medication item is required to authorise a prescription.",
+        )
 
     # Validate distinct item orders
     orders = [item.item_order for item in payload.items]
@@ -117,11 +178,14 @@ def create_prescription(
             message="Each prescription item must have a unique item order.",
         )
 
+    now_utc = datetime.now(timezone.utc)
     rx = Prescription(
         patient_id=payload.patient_id,
         doctor_id=principal.doctor_id,
         encounter_id=payload.encounter_id,
-        diagnosis=payload.diagnosis,
+        status=target_status,
+        authorised_at=now_utc if target_status == PrescriptionStatus.AUTHORISED.value else None,
+        diagnosis=diagnosis,
         dietary_advice=payload.dietary_advice,
         general_advice=payload.general_advice,
         follow_up_date=payload.follow_up_date,
@@ -138,6 +202,9 @@ def create_prescription(
             frequency=item_data.frequency,
             duration_days=item_data.duration_days,
             instructions=item_data.instructions,
+            strength=item_data.strength,
+            form=item_data.form,
+            route=item_data.route,
         )
         session.add(item)
 
@@ -147,7 +214,11 @@ def create_prescription(
     stmt = (
         select(Prescription)
         .where(Prescription.id == rx.id)
-        .options(selectinload(Prescription.items))
+        .options(
+            selectinload(Prescription.patient),
+            selectinload(Prescription.doctor),
+            selectinload(Prescription.items),
+        )
     )
     refreshed_rx = session.execute(stmt).scalar_one()
 
@@ -163,8 +234,285 @@ def create_prescription(
             "patient_urn": patient.urn,
             "doctor_id": refreshed_rx.doctor_id,
             "encounter_id": refreshed_rx.encounter_id,
+            "status": refreshed_rx.status,
             "diagnosis": refreshed_rx.diagnosis,
             "items_count": len(refreshed_rx.items),
+        },
+    )
+
+    return _to_prescription_out(refreshed_rx)
+
+
+@router.put(
+    "/prescriptions/{id}",
+    response_model=PrescriptionOut,
+    dependencies=[Depends(require(Permission.PRESCRIPTION_WRITE))],
+)
+def update_prescription_draft(
+    id: int,
+    payload: PrescriptionUpdate,
+    request: Request,
+    session: SessionDep,
+    principal: Principal = Depends(current_principal),
+) -> PrescriptionOut:
+    """Modify an in-progress prescription draft. Authorised prescriptions return HTTP 409 (DWS-07)."""
+    if principal.role != Role.DOCTOR or principal.doctor_id is None:
+        raise ApiError(
+            status_code=403,
+            code="doctor_only",
+            message="Only authenticated doctors can modify prescriptions.",
+        )
+
+    stmt = (
+        select(Prescription)
+        .where(Prescription.id == id)
+        .options(
+            selectinload(Prescription.patient),
+            selectinload(Prescription.doctor),
+            selectinload(Prescription.items),
+        )
+    )
+    rx = session.execute(stmt).scalar_one_or_none()
+    if not rx:
+        raise ApiError(status_code=404, code="prescription_not_found", message="Prescription not found.")
+
+    if rx.doctor_id != principal.doctor_id:
+        raise ApiError(status_code=404, code="prescription_not_found", message="Prescription not found.")
+
+    if rx.status != PrescriptionStatus.DRAFT.value:
+        raise ApiError(
+            status_code=409,
+            code="prescription_locked",
+            message="Authorised prescriptions cannot be modified. Cancel and reissue to make changes.",
+        )
+
+    if payload.version_id is not None and rx.version_id != payload.version_id:
+        raise ApiError(
+            status_code=409,
+            code="concurrency_conflict",
+            message="Prescription was modified concurrently by another request.",
+        )
+
+    if payload.diagnosis is not None:
+        diag = payload.diagnosis.strip()
+        if len(diag) < 2:
+            raise ApiError(
+                status_code=422,
+                code="diagnosis_required",
+                message="Prescription diagnosis must be at least 2 characters.",
+            )
+        rx.diagnosis = diag
+
+    if payload.dietary_advice is not None:
+        rx.dietary_advice = payload.dietary_advice
+    if payload.general_advice is not None:
+        rx.general_advice = payload.general_advice
+    if payload.follow_up_date is not None:
+        rx.follow_up_date = payload.follow_up_date
+
+    if payload.items is not None:
+        orders = [item.item_order for item in payload.items]
+        if len(orders) != len(set(orders)):
+            raise ApiError(
+                status_code=422,
+                code="duplicate_item_order",
+                message="Each prescription item must have a unique item order.",
+            )
+        for old_item in list(rx.items):
+            session.delete(old_item)
+        rx.items.clear()
+        session.flush()
+
+        for item_data in payload.items:
+            new_item = PrescriptionItem(
+                prescription_id=rx.id,
+                item_order=item_data.item_order,
+                medicine_name=item_data.medicine_name,
+                dosage=item_data.dosage,
+                frequency=item_data.frequency,
+                duration_days=item_data.duration_days,
+                instructions=item_data.instructions,
+                strength=item_data.strength,
+                form=item_data.form,
+                route=item_data.route,
+            )
+            session.add(new_item)
+            rx.items.append(new_item)
+
+    session.flush()
+
+    # Re-query
+    refreshed_rx = session.execute(stmt).scalar_one()
+
+    ctx = build_audit_context(request, principal)
+    audit_service.record(
+        session,
+        ctx,
+        action=AuditAction.PRESCRIPTION_UPDATED,
+        entity_type="prescription",
+        entity_id=refreshed_rx.id,
+        after={
+            "diagnosis": refreshed_rx.diagnosis,
+            "items_count": len(refreshed_rx.items),
+            "version_id": refreshed_rx.version_id,
+        },
+    )
+
+    return _to_prescription_out(refreshed_rx)
+
+
+@router.post(
+    "/prescriptions/{id}/authorise",
+    response_model=PrescriptionOut,
+    dependencies=[Depends(require(Permission.PRESCRIPTION_WRITE))],
+)
+def authorise_prescription(
+    id: int,
+    request: Request,
+    session: SessionDep,
+    principal: Principal = Depends(current_principal),
+) -> PrescriptionOut:
+    """Transition a DRAFT prescription to AUTHORISED (DWS-07)."""
+    if principal.role != Role.DOCTOR or principal.doctor_id is None:
+        raise ApiError(
+            status_code=403,
+            code="doctor_only",
+            message="Only authenticated doctors can authorise prescriptions.",
+        )
+
+    stmt = (
+        select(Prescription)
+        .where(Prescription.id == id)
+        .options(
+            selectinload(Prescription.patient),
+            selectinload(Prescription.doctor),
+            selectinload(Prescription.items),
+        )
+    )
+    rx = session.execute(stmt).scalar_one_or_none()
+    if not rx:
+        raise ApiError(status_code=404, code="prescription_not_found", message="Prescription not found.")
+
+    if rx.doctor_id != principal.doctor_id:
+        raise ApiError(status_code=404, code="prescription_not_found", message="Prescription not found.")
+
+    if rx.status != PrescriptionStatus.DRAFT.value:
+        raise ApiError(
+            status_code=409,
+            code="invalid_status_transition",
+            message=f"Cannot authorise prescription with status '{rx.status}'. Only DRAFT can be authorised.",
+        )
+
+    if not rx.items:
+        raise ApiError(
+            status_code=422,
+            code="items_required",
+            message="Prescription must have at least one medication item to be authorised.",
+        )
+
+    if not rx.diagnosis or len(rx.diagnosis.strip()) < 2:
+        raise ApiError(
+            status_code=422,
+            code="diagnosis_required",
+            message="Valid clinical diagnosis is required to authorise prescription.",
+        )
+
+    now_utc = datetime.now(timezone.utc)
+    rx.status = PrescriptionStatus.AUTHORISED.value
+    rx.authorised_at = now_utc
+    session.flush()
+
+    refreshed_rx = session.execute(stmt).scalar_one()
+
+    ctx = build_audit_context(request, principal)
+    audit_service.record(
+        session,
+        ctx,
+        action=AuditAction.PRESCRIPTION_AUTHORISED,
+        entity_type="prescription",
+        entity_id=refreshed_rx.id,
+        after={
+            "status": refreshed_rx.status,
+            "authorised_at": refreshed_rx.authorised_at.isoformat(),
+            "items_count": len(refreshed_rx.items),
+        },
+    )
+
+    return _to_prescription_out(refreshed_rx)
+
+
+@router.post(
+    "/prescriptions/{id}/cancel",
+    response_model=PrescriptionOut,
+    dependencies=[Depends(require(Permission.PRESCRIPTION_WRITE))],
+)
+def cancel_prescription(
+    id: int,
+    payload: PrescriptionCancelRequest,
+    request: Request,
+    session: SessionDep,
+    principal: Principal = Depends(current_principal),
+) -> PrescriptionOut:
+    """Cancel an active prescription with recorded reason and attribution (D-19-15)."""
+    if principal.role != Role.DOCTOR or principal.doctor_id is None:
+        raise ApiError(
+            status_code=403,
+            code="doctor_only",
+            message="Only authenticated doctors can cancel prescriptions.",
+        )
+
+    stmt = (
+        select(Prescription)
+        .where(Prescription.id == id)
+        .options(
+            selectinload(Prescription.patient),
+            selectinload(Prescription.doctor),
+            selectinload(Prescription.items),
+        )
+    )
+    rx = session.execute(stmt).scalar_one_or_none()
+    if not rx:
+        raise ApiError(status_code=404, code="prescription_not_found", message="Prescription not found.")
+
+    if rx.doctor_id != principal.doctor_id:
+        raise ApiError(status_code=404, code="prescription_not_found", message="Prescription not found.")
+
+    if rx.status == PrescriptionStatus.CANCELLED.value:
+        raise ApiError(
+            status_code=409,
+            code="already_cancelled",
+            message="Prescription is already cancelled.",
+        )
+
+    reason = payload.reason.strip()
+    if len(reason) < 3:
+        raise ApiError(
+            status_code=422,
+            code="invalid_reason",
+            message="Cancellation reason must be at least 3 characters.",
+        )
+
+    now_utc = datetime.now(timezone.utc)
+    rx.status = PrescriptionStatus.CANCELLED.value
+    rx.cancelled_at = now_utc
+    rx.cancelled_by_user_id = principal.user_id
+    rx.cancellation_reason = reason
+    session.flush()
+
+    refreshed_rx = session.execute(stmt).scalar_one()
+
+    ctx = build_audit_context(request, principal)
+    audit_service.record(
+        session,
+        ctx,
+        action=AuditAction.PRESCRIPTION_CANCELLED,
+        entity_type="prescription",
+        entity_id=refreshed_rx.id,
+        after={
+            "status": refreshed_rx.status,
+            "cancellation_reason": refreshed_rx.cancellation_reason,
+            "cancelled_at": refreshed_rx.cancelled_at.isoformat(),
+            "cancelled_by_user_id": refreshed_rx.cancelled_by_user_id,
         },
     )
 
@@ -233,6 +581,7 @@ def list_prescription_follow_ups(
             doctor_id=rx.doctor_id,
             doctor_name=rx.doctor.name_en if rx.doctor else "",
             encounter_id=rx.encounter_id,
+            status=rx.status,
             diagnosis=rx.diagnosis,
             items_count=len(rx.items),
             follow_up_date=rx.follow_up_date,
@@ -254,7 +603,13 @@ def get_prescription(
 ) -> PrescriptionOut:
     """Retrieve full prescription details including all medication lines (RX-01)."""
     stmt = (
-        select(Prescription).where(Prescription.id == id).options(selectinload(Prescription.items))
+        select(Prescription)
+        .where(Prescription.id == id)
+        .options(
+            selectinload(Prescription.patient),
+            selectinload(Prescription.doctor),
+            selectinload(Prescription.items),
+        )
     )
     rx = session.execute(stmt).scalar_one_or_none()
     if not rx:
@@ -289,7 +644,11 @@ def list_patient_prescriptions(
     stmt = (
         select(Prescription)
         .where(Prescription.patient_id == patient_id)
-        .options(selectinload(Prescription.items))
+        .options(
+            selectinload(Prescription.patient),
+            selectinload(Prescription.doctor),
+            selectinload(Prescription.items),
+        )
         .order_by(Prescription.created_at.desc())
     )
 
@@ -307,6 +666,7 @@ def list_patient_prescriptions(
             doctor_id=p.doctor_id,
             doctor_name=p.doctor.name_en if p.doctor else "",
             encounter_id=p.encounter_id,
+            status=p.status,
             diagnosis=p.diagnosis,
             items_count=len(p.items),
             follow_up_date=p.follow_up_date,

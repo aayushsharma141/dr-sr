@@ -1,4 +1,4 @@
-"""Pydantic schemas for structured doctor prescriptions and medication lines (RX-01)."""
+"""Pydantic schemas for structured doctor prescriptions and medication lines (RX-01, DWS-07)."""
 
 from datetime import date, datetime
 
@@ -20,6 +20,15 @@ class PrescriptionItemCreate(BaseModel):
     instructions: str | None = Field(
         default=None, max_length=500, description="Specific instructions (e.g. After food)"
     )
+    strength: str | None = Field(
+        default=None, max_length=64, description="Strength specification (e.g. 500mg, 0.5%)"
+    )
+    form: str | None = Field(
+        default=None, max_length=32, description="Form (e.g. Tablet, Eye Drops, Syrup)"
+    )
+    route: str | None = Field(
+        default=None, max_length=32, description="Route (e.g. Oral, Right Eye (OD), Left Eye (OS))"
+    )
 
 
 class PrescriptionItemOut(BaseModel):
@@ -35,10 +44,21 @@ class PrescriptionItemOut(BaseModel):
     frequency: str
     duration_days: int
     instructions: str | None = None
+    strength: str | None = None
+    form: str | None = None
+    route: str | None = None
+
+
+class PrescriptionCancelRequest(BaseModel):
+    """Schema for cancelling an existing prescription (D-19-15)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    reason: str = Field(min_length=3, max_length=1000, description="Clinical or administrative cancellation reason")
 
 
 class PrescriptionCreate(BaseModel):
-    """Schema for doctor creating a prescription."""
+    """Schema for doctor creating a prescription (RX-01, DWS-07)."""
 
     model_config = ConfigDict(extra="forbid")
 
@@ -46,13 +66,29 @@ class PrescriptionCreate(BaseModel):
     encounter_id: int | None = Field(
         default=None, gt=0, description="Optional linked clinical encounter ID"
     )
-    diagnosis: str = Field(min_length=2, max_length=1000, description="Clinical diagnosis")
+    status: str = Field(default="AUTHORISED", description="Prescription status: DRAFT or AUTHORISED")
+    diagnosis: str | None = Field(
+        default=None, max_length=1000, description="Clinical diagnosis (inherited from encounter if omitted)"
+    )
     dietary_advice: str | None = Field(default=None, max_length=1000)
     general_advice: str | None = Field(default=None, max_length=1000)
     follow_up_date: date | None = Field(default=None)
     items: list[PrescriptionItemCreate] = Field(
-        min_length=1, description="At least one prescribed medicine item required"
+        default_factory=list, description="Prescribed medicine items"
     )
+
+
+class PrescriptionUpdate(BaseModel):
+    """Schema for updating a draft prescription."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    diagnosis: str | None = Field(default=None, max_length=1000)
+    dietary_advice: str | None = Field(default=None, max_length=1000)
+    general_advice: str | None = Field(default=None, max_length=1000)
+    follow_up_date: date | None = Field(default=None)
+    items: list[PrescriptionItemCreate] | None = Field(default=None)
+    version_id: int | None = Field(default=None, description="Expected version_id for optimistic locking")
 
 
 class PrescriptionOut(BaseModel):
@@ -67,6 +103,12 @@ class PrescriptionOut(BaseModel):
     doctor_id: int
     doctor_name: str
     encounter_id: int | None = None
+    status: str
+    authorised_at: datetime | None = None
+    cancelled_at: datetime | None = None
+    cancellation_reason: str | None = None
+    cancelled_by_user_id: int | None = None
+    is_printable: bool = False
     diagnosis: str
     dietary_advice: str | None = None
     general_advice: str | None = None
@@ -89,6 +131,7 @@ class PrescriptionSummary(BaseModel):
     doctor_id: int
     doctor_name: str
     encounter_id: int | None = None
+    status: str
     diagnosis: str
     items_count: int
     follow_up_date: date | None = None
