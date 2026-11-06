@@ -301,7 +301,7 @@ export function AppointmentBookingModal({
                 />
                 <label htmlFor="walk-in-checkin" className="text-xs text-neutral-800 cursor-pointer">
                   <span className="font-bold text-emerald-950 block">Walk-in arrival: Check In immediately</span>
-                  <span className="text-neutral-600 block text-[11px] mt-0.5">
+                  <span className="text-neutral-600 block text-xs mt-0.5">
                     Places patient directly into the doctor&apos;s active waiting queue in ARRIVED status upon booking.
                   </span>
                 </label>

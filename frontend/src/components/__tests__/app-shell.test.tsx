@@ -19,6 +19,16 @@ vi.mock('../../api/queries', () => ({
   }),
 }))
 
+vi.mock('../../api/health', () => ({
+  useHealth: () => ({
+    data: { status: 'ok', db: 'ok', setup_required: false },
+    isError: false,
+    isLoading: false,
+    isFetching: false,
+    refetch: vi.fn(),
+  }),
+}))
+
 vi.mock('../../api/branding', () => ({
   useClinicBranding: () => ({
     trustNameEn: 'Sri Vashishtha Kalyan Trust',

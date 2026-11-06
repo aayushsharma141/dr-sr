@@ -2,17 +2,17 @@ import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import { LANStatusPill } from '../LANStatusPill'
-import * as queries from '../../api/queries'
+import * as healthQueries from '../../api/health'
 
 describe('LANStatusPill Component', () => {
   it('renders Online status when server is reachable and healthy', () => {
-    vi.spyOn(queries, 'useHealth').mockReturnValue({
+    vi.spyOn(healthQueries, 'useHealth').mockReturnValue({
       data: { status: 'ok', db: 'ok', setup_required: false },
       isError: false,
       isLoading: false,
       isFetching: false,
       refetch: vi.fn(),
-    } as unknown as ReturnType<typeof queries.useHealth>)
+    } as unknown as ReturnType<typeof healthQueries.useHealth>)
 
     render(<LANStatusPill />)
 
@@ -22,13 +22,13 @@ describe('LANStatusPill Component', () => {
 
   it('renders Disconnected status when server is unreachable', async () => {
     const mockRefetch = vi.fn()
-    vi.spyOn(queries, 'useHealth').mockReturnValue({
+    vi.spyOn(healthQueries, 'useHealth').mockReturnValue({
       data: undefined,
       isError: true,
       isLoading: false,
       isFetching: false,
       refetch: mockRefetch,
-    } as unknown as ReturnType<typeof queries.useHealth>)
+    } as unknown as ReturnType<typeof healthQueries.useHealth>)
 
     const user = userEvent.setup()
     render(<LANStatusPill />)
@@ -43,13 +43,13 @@ describe('LANStatusPill Component', () => {
   })
 
   it('renders Checking state while initial health probe is loading', () => {
-    vi.spyOn(queries, 'useHealth').mockReturnValue({
+    vi.spyOn(healthQueries, 'useHealth').mockReturnValue({
       data: undefined,
       isError: false,
       isLoading: true,
       isFetching: true,
       refetch: vi.fn(),
-    } as unknown as ReturnType<typeof queries.useHealth>)
+    } as unknown as ReturnType<typeof healthQueries.useHealth>)
 
     render(<LANStatusPill />)
 

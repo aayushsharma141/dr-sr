@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useHealth } from '../api/queries'
+import { useHealth } from '../api/health'
 
 export function LANStatusPill() {
   const [isBrowserOnline, setIsBrowserOnline] = useState(
@@ -54,7 +54,7 @@ export function LANStatusPill() {
         <span className="h-2 w-2 rounded-full bg-rose-600" aria-hidden="true" />
         <span className="hidden sm:inline">LAN:</span>
         <span>Disconnected</span>
-        {isFetching && <span className="text-[10px] text-rose-600 animate-spin">⟳</span>}
+        {isFetching && <span className="text-xs text-rose-700 animate-spin">⟳</span>}
       </button>
     )
   }
@@ -71,7 +71,7 @@ export function LANStatusPill() {
       <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" aria-hidden="true" />
       <span className="hidden sm:inline">LAN:</span>
       <span>Online</span>
-      {isFetching && <span className="text-[10px] text-emerald-600 animate-spin">⟳</span>}
+      {isFetching && <span className="text-xs text-emerald-700 animate-spin">⟳</span>}
     </button>
   )
 }
