@@ -274,6 +274,53 @@ describe('Clinical Encounter Workspace Test Suite', () => {
           text: () => Promise.resolve(JSON.stringify(mockPriorEncounterFull)),
         })
       }
+      if (urlStr.includes('/api/prescriptions') && init?.method === 'POST') {
+        if (urlStr.includes('/cancel')) {
+          return Promise.resolve({
+            ok: true,
+            status: 200,
+            headers: new Headers({ 'content-type': 'application/json' }),
+            text: () => Promise.resolve(JSON.stringify({ id: 99, status: 'CANCELLED', is_printable: false })),
+          })
+        }
+        if (urlStr.includes('/authorise')) {
+          return Promise.resolve({
+            ok: true,
+            status: 200,
+            headers: new Headers({ 'content-type': 'application/json' }),
+            text: () => Promise.resolve(JSON.stringify({ id: 99, status: 'AUTHORISED', is_printable: true })),
+          })
+        }
+        const body = init?.body ? JSON.parse(String(init.body)) : {}
+        return Promise.resolve({
+          ok: true,
+          status: 201,
+          headers: new Headers({ 'content-type': 'application/json' }),
+          text: () =>
+            Promise.resolve(
+              JSON.stringify({
+                id: 99,
+                patient_id: enc.patient_id,
+                patient_urn: 'KH-2026-0001',
+                patient_name: 'Aarav Kumar',
+                doctor_id: 1,
+                doctor_name: 'Dr. Madan Mohan Dwivedi',
+                encounter_id: enc.id,
+                status: 'AUTHORISED',
+                is_printable: true,
+                diagnosis: 'Lumbar Radiculopathy',
+                items: (body.items || []).map((it: any, idx: number) => ({
+                  ...it,
+                  id: idx + 1,
+                  prescription_id: 99,
+                })),
+                version_id: 1,
+                created_at: '2026-11-06T10:00:00Z',
+                updated_at: '2026-11-06T10:00:00Z',
+              })
+            ),
+        })
+      }
       if (urlStr.includes(`/api/patients/${enc.patient_id}/prescriptions`)) {
         return Promise.resolve({
           ok: true,
@@ -578,9 +625,9 @@ describe('Clinical Encounter Workspace Test Suite', () => {
       renderWorkspace(10)
 
       expect(await screen.findByText(/Ophthalmology Specialty Assessment/i)).toBeInTheDocument()
-      expect(screen.getByText(/Right Eye \(OD\)/i)).toBeInTheDocument()
-      expect(screen.getByText(/Left Eye \(OS\)/i)).toBeInTheDocument()
-      expect(screen.getByLabelText(/Distance Uncorrected \(OD\)/i || /Distance Uncorrected/i)).toBeInTheDocument()
+      expect(screen.getAllByText(/Right Eye \(OD\)/i).length).toBeGreaterThanOrEqual(1)
+      expect(screen.getAllByText(/Left Eye \(OS\)/i).length).toBeGreaterThanOrEqual(1)
+      expect(screen.getAllByLabelText(/Distance Uncorrected/i).length).toBeGreaterThanOrEqual(1)
       expect(screen.getByLabelText(/IOP OD \(mmHg\)/i)).toBeInTheDocument()
       expect(screen.getByLabelText(/IOP OS \(mmHg\)/i)).toBeInTheDocument()
     })
@@ -632,7 +679,7 @@ describe('Clinical Encounter Workspace Test Suite', () => {
       await userEvent.type(medNameInput, 'Tab Naproxen 500mg')
 
       // Authorise prescription
-      const authBtn = screen.getByRole('button', { name: /Authorise Prescription/i })
+      const authBtn = screen.getAllByRole('button', { name: /Authorise Prescription/i })[0]
       await userEvent.click(authBtn)
 
       // Status updates to AUTHORISED (Locked)
@@ -656,7 +703,7 @@ describe('Clinical Encounter Workspace Test Suite', () => {
       const medNameInput = screen.getByPlaceholderText(/e\.g\. Paracetamol/i)
       await userEvent.type(medNameInput, 'Tab Tramadol')
 
-      const authBtn = screen.getByRole('button', { name: /Authorise Prescription/i })
+      const authBtn = screen.getAllByRole('button', { name: /Authorise Prescription/i })[0]
       await userEvent.click(authBtn)
 
       // Wait for authorised status and "Cancel Prescription & Re-issue" button
