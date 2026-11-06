@@ -25,6 +25,8 @@ from kalyan_api.models import (
     AppointmentStatus,
     ClinicalAddendum,
     ClinicalEncounter,
+    ClinicalTemplateResponse,
+    ClinicalTemplateVersion,
     Patient,
 )
 from kalyan_api.schemas.encounters import (
@@ -36,6 +38,7 @@ from kalyan_api.schemas.encounters import (
     EncounterSummary,
     EncounterUpdate,
 )
+from kalyan_api.schemas.templates import TemplateResponseInput, TemplateResponseRead
 from kalyan_api.services import audit_service
 from kalyan_api.services.audit_service import AuditAction
 
@@ -347,6 +350,33 @@ def finalise_encounter(
                 message="Diagnosis is required to finalise the consultation (minimum 2 characters).",
             )
 
+        # Validate specialty template response required fields if response exists (D-19-09, DWS-05)
+        tmpl_resp = session.scalar(
+            select(ClinicalTemplateResponse).where(ClinicalTemplateResponse.encounter_id == enc.id)
+        )
+        if tmpl_resp:
+            resp_data = tmpl_resp.response_data or {}
+            tmpl_version = session.get(ClinicalTemplateVersion, tmpl_resp.template_version_id)
+            if tmpl_version and tmpl_version.schema_json:
+                required_fields = tmpl_version.schema_json.get("required", [])
+                missing_fields = []
+                for field in required_fields:
+                    val = resp_data
+                    for part in field.split("."):
+                        if isinstance(val, dict):
+                            val = val.get(part)
+                        else:
+                            val = None
+                            break
+                    if val is None or (isinstance(val, str) and not str(val).strip()):
+                        missing_fields.append(field)
+                if missing_fields:
+                    raise ApiError(
+                        status_code=422,
+                        code="template_required_fields_missing",
+                        message=f"Required specialty template fields missing: {', '.join(missing_fields)}",
+                    )
+
         enc.is_finalised = True
         enc.finalised_at = clock.utcnow()
         enc.version_id += 1
@@ -438,3 +468,91 @@ def add_encounter_addendum(
         addendum_text=addendum.addendum_text,
         created_at=addendum.created_at,
     )
+
+
+@router.get(
+    "/encounters/{id}/template-response",
+    response_model=TemplateResponseRead,
+    dependencies=[Depends(require(Permission.ENCOUNTER_READ))],
+)
+def get_encounter_template_response(
+    id: int,
+    session: SessionDep,
+    principal: Principal = Depends(current_principal),
+) -> TemplateResponseRead:
+    """Retrieve saved specialty template responses for encounter."""
+    enc = session.get(ClinicalEncounter, id)
+    if not enc or enc.doctor_id != principal.doctor_id:
+        raise ApiError(
+            status_code=404,
+            code="encounter_not_found",
+            message="Clinical encounter not found.",
+        )
+    resp = session.scalar(
+        select(ClinicalTemplateResponse).where(ClinicalTemplateResponse.encounter_id == id)
+    )
+    if not resp:
+        raise ApiError(
+            status_code=404,
+            code="template_response_not_found",
+            message="No specialty template response for encounter.",
+        )
+    return TemplateResponseRead.model_validate(resp)
+
+
+@router.put(
+    "/encounters/{id}/template-response",
+    response_model=TemplateResponseRead,
+    dependencies=[Depends(require(Permission.ENCOUNTER_WRITE))],
+)
+def save_encounter_template_response(
+    id: int,
+    payload: TemplateResponseInput,
+    session: SessionDep,
+    principal: Principal = Depends(current_principal),
+) -> TemplateResponseRead:
+    """Save or update specialty template response for a draft encounter (D-19-09, DWS-05)."""
+    enc = session.get(ClinicalEncounter, id)
+    if not enc or enc.doctor_id != principal.doctor_id:
+        raise ApiError(
+            status_code=404,
+            code="encounter_not_found",
+            message="Clinical encounter not found.",
+        )
+
+    if enc.is_finalised:
+        raise ApiError(
+            status_code=400,
+            code="encounter_finalised",
+            message="Cannot modify specialty template response for a finalised clinical encounter.",
+        )
+
+    version = session.get(ClinicalTemplateVersion, payload.template_version_id)
+    if not version:
+        raise ApiError(
+            status_code=404,
+            code="template_version_not_found",
+            message="Clinical template version not found.",
+        )
+
+    existing = session.scalar(
+        select(ClinicalTemplateResponse).where(ClinicalTemplateResponse.encounter_id == id)
+    )
+    if existing:
+        existing.template_version_id = payload.template_version_id
+        existing.response_data = payload.response_data
+        existing.updated_at = clock.utcnow()
+        session.flush()
+        session.refresh(existing)
+        return TemplateResponseRead.model_validate(existing)
+    else:
+        new_resp = ClinicalTemplateResponse(
+            encounter_id=id,
+            template_version_id=payload.template_version_id,
+            response_data=payload.response_data,
+        )
+        session.add(new_resp)
+        session.flush()
+        session.refresh(new_resp)
+        return TemplateResponseRead.model_validate(new_resp)
+
