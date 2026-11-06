@@ -23,6 +23,7 @@ from sqlalchemy import (
     Index,
     Integer,
     MetaData,
+    Numeric,
     SmallInteger,
     String,
     Text,
@@ -594,7 +595,9 @@ class ClinicalEncounter(Base):
     appointment_id: Mapped[int | None] = mapped_column(
         BigInteger, ForeignKey("appointments.id", ondelete="SET NULL"), nullable=True
     )
-    department_id: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    department_id: Mapped[int | None] = mapped_column(
+        BigInteger, ForeignKey("departments.id", ondelete="SET NULL"), nullable=True
+    )
     patient_id: Mapped[int] = mapped_column(
         BigInteger, ForeignKey("patients.id", ondelete="RESTRICT"), nullable=False
     )
@@ -629,12 +632,25 @@ class ClinicalEncounter(Base):
 
     patient = relationship("Patient", lazy="joined")
     doctor = relationship("Doctor", lazy="joined")
+    department = relationship("Department", lazy="select")
     appointment = relationship("Appointment", lazy="select")
     addenda = relationship(
         "ClinicalAddendum",
         back_populates="encounter",
         cascade="all, delete-orphan",
         order_by="ClinicalAddendum.created_at",
+    )
+    template_response = relationship(
+        "ClinicalTemplateResponse",
+        back_populates="encounter",
+        uselist=False,
+        cascade="all, delete-orphan",
+    )
+    vitals = relationship(
+        "VitalObservation",
+        back_populates="encounter",
+        uselist=False,
+        cascade="all, delete-orphan",
     )
 
 
@@ -986,3 +1002,187 @@ class Payment(Base):
     appointment = relationship("Appointment", lazy="select")
     created_by_user = relationship("User", foreign_keys=[created_by_user_id], lazy="joined")
     reversed_by_user = relationship("User", foreign_keys=[reversed_by_user_id], lazy="joined")
+
+
+class Department(Base):
+    """Department entity (CLN-01, DWS-04)."""
+
+    __tablename__ = "departments"
+
+    id: Mapped[int] = mapped_column(BigInteger, Identity(always=False), primary_key=True)
+    code: Mapped[str] = mapped_column(String(64), unique=True, nullable=False)
+    name_en: Mapped[str] = mapped_column(String(128), nullable=False)
+    name_hi: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    is_active: Mapped[bool] = mapped_column(
+        Boolean, default=True, server_default=text("true"), nullable=False
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    templates: Mapped[list["ClinicalTemplate"]] = relationship(
+        "ClinicalTemplate", back_populates="department"
+    )
+
+
+class ClinicalTemplate(Base):
+    """Specialty clinical template definition."""
+
+    __tablename__ = "clinical_templates"
+
+    id: Mapped[int] = mapped_column(BigInteger, Identity(always=False), primary_key=True)
+    department_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("departments.id", ondelete="RESTRICT"), nullable=False
+    )
+    code: Mapped[str] = mapped_column(String(64), unique=True, nullable=False)
+    name_en: Mapped[str] = mapped_column(String(128), nullable=False)
+    name_hi: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    is_active: Mapped[bool] = mapped_column(
+        Boolean, default=True, server_default=text("true"), nullable=False
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    department: Mapped["Department"] = relationship("Department", back_populates="templates")
+    versions: Mapped[list["ClinicalTemplateVersion"]] = relationship(
+        "ClinicalTemplateVersion", back_populates="template", cascade="all, delete-orphan"
+    )
+
+
+class ClinicalTemplateVersion(Base):
+    """Versioned schema definition for a specialty clinical template."""
+
+    __tablename__ = "clinical_template_versions"
+    __table_args__ = (
+        UniqueConstraint("template_id", "version_number", name="uq_template_version"),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, Identity(always=False), primary_key=True)
+    template_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("clinical_templates.id", ondelete="CASCADE"), nullable=False
+    )
+    version_number: Mapped[int] = mapped_column(Integer, nullable=False)
+    schema_json: Mapped[dict] = mapped_column(JSONB, nullable=False)
+    is_active: Mapped[bool] = mapped_column(
+        Boolean, default=True, server_default=text("true"), nullable=False
+    )
+    approved_by: Mapped[str] = mapped_column(String(128), nullable=False)
+    approved_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    template: Mapped["ClinicalTemplate"] = relationship("ClinicalTemplate", back_populates="versions")
+    responses: Mapped[list["ClinicalTemplateResponse"]] = relationship(
+        "ClinicalTemplateResponse", back_populates="template_version"
+    )
+
+
+class ClinicalTemplateResponse(Base):
+    """Encounter-specific specialty template response data."""
+
+    __tablename__ = "clinical_template_responses"
+    __table_args__ = (
+        UniqueConstraint("encounter_id", name="uq_template_responses_encounter"),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, Identity(always=False), primary_key=True)
+    encounter_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("clinical_encounters.id", ondelete="CASCADE"), nullable=False
+    )
+    template_version_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("clinical_template_versions.id", ondelete="RESTRICT"), nullable=False
+    )
+    response_data: Mapped[dict] = mapped_column(
+        JSONB, default=dict, server_default=text("'{}'::jsonb"), nullable=False
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
+
+    encounter: Mapped["ClinicalEncounter"] = relationship("ClinicalEncounter", back_populates="template_response")
+    template_version: Mapped["ClinicalTemplateVersion"] = relationship("ClinicalTemplateVersion", back_populates="responses")
+
+
+class VitalObservation(Base):
+    """Vital observations and biometrics recorded for an encounter."""
+
+    __tablename__ = "vital_observations"
+    __table_args__ = (
+        UniqueConstraint("encounter_id", name="uq_vital_observations_encounter"),
+        CheckConstraint(
+            "height_cm IS NULL OR (height_cm > 20 AND height_cm < 280)",
+            name="ck_vital_observations_height_cm",
+        ),
+        CheckConstraint(
+            "weight_kg IS NULL OR (weight_kg > 1 AND weight_kg < 400)",
+            name="ck_vital_observations_weight_kg",
+        ),
+        CheckConstraint(
+            "bmi IS NULL OR (bmi >= 5 AND bmi <= 100)",
+            name="ck_vital_observations_bmi",
+        ),
+        CheckConstraint(
+            "systolic_bp IS NULL OR (systolic_bp >= 40 AND systolic_bp <= 300)",
+            name="ck_vital_observations_systolic_bp",
+        ),
+        CheckConstraint(
+            "diastolic_bp IS NULL OR (diastolic_bp >= 20 AND diastolic_bp <= 200)",
+            name="ck_vital_observations_diastolic_bp",
+        ),
+        CheckConstraint(
+            "pulse_bpm IS NULL OR (pulse_bpm >= 30 AND pulse_bpm <= 260)",
+            name="ck_vital_observations_pulse_bpm",
+        ),
+        CheckConstraint(
+            "temperature_f IS NULL OR (temperature_f >= 85 AND temperature_f <= 110)",
+            name="ck_vital_observations_temperature_f",
+        ),
+        CheckConstraint(
+            "respiratory_rate IS NULL OR (respiratory_rate >= 5 AND respiratory_rate <= 80)",
+            name="ck_vital_observations_respiratory_rate",
+        ),
+        CheckConstraint(
+            "spo2_percent IS NULL OR (spo2_percent >= 40 AND spo2_percent <= 100)",
+            name="ck_vital_observations_spo2_percent",
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, Identity(always=False), primary_key=True)
+    encounter_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("clinical_encounters.id", ondelete="CASCADE"), nullable=False
+    )
+    patient_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("patients.id", ondelete="RESTRICT"), nullable=False
+    )
+    height_cm: Mapped[float | None] = mapped_column(Numeric(5, 2), nullable=True)
+    weight_kg: Mapped[float | None] = mapped_column(Numeric(5, 2), nullable=True)
+    bmi: Mapped[float | None] = mapped_column(Numeric(4, 1), nullable=True)
+    systolic_bp: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    diastolic_bp: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    pulse_bpm: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    temperature_f: Mapped[float | None] = mapped_column(Numeric(4, 1), nullable=True)
+    respiratory_rate: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    spo2_percent: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
+
+    encounter: Mapped["ClinicalEncounter"] = relationship("ClinicalEncounter", back_populates="vitals")
+    patient: Mapped["Patient"] = relationship("Patient")
+
