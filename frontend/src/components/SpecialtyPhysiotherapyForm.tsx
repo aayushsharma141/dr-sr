@@ -1,4 +1,3 @@
-import React from 'react'
 
 export interface PhysiotherapyFormData {
   starting_vas?: number
@@ -96,7 +95,7 @@ export function SpecialtyPhysiotherapyForm({
             onBlur={onBlur}
             className="w-full accent-[#8E1C3D] cursor-pointer"
           />
-          <div className="flex justify-between text-[11px] text-neutral-500 font-medium px-1">
+          <div className="flex justify-between text-xs text-neutral-500 font-medium px-1">
             <span>0 (None)</span>
             <span>2 (Mild)</span>
             <span>5 (Moderate)</span>

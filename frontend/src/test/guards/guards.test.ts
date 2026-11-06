@@ -29,7 +29,7 @@ describe('legibility guard (UX-04)', () => {
   // the semantic colours that fail 4.5:1 on white. Print-only documents keep their small
   // print type by design. The guard reads class names, so it cannot see the surface behind
   // the text: a light-on-dark panel needs a documented exception (see PENDING below).
-  const PRINT_ONLY = new Set(['PrintLetterhead.tsx', 'RegistrationCard.tsx', 'PrescriptionPrint.tsx', 'ReceiptPrint.tsx'])
+  const PRINT_ONLY = new Set(['PrintLetterhead.tsx', 'RegistrationCard.tsx', 'PrescriptionPrint.tsx', 'ReceiptPrint.tsx', 'ConsultationSummaryPrint.tsx'])
   const SIZE = /(?<![\w-])(?:[a-z-]+:)*text-\[(\d+(?:\.\d+)?)(px|rem)\]/g // rem counts as 16px
   const GREY = /(?<![\w-])((?:[a-z-]+:)*)text-(?:neutral|slate|gray|zinc|stone)-(?:300|400)(?![\w-])/g
   const SEMANTIC = /(?<![\w-])((?:[a-z-]+:)*)text-(?:red-500|emerald-600|amber-600|teal-600)(?![\w-])/g

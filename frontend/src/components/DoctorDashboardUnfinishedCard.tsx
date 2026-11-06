@@ -1,4 +1,3 @@
-import React from 'react'
 import { useNavigate } from 'react-router'
 import { useUnfinishedEncounters } from '../api/queries'
 import type { UnfinishedEncounter } from '../api/types'
@@ -76,7 +75,7 @@ export function DoctorDashboardUnfinishedCard({
         </div>
       ) : drafts.length === 0 ? (
         <div className="p-8 text-center" data-testid="unfinished-empty-state">
-          <div className="mx-auto w-10 h-10 rounded-full bg-amber-50 flex items-center justify-center text-amber-600 mb-2">
+          <div className="mx-auto w-10 h-10 rounded-full bg-amber-50 flex items-center justify-center text-amber-700 mb-2">
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
             </svg>

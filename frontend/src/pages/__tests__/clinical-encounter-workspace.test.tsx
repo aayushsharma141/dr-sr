@@ -170,22 +170,15 @@ const mockOphthalTemplate: ClinicalTemplateRead = {
 const mockDoctorList: DoctorOut[] = [
   {
     id: 1,
-    user_id: 3,
     name_en: 'Dr. Madan Mohan Dwivedi',
     name_hi: 'डॉ. मदन मोहन द्विवेदी',
-    department_id: 1,
-    designation: 'Chief Consultant Physiotherapist',
-    reg_number: 'PT-12345',
-    qualifications: 'BPT, MPT (Ortho)',
+    qualification: 'BPT, MPT (Ortho)',
+    registration_number: 'PT-12345',
+    default_fee_paise: 50000,
     is_active: true,
-    department: {
-      id: 1,
-      code: 'PHYSIOTHERAPY',
-      name_en: 'Physiotherapy',
-      name_hi: 'फिजियोथेरेपी',
-      is_active: true,
-      created_at: '2026-01-01T00:00:00Z',
-    },
+    version_id: 1,
+    created_at: '2026-01-01T00:00:00Z',
+    updated_at: '2026-01-01T00:00:00Z',
   },
 ]
 
@@ -205,6 +198,7 @@ describe('Clinical Encounter Workspace Test Suite', () => {
   afterEach(() => {
     cleanup()
     vi.restoreAllMocks()
+    vi.useRealTimers()
     localStorage.clear()
     sessionStorage.clear()
   })
@@ -419,7 +413,7 @@ describe('Clinical Encounter Workspace Test Suite', () => {
       expect(screen.getAllByText(/KH-2026-0001/i).length).toBeGreaterThanOrEqual(1)
 
       // Severe allergy warning badge
-      const allergyBadge = screen.getByTestId('allergy-alert-badge')
+      const allergyBadge = await screen.findByTestId('allergy-alert-badge')
       expect(allergyBadge).toBeInTheDocument()
       expect(allergyBadge).toHaveTextContent(/Penicillin, Sulfa drugs/i)
 
@@ -497,20 +491,24 @@ describe('Clinical Encounter Workspace Test Suite', () => {
   // =========================================================================
   describe('auto-save and vitals', () => {
     it('triggers debounced auto-save ~3s after typing and shows saved timestamp badge', async () => {
-      vi.useFakeTimers({ shouldAdvanceTime: true })
       const mockFetch = setupDefaultFetchMocks()
       vi.stubGlobal('fetch', mockFetch)
 
       renderWorkspace(10)
 
-      // Wait for initial render
+      // Wait for initial render with real timers
       const symptomsInput = await screen.findByLabelText(/Chief Complaints & Symptoms/i)
 
-      // User types new text
-      fireEvent.change(symptomsInput, { target: { value: 'Persistent pain in lower lumbar area' } })
+      vi.useFakeTimers()
+      try {
+        // User types new text
+        fireEvent.change(symptomsInput, { target: { value: 'Persistent pain in lower lumbar area' } })
 
-      // Fast-forward 3000ms debounce
-      await vi.advanceTimersByTimeAsync(3200)
+        // Fast-forward 3000ms debounce
+        await vi.advanceTimersByTimeAsync(3500)
+      } finally {
+        vi.useRealTimers()
+      }
 
       await waitFor(() => {
         expect(screen.getByTestId('auto-save-pill')).toHaveTextContent(/Saved to server at/i)
@@ -519,8 +517,6 @@ describe('Clinical Encounter Workspace Test Suite', () => {
       // Strict security invariant T-19-10: zero clinical notes written to web storage
       expect(localStorage.length).toBe(0)
       expect(sessionStorage.length).toBe(0)
-
-      vi.useRealTimers()
     })
 
     it('triggers immediate save on blur when doctor leaves a section', async () => {

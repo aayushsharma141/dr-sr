@@ -1,4 +1,4 @@
-import React, { useId } from 'react'
+import { useId } from 'react'
 import type { VitalObservationInput } from '../api/types'
 
 export interface VitalsBiometricsProps {
@@ -67,7 +67,7 @@ export function VitalsBiometricsSection({
           >
             <span>BMI: {displayBmi} kg/m²</span>
             {bmiInfo.category && (
-              <span className="px-1.5 py-0.5 rounded text-[11px] font-bold uppercase tracking-wider bg-white/60">
+              <span className="px-1.5 py-0.5 rounded text-xs font-bold uppercase tracking-wider bg-white/60">
                 {bmiInfo.category}
               </span>
             )}

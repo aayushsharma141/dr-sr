@@ -1,11 +1,11 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { useParams, useSearchParams, useNavigate, Link } from 'react-router'
 import { AppShell } from '../components/AppShell'
 import { ConflictBanner } from '../components/ConflictBanner'
 import { Modal } from '../components/Modal'
 import { VitalsBiometricsSection } from '../components/VitalsBiometricsSection'
-import { SpecialtyPhysiotherapyForm, PhysiotherapyFormData } from '../components/SpecialtyPhysiotherapyForm'
-import { SpecialtyOphthalmologyForm, OphthalmologyFormData } from '../components/SpecialtyOphthalmologyForm'
+import { SpecialtyPhysiotherapyForm, type PhysiotherapyFormData } from '../components/SpecialtyPhysiotherapyForm'
+import { SpecialtyOphthalmologyForm, type OphthalmologyFormData } from '../components/SpecialtyOphthalmologyForm'
 import { PrescriptionFormSection } from '../components/PrescriptionFormSection'
 import { FollowUpSection } from '../components/FollowUpSection'
 import { AppointmentBookingModal } from '../components/AppointmentBookingModal'
@@ -23,9 +23,7 @@ import {
   useDepartmentTemplate,
   useEncounterTemplateResponse,
   useSaveEncounterTemplateResponse,
-  usePatientPrescriptions,
   useCreatePrescription,
-  useUpdatePrescription,
   useAuthorisePrescription,
   useCancelPrescription,
   useEncounterFollowUp,
@@ -80,16 +78,7 @@ export function ClinicalEncounterWorkspace() {
   const { data: deptTemplate } = useDepartmentTemplate(departmentId)
   const { data: serverTemplateResponse } = useEncounterTemplateResponse(encounterId)
 
-  // 4. Prescription queries
-  const { data: patientPrescriptions } = usePatientPrescriptions(effectivePatientId)
-  const activePrescription = Array.isArray(patientPrescriptions)
-    ? patientPrescriptions.find(
-        (p) => p.encounter_id === encounterId && p.status !== 'CANCELLED'
-      )
-    : null
-  const activePrescriptionId = activePrescription?.id || null
-
-  // 5. Follow-up recommendation
+  // 4. Follow-up recommendation
   const { data: serverFollowUp } = useEncounterFollowUp(encounterId)
 
   // Form State: Core Encounter
@@ -151,7 +140,6 @@ export function ClinicalEncounterWorkspace() {
   const saveVitalsMutation = useSaveVitals(encounterId)
   const saveTemplateResponseMutation = useSaveEncounterTemplateResponse(encounterId)
   const createRxMutation = useCreatePrescription()
-  const updateRxMutation = useUpdatePrescription()
   const authoriseRxMutation = useAuthorisePrescription()
   const cancelRxMutation = useCancelPrescription()
   const createFollowUpMutation = useCreateFollowUp(encounterId)
@@ -232,6 +220,15 @@ export function ClinicalEncounterWorkspace() {
         })
       }
 
+      // 4. Save Follow-up recommendation if date entered
+      if (followUpDate) {
+        await createFollowUpMutation.mutateAsync({
+          recommended_date: followUpDate,
+          recommended_doctor_id: followUpDoctorId,
+          clinical_reason: followUpReason || undefined,
+        })
+      }
+
       // Mark success with timestamp
       const now = new Date()
       const timeStr = now.toTimeString().split(' ')[0]
@@ -255,6 +252,10 @@ export function ClinicalEncounterWorkspace() {
     vitals,
     specialtyData,
     deptTemplate,
+    followUpDate,
+    followUpDoctorId,
+    followUpReason,
+    createFollowUpMutation,
     saveDraftMutation,
     saveVitalsMutation,
     saveTemplateResponseMutation,
@@ -623,7 +624,7 @@ export function ClinicalEncounterWorkspace() {
             aria-label="Consultation Jump Navigation"
             className="w-56 shrink-0 sticky top-24 bg-white rounded-lg border border-neutral-200 p-3 shadow-xs space-y-1 text-xs"
           >
-            <span className="block px-3 py-1 font-bold text-neutral-400 uppercase tracking-wider text-[10px]">
+            <span className="block px-3 py-1 font-bold text-neutral-500 uppercase tracking-wider text-xs">
               Workspace Anchors
             </span>
             {[
@@ -654,7 +655,7 @@ export function ClinicalEncounterWorkspace() {
             <div className="pt-4 border-t border-neutral-200 mt-3 px-3">
               <Link
                 to="/doctor"
-                className="text-[11px] text-neutral-500 hover:text-neutral-900 flex items-center gap-1 font-medium"
+                className="text-xs text-neutral-500 hover:text-neutral-900 flex items-center gap-1 font-medium"
               >
                 &larr; Consultation Queue
               </Link>
@@ -956,7 +957,7 @@ export function ClinicalEncounterWorkspace() {
                   </div>
                   <div>
                     <h3 className="text-sm font-semibold text-neutral-900">{patient.full_name}</h3>
-                    <div className="text-[11px] font-mono text-neutral-500">{patient.urn}</div>
+                    <div className="text-xs font-mono text-neutral-500">{patient.urn}</div>
                   </div>
                 </div>
 
@@ -1006,7 +1007,7 @@ export function ClinicalEncounterWorkspace() {
                 <h4 className="text-sm font-semibold text-neutral-900">
                   Previous Consultation Card
                 </h4>
-                <p className="text-[11px] text-neutral-500">
+                <p className="text-xs text-neutral-500">
                   Read-only findings from most recent prior visit.
                 </p>
               </div>
@@ -1016,13 +1017,13 @@ export function ClinicalEncounterWorkspace() {
                   <h5 className="text-xs font-semibold text-neutral-800">
                     No Prior Encounters Recorded
                   </h5>
-                  <p className="text-[11px] text-neutral-500 leading-relaxed">
+                  <p className="text-xs text-neutral-500 leading-relaxed">
                     This patient has no earlier consultation records in Kalyan Hospital. Complete this initial consultation to establish the clinical baseline.
                   </p>
                 </div>
               ) : (
                 <div className="space-y-3 text-xs">
-                  <div className="flex justify-between items-center text-neutral-500 text-[11px] font-mono">
+                  <div className="flex justify-between items-center text-neutral-500 text-xs font-mono">
                     <span>{new Date(priorEncounter.encounter_date).toLocaleDateString()}</span>
                     <span>{withDoctorTitle(priorEncounter.doctor_name)}</span>
                   </div>
@@ -1030,14 +1031,14 @@ export function ClinicalEncounterWorkspace() {
                   {/* Prior Chief Complaints with Copy Button */}
                   <div className="p-2.5 bg-neutral-50 rounded border border-neutral-200 space-y-1.5">
                     <div className="flex justify-between items-center">
-                      <span className="font-semibold text-neutral-700 uppercase text-[10px] tracking-wider">
+                      <span className="font-semibold text-neutral-700 uppercase text-xs tracking-wider">
                         Complaints
                       </span>
                       {!isFinalised && (
                         <button
                           type="button"
                           onClick={handleCopySymptoms}
-                          className="text-[11px] font-semibold text-[#8E1C3D] hover:underline"
+                          className="text-xs font-semibold text-[#8E1C3D] hover:underline"
                         >
                           Copy Section Findings
                         </button>
@@ -1052,20 +1053,20 @@ export function ClinicalEncounterWorkspace() {
                   {priorEncounter.vitals && (
                     <div className="p-2.5 bg-neutral-50 rounded border border-neutral-200 space-y-1.5">
                       <div className="flex justify-between items-center">
-                        <span className="font-semibold text-neutral-700 uppercase text-[10px] tracking-wider">
+                        <span className="font-semibold text-neutral-700 uppercase text-xs tracking-wider">
                           Vitals Snapshot
                         </span>
                         {!isFinalised && (
                           <button
                             type="button"
                             onClick={handleCopyVitals}
-                            className="text-[11px] font-semibold text-[#8E1C3D] hover:underline"
+                            className="text-xs font-semibold text-[#8E1C3D] hover:underline"
                           >
                             Copy Section Findings
                           </button>
                         )}
                       </div>
-                      <div className="grid grid-cols-2 gap-x-2 gap-y-0.5 text-[11px] text-neutral-700 font-mono">
+                      <div className="grid grid-cols-2 gap-x-2 gap-y-0.5 text-xs text-neutral-700 font-mono">
                         <span>BP: {priorEncounter.vitals.systolic_bp}/{priorEncounter.vitals.diastolic_bp}</span>
                         <span>Pulse: {priorEncounter.vitals.pulse_bpm} bpm</span>
                         <span>SpO2: {priorEncounter.vitals.spo2_percent}%</span>
@@ -1077,14 +1078,14 @@ export function ClinicalEncounterWorkspace() {
                   {/* Prior Diagnosis with Copy Button */}
                   <div className="p-2.5 bg-neutral-50 rounded border border-neutral-200 space-y-1.5">
                     <div className="flex justify-between items-center">
-                      <span className="font-semibold text-neutral-700 uppercase text-[10px] tracking-wider">
+                      <span className="font-semibold text-neutral-700 uppercase text-xs tracking-wider">
                         Diagnosis
                       </span>
                       {!isFinalised && (
                         <button
                           type="button"
                           onClick={handleCopyDiagnosis}
-                          className="text-[11px] font-semibold text-[#8E1C3D] hover:underline"
+                          className="text-xs font-semibold text-[#8E1C3D] hover:underline"
                         >
                           Copy Section Findings
                         </button>
@@ -1159,6 +1160,7 @@ export function ClinicalEncounterWorkspace() {
                 patient_name: patientName,
                 doctor_id: me?.doctor_id || 1,
                 doctor_name: me?.full_name || '',
+                appointment_id: paramApptId || 0,
                 encounter_date: new Date().toISOString(),
                 symptoms,
                 clinical_notes: clinicalNotes,
@@ -1180,7 +1182,7 @@ export function ClinicalEncounterWorkspace() {
                     doctor_name:
                       doctors.find((d) => d.id === serverFollowUp.recommended_doctor_id)?.name_en ||
                       existingEncounter?.doctor_name,
-                    reception_notes: serverFollowUp.reception_notes,
+                    reception_notes: null,
                   }
                 : followUpDate
                 ? {
@@ -1189,7 +1191,7 @@ export function ClinicalEncounterWorkspace() {
                     doctor_name:
                       doctors.find((d) => d.id === followUpDoctorId)?.name_en ||
                       existingEncounter?.doctor_name,
-                    reception_notes: '',
+                    reception_notes: null,
                   }
                 : null
             }

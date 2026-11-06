@@ -49,6 +49,8 @@ const mockCreatedPrescription: PrescriptionOut = {
   doctor_id: 1,
   doctor_name: 'Dr. Madan Mohan Dwivedi',
   encounter_id: null,
+  status: 'AUTHORISED',
+  is_printable: true,
   diagnosis: 'Acute Cervical Strain',
   dietary_advice: 'Drink warm water',
   general_advice: 'Avoid heavy lifting',

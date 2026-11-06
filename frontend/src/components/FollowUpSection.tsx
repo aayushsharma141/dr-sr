@@ -1,5 +1,5 @@
-import React from 'react'
 import type { DoctorOut } from '../api/types'
+import { istToday } from '../format'
 
 export interface FollowUpSectionProps {
   recommendedDate: string
@@ -26,7 +26,7 @@ export function FollowUpSection({
   onBlur,
   readOnly = false,
 }: FollowUpSectionProps) {
-  const todayStr = new Date().toISOString().split('T')[0]
+  const todayStr = istToday()
 
   return (
     <div className="space-y-4">
@@ -90,7 +90,7 @@ export function FollowUpSection({
             <option value="">Select doctor...</option>
             {doctors.map((doc) => (
               <option key={doc.id} value={doc.id}>
-                {doc.name_en} ({doc.department?.name_en || 'General'})
+                {doc.name_en} {doc.qualification ? `(${doc.qualification})` : ''}
               </option>
             ))}
           </select>
@@ -111,7 +111,7 @@ export function FollowUpSection({
           placeholder="Internal medical rationale for follow-up review (strictly hidden from reception)..."
           className="w-full px-3 py-2 border border-neutral-300 rounded text-xs focus:ring-1 focus:ring-[#8E1C3D] disabled:bg-neutral-100"
         />
-        <p className="text-[11px] text-neutral-500 mt-1">
+        <p className="text-xs text-neutral-500 mt-1">
           Note: This rationale is internal to doctors and is omitted from reception booking queues.
         </p>
       </div>

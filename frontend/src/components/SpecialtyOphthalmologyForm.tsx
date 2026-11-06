@@ -1,4 +1,3 @@
-import React from 'react'
 
 export interface OphthalmologyFormData {
   va_distance_uncorrected_od?: string
@@ -529,10 +528,10 @@ export function SpecialtyOphthalmologyForm({
 
             {/* Refraction grid OD */}
             <div className="pt-2 border-t border-blue-200">
-              <span className="text-[11px] font-semibold text-neutral-600 uppercase">Refraction (OD)</span>
+              <span className="text-xs font-semibold text-neutral-600 uppercase">Refraction (OD)</span>
               <div className="grid grid-cols-4 gap-1.5 mt-1">
                 <div>
-                  <label htmlFor="od-sph" className="block text-[10px] text-neutral-500">Sph</label>
+                  <label htmlFor="od-sph" className="block text-xs text-neutral-500">Sph</label>
                   <input
                     id="od-sph"
                     type="text"
@@ -545,7 +544,7 @@ export function SpecialtyOphthalmologyForm({
                   />
                 </div>
                 <div>
-                  <label htmlFor="od-cyl" className="block text-[10px] text-neutral-500">Cyl</label>
+                  <label htmlFor="od-cyl" className="block text-xs text-neutral-500">Cyl</label>
                   <input
                     id="od-cyl"
                     type="text"
@@ -558,7 +557,7 @@ export function SpecialtyOphthalmologyForm({
                   />
                 </div>
                 <div>
-                  <label htmlFor="od-axis" className="block text-[10px] text-neutral-500">Axis</label>
+                  <label htmlFor="od-axis" className="block text-xs text-neutral-500">Axis</label>
                   <input
                     id="od-axis"
                     type="text"
@@ -571,7 +570,7 @@ export function SpecialtyOphthalmologyForm({
                   />
                 </div>
                 <div>
-                  <label htmlFor="od-add" className="block text-[10px] text-neutral-500">Add</label>
+                  <label htmlFor="od-add" className="block text-xs text-neutral-500">Add</label>
                   <input
                     id="od-add"
                     type="text"
@@ -620,10 +619,10 @@ export function SpecialtyOphthalmologyForm({
 
             {/* Refraction grid OS */}
             <div className="pt-2 border-t border-emerald-200">
-              <span className="text-[11px] font-semibold text-neutral-600 uppercase">Refraction (OS)</span>
+              <span className="text-xs font-semibold text-neutral-600 uppercase">Refraction (OS)</span>
               <div className="grid grid-cols-4 gap-1.5 mt-1">
                 <div>
-                  <label htmlFor="os-sph" className="block text-[10px] text-neutral-500">Sph</label>
+                  <label htmlFor="os-sph" className="block text-xs text-neutral-500">Sph</label>
                   <input
                     id="os-sph"
                     type="text"
@@ -636,7 +635,7 @@ export function SpecialtyOphthalmologyForm({
                   />
                 </div>
                 <div>
-                  <label htmlFor="os-cyl" className="block text-[10px] text-neutral-500">Cyl</label>
+                  <label htmlFor="os-cyl" className="block text-xs text-neutral-500">Cyl</label>
                   <input
                     id="os-cyl"
                     type="text"
@@ -649,7 +648,7 @@ export function SpecialtyOphthalmologyForm({
                   />
                 </div>
                 <div>
-                  <label htmlFor="os-axis" className="block text-[10px] text-neutral-500">Axis</label>
+                  <label htmlFor="os-axis" className="block text-xs text-neutral-500">Axis</label>
                   <input
                     id="os-axis"
                     type="text"
@@ -662,7 +661,7 @@ export function SpecialtyOphthalmologyForm({
                   />
                 </div>
                 <div>
-                  <label htmlFor="os-add" className="block text-[10px] text-neutral-500">Add</label>
+                  <label htmlFor="os-add" className="block text-xs text-neutral-500">Add</label>
                   <input
                     id="os-add"
                     type="text"

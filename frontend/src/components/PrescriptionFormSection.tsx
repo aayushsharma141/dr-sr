@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import { useState } from 'react'
 import { Modal } from './Modal'
 import type { PrescriptionItemCreate, PrescriptionOut } from '../api/types'
 
@@ -258,6 +258,7 @@ export function PrescriptionFormSection({
                     <td className="px-2.5 py-2">
                       <input
                         type="text"
+                        aria-label={`Medicine name row ${idx + 1}`}
                         value={it.medicine_name}
                         disabled={isLocked}
                         onChange={(e) => handleItemChange(idx, 'medicine_name', e.target.value)}
@@ -269,6 +270,7 @@ export function PrescriptionFormSection({
                     <td className="px-2 py-2">
                       <input
                         type="text"
+                        aria-label={`Strength row ${idx + 1}`}
                         value={it.strength ?? ''}
                         disabled={isLocked}
                         onChange={(e) => handleItemChange(idx, 'strength', e.target.value)}
@@ -279,6 +281,7 @@ export function PrescriptionFormSection({
                     </td>
                     <td className="px-2 py-2">
                       <select
+                        aria-label={`Form row ${idx + 1}`}
                         value={it.form ?? 'Tablet'}
                         disabled={isLocked}
                         onChange={(e) => handleItemChange(idx, 'form', e.target.value)}
@@ -292,6 +295,7 @@ export function PrescriptionFormSection({
                     </td>
                     <td className="px-2 py-2">
                       <select
+                        aria-label={`Route row ${idx + 1}`}
                         value={it.route ?? 'Oral'}
                         disabled={isLocked}
                         onChange={(e) => handleItemChange(idx, 'route', e.target.value)}
@@ -306,6 +310,7 @@ export function PrescriptionFormSection({
                     <td className="px-2 py-2">
                       <input
                         type="text"
+                        aria-label={`Dosage row ${idx + 1}`}
                         value={it.dosage}
                         disabled={isLocked}
                         onChange={(e) => handleItemChange(idx, 'dosage', e.target.value)}
@@ -316,6 +321,7 @@ export function PrescriptionFormSection({
                     </td>
                     <td className="px-2 py-2">
                       <select
+                        aria-label={`Frequency row ${idx + 1}`}
                         value={it.frequency}
                         disabled={isLocked}
                         onChange={(e) => handleItemChange(idx, 'frequency', e.target.value)}
@@ -332,6 +338,7 @@ export function PrescriptionFormSection({
                         type="number"
                         min={1}
                         max={365}
+                        aria-label={`Duration days row ${idx + 1}`}
                         value={it.duration_days}
                         disabled={isLocked}
                         onChange={(e) => handleItemChange(idx, 'duration_days', Number(e.target.value))}
@@ -342,6 +349,7 @@ export function PrescriptionFormSection({
                     <td className="px-2 py-2">
                       <input
                         type="text"
+                        aria-label={`Instructions row ${idx + 1}`}
                         value={it.instructions ?? ''}
                         disabled={isLocked}
                         onChange={(e) => handleItemChange(idx, 'instructions', e.target.value)}

@@ -806,6 +806,7 @@ export interface PrescriptionSummary {
   doctor_id: number
   doctor_name: string
   encounter_id: number | null
+  status: string
   diagnosis: string
   items_count: number
   follow_up_date: string | null

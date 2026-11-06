@@ -5,10 +5,7 @@ import { createMemoryRouter, RouterProvider } from 'react-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { setCsrfToken } from '../../api/client'
 import { Login } from '../Login'
-import {
-  TakeoverSessionModal,
-  formatTimestamp,
-} from '../../components/TakeoverSessionModal'
+import { TakeoverSessionModal } from '../../components/TakeoverSessionModal'
 import type { Me } from '../../api/types'
 
 const mockConflictSession = {

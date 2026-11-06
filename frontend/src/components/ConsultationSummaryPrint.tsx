@@ -1,4 +1,3 @@
-import React from 'react'
 import type { EncounterRead, PatientOut } from '../api/types'
 import { Modal } from './Modal'
 import { useClinicSettings } from '../api/queries'
