@@ -5,6 +5,8 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from kalyan_api.core.errors import ApiError
+from kalyan_api.core.permissions import Permission
+from kalyan_api.core.policy import require
 from kalyan_api.core.principal import Principal, current_principal
 from kalyan_api.db.session import SessionDep
 from kalyan_api.models import ClinicalTemplate, ClinicalTemplateVersion, Department
@@ -15,7 +17,11 @@ from kalyan_api.schemas.templates import (
     ClinicalTemplateVersionRead,
 )
 
-router = APIRouter(prefix="/templates", tags=["templates"])
+router = APIRouter(
+    prefix="/templates",
+    tags=["templates"],
+    dependencies=[Depends(require(Permission.ENCOUNTER_READ))],
+)
 
 
 def ensure_specialty_templates_seeded(session: Session) -> None:

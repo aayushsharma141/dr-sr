@@ -306,12 +306,12 @@ def test_concurrent_http_race_20_iterations(
     created_user_ids: list[int] = []
 
     try:
-        # Create dedicated admin
+        # Create dedicated admins
         with Session(app_engine) as sess:
-            admin_u = make_user(sess, test_settings, "ADMIN", f"race_adm_{uid}")
+            admin_a_u = make_user(sess, test_settings, "ADMIN", f"race_adm_a_{uid}")
+            admin_b_u = make_user(sess, test_settings, "ADMIN", f"race_adm_b_{uid}")
             sess.commit()
-            admin_id = admin_u.id
-            created_user_ids.append(admin_id)
+            created_user_ids.extend([admin_a_u.id, admin_b_u.id])
 
         # Authenticate two client instances
         client_a = TestClient(
@@ -321,7 +321,7 @@ def test_concurrent_http_race_20_iterations(
         )
         login_a = client_a.post(
             "/api/auth/login",
-            json={"username": f"race_adm_{uid}", "password": TEST_PASSWORD},
+            json={"username": f"race_adm_a_{uid}", "password": TEST_PASSWORD},
         )
         assert login_a.status_code == 200
         client_a.headers["X-CSRF-Token"] = login_a.json()["csrf_token"]
@@ -333,7 +333,7 @@ def test_concurrent_http_race_20_iterations(
         )
         login_b = client_b.post(
             "/api/auth/login",
-            json={"username": f"race_adm_{uid}", "password": TEST_PASSWORD},
+            json={"username": f"race_adm_b_{uid}", "password": TEST_PASSWORD},
         )
         assert login_b.status_code == 200
         client_b.headers["X-CSRF-Token"] = login_b.json()["csrf_token"]

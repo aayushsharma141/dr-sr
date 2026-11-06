@@ -1,5 +1,6 @@
 """Tests for forced first-login password change and NIST-style password policy."""
 
+import hashlib
 from collections.abc import Callable
 
 from fastapi import APIRouter, Depends, FastAPI
@@ -12,8 +13,9 @@ from kalyan_api.config import Settings
 from kalyan_api.core.password_policy import BLOCKLIST
 from kalyan_api.core.permissions import Permission
 from kalyan_api.core.policy import require
+from kalyan_api.core.security import hash_token, new_session_token
 from kalyan_api.main import create_app
-from kalyan_api.models import AuditLog
+from kalyan_api.models import AuditLog, AuthSession
 from tests.conftest import TEST_PASSWORD, make_user
 
 
@@ -60,9 +62,20 @@ def test_must_change_user_restricted_access_and_change_flow(
     assert blocked_res.status_code == 403
     assert blocked_res.json()["code"] == "password_change_required"
 
-    # Create a secondary session for the same user to verify revocation
-    client2 = login_client(user)
-    old_token_2 = client2.cookies.get(test_settings.cookie_name)
+    # Create a secondary session for the same user in DB to verify revocation
+    token2 = new_session_token()
+    token2_hash = hash_token(token2)
+    client2 = TestClient(app, base_url="http://testserver", headers={"Origin": "http://testserver"})
+    old_token_2 = token2
+    s2 = AuthSession(
+        user_id=user.id,
+        token_hash=token2_hash,
+        csrf_token="dummy_csrf_token_for_s2",
+        ip="127.0.0.1",
+        user_agent="testclient",
+    )
+    db_session.add(s2)
+    db_session.flush()
 
     # Change password
     new_pw = "BrandNewValidPassword456!"

@@ -269,9 +269,12 @@ def doctor_b_user(db_session: Session, test_settings: Settings) -> User:
 def login_client(app: FastAPI):
     """Factory fixture returning an authenticated TestClient for a given user."""
 
-    def _create(user: User, password: str = TEST_PASSWORD) -> TestClient:
+    def _create(user: User, password: str = TEST_PASSWORD, takeover: bool = True) -> TestClient:
         c = TestClient(app, base_url="http://testserver", headers={"Origin": "http://testserver"})
-        res = c.post("/api/auth/login", json={"username": user.username, "password": password})
+        res = c.post(
+            "/api/auth/login",
+            json={"username": user.username, "password": password, "takeover": takeover},
+        )
         assert res.status_code == 200, f"login_client failed: {res.text}"
         data = res.json()
         c.headers["X-CSRF-Token"] = data["csrf_token"]

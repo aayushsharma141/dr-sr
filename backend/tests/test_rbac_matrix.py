@@ -589,6 +589,19 @@ def test_rbac_matrix_cell(
         target_entity = rec
         resolved_path = row.path.replace("{id}", str(rec.id))
 
+    elif "/api/templates" in row.path:
+        from kalyan_api.models import ClinicalTemplate, ClinicalTemplateVersion
+        from kalyan_api.routers.templates import ensure_specialty_templates_seeded
+        ensure_specialty_templates_seeded(db_session)
+        tmpl = db_session.scalar(select(ClinicalTemplate).where(ClinicalTemplate.code == "PHYSIOTHERAPY"))
+        version = db_session.scalar(select(ClinicalTemplateVersion).where(ClinicalTemplateVersion.template_id == tmpl.id))
+        resolved_path = (
+            row.path
+            .replace("{department_id}", str(tmpl.department_id))
+            .replace("{version_id}", str(version.id))
+        )
+        target_entity = None
+
     elif "{id}" in row.path:
         is_active = "reactivate" not in row.path
         target_user = make_user(

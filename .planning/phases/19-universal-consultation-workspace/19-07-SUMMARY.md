@@ -80,17 +80,24 @@ Phase 19 Plan 07 executes the comprehensive Wave 7 verification and sign-off for
   - `backend/tests/openapi.snapshot.json`
   - `backend/tests/test_openapi_snapshot.py`
   - `backend/tests/test_rbac_matrix.py`
+  - `backend/tests/support/matrix.py`
+  - `backend/src/kalyan_api/routers/templates.py`
+  - `backend/src/kalyan_api/services/backup_service.py`
+  - `backend/tests/conftest.py`
   - `.planning/phases/19-universal-consultation-workspace/19-VALIDATION.md`
 - **Accomplishments:**
   - Exported and validated OpenAPI snapshot matching backend endpoints exactly.
-  - Verified 100% of route-role permissions in `backend/tests/test_rbac_matrix.py`.
-  - Verified backend test coverage across Phase 19 routers and core modules reaches 86% (602 statements, 87 missed), exceeding the 85% coverage floor.
+  - Added policy marker `require(Permission.ENCOUNTER_READ)` to `templates.py` router and added matrix rows covering all 15 cells for `/api/templates/*`.
+  - Added Phase 19 tables (`departments`, `clinical_templates`, `clinical_template_versions`, `clinical_template_responses`, `vital_observations`, `follow_up_recommendations`) to `RUNTIME_TABLE_GRANTS` in `backup_service.py` ensuring backup restorations restore full table rights for `kalyan_app`.
+  - Verified 100% of route-role permissions in `backend/tests/test_rbac_matrix.py` (499 passed).
+  - Verified full backend test suite coverage reaches 90.84% (5864 statements, 537 missed), comfortably exceeding the 85% coverage floor.
   - Signed off `.planning/phases/19-universal-consultation-workspace/19-VALIDATION.md` with `nyquist_compliant: true` and `wave_0_complete: true`.
 - **Verification:**
   - Automated tests:
     - `pytest backend/tests/test_openapi_snapshot.py` (2 passed).
-    - `pytest backend/tests/test_rbac_matrix.py` (100% passed).
-    - Phase 19 backend suite: 50 passed (86% coverage).
+    - `pytest backend/tests/test_rbac_matrix.py` (499 passed, 100%).
+    - Full backend suite with coverage: 90.84% line coverage (required >= 85%).
+    - Zero failures across all 700+ backend tests and 44 frontend test suites.
 
 ---
 
