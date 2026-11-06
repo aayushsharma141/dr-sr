@@ -66,6 +66,8 @@ class AuditAction(StrEnum):
     TREATMENT_PLAN_CANCELLED = "TREATMENT_PLAN_CANCELLED"
     TREATMENT_SESSION_LOGGED = "TREATMENT_SESSION_LOGGED"
     TREATMENT_SESSION_ADDENDUM_ADDED = "TREATMENT_SESSION_ADDENDUM_ADDED"
+    # Phase 19 actions
+    CROSS_DOCTOR_CLINICAL_READ = "CROSS_DOCTOR_CLINICAL_READ"
     # Phase 15 actions
     PAYMENT_RECORDED = "PAYMENT_RECORDED"
     PAYMENT_REVERSED = "PAYMENT_REVERSED"
@@ -269,3 +271,30 @@ def record(
     session.add(entry)
     session.flush()
     return entry
+
+
+def record_audit_event(
+    session: Session,
+    actor_user_id: int | None,
+    action: AuditAction | str,
+    entity_type: str | None,
+    entity_id: int | str | None,
+    details: dict[str, Any] | None = None,
+    actor_username: str | None = None,
+    actor_role: str | None = None,
+) -> AuditLog:
+    """Convenience helper to record an audit event with details payload."""
+    ctx = AuditContext(
+        actor_user_id=actor_user_id,
+        actor_username=actor_username or (f"user_{actor_user_id}" if actor_user_id else "SYSTEM"),
+        actor_role=actor_role or "DOCTOR",
+    )
+    return record(
+        session=session,
+        ctx=ctx,
+        action=action,
+        entity_type=entity_type,
+        entity_id=entity_id,
+        after=details,
+    )
+

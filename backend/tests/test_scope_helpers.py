@@ -205,6 +205,14 @@ def test_get_scoped_or_404_indistinguishable_from_missing(
         (ScopeFamily.CLINICAL, Role.DOCTOR, False, []),
         (ScopeFamily.CLINICAL, Role.ADMIN, False, []),
         (ScopeFamily.CLINICAL, Role.RECEPTION, False, []),
+        (ScopeFamily.CLINICAL_WRITE, Role.DOCTOR, True, [1]),
+        (ScopeFamily.CLINICAL_WRITE, Role.DOCTOR, False, []),
+        (ScopeFamily.CLINICAL_WRITE, Role.ADMIN, False, []),
+        (ScopeFamily.CLINICAL_WRITE, Role.RECEPTION, False, []),
+        (ScopeFamily.CLINICAL_READ, Role.DOCTOR, True, [1, 2, 3]),
+        (ScopeFamily.CLINICAL_READ, Role.DOCTOR, False, []),
+        (ScopeFamily.CLINICAL_READ, Role.ADMIN, False, []),
+        (ScopeFamily.CLINICAL_READ, Role.RECEPTION, False, []),
         (ScopeFamily.DEMOGRAPHIC, Role.ADMIN, False, [1, 2, 3]),
         (ScopeFamily.DEMOGRAPHIC, Role.RECEPTION, False, [1, 2, 3]),
         (ScopeFamily.DEMOGRAPHIC, Role.DOCTOR, True, [1]),
@@ -249,3 +257,54 @@ def test_scoped_models_registry_validation(
         assert hasattr(spec, "table")
         assert hasattr(spec, "doctor_id_col")
         assert hasattr(spec, "id_col")
+
+
+def test_cross_doctor_clinical_read_auditing(
+    db_session: Session, scoped_test_bed: ScopedSpec, doctor_a_user: Any
+) -> None:
+    """Reading another doctor's clinical record triggers CROSS_DOCTOR_CLINICAL_READ audit entry."""
+    from kalyan_api.models import AuditLog
+    from kalyan_api.services.audit_service import AuditAction
+
+    spec = scoped_test_bed
+    p_doc_a = _make_test_principal(Role.DOCTOR, doctor_id=101, user_id=doctor_a_user.id)
+
+    # 1. Reading Doctor A's own record with CLINICAL_READ does NOT generate cross-doctor audit log
+    row_own = get_scoped_or_404(
+        db_session,
+        spec.table,
+        obj_id=1,
+        principal=p_doc_a,
+        family=ScopeFamily.CLINICAL_READ,
+        doctor_id_col=spec.doctor_id_col,
+    )
+    assert row_own.id == 1
+
+    logs_after_own = db_session.execute(
+        select(AuditLog).where(AuditLog.action == AuditAction.CROSS_DOCTOR_CLINICAL_READ)
+    ).scalars().all()
+    assert len(logs_after_own) == 0
+
+    # 2. Reading Doctor B's record (id=2, doctor_id=102) with CLINICAL_READ generates audit log
+    row_cross = get_scoped_or_404(
+        db_session,
+        spec.table,
+        obj_id=2,
+        principal=p_doc_a,
+        family=ScopeFamily.CLINICAL_READ,
+        doctor_id_col=spec.doctor_id_col,
+    )
+    assert row_cross.id == 2
+
+    logs_after_cross = db_session.execute(
+        select(AuditLog).where(AuditLog.action == AuditAction.CROSS_DOCTOR_CLINICAL_READ)
+    ).scalars().all()
+    assert len(logs_after_cross) == 1
+    log = logs_after_cross[0]
+    assert log.actor_user_id == p_doc_a.user_id
+    assert log.after_data == {
+        "actor_doctor_id": 101,
+        "record_doctor_id": 102,
+        "patient_id": None,
+    }
+
