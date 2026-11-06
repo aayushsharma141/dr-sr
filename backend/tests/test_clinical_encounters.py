@@ -189,12 +189,12 @@ def test_doctor_silo_cross_isolation(login_client, doctor_a_user, doctor_b_user,
     # Doctor B logs in
     doc_b_client = login_client(doctor_b_user)
 
-    # Doctor B looking up Doctor A's encounter receives 404 (prevent ID leakage)
+    # Doctor B looking up Doctor A's encounter receives 200 under DWS-04 cross-read
     b_get = doc_b_client.get(f"/api/encounters/{enc_id}")
-    assert b_get.status_code == 404
-    assert b_get.json()["code"] == "encounter_not_found"
+    assert b_get.status_code == 200
+    assert b_get.json()["id"] == enc_id
 
-    # Doctor B attempting to patch Doctor A's encounter receives 404
+    # Doctor B attempting to patch Doctor A's encounter receives 404 (write silo preserved)
     b_patch = doc_b_client.patch(
         f"/api/encounters/{enc_id}",
         json={"diagnosis": "Cross-doctor tampering attempt", "version_id": 1},

@@ -14,13 +14,14 @@ Doctor silo (D-03):
 import re
 
 from fastapi import APIRouter, Depends
-from sqlalchemy import select
+from sqlalchemy import select, true
 from sqlalchemy.orm import selectinload
 
 from kalyan_api.core.errors import ApiError
 from kalyan_api.core.permissions import Permission, Role
 from kalyan_api.core.policy import require
 from kalyan_api.core.principal import Principal, current_principal
+from kalyan_api.core.scope import ScopeFamily, row_scope
 from kalyan_api.db.session import SessionDep
 from kalyan_api.models import (
     Appointment,
@@ -90,20 +91,22 @@ def get_patient_timeline(
             )
         )
 
-    # 2. Clinical Encounters (Doctor Silo & Reception Policy)
-    # Reception does not view raw clinical encounters; Doctors only view their own
+    # 2. Clinical Encounters (CLINICAL_READ & Reception Policy)
+    # Reception does not view raw clinical encounters; Doctors can view all under CLINICAL_READ (DWS-04)
     if principal.role in (Role.ADMIN, Role.DOCTOR):
+        enc_scope = (
+            true()
+            if principal.role == Role.ADMIN
+            else row_scope(principal, ScopeFamily.CLINICAL_READ, ClinicalEncounter.doctor_id)
+        )
         enc_stmt = (
             select(ClinicalEncounter)
-            .where(ClinicalEncounter.patient_id == patient_id)
+            .where(ClinicalEncounter.patient_id == patient_id, enc_scope)
             .options(
                 selectinload(ClinicalEncounter.doctor),
                 selectinload(ClinicalEncounter.addenda),
             )
         )
-        if principal.role == Role.DOCTOR:
-            enc_stmt = enc_stmt.where(ClinicalEncounter.doctor_id == principal.doctor_id)
-
         encounters = session.execute(enc_stmt).scalars().all()
         for enc in encounters:
             doc_name = enc.doctor.name_en if enc.doctor else "Doctor"
@@ -136,19 +139,21 @@ def get_patient_timeline(
                 )
             )
 
-    # 3. Prescriptions (Doctor Silo & Reception Policy)
+    # 3. Prescriptions (CLINICAL_READ & Reception Policy)
     if principal.role in (Role.ADMIN, Role.DOCTOR):
+        rx_scope = (
+            true()
+            if principal.role == Role.ADMIN
+            else row_scope(principal, ScopeFamily.CLINICAL_READ, Prescription.doctor_id)
+        )
         rx_stmt = (
             select(Prescription)
-            .where(Prescription.patient_id == patient_id)
+            .where(Prescription.patient_id == patient_id, rx_scope)
             .options(
                 selectinload(Prescription.doctor),
                 selectinload(Prescription.items),
             )
         )
-        if principal.role == Role.DOCTOR:
-            rx_stmt = rx_stmt.where(Prescription.doctor_id == principal.doctor_id)
-
         prescriptions = session.execute(rx_stmt).scalars().all()
         for rx in prescriptions:
             doc_name = rx.doctor.name_en if rx.doctor else "Doctor"
@@ -209,9 +214,14 @@ def get_patient_timeline(
         )
 
     # 5. Treatment Sessions
+    sess_scope = (
+        true()
+        if principal.role in (Role.ADMIN, Role.RECEPTION)
+        else row_scope(principal, ScopeFamily.CLINICAL_READ, TreatmentSession.doctor_id)
+    )
     sess_stmt = (
         select(TreatmentSession)
-        .where(TreatmentSession.patient_id == patient_id)
+        .where(TreatmentSession.patient_id == patient_id, sess_scope)
         .options(
             selectinload(TreatmentSession.treatment_plan),
             selectinload(TreatmentSession.doctor),

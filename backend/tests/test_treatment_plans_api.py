@@ -261,11 +261,11 @@ def test_doctor_silo_cross_isolation_on_plans(
     assert create_resp.status_code == 201
     plan_id = create_resp.json()["id"]
 
-    # Doctor B attempts to read Doctor A's plan -> 404
+    # Doctor B reads Doctor A's plan -> 200 under DWS-04 cross-read
     doc_b_client = login_client(doctor_b_user)
-    assert doc_b_client.get(f"/api/treatment-plans/{plan_id}").status_code == 404
+    assert doc_b_client.get(f"/api/treatment-plans/{plan_id}").status_code == 200
 
-    # Doctor B attempts to modify Doctor A's plan -> 404
+    # Doctor B attempts to modify Doctor A's plan -> 404 (write silo preserved)
     assert (
         doc_b_client.patch(
             f"/api/treatment-plans/{plan_id}",

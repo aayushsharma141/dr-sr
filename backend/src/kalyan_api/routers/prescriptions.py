@@ -24,6 +24,7 @@ from kalyan_api.core.principal import (
     build_audit_context,
     current_principal,
 )
+from kalyan_api.core.scope import ScopeFamily, get_scoped_or_404, row_scope
 from kalyan_api.db.session import SessionDep
 from kalyan_api.models import (
     ClinicalEncounter,
@@ -117,13 +118,14 @@ def create_prescription(
 
     encounter = None
     if payload.encounter_id is not None:
-        encounter = session.get(ClinicalEncounter, payload.encounter_id)
-        if not encounter or encounter.doctor_id != principal.doctor_id:
-            raise ApiError(
-                status_code=404,
-                code="encounter_not_found",
-                message="Clinical encounter not found or not assigned to this doctor.",
-            )
+        encounter = get_scoped_or_404(
+            session,
+            ClinicalEncounter,
+            payload.encounter_id,
+            principal,
+            family=ScopeFamily.CLINICAL_WRITE,
+            doctor_id_col=ClinicalEncounter.doctor_id,
+        )
 
         # Enforce partial unique index: at most one active prescription per encounter (D-19-15)
         active_rx = session.execute(
@@ -263,21 +265,14 @@ def update_prescription_draft(
             message="Only authenticated doctors can modify prescriptions.",
         )
 
-    stmt = (
-        select(Prescription)
-        .where(Prescription.id == id)
-        .options(
-            selectinload(Prescription.patient),
-            selectinload(Prescription.doctor),
-            selectinload(Prescription.items),
-        )
+    rx = get_scoped_or_404(
+        session,
+        Prescription,
+        id,
+        principal,
+        family=ScopeFamily.CLINICAL_WRITE,
+        doctor_id_col=Prescription.doctor_id,
     )
-    rx = session.execute(stmt).scalar_one_or_none()
-    if not rx:
-        raise ApiError(status_code=404, code="prescription_not_found", message="Prescription not found.")
-
-    if rx.doctor_id != principal.doctor_id:
-        raise ApiError(status_code=404, code="prescription_not_found", message="Prescription not found.")
 
     if rx.status != PrescriptionStatus.DRAFT.value:
         raise ApiError(
@@ -340,9 +335,7 @@ def update_prescription_draft(
             rx.items.append(new_item)
 
     session.flush()
-
-    # Re-query
-    refreshed_rx = session.execute(stmt).scalar_one()
+    session.refresh(rx)
 
     ctx = build_audit_context(request, principal)
     audit_service.record(
@@ -350,15 +343,15 @@ def update_prescription_draft(
         ctx,
         action=AuditAction.PRESCRIPTION_UPDATED,
         entity_type="prescription",
-        entity_id=refreshed_rx.id,
+        entity_id=rx.id,
         after={
-            "diagnosis": refreshed_rx.diagnosis,
-            "items_count": len(refreshed_rx.items),
-            "version_id": refreshed_rx.version_id,
+            "diagnosis": rx.diagnosis,
+            "items_count": len(rx.items),
+            "version_id": rx.version_id,
         },
     )
 
-    return _to_prescription_out(refreshed_rx)
+    return _to_prescription_out(rx)
 
 
 @router.post(
@@ -380,21 +373,14 @@ def authorise_prescription(
             message="Only authenticated doctors can authorise prescriptions.",
         )
 
-    stmt = (
-        select(Prescription)
-        .where(Prescription.id == id)
-        .options(
-            selectinload(Prescription.patient),
-            selectinload(Prescription.doctor),
-            selectinload(Prescription.items),
-        )
+    rx = get_scoped_or_404(
+        session,
+        Prescription,
+        id,
+        principal,
+        family=ScopeFamily.CLINICAL_WRITE,
+        doctor_id_col=Prescription.doctor_id,
     )
-    rx = session.execute(stmt).scalar_one_or_none()
-    if not rx:
-        raise ApiError(status_code=404, code="prescription_not_found", message="Prescription not found.")
-
-    if rx.doctor_id != principal.doctor_id:
-        raise ApiError(status_code=404, code="prescription_not_found", message="Prescription not found.")
 
     if rx.status != PrescriptionStatus.DRAFT.value:
         raise ApiError(
@@ -421,8 +407,7 @@ def authorise_prescription(
     rx.status = PrescriptionStatus.AUTHORISED.value
     rx.authorised_at = now_utc
     session.flush()
-
-    refreshed_rx = session.execute(stmt).scalar_one()
+    session.refresh(rx)
 
     ctx = build_audit_context(request, principal)
     audit_service.record(
@@ -430,15 +415,15 @@ def authorise_prescription(
         ctx,
         action=AuditAction.PRESCRIPTION_AUTHORISED,
         entity_type="prescription",
-        entity_id=refreshed_rx.id,
+        entity_id=rx.id,
         after={
-            "status": refreshed_rx.status,
-            "authorised_at": refreshed_rx.authorised_at.isoformat(),
-            "items_count": len(refreshed_rx.items),
+            "status": rx.status,
+            "authorised_at": rx.authorised_at.isoformat() if rx.authorised_at else None,
+            "items_count": len(rx.items),
         },
     )
 
-    return _to_prescription_out(refreshed_rx)
+    return _to_prescription_out(rx)
 
 
 @router.post(
@@ -461,21 +446,14 @@ def cancel_prescription(
             message="Only authenticated doctors can cancel prescriptions.",
         )
 
-    stmt = (
-        select(Prescription)
-        .where(Prescription.id == id)
-        .options(
-            selectinload(Prescription.patient),
-            selectinload(Prescription.doctor),
-            selectinload(Prescription.items),
-        )
+    rx = get_scoped_or_404(
+        session,
+        Prescription,
+        id,
+        principal,
+        family=ScopeFamily.CLINICAL_WRITE,
+        doctor_id_col=Prescription.doctor_id,
     )
-    rx = session.execute(stmt).scalar_one_or_none()
-    if not rx:
-        raise ApiError(status_code=404, code="prescription_not_found", message="Prescription not found.")
-
-    if rx.doctor_id != principal.doctor_id:
-        raise ApiError(status_code=404, code="prescription_not_found", message="Prescription not found.")
 
     if rx.status == PrescriptionStatus.CANCELLED.value:
         raise ApiError(
@@ -498,8 +476,7 @@ def cancel_prescription(
     rx.cancelled_by_user_id = principal.user_id
     rx.cancellation_reason = reason
     session.flush()
-
-    refreshed_rx = session.execute(stmt).scalar_one()
+    session.refresh(rx)
 
     ctx = build_audit_context(request, principal)
     audit_service.record(
@@ -507,16 +484,16 @@ def cancel_prescription(
         ctx,
         action=AuditAction.PRESCRIPTION_CANCELLED,
         entity_type="prescription",
-        entity_id=refreshed_rx.id,
+        entity_id=rx.id,
         after={
-            "status": refreshed_rx.status,
-            "cancellation_reason": refreshed_rx.cancellation_reason,
-            "cancelled_at": refreshed_rx.cancelled_at.isoformat(),
-            "cancelled_by_user_id": refreshed_rx.cancelled_by_user_id,
+            "status": rx.status,
+            "cancellation_reason": rx.cancellation_reason,
+            "cancelled_at": rx.cancelled_at.isoformat() if rx.cancelled_at else None,
+            "cancelled_by_user_id": rx.cancelled_by_user_id,
         },
     )
 
-    return _to_prescription_out(refreshed_rx)
+    return _to_prescription_out(rx)
 
 
 @router.get(
@@ -601,32 +578,15 @@ def get_prescription(
     session: SessionDep,
     principal: Principal = Depends(current_principal),
 ) -> PrescriptionOut:
-    """Retrieve full prescription details including all medication lines (RX-01)."""
-    stmt = (
-        select(Prescription)
-        .where(Prescription.id == id)
-        .options(
-            selectinload(Prescription.patient),
-            selectinload(Prescription.doctor),
-            selectinload(Prescription.items),
-        )
+    """Retrieve full prescription details including all medication lines (RX-01, DWS-04)."""
+    rx = get_scoped_or_404(
+        session,
+        Prescription,
+        id,
+        principal,
+        family=ScopeFamily.CLINICAL_READ,
+        doctor_id_col=Prescription.doctor_id,
     )
-    rx = session.execute(stmt).scalar_one_or_none()
-    if not rx:
-        raise ApiError(
-            status_code=404,
-            code="prescription_not_found",
-            message="Prescription not found.",
-        )
-
-    # Doctor silo: doctor can only read prescriptions they issued
-    if principal.role == Role.DOCTOR and rx.doctor_id != principal.doctor_id:
-        raise ApiError(
-            status_code=404,
-            code="prescription_not_found",
-            message="Prescription not found.",
-        )
-
     return _to_prescription_out(rx)
 
 
@@ -640,10 +600,13 @@ def list_patient_prescriptions(
     session: SessionDep,
     principal: Principal = Depends(current_principal),
 ) -> list[PrescriptionSummary]:
-    """List historical prescriptions for a given patient."""
+    """List historical prescriptions for a given patient scoped via CLINICAL_READ (DWS-04)."""
     stmt = (
         select(Prescription)
-        .where(Prescription.patient_id == patient_id)
+        .where(
+            Prescription.patient_id == patient_id,
+            row_scope(principal, ScopeFamily.CLINICAL_READ, Prescription.doctor_id),
+        )
         .options(
             selectinload(Prescription.patient),
             selectinload(Prescription.doctor),
@@ -651,9 +614,6 @@ def list_patient_prescriptions(
         )
         .order_by(Prescription.created_at.desc())
     )
-
-    if principal.role == Role.DOCTOR:
-        stmt = stmt.where(Prescription.doctor_id == principal.doctor_id)
 
     results = session.execute(stmt).scalars().all()
 

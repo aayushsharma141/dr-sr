@@ -287,10 +287,18 @@ def test_doctor_silo_cross_isolation_on_prescriptions(
     assert create_resp.status_code == 201
     rx_id = create_resp.json()["id"]
 
-    # Doctor B attempts to view Doctor A's prescription
+    # Doctor B views Doctor A's prescription (allowed under DWS-04)
     doc_b_client = login_client(doctor_b_user)
     resp = doc_b_client.get(f"/api/prescriptions/{rx_id}")
-    assert resp.status_code == 404
+    assert resp.status_code == 200
+    assert resp.json()["id"] == rx_id
+
+    # Doctor B attempts to cancel Doctor A's prescription receives 404 (write silo preserved)
+    cancel_resp = doc_b_client.post(
+        f"/api/prescriptions/{rx_id}/cancel",
+        json={"reason": "Unauthorized cancellation attempt"},
+    )
+    assert cancel_resp.status_code == 404
 
 
 def test_prescription_follow_ups_are_date_filtered_and_doctor_scoped(

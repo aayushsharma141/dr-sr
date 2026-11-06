@@ -19,6 +19,7 @@ from kalyan_api.core.principal import (
     build_audit_context,
     current_principal,
 )
+from kalyan_api.core.scope import ScopeFamily, get_scoped_or_404, row_scope
 from kalyan_api.db.session import SessionDep
 from kalyan_api.models import (
     Appointment,
@@ -177,14 +178,15 @@ def get_encounter(
     session: SessionDep,
     principal: Principal = Depends(current_principal),
 ) -> EncounterRead:
-    """Retrieve encounter details including addenda (CLN-01). Scoped to doctor silo (D-03)."""
-    enc = session.get(ClinicalEncounter, id)
-    if not enc or enc.doctor_id != principal.doctor_id:
-        raise ApiError(
-            status_code=404,
-            code="encounter_not_found",
-            message="Clinical encounter not found.",
-        )
+    """Retrieve encounter details including addenda (CLN-01, DWS-04)."""
+    enc = get_scoped_or_404(
+        session,
+        ClinicalEncounter,
+        id,
+        principal,
+        family=ScopeFamily.CLINICAL_READ,
+        doctor_id_col=ClinicalEncounter.doctor_id,
+    )
 
     return _to_read_schema(enc)
 
@@ -199,7 +201,7 @@ def list_patient_encounters(
     session: SessionDep,
     principal: Principal = Depends(current_principal),
 ) -> list[EncounterSummary]:
-    """List historical encounters for a patient scoped to the authenticated doctor (D-03)."""
+    """List historical encounters for a patient scoped via CLINICAL_READ (DWS-04)."""
     if principal.role != Role.DOCTOR or principal.doctor_id is None:
         raise ApiError(status_code=403, code="doctor_only", message="Doctor access required.")
 
@@ -207,7 +209,7 @@ def list_patient_encounters(
         select(ClinicalEncounter)
         .where(
             ClinicalEncounter.patient_id == patient_id,
-            ClinicalEncounter.doctor_id == principal.doctor_id,
+            row_scope(principal, ScopeFamily.CLINICAL_READ, ClinicalEncounter.doctor_id),
         )
         .order_by(ClinicalEncounter.encounter_date.desc())
     )
@@ -242,13 +244,14 @@ def update_encounter(
     principal: Principal = Depends(current_principal),
 ) -> EncounterRead:
     """Update draft encounter notes. Locked if already finalised (CLN-02)."""
-    enc = session.get(ClinicalEncounter, id)
-    if not enc or enc.doctor_id != principal.doctor_id:
-        raise ApiError(
-            status_code=404,
-            code="encounter_not_found",
-            message="Clinical encounter not found.",
-        )
+    enc = get_scoped_or_404(
+        session,
+        ClinicalEncounter,
+        id,
+        principal,
+        family=ScopeFamily.CLINICAL_WRITE,
+        doctor_id_col=ClinicalEncounter.doctor_id,
+    )
 
     if enc.is_finalised:
         raise ApiError(
@@ -314,13 +317,14 @@ def finalise_encounter(
     principal: Principal = Depends(current_principal),
 ) -> EncounterRead:
     """Finalise encounter notes, locking them against future updates (CLN-02, D-19-09)."""
-    enc = session.get(ClinicalEncounter, id)
-    if not enc or enc.doctor_id != principal.doctor_id:
-        raise ApiError(
-            status_code=404,
-            code="encounter_not_found",
-            message="Clinical encounter not found.",
-        )
+    enc = get_scoped_or_404(
+        session,
+        ClinicalEncounter,
+        id,
+        principal,
+        family=ScopeFamily.CLINICAL_WRITE,
+        doctor_id_col=ClinicalEncounter.doctor_id,
+    )
 
     if not enc.is_finalised:
         # If payload is provided, update encounter fields before finalising
@@ -422,13 +426,14 @@ def add_encounter_addendum(
     principal: Principal = Depends(current_principal),
 ) -> AddendumRead:
     """Append a dated addendum to a finalised clinical encounter (CLN-02)."""
-    enc = session.get(ClinicalEncounter, id)
-    if not enc or enc.doctor_id != principal.doctor_id:
-        raise ApiError(
-            status_code=404,
-            code="encounter_not_found",
-            message="Clinical encounter not found.",
-        )
+    enc = get_scoped_or_404(
+        session,
+        ClinicalEncounter,
+        id,
+        principal,
+        family=ScopeFamily.CLINICAL_WRITE,
+        doctor_id_col=ClinicalEncounter.doctor_id,
+    )
 
     if not enc.is_finalised:
         raise ApiError(
@@ -481,13 +486,14 @@ def get_encounter_template_response(
     principal: Principal = Depends(current_principal),
 ) -> TemplateResponseRead:
     """Retrieve saved specialty template responses for encounter."""
-    enc = session.get(ClinicalEncounter, id)
-    if not enc or enc.doctor_id != principal.doctor_id:
-        raise ApiError(
-            status_code=404,
-            code="encounter_not_found",
-            message="Clinical encounter not found.",
-        )
+    enc = get_scoped_or_404(
+        session,
+        ClinicalEncounter,
+        id,
+        principal,
+        family=ScopeFamily.CLINICAL_READ,
+        doctor_id_col=ClinicalEncounter.doctor_id,
+    )
     resp = session.scalar(
         select(ClinicalTemplateResponse).where(ClinicalTemplateResponse.encounter_id == id)
     )
@@ -512,13 +518,14 @@ def save_encounter_template_response(
     principal: Principal = Depends(current_principal),
 ) -> TemplateResponseRead:
     """Save or update specialty template response for a draft encounter (D-19-09, DWS-05)."""
-    enc = session.get(ClinicalEncounter, id)
-    if not enc or enc.doctor_id != principal.doctor_id:
-        raise ApiError(
-            status_code=404,
-            code="encounter_not_found",
-            message="Clinical encounter not found.",
-        )
+    enc = get_scoped_or_404(
+        session,
+        ClinicalEncounter,
+        id,
+        principal,
+        family=ScopeFamily.CLINICAL_WRITE,
+        doctor_id_col=ClinicalEncounter.doctor_id,
+    )
 
     if enc.is_finalised:
         raise ApiError(

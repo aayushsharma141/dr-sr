@@ -188,14 +188,14 @@ def test_timeline_chronological_ordering_admin(
     assert dates == sorted(dates, reverse=True)
 
 
-def test_timeline_doctor_silo_filtering(
+def test_timeline_cross_doctor_access(
     doctor_a_user: User,
     doctor_b_user: User,
     admin_user: User,
     db_session: Session,
     login_client: type[TestClient],
 ) -> None:
-    """Doctor views timeline but cannot see encounters/prescriptions from other doctors (D-03)."""
+    """Doctor views timeline and sees encounters/prescriptions across all doctors (DWS-04)."""
     pat = _seed_patient_activity(
         db_session, doctor_a_user.doctor_id, doctor_b_user.doctor_id, admin_user
     )
@@ -205,12 +205,12 @@ def test_timeline_doctor_silo_filtering(
     assert resp.status_code == 200
     timeline = resp.json()
 
-    # Doctor A's encounter should be present
+    # Both Doctor A's and Doctor B's encounters should be present under DWS-04
     enc_items = [it for it in timeline if it["event_type"] == "ENCOUNTER"]
-    assert len(enc_items) == 1
-    assert "Lumbar radiculopathy" in enc_items[0]["summary"]
-    # Doctor B's encounter ("Early osteo-arthritis") must NOT be leaked
-    assert not any("osteo-arthritis" in (it.get("summary") or "") for it in timeline)
+    assert len(enc_items) == 2
+    summaries = [it.get("summary") or "" for it in enc_items]
+    assert any("Lumbar radiculopathy" in s for s in summaries)
+    assert any("osteo-arthritis" in s for s in summaries)
 
 
 def test_timeline_reception_access(

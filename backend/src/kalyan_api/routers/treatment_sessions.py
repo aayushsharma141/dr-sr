@@ -21,6 +21,7 @@ from kalyan_api.core.principal import (
     build_audit_context,
     current_principal,
 )
+from kalyan_api.core.scope import ScopeFamily, get_scoped_or_404, row_scope
 from kalyan_api.db.session import SessionDep
 from kalyan_api.models import (
     TreatmentPlan,
@@ -101,15 +102,17 @@ def log_treatment_session(
             message="Only authenticated doctors can log treatment sessions.",
         )
 
+    # Check plan write scope before allocating
+    get_scoped_or_404(
+        session,
+        TreatmentPlan,
+        plan_id,
+        principal,
+        family=ScopeFamily.CLINICAL_WRITE,
+        doctor_id_col=TreatmentPlan.doctor_id,
+    )
     # Concurrency-safe atomic allocation locking plan row
     plan, next_session_number = allocate_next_session_number(session, plan_id)
-
-    if plan.doctor_id != principal.doctor_id:
-        raise ApiError(
-            status_code=404,
-            code="plan_not_found",
-            message="Treatment plan not found.",
-        )
 
     session_date = payload.session_date or clock.ist_today()
 
@@ -166,19 +169,22 @@ def list_treatment_sessions(
     principal: Principal = Depends(current_principal),
 ) -> list[TreatmentSessionOut]:
     """Retrieve chronological sessions and VAS scores for a treatment plan."""
-    plan = session.get(TreatmentPlan, plan_id)
-    if not plan:
-        raise ApiError(
-            status_code=404,
-            code="plan_not_found",
-            message="Treatment plan not found.",
-        )
-
-    if principal.role == Role.DOCTOR and plan.doctor_id != principal.doctor_id:
-        raise ApiError(
-            status_code=404,
-            code="plan_not_found",
-            message="Treatment plan not found.",
+    if principal.role in (Role.ADMIN, Role.RECEPTION):
+        plan = session.get(TreatmentPlan, plan_id)
+        if not plan:
+            raise ApiError(
+                status_code=404,
+                code="plan_not_found",
+                message="Treatment plan not found.",
+            )
+    else:
+        plan = get_scoped_or_404(
+            session,
+            TreatmentPlan,
+            plan_id,
+            principal,
+            family=ScopeFamily.CLINICAL_READ,
+            doctor_id_col=TreatmentPlan.doctor_id,
         )
 
     stmt = (
@@ -240,13 +246,14 @@ def create_session_addendum(
             message="Only authenticated doctors can append session addenda.",
         )
 
-    sess = session.get(TreatmentSession, id)
-    if not sess or sess.doctor_id != principal.doctor_id:
-        raise ApiError(
-            status_code=404,
-            code="session_not_found",
-            message="Treatment session not found.",
-        )
+    sess = get_scoped_or_404(
+        session,
+        TreatmentSession,
+        id,
+        principal,
+        family=ScopeFamily.CLINICAL_WRITE,
+        doctor_id_col=TreatmentSession.doctor_id,
+    )
 
     addendum = TreatmentSessionAddendum(
         session_id=sess.id,
