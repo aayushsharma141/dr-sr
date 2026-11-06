@@ -9,6 +9,7 @@ import { SpecialtyOphthalmologyForm, OphthalmologyFormData } from '../components
 import { PrescriptionFormSection } from '../components/PrescriptionFormSection'
 import { FollowUpSection } from '../components/FollowUpSection'
 import { AppointmentBookingModal } from '../components/AppointmentBookingModal'
+import { ConsultationSummaryPrint } from '../components/ConsultationSummaryPrint'
 import {
   usePatient,
   usePatientPriorEncounter,
@@ -136,6 +137,7 @@ export function ClinicalEncounterWorkspace() {
   const [addendumText, setAddendumText] = useState('')
   const [activeAnchor, setActiveAnchor] = useState('section-complaints')
   const [showBookingModal, setShowBookingModal] = useState(false)
+  const [showPrintSummary, setShowPrintSummary] = useState(false)
 
   // Track user modifications
   const isDirtyRef = useRef(false)
@@ -553,11 +555,7 @@ export function ClinicalEncounterWorkspace() {
               <button
                 type="button"
                 disabled={!isFinalised}
-                onClick={() => {
-                  if (encounterId > 0) {
-                    window.open(`/doctor/encounters/${encounterId}/print-summary`, '_blank')
-                  }
-                }}
+                onClick={() => setShowPrintSummary(true)}
                 className="px-3.5 py-1.5 border border-neutral-300 rounded text-xs font-semibold text-neutral-700 hover:bg-neutral-50 disabled:opacity-40 transition-colors"
               >
                 Print Consultation Summary
@@ -1147,6 +1145,56 @@ export function ClinicalEncounterWorkspace() {
               setShowBookingModal(false)
               setActionSuccess('Follow-up appointment booked successfully.')
             }}
+          />
+        )}
+
+        {/* Patient Consultation Summary Print Modal (DWS-09, T-19-12) */}
+        {showPrintSummary && (
+          <ConsultationSummaryPrint
+            encounter={
+              existingEncounter || {
+                id: encounterId,
+                patient_id: effectivePatientId,
+                patient_urn: patientUrn,
+                patient_name: patientName,
+                doctor_id: me?.doctor_id || 1,
+                doctor_name: me?.full_name || '',
+                encounter_date: new Date().toISOString(),
+                symptoms,
+                clinical_notes: clinicalNotes,
+                diagnosis,
+                is_finalised: isFinalised,
+                finalised_at: finalisedAt,
+                version_id: versionId,
+                created_at: new Date().toISOString(),
+                updated_at: new Date().toISOString(),
+                addenda: [],
+              }
+            }
+            patient={patient || null}
+            followUp={
+              serverFollowUp
+                ? {
+                    recommended_date: serverFollowUp.recommended_date,
+                    recommended_doctor_id: serverFollowUp.recommended_doctor_id,
+                    doctor_name:
+                      doctors.find((d) => d.id === serverFollowUp.recommended_doctor_id)?.name_en ||
+                      existingEncounter?.doctor_name,
+                    reception_notes: serverFollowUp.reception_notes,
+                  }
+                : followUpDate
+                ? {
+                    recommended_date: followUpDate,
+                    recommended_doctor_id: followUpDoctorId,
+                    doctor_name:
+                      doctors.find((d) => d.id === followUpDoctorId)?.name_en ||
+                      existingEncounter?.doctor_name,
+                    reception_notes: '',
+                  }
+                : null
+            }
+            advice={clinicalNotes}
+            onClose={() => setShowPrintSummary(false)}
           />
         )}
       </div>
