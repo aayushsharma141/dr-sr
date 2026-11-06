@@ -40,7 +40,7 @@ namespaces = true
 testpaths = ["tests"]
 addopts = "-ra -q --import-mode=importlib --strict-markers"
 timeout = 60
-pythonpath = ["tests"]
+pythonpath = ["tests", ".."]
 markers = [
     "concurrency: Concurrency stress and race condition tests",
     "db_owner: Tests requiring PostgreSQL owner role privileges",
