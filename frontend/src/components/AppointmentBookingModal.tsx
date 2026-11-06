@@ -1,6 +1,12 @@
 import { useState } from 'react'
 import { Modal } from './Modal'
-import { useDepartments, useDepartmentDoctors, usePatients, useBookAppointment } from '../api/queries'
+import {
+  useDepartments,
+  useDepartmentDoctors,
+  usePatients,
+  useBookAppointment,
+  useUpdateAppointmentStatus,
+} from '../api/queries'
 import type { PatientOut, DepartmentDoctorOut } from '../api/types'
 import { istToday } from '../format'
 
@@ -24,14 +30,19 @@ export function AppointmentBookingModal({
   const [selectedDepartmentId, setSelectedDepartmentId] = useState<number | ''>('')
   const [selectedDoctorId, setSelectedDoctorId] = useState<number | ''>('')
   const [appointmentDate, setAppointmentDate] = useState(istToday)
+  const [isWalkInCheckIn, setIsWalkInCheckIn] = useState(true)
+  const [isCheckedIn, setIsCheckedIn] = useState(false)
   const [notes, setNotes] = useState('')
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
   const [allocatedToken, setAllocatedToken] = useState<number | null>(null)
+
+  const isToday = appointmentDate === istToday()
 
   const { data: departments } = useDepartments()
   const { data: doctors } = useDepartmentDoctors(selectedDepartmentId || null)
   const { data: searchResults, isPending: isSearching } = usePatients(patientSearch, 5, 0)
   const bookMutation = useBookAppointment()
+  const updateStatusMutation = useUpdateAppointmentStatus()
 
   if (!isOpen) return null
 
@@ -66,6 +77,22 @@ export function AppointmentBookingModal({
         notes: notes.trim() || null,
       })
       setAllocatedToken(res.token_number)
+
+      if (isToday && isWalkInCheckIn) {
+        try {
+          await updateStatusMutation.mutateAsync({
+            id: res.id,
+            body: {
+              status: 'ARRIVED',
+              version_id: res.version_id,
+            },
+          })
+          setIsCheckedIn(true)
+        } catch (statusErr) {
+          console.warn('Auto check-in failed, appointment remains booked:', statusErr)
+        }
+      }
+
       if (onSuccess) onSuccess()
     } catch (err: unknown) {
       if (err instanceof Error) {
@@ -78,6 +105,8 @@ export function AppointmentBookingModal({
 
   const handleClose = () => {
     setAllocatedToken(null)
+    setIsCheckedIn(false)
+    setIsWalkInCheckIn(true)
     setErrorMsg(null)
     onClose()
   }
@@ -110,6 +139,18 @@ export function AppointmentBookingModal({
                 Patient: <span className="font-semibold">{selectedPatient?.full_name}</span> ({selectedPatient?.urn})
               </p>
               <p className="text-xs text-neutral-600">Date: {appointmentDate}</p>
+              <div className="mt-3">
+                {isCheckedIn ? (
+                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800 border border-emerald-300">
+                    <span className="h-2 w-2 rounded-full bg-emerald-600" aria-hidden="true" />
+                    Checked In · Placed in Doctor Queue
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-amber-100 text-amber-800 border border-amber-300">
+                    Status: Booked (Awaiting Check-In)
+                  </span>
+                )}
+              </div>
             </div>
             <button
               onClick={handleClose}
@@ -236,11 +277,36 @@ export function AppointmentBookingModal({
                 id="date-input"
                 type="date"
                 value={appointmentDate}
-                onChange={(e) => setAppointmentDate(e.target.value)}
+                onChange={(e) => {
+                  const val = e.target.value
+                  setAppointmentDate(val)
+                  if (val !== istToday()) {
+                    setIsWalkInCheckIn(false)
+                  }
+                }}
                 required
                 className="w-full p-2 border border-neutral-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-red-800"
               />
             </div>
+
+            {/* Walk-in Quick Intake Toggle */}
+            {isToday && (
+              <div className="flex items-start gap-2.5 rounded-lg border border-emerald-200 bg-emerald-50/70 p-3">
+                <input
+                  id="walk-in-checkin"
+                  type="checkbox"
+                  checked={isWalkInCheckIn}
+                  onChange={(e) => setIsWalkInCheckIn(e.target.checked)}
+                  className="mt-0.5 h-4 w-4 rounded border-neutral-300 text-[#5D0B26] focus:ring-[#8E1C3D]"
+                />
+                <label htmlFor="walk-in-checkin" className="text-xs text-neutral-800 cursor-pointer">
+                  <span className="font-bold text-emerald-950 block">Walk-in arrival: Check In immediately</span>
+                  <span className="text-neutral-600 block text-xs mt-0.5">
+                    Places patient directly into the doctor&apos;s active waiting queue in ARRIVED status upon booking.
+                  </span>
+                </label>
+              </div>
+            )}
 
             {/* Notes */}
             <div>

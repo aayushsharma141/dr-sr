@@ -732,15 +732,20 @@ export function useUploadPatientPhoto() {
 
 
 // ==============================================================================
+export { useHealth, type HealthStatus } from './health'
+
 // Appointments & Clinical Encounters (Phase 13)
 // ==============================================================================
 
-export function useAppointments(params?: {
-  appointment_date?: string
-  doctor_id?: number
-  patient_id?: number
-  status?: string
-}) {
+export function useAppointments(
+  params?: {
+    appointment_date?: string
+    doctor_id?: number
+    patient_id?: number
+    status?: string
+  },
+  options?: { refetchInterval?: number | false },
+) {
   const q = new URLSearchParams()
   if (params?.appointment_date) q.set('appointment_date', params.appointment_date)
   if (params?.doctor_id) q.set('doctor_id', String(params.doctor_id))
@@ -751,6 +756,7 @@ export function useAppointments(params?: {
   return useQuery({
     queryKey: ['appointments', params],
     queryFn: () => apiFetch<AppointmentListResponse>(`/appointments${qs}`),
+    refetchInterval: options?.refetchInterval ?? 10000,
   })
 }
 
