@@ -3,6 +3,7 @@ import { Link, useNavigate, useSearchParams } from 'react-router'
 import { useLogin, useSetupStatus } from '../api/queries'
 import { ApiError } from '../api/client'
 import { ROLE_HOME } from '../auth/roles'
+import { TakeoverSessionModal, type ActiveSessionInfo } from '../components/TakeoverSessionModal'
 
 type LoginNotice = {
   title: string
@@ -20,12 +21,49 @@ export function Login() {
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [loginNotice, setLoginNotice] = useState<LoginNotice | null>(null)
+  const [showTakeoverModal, setShowTakeoverModal] = useState(false)
+  const [activeSessionConflict, setActiveSessionConflict] = useState<ActiveSessionInfo | null>(null)
+  const [isTakingOver, setIsTakingOver] = useState(false)
 
   const loginMutation = useLogin()
   const {
     data: setupStatus,
     isError: setupStatusError,
   } = useSetupStatus()
+
+  const handleConfirmTakeover = async () => {
+    setIsTakingOver(true)
+    try {
+      const me = await loginMutation.mutateAsync({
+        username: username.trim(),
+        password,
+        takeover: true,
+      })
+      setShowTakeoverModal(false)
+      if (me.must_change_password) {
+        navigate('/change-password', { replace: true })
+      } else {
+        navigate(ROLE_HOME[me.role], { replace: true })
+      }
+    } catch (err: unknown) {
+      setShowTakeoverModal(false)
+      if (err instanceof ApiError) {
+        setLoginNotice({
+          title: 'Takeover unsuccessful',
+          message: err.message,
+          tone: 'danger',
+        })
+      }
+    } finally {
+      setIsTakingOver(false)
+    }
+  }
+
+  const handleCancelTakeover = () => {
+    setShowTakeoverModal(false)
+    setActiveSessionConflict(null)
+    setPassword('')
+  }
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault()
@@ -54,6 +92,15 @@ export function Login() {
       }
     } catch (err: unknown) {
       if (err instanceof ApiError) {
+        if (
+          err.status === 409 &&
+          (err.code === 'session_in_use' || (err as any).extra?.code === 'session_in_use')
+        ) {
+          const conflictData = (err.active_session || (err.extra as any)?.active_session) as ActiveSessionInfo
+          setActiveSessionConflict(conflictData || null)
+          setShowTakeoverModal(true)
+          return
+        }
         if (err.code === 'too_many_attempts') {
           setLoginNotice({
             title: 'Sign-in temporarily paused',
@@ -362,6 +409,15 @@ export function Login() {
           </div>
         </section>
       </div>
+
+      {/* Concurrent Session Takeover Modal (D-19-26, DWS-10) */}
+      <TakeoverSessionModal
+        open={showTakeoverModal}
+        activeSession={activeSessionConflict}
+        isSubmitting={isTakingOver}
+        onConfirm={handleConfirmTakeover}
+        onCancel={handleCancelTakeover}
+      />
     </main>
   )
 }

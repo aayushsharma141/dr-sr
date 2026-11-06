@@ -140,7 +140,7 @@ export function useMe() {
 export function useLogin() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: async (credentials: { username: string; password: string }): Promise<Me> => {
+    mutationFn: async (credentials: { username: string; password: string; takeover?: boolean }): Promise<Me> => {
       const res = await apiFetch<Me>('/auth/login', {
         method: 'POST',
         body: credentials,
