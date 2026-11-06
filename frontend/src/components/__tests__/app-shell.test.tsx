@@ -10,6 +10,13 @@ vi.mock('../../api/queries', () => ({
     mutateAsync: vi.fn().mockResolvedValue(undefined),
     isPending: false,
   }),
+  useHealth: () => ({
+    data: { status: 'ok', db: 'ok', setup_required: false },
+    isError: false,
+    isLoading: false,
+    isFetching: false,
+    refetch: vi.fn(),
+  }),
 }))
 
 vi.mock('../../api/branding', () => ({

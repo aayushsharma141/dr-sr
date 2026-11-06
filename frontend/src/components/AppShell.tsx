@@ -3,6 +3,7 @@ import { useClinicBranding } from '../api/branding'
 import { Link, useLocation, useNavigate } from 'react-router'
 import { useLogout } from '../api/queries'
 import type { Role } from '../api/types'
+import { LANStatusPill } from './LANStatusPill'
 import {
   findAdminModuleForPath,
 } from '../admin/modules'
@@ -654,6 +655,7 @@ export function AppShell({ name, role, children }: AppShellProps) {
           </div>
 
           <div className="flex shrink-0 items-center gap-3 sm:gap-4">
+            <LANStatusPill />
             <div className="hidden text-right lg:block">
               <p className="text-xs font-bold text-slate-800">{clock}</p>
               <p className="text-xs text-slate-600 font-medium">{branding.locationLine}</p>
