@@ -1356,4 +1356,54 @@ class HospitalAsset(Base):
     uploaded_by_user = relationship("User", foreign_keys=[uploaded_by_user_id], lazy="joined")
 
 
+class PrintDocumentType(StrEnum):
+    """Supported print document types for bilingual print templates."""
+
+    PRESCRIPTION = "prescription"
+    RECEIPT = "receipt"
+    REGISTRATION_CARD = "registration_card"
+    CONSULTATION_SUMMARY = "consultation_summary"
+
+
+class PrintTemplate(Base):
+    """Bilingual print template configuration per document type (SET-01, BIL-04, D-20-04)."""
+
+    __tablename__ = "print_templates"
+    __table_args__ = (
+        UniqueConstraint("document_type", name="uq_print_templates_document_type"),
+        CheckConstraint(
+            "document_type IN ('prescription', 'receipt', 'registration_card', 'consultation_summary')",
+            name="ck_print_templates_document_type",
+        ),
+        Index("ix_print_templates_updated_by", "updated_by_user_id"),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, Identity(always=False), primary_key=True)
+    document_type: Mapped[str] = mapped_column(String(32), nullable=False)
+    header_en: Mapped[str | None] = mapped_column(Text, nullable=True)
+    header_hi: Mapped[str | None] = mapped_column(Text, nullable=True)
+    footer_en: Mapped[str | None] = mapped_column(Text, nullable=True)
+    footer_hi: Mapped[str | None] = mapped_column(Text, nullable=True)
+    version: Mapped[int] = mapped_column(
+        Integer, default=1, server_default=text("1"), nullable=False
+    )
+    updated_by_user_id: Mapped[int | None] = mapped_column(
+        BigInteger, ForeignKey("users.id", ondelete="RESTRICT"), nullable=True
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    __mapper_args__ = {"version_id_col": version}
+
+    updated_by_user = relationship("User", foreign_keys=[updated_by_user_id], lazy="joined")
+
+
+
 
