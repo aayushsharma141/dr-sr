@@ -3304,6 +3304,60 @@
         "title": "EncounterUpdate",
         "type": "object"
       },
+      "ExportScope": {
+        "additionalProperties": false,
+        "description": "Filter criteria scoping patient records for export.",
+        "properties": {
+          "department_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Department Id"
+          },
+          "end_date": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "End Date"
+          },
+          "search_query": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Search Query"
+          },
+          "start_date": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Start Date"
+          }
+        },
+        "title": "ExportScope",
+        "type": "object"
+      },
       "FeeCreate": {
         "additionalProperties": false,
         "description": "Payload for creating a consultation fee schedule.",
@@ -4330,6 +4384,48 @@
           "address"
         ],
         "title": "PatientCreate",
+        "type": "object"
+      },
+      "PatientExportRequest": {
+        "additionalProperties": false,
+        "description": "Administrative request payload for patient dataset export.",
+        "properties": {
+          "fields": {
+            "description": "List of patient fields to include in export",
+            "items": {
+              "type": "string"
+            },
+            "minItems": 1,
+            "title": "Fields",
+            "type": "array"
+          },
+          "format": {
+            "default": "csv",
+            "description": "Desired export file format ('csv' or 'xlsx')",
+            "enum": [
+              "csv",
+              "xlsx"
+            ],
+            "title": "Format",
+            "type": "string"
+          },
+          "reason": {
+            "description": "Documented purpose / justification for export (audited)",
+            "maxLength": 500,
+            "minLength": 5,
+            "title": "Reason",
+            "type": "string"
+          },
+          "scope": {
+            "$ref": "#/components/schemas/ExportScope",
+            "description": "Filter parameters for scoping patients"
+          }
+        },
+        "required": [
+          "reason",
+          "fields"
+        ],
+        "title": "PatientExportRequest",
         "type": "object"
       },
       "PatientGrowthMonth": {
@@ -8315,6 +8411,46 @@
         "summary": "Get Asset File",
         "tags": [
           "assets"
+        ]
+      }
+    },
+    "/api/admin/exports": {
+      "post": {
+        "description": "Stream field-selective, formula-sanitized patient records in CSV or XLSX format.",
+        "operationId": "export_patients_api_admin_exports_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PatientExportRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Export Patients",
+        "tags": [
+          "admin-exports"
         ]
       }
     },
