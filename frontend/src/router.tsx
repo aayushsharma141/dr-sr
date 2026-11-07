@@ -169,18 +169,12 @@ export const router = createBrowserRouter([
           },
           {
             path: '/admin/templates',
-            lazy: async () => ({
-              Component: function PrintTemplatesPage() {
-                return (
-                  <div className="space-y-4 rounded-xl border border-slate-200 bg-white p-6 shadow-xs">
-                    <h1 className="text-xl font-bold text-slate-900">Print Templates</h1>
-                    <p className="text-sm text-slate-600">
-                      Configure bilingual print header and footer templates.
-                    </p>
-                  </div>
-                )
-              },
-            }),
+            lazy: async () => {
+              const { PrintTemplatesPage } = await import('./pages/admin/PrintTemplatesPage')
+              return {
+                Component: PrintTemplatesPage,
+              }
+            },
           },
           {
             path: '/admin/patients/correct',

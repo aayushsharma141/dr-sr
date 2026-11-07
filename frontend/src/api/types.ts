@@ -1321,4 +1321,30 @@ export interface HospitalAssetOut {
   created_at: string
 }
 
+export type PrintDocumentType =
+  | 'prescription'
+  | 'receipt'
+  | 'registration_card'
+  | 'consultation_summary'
+
+export interface PrintTemplateOut {
+  id: number
+  document_type: PrintDocumentType
+  header_en: string | null
+  header_hi: string | null
+  footer_en: string | null
+  footer_hi: string | null
+  version: number
+  updated_at: string
+}
+
+export interface PrintTemplateUpdatePayload {
+  header_en?: string | null
+  header_hi?: string | null
+  footer_en?: string | null
+  footer_hi?: string | null
+  version: number
+}
+
+
 

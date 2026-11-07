@@ -11,6 +11,8 @@ import type {
   IntegrityReportOut,
   LoginHistoryEntry,
   PasswordPolicyOut,
+  PrintTemplateOut,
+  PrintTemplateUpdatePayload,
   RestoreRequest,
   RestoreResultOut,
   RevokeSessionOut,
@@ -1444,4 +1446,44 @@ export function useDeactivateAsset() {
     },
   })
 }
+
+export function usePrintTemplates() {
+  return useQuery({
+    queryKey: ['admin', 'templates'],
+    queryFn: () => apiFetch<PrintTemplateOut[]>('/api/admin/templates'),
+  })
+}
+
+export function usePrintTemplate(docType: string) {
+  return useQuery({
+    queryKey: ['admin', 'templates', docType],
+    queryFn: () => apiFetch<PrintTemplateOut>(`/api/admin/templates/${docType}`),
+    enabled: !!docType,
+  })
+}
+
+export function useUpdatePrintTemplate() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({
+      docType,
+      payload,
+    }: {
+      docType: string
+      payload: PrintTemplateUpdatePayload
+    }) =>
+      apiFetch<PrintTemplateOut>(`/api/admin/templates/${docType}`, {
+        method: 'PATCH',
+        body: JSON.stringify(payload),
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      }),
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['admin', 'templates'] })
+      queryClient.invalidateQueries({ queryKey: ['admin', 'templates', variables.docType] })
+    },
+  })
+}
+
 
