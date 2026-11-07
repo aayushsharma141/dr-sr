@@ -235,7 +235,7 @@ export function HospitalAssetManager() {
             className="flex flex-col items-center justify-center rounded-xl border border-dashed border-slate-300 bg-white p-12 text-center"
             data-testid="asset-empty-state"
           >
-            <div className="mb-3 rounded-full bg-slate-100 p-3 text-slate-400">
+            <div className="mb-3 rounded-full bg-slate-100 p-3 text-slate-600">
               <svg className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
                 <path
                   strokeLinecap="round"
@@ -407,7 +407,7 @@ export function HospitalAssetManager() {
           {/* Asset Type Selector */}
           <div>
             <label htmlFor="asset-type-select" className="block text-xs font-semibold uppercase text-slate-700">
-              Asset Type <span className="text-red-500">*</span>
+              Asset Type <span className="text-red-700">*</span>
             </label>
             <select
               id="asset-type-select"
@@ -428,8 +428,8 @@ export function HospitalAssetManager() {
 
           {/* Drag & Drop Dropzone */}
           <div>
-            <label className="block text-xs font-semibold uppercase text-slate-700">
-              Asset File <span className="text-red-500">*</span>
+            <label htmlFor="asset-file-input" className="block text-xs font-semibold uppercase text-slate-700">
+              Asset File <span className="text-red-700">*</span>
             </label>
             <div
               onDragOver={handleDragOver}
@@ -443,15 +443,17 @@ export function HospitalAssetManager() {
               }`}
             >
               <input
+                id="asset-file-input"
                 ref={fileInputRef}
                 type="file"
+                aria-label="Upload hospital asset file"
                 accept=".png,.jpg,.jpeg,.webp,.svg,.pdf"
                 onChange={handleFileInputChange}
                 className="hidden"
                 data-testid="asset-file-input"
               />
 
-              <svg className="mb-2 h-8 w-8 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <svg className="mb-2 h-8 w-8 text-slate-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path
                   strokeLinecap="round"
                   strokeLinejoin="round"
