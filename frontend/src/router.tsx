@@ -178,18 +178,12 @@ export const router = createBrowserRouter([
           },
           {
             path: '/admin/patients/correct',
-            lazy: async () => ({
-              Component: function DemographicCorrectionPage() {
-                return (
-                  <div className="space-y-4 rounded-xl border border-slate-200 bg-white p-6 shadow-xs">
-                    <h1 className="text-xl font-bold text-slate-900">Patient Demographic Correction</h1>
-                    <p className="text-sm text-slate-600">
-                      Audited administrative correction of patient demographic records.
-                    </p>
-                  </div>
-                )
-              },
-            }),
+            lazy: async () => {
+              const { PatientCorrectionPage } = await import('./pages/admin/PatientCorrectionPage')
+              return {
+                Component: PatientCorrectionPage,
+              }
+            },
           },
           {
             path: '/admin/imports',

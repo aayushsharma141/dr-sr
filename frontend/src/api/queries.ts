@@ -60,6 +60,7 @@ import type {
   TreatmentSessionOut,
 } from './types'
 import type {
+  AdminPatientDemographicCorrection,
   DuplicateCheckResponse,
   PatientCreate,
   PatientOut,
@@ -1485,5 +1486,29 @@ export function useUpdatePrintTemplate() {
     },
   })
 }
+
+export function useAdminSearchPatients(q: string) {
+  return useQuery({
+    queryKey: ['admin', 'patients', 'search', q],
+    queryFn: () => apiFetch<PatientOut[]>(`/admin/patients/search?q=${encodeURIComponent(q)}`),
+    enabled: q.trim().length >= 1,
+  })
+}
+
+export function useCorrectPatientDemographics() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, payload }: { id: number; payload: AdminPatientDemographicCorrection }) =>
+      apiFetch<PatientOut>(`/admin/patients/${id}/demographics`, {
+        method: 'PATCH',
+        body: payload,
+      }),
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['admin', 'patients', 'search'] })
+      queryClient.invalidateQueries({ queryKey: ['patient', data.id] })
+    },
+  })
+}
+
 
 

@@ -142,7 +142,7 @@ export function ConsultationSummaryPrint({
             name: encounter.patient_name || patient?.full_name,
             ageSex: ageSexCombined,
             date: consultationDate,
-            address: patient?.address,
+            address: encounter.patient_address || patient?.address,
           }}
         />
 
@@ -153,6 +153,14 @@ export function ConsultationSummaryPrint({
               {encounter.patient_urn || patient?.urn}
             </span>
           </span>
+          {(encounter.patient_mobile || patient?.mobile) && (
+            <span>
+              <span className="font-bold text-slate-600">Mobile (मोबाइल):</span>{' '}
+              <span className="font-mono font-semibold text-slate-900">
+                {encounter.patient_mobile || patient?.mobile}
+              </span>
+            </span>
+          )}
           <span>
             <span className="font-bold text-slate-600">Consulting Doctor (परामर्शदाता चिकित्सक):</span>{' '}
             <span className="font-semibold">{encounter.doctor_name}</span>

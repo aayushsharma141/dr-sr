@@ -94,12 +94,32 @@ export const ReceiptPrint: React.FC<ReceiptPrintProps> = ({ payment, isReprint =
       <div className="mt-3 rounded border border-slate-300 bg-slate-50 p-2.5 text-xs">
         <div className="flex justify-between">
           <span className="text-slate-700">Patient URN:</span>
-          <span className="font-mono font-semibold text-slate-900">{payment.patient_urn}</span>
+          <span className="font-mono font-semibold text-slate-900">
+            {payment.patient_urn || (payment as { patient?: { urn?: string } }).patient?.urn}
+          </span>
         </div>
         <div className="mt-1 flex justify-between">
           <span className="text-slate-700">Patient Name:</span>
-          <span className="font-bold text-slate-900">{payment.patient_name}</span>
+          <span className="font-bold text-slate-900">
+            {payment.patient_name || (payment as { patient?: { full_name?: string } }).patient?.full_name}
+          </span>
         </div>
+        {(payment.patient_mobile || (payment as { patient?: { mobile?: string } }).patient?.mobile) && (
+          <div className="mt-1 flex justify-between">
+            <span className="text-slate-700">Mobile:</span>
+            <span className="font-mono font-medium text-slate-900">
+              {payment.patient_mobile || (payment as { patient?: { mobile?: string } }).patient?.mobile}
+            </span>
+          </div>
+        )}
+        {(payment.patient_address || (payment as { patient?: { address?: string } }).patient?.address) && (
+          <div className="mt-1 flex justify-between">
+            <span className="text-slate-700">Address:</span>
+            <span className="max-w-[70%] text-right text-slate-900 break-words">
+              {payment.patient_address || (payment as { patient?: { address?: string } }).patient?.address}
+            </span>
+          </div>
+        )}
         {payment.treatment_plan_name && (
           <div className="mt-1 flex justify-between">
             <span className="text-slate-700">Package:</span>

@@ -638,6 +638,7 @@ export interface FeeUpdate {
 export interface PatientOut {
   id: number
   urn: string
+  legacy_urn?: string | null
   full_name: string
   guardian_name: string
   gender: 'M' | 'F' | 'O'
@@ -692,6 +693,21 @@ export interface PatientUpdate {
 export interface DuplicateCheckResponse {
   has_duplicate: boolean
   matching_patient: PatientOut | null
+}
+
+export interface AdminPatientDemographicCorrection {
+  reason: string
+  version_id: number
+  full_name: string
+  guardian_name: string
+  gender: 'M' | 'F' | 'O'
+  dob?: string | null
+  age_years: number
+  mobile: string
+  address: string
+  district: string
+  state: string
+  emergency_contact?: string | null
 }
 
 // ==============================================================================
@@ -806,6 +822,8 @@ export interface EncounterRead {
   patient_id: number
   patient_urn: string
   patient_name: string
+  patient_mobile?: string | null
+  patient_address?: string | null
   doctor_id: number
   doctor_name: string
   appointment_id: number | null
@@ -904,6 +922,8 @@ export interface PrescriptionOut {
   patient_id: number
   patient_urn: string
   patient_name: string
+  patient_mobile?: string | null
+  patient_address?: string | null
   doctor_id: number
   doctor_name: string
   encounter_id: number | null
@@ -1044,6 +1064,8 @@ export interface PaymentOut {
   patient_id: number
   patient_urn: string
   patient_name: string
+  patient_mobile?: string | null
+  patient_address?: string | null
   treatment_plan_id: number | null
   treatment_plan_name: string | null
   appointment_id: number | null

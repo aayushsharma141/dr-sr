@@ -65,7 +65,11 @@ export function PrescriptionPrint({ prescription, onClose }: PrescriptionPrintPr
         <LetterheadBanner clinicName={clinicNameEn} />
         <LetterheadDoctors />
         <PatientStrip
-          values={{ name: prescription.patient_name, date: issuedOn }}
+          values={{
+            name: prescription.patient_name,
+            date: issuedOn,
+            address: prescription.patient_address ?? undefined,
+          }}
         />
 
         <div className="mt-2 flex items-center justify-between text-[12px]">
@@ -75,6 +79,12 @@ export function PrescriptionPrint({ prescription, onClose }: PrescriptionPrintPr
               {prescription.patient_urn}
             </span>
           </span>
+          {prescription.patient_mobile && (
+            <span>
+              <span className="font-bold text-slate-600">Mobile (मोबाइल):</span>{' '}
+              <span className="font-mono font-semibold text-slate-900">{prescription.patient_mobile}</span>
+            </span>
+          )}
           <span>
             <span className="font-bold text-slate-600">Doctor (चिकित्सक):</span>{' '}
             <span className="font-semibold">{prescription.doctor_name}</span>
