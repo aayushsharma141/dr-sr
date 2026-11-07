@@ -2183,6 +2183,16 @@
             "title": "Appointments Today",
             "type": "integer"
           },
+          "arrived_waiting": {
+            "default": 0,
+            "title": "Arrived Waiting",
+            "type": "integer"
+          },
+          "department": {
+            "default": "Physiotherapy",
+            "title": "Department",
+            "type": "string"
+          },
           "doctor_id": {
             "title": "Doctor Id",
             "type": "integer"
@@ -2198,6 +2208,17 @@
           "name": {
             "title": "Name",
             "type": "string"
+          },
+          "next_token": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Token"
           },
           "waiting": {
             "title": "Waiting",
@@ -2867,6 +2888,31 @@
           }
         },
         "title": "HTTPValidationError",
+        "type": "object"
+      },
+      "HourlyCollectionOut": {
+        "additionalProperties": false,
+        "description": "Hourly bucket of payment collections for today (IST).",
+        "properties": {
+          "amount_paise": {
+            "default": 0,
+            "title": "Amount Paise",
+            "type": "integer"
+          },
+          "count": {
+            "default": 0,
+            "title": "Count",
+            "type": "integer"
+          },
+          "hour": {
+            "title": "Hour",
+            "type": "string"
+          }
+        },
+        "required": [
+          "hour"
+        ],
+        "title": "HourlyCollectionOut",
         "type": "object"
       },
       "IntegrityCheckItemOut": {
@@ -4819,14 +4865,78 @@
         "additionalProperties": false,
         "description": "Reception dashboard summary.",
         "properties": {
+          "alerts": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/OverviewAlertOut"
+            },
+            "title": "Alerts",
+            "type": "array"
+          },
+          "appointments_today": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "default": {},
+            "title": "Appointments Today",
+            "type": "object"
+          },
           "area": {
             "default": "reception",
             "title": "Area",
             "type": "string"
           },
+          "business_date": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Business Date"
+          },
+          "collections_today": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CollectionsTodayOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "doctors_today": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/DoctorTodayOut"
+            },
+            "title": "Doctors Today",
+            "type": "array"
+          },
+          "hourly_collections": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/HourlyCollectionOut"
+            },
+            "title": "Hourly Collections",
+            "type": "array"
+          },
           "name": {
             "title": "Name",
             "type": "string"
+          },
+          "outstanding_dues_paise": {
+            "default": 0,
+            "title": "Outstanding Dues Paise",
+            "type": "integer"
+          },
+          "registrations_today": {
+            "default": 0,
+            "title": "Registrations Today",
+            "type": "integer"
           },
           "role": {
             "title": "Role",
@@ -10002,7 +10112,7 @@
     },
     "/api/reception/overview": {
       "get": {
-        "description": "Return reception overview profile.",
+        "description": "Return reception overview operational metrics, queue counters, and alerts.",
         "operationId": "get_reception_overview_api_reception_overview_get",
         "responses": {
           "200": {

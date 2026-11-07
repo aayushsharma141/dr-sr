@@ -164,6 +164,15 @@ export const router = createBrowserRouter([
         element: <RequireRole role={['ADMIN', 'RECEPTION']} />,
         children: [
           {
+            path: '/reception/billing',
+            lazy: async () => {
+              const { ReceptionBillingPage } = await import('./pages/ReceptionBillingPage')
+              return {
+                Component: ReceptionBillingPage,
+              }
+            },
+          },
+          {
             path: '/reception/dues',
             lazy: async () => {
               const { PendingDuesPage } = await import('./pages/PendingDuesPage')
@@ -183,6 +192,15 @@ export const router = createBrowserRouter([
               const { PatientRegister } = await import('./pages/PatientRegister')
               return {
                 Component: PatientRegister,
+              }
+            },
+          },
+          {
+            path: '/reception/tokens',
+            lazy: async () => {
+              const { TokenGenerationPage } = await import('./pages/TokenGenerationPage')
+              return {
+                Component: TokenGenerationPage,
               }
             },
           },

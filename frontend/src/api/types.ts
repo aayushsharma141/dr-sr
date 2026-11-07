@@ -62,6 +62,15 @@ export interface DoctorTodayOut {
   waiting: number
   in_consultation: number
   done: number
+  arrived_waiting?: number
+  department?: string
+  next_token?: number | null
+}
+
+export interface HourlyCollectionPoint {
+  hour: string
+  amount_paise: number
+  count: number
 }
 
 /**
@@ -146,10 +155,91 @@ export interface AdminOverview {
   alerts: OverviewAlertOut[]
 }
 
+export interface ManagementMetricChange {
+  value_paise: number
+  prior_paise: number
+  percent_change: number
+}
+
+export interface ManagementAttentionItem {
+  key: string
+  label: string
+  count: number
+  badge_variant: string
+  target_path: string
+}
+
+export interface FinancialTrendMonth {
+  month: string
+  revenue_paise: number
+  expenses_paise: number
+}
+
+export interface DepartmentRevenueItem {
+  name: string
+  percentage: number
+  revenue_paise: number
+  color: string
+}
+
+export interface HospitalGrowthSummary {
+  new_patients: number
+  new_patients_change_pct: number
+  returning_patients: number
+  returning_patients_change_pct: number
+}
+
+export interface DoctorUtilizationSummary {
+  utilization_pct: number
+  occupied_minutes: number
+  scheduled_minutes: number
+}
+
+export interface PatientGrowthMonth {
+  month: string
+  count: number
+}
+
+export interface SystemHealthSummary {
+  status: string
+  application_version: string
+  database_status: string
+  last_backup_time: string | null
+  storage_used_bytes: number
+  storage_total_bytes: number
+  storage_percentage: number
+}
+
+export interface ManagementOverview {
+  current_month_label: string
+  comparison_month_label: string
+  monthly_revenue: ManagementMetricChange
+  operating_expenses: ManagementMetricChange
+  net_surplus: ManagementMetricChange
+  outstanding_receivables_paise: number
+  financial_trends: FinancialTrendMonth[]
+  department_revenues: DepartmentRevenueItem[]
+  management_attention: ManagementAttentionItem[]
+  management_attention_total: number
+  hospital_growth: HospitalGrowthSummary
+  doctor_utilization: DoctorUtilizationSummary
+  patient_growth_trends: PatientGrowthMonth[]
+  patient_growth_pct: number
+  system_health: SystemHealthSummary
+}
+
 export interface ReceptionOverview {
   area: 'reception'
   name: string
   role: string
+  business_date?: string
+  registrations_today?: number
+  appointments_today?: Record<string, number>
+  doctors_today?: DoctorTodayOut[]
+  collections_today?: CollectionsTodayOut
+  outstanding_dues_paise?: number
+  hourly_collections?: HourlyCollectionPoint[]
+  alerts?: OverviewAlertOut[]
 }
 
 export interface DoctorOverview {
@@ -457,6 +547,39 @@ export interface ReceiptCycleConfirmationExtra {
   receipts_issued: number
 }
 
+export interface DepartmentOut {
+  id: number
+  name_en: string
+  name_hi: string | null
+  description: string | null
+  is_active: boolean
+  version_id: number
+}
+
+export interface DepartmentCreate {
+  name_en: string
+  name_hi?: string | null
+  description?: string | null
+}
+
+export interface DepartmentUpdate extends DepartmentCreate {
+  is_active: boolean
+  version_id: number
+}
+
+export interface DoctorDepartmentAssignment {
+  department_ids: number[]
+  version_id: number
+}
+
+export interface DepartmentDoctorOut {
+  id: number
+  name_en: string
+  name_hi: string | null
+  qualification: string | null
+  default_fee_paise: number
+}
+
 export interface DoctorOut {
   id: number
   name_en: string
@@ -596,6 +719,7 @@ export interface Appointment {
   token_number: number
   status: AppointmentStatus
   status_updated_at: string
+  check_in_at?: string | null
   cancellation_reason: string | null
   notes: string | null
   version_id: number
@@ -605,6 +729,7 @@ export interface Appointment {
 
 export interface AppointmentCreate {
   patient_id: number
+  department_id?: number | null
   doctor_id: number
   appointment_date: string
   notes?: string | null

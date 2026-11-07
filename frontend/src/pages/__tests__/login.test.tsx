@@ -270,7 +270,7 @@ describe('Login & Role Navigation Flow', () => {
     await waitFor(() => {
       expect(screen.getByText('Reception Dashboard')).toBeInTheDocument()
       expect(
-        screen.getByText(/Reception area active. Ready for patient check-ins/i),
+        screen.getByText(/Front Desk & Reception Command Center/i),
       ).toBeInTheDocument()
     })
   })

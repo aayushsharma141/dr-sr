@@ -77,30 +77,34 @@ describe('AppShell clinical navigation hierarchy', () => {
     const primaryNav = navigations[0]
 
     // Verify sections and links for ADMIN
-    expect(within(primaryNav).getByRole('link', { name: 'Dashboard' })).toHaveAttribute('href', '/admin')
-    expect(within(primaryNav).getByRole('link', { name: 'Patient Records' })).toHaveAttribute('href', '/reception/patients')
-    expect(within(primaryNav).getByRole('link', { name: 'Appointments' })).toHaveAttribute('href', '/reception/appointments?tab=today')
-    expect(within(primaryNav).getByRole('link', { name: 'Billing & Payments' })).toHaveAttribute('href', '/reception/dues')
+    expect(within(primaryNav).getByRole('link', { name: 'Management Overview' })).toHaveAttribute('href', '/admin')
+    expect(within(primaryNav).getByRole('link', { name: /Financial Reports/ })).toHaveAttribute('href', '/admin/billing')
+    expect(within(primaryNav).getByRole('link', { name: /Hospital Performance/ })).toHaveAttribute('href', '/admin')
+    expect(within(primaryNav).getByRole('link', { name: /Department Analytics/ })).toHaveAttribute('href', '/admin')
+    expect(within(primaryNav).getByRole('link', { name: /Resource Utilization/ })).toHaveAttribute('href', '/admin')
 
-    // Hospital Administration
-    expect(within(primaryNav).getByRole('link', { name: 'Hospital Configuration' })).toHaveAttribute('href', '/admin/settings')
-    expect(within(primaryNav).getByRole('link', { name: 'Doctor & Clinical Configuration' })).toHaveAttribute('href', '/admin/doctors')
-    expect(within(primaryNav).getByRole('link', { name: 'Billing & Financial' })).toHaveAttribute('href', '/admin/billing')
+    // Hospital Governance
+    expect(within(primaryNav).getByRole('link', { name: /Hospital Profile/ })).toHaveAttribute('href', '/admin/settings')
+    expect(within(primaryNav).getByRole('link', { name: /Departments & Services/ })).toHaveAttribute('href', '/admin/doctors')
+    expect(within(primaryNav).getByRole('link', { name: /Doctors & Staff/ })).toHaveAttribute('href', '/admin/doctors')
+    expect(within(primaryNav).getByRole('link', { name: /Policies & Approvals/ })).toHaveAttribute('href', '/admin/security')
+    expect(within(primaryNav).getByRole('link', { name: /Audit & Compliance/ })).toHaveAttribute('href', '/admin/audit')
 
     // System Administration
-    expect(within(primaryNav).getByRole('link', { name: 'User & Authority' })).toHaveAttribute('href', '/admin/users')
-    expect(within(primaryNav).getByRole('link', { name: 'Security & Access' })).toHaveAttribute('href', '/admin/security')
-    expect(within(primaryNav).getByRole('link', { name: 'Audit & Compliance' })).toHaveAttribute('href', '/admin/audit')
-    expect(within(primaryNav).getByRole('link', { name: 'Backup, Restore & Data' })).toHaveAttribute('aria-current', 'page')
-    expect(within(primaryNav).getByRole('link', { name: 'System Health & Maintenance' })).toHaveAttribute('href', '/admin/system')
+    expect(within(primaryNav).getByRole('link', { name: /Users & Roles/ })).toHaveAttribute('href', '/admin/users')
+    expect(within(primaryNav).getByRole('link', { name: /Configuration Settings/ })).toHaveAttribute('href', '/admin/settings')
+    expect(within(primaryNav).getByRole('link', { name: /Backup & Restore/ })).toHaveAttribute('aria-current', 'page')
+    expect(within(primaryNav).getByRole('link', { name: /System Health/ })).toHaveAttribute('href', '/admin/system')
+    expect(within(primaryNav).getByRole('link', { name: /Audit Logs/ })).toHaveAttribute('href', '/admin/audit')
+    expect(within(primaryNav).getByRole('link', { name: /Updates & Maintenance/ })).toHaveAttribute('href', '/admin/integrity')
 
     // No second Administration sidebar / subnavigation
     expect(screen.queryByRole('navigation', { name: 'Administration sections' })).not.toBeInTheDocument()
     expect(screen.queryByRole('complementary', { name: 'Administration modules' })).not.toBeInTheDocument()
 
     // No duplicate destinations across the screen
-    expect(within(primaryNav).getAllByRole('link', { name: 'Backup, Restore & Data' })).toHaveLength(1)
-    expect(within(primaryNav).getAllByRole('link', { name: 'Hospital Configuration' })).toHaveLength(1)
+    expect(within(primaryNav).getAllByRole('link', { name: /Backup & Restore/ })).toHaveLength(1)
+    expect(within(primaryNav).getAllByRole('link', { name: /Hospital Profile/ })).toHaveLength(1)
 
     // Doctor/Reception specific items not exposed
     expect(within(primaryNav).queryByRole('link', { name: 'Patient Registration' })).not.toBeInTheDocument()

@@ -151,7 +151,7 @@ describe('Patient Registration Screen', () => {
       expect(screen.getByText('Registration Successful!')).toBeInTheDocument()
     })
 
-    expect(screen.getByText('KH-2026-0001')).toBeInTheDocument()
+    expect(screen.getAllByText('KH-2026-0001')[0]).toBeInTheDocument()
     expect((capturedBody as any)?.full_name).toBe('Aarav Kumar')
     expect((capturedBody as any)?.mobile).toBe('9876543210')
   })

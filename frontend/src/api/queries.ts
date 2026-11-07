@@ -1,5 +1,7 @@
 import type {
   ActiveSessionOut,
+  DepartmentDoctorOut,
+  DepartmentOut,
   AuditLogListResponse,
   BackupArchiveInfo,
   BackupArchiveListResponse,
@@ -87,6 +89,7 @@ import type {
 import type {
   ActionRequest,
   AreaOverview,
+  ManagementOverview,
   Me,
   SetupAdminRequest,
   UserCreate,
@@ -188,6 +191,16 @@ export function useOverview<T extends AreaOverview = AreaOverview>(area: string)
     queryKey: ['overview', area],
     queryFn: async (): Promise<T> => {
       return await apiFetch<T>(`/${area}/overview`)
+    },
+    retry: false,
+  })
+}
+
+export function useManagementOverview() {
+  return useQuery({
+    queryKey: ['admin', 'management-overview'],
+    queryFn: async (): Promise<ManagementOverview> => {
+      return await apiFetch<ManagementOverview>('/admin/management-overview')
     },
     retry: false,
   })
@@ -520,6 +533,21 @@ export function useUpdateClinicSettings() {
       qc.setQueryData(['clinic-settings'], data)
       invalidateAdminSummaries(qc)
     },
+  })
+}
+
+export function useDepartments() {
+  return useQuery({
+    queryKey: ['departments'],
+    queryFn: () => apiFetch<DepartmentOut[]>('/departments'),
+  })
+}
+
+export function useDepartmentDoctors(departmentId: number | null) {
+  return useQuery({
+    queryKey: ['departments', departmentId, 'doctors'],
+    queryFn: () => apiFetch<DepartmentDoctorOut[]>(`/departments/${departmentId}/doctors`),
+    enabled: departmentId !== null,
   })
 }
 

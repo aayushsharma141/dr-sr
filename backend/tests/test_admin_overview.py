@@ -394,3 +394,36 @@ def test_admin_overview_backup_and_integrity_status(
     codes2 = _alert_codes(body2)
     assert "last_backup_failed" not in codes2
     assert "integrity_issues" not in codes2
+
+
+def test_admin_management_overview_endpoint(
+    login_client: Any,
+    admin_user: User,
+    reception_user: User,
+    doctor_a_user: User,
+    overview_settings: Settings,
+) -> None:
+    path = "/api/admin/management-overview"
+    # RBAC check
+    assert login_client(reception_user).get(path).status_code == 403
+    assert login_client(doctor_a_user).get(path).status_code == 403
+
+    res = login_client(admin_user).get(path)
+    assert res.status_code == 200
+    data = res.json()
+
+    assert "current_month_label" in data
+    assert "comparison_month_label" in data
+    assert data["monthly_revenue"]["value_paise"] > 0
+    assert data["operating_expenses"]["value_paise"] > 0
+    assert data["net_surplus"]["value_paise"] > 0
+    assert data["outstanding_receivables_paise"] > 0
+    assert len(data["financial_trends"]) == 6
+    assert len(data["department_revenues"]) == 5
+    assert len(data["management_attention"]) == 5
+    assert data["management_attention_total"] >= 5
+    assert data["hospital_growth"]["new_patients"] > 0
+    assert data["doctor_utilization"]["utilization_pct"] == 76
+    assert len(data["patient_growth_trends"]) == 6
+    assert data["system_health"]["status"] == "Healthy"
+    assert data["system_health"]["application_version"] == "v1.16.0"

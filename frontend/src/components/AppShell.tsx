@@ -16,6 +16,7 @@ interface AppShellProps {
 type NavigationIcon =
   | 'dashboard'
   | 'user-plus'
+  | 'ticket'
   | 'folder'
   | 'activity'
   | 'calendar'
@@ -66,6 +67,14 @@ const NAVIGATION: NavigationItem[] = [
     sectionStart: 'PATIENT & CLINICAL WORKFLOW',
   },
   {
+    key: 'token-generation',
+    label: 'Visit & Token Desk',
+    description: 'Register visit and issue queue token',
+    path: '/reception/tokens',
+    icon: 'ticket',
+    roles: ['RECEPTION', 'ADMIN'],
+  },
+  {
     key: 'patient-records',
     label: 'Patient Records',
     description: 'Search and inspect patient records',
@@ -85,9 +94,9 @@ const NAVIGATION: NavigationItem[] = [
   {
     key: 'appointments',
     label: 'Appointments',
-    description: "Today's token queue and appointment booking",
+    description: "Daily token schedule and waiting hall queue",
     path: '/reception/appointments?tab=today',
-    icon: 'calendar',
+    icon: 'ticket',
     roles: ALL_ROLES,
   },
   {
@@ -101,10 +110,11 @@ const NAVIGATION: NavigationItem[] = [
   {
     key: 'billing',
     label: 'Billing & Payments',
-    description: 'Patient balances, collections and receipts',
+    description: 'Patient checkout, collections, receipts and dues',
     path: '/reception/dues',
     icon: 'rupee',
     roles: ADMIN_RECEPTION,
+    activePaths: ['/reception/dues', '/reception/billing'],
   },
   // Hospital Administration
   {
@@ -255,6 +265,15 @@ function NavIcon({ name }: { name: NavigationIcon }) {
           <line x1="22" y1="11" x2="16" y2="11" />
         </svg>
       )
+    case 'ticket':
+      return (
+        <svg {...shared}>
+          <path d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2z" />
+          <line x1="13" y1="5" x2="13" y2="7" />
+          <line x1="13" y1="17" x2="13" y2="19" />
+          <line x1="13" y1="11" x2="13" y2="13" />
+        </svg>
+      )
     case 'folder':
       return (
         <svg {...shared}>
@@ -385,6 +404,8 @@ function Breadcrumbs({ pathname, role }: { pathname: string; role: Role }) {
 
   if (pathname === '/reception/patients/new') {
     crumbs.push({ label: 'Patient Registration' })
+  } else if (pathname === '/reception/tokens') {
+    crumbs.push({ label: 'Visit & Token Desk' })
   } else if (pathname === '/reception/patients') {
     crumbs.push({ label: 'Patient Records' })
   } else if (/^\/reception\/patients\/\d+$/.test(pathname)) {
@@ -394,9 +415,12 @@ function Breadcrumbs({ pathname, role }: { pathname: string; role: Role }) {
     crumbs.push({ label: 'Patient Records', href: '/reception/patients' })
     crumbs.push({ label: 'Print Patient Card' })
   } else if (pathname === '/reception/appointments') {
-    crumbs.push({ label: 'Appointments & Queue' })
+    crumbs.push({ label: 'Waiting Queue / OPD' })
+  } else if (pathname === '/reception/billing') {
+    crumbs.push({ label: 'Billing & Payments' })
   } else if (pathname === '/reception/dues') {
-    crumbs.push({ label: 'Billing & Outstanding Dues' })
+    crumbs.push({ label: 'Billing & Payments', href: '/reception/billing' })
+    crumbs.push({ label: 'Outstanding Package Dues' })
   } else if (pathname === '/doctor/treatment-plans') {
     crumbs.push({ label: 'Physiotherapy Treatment Plans' })
   } else if (pathname === '/doctor/encounters/new') {
@@ -484,20 +508,285 @@ export function AppShell({ name, role, children }: AppShellProps) {
     }
   }
 
-  const renderSidebar = (isDrawer = false) => {
+  const renderAdminSidebar = (isDrawer = false) => {
     const isDesktopSidebar = !isDrawer
     return (
       <aside
-        aria-label="Hospital workspace navigation"
-        className={`flex h-full flex-col bg-[#5D0B26] text-white transition-all duration-200 ${
+        aria-label="Primary navigation"
+        className={`flex h-full flex-col bg-[#131b2e] text-white transition-all duration-200 ${
           isDrawer ? 'w-72 max-w-[85vw] shadow-2xl' : 'w-16 lg:w-64 shrink-0'
         }`}
       >
         {/* Sidebar Brand Header */}
         <div
-          className={`flex min-h-[64px] items-center border-b border-white/15 ${
+          className={`flex min-h-[64px] items-center border-b border-white/10 ${
             isDesktopSidebar ? 'justify-center px-2 lg:justify-start lg:gap-3 lg:px-4' : 'justify-between px-4'
           }`}
+        >
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-indigo-500/20 text-indigo-400 border border-indigo-500/30">
+              <svg className="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 2v20M8 5a4 4 0 018 0c0 4-8 6-8 10a4 4 0 008 0M8 7a4 4 0 008 0" />
+              </svg>
+            </div>
+            <div className={`min-w-0 ${isDesktopSidebar ? 'hidden lg:block' : 'block'}`}>
+              <div className="truncate text-xs font-bold uppercase tracking-wider text-white">
+                Kalyan Hospital
+              </div>
+              <p className="truncate text-xs font-medium text-slate-200">
+                Admin Panel
+              </p>
+            </div>
+          </div>
+          {isDrawer && (
+            <button
+              type="button"
+              onClick={() => setMobileOpen(false)}
+              aria-label="Close navigation menu"
+              className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-white/20 text-white hover:bg-white/10"
+            >
+              ✕
+            </button>
+          )}
+        </div>
+
+        {/* Scrollable Navigation Items */}
+        <nav
+          aria-label="Primary navigation"
+          className="flex-1 space-y-3 overflow-y-auto px-3 py-4"
+        >
+          {/* Management Overview (Home) */}
+          <Link
+            to="/admin"
+            onClick={() => isDrawer && setMobileOpen(false)}
+            aria-current={location.pathname === '/admin' ? 'page' : undefined}
+            className={`flex items-center gap-3 rounded-xl px-3 py-2.5 text-xs font-bold transition-colors ${
+              location.pathname === '/admin'
+                ? 'bg-indigo-600 text-white shadow-xs'
+                : 'text-slate-200 hover:bg-white/5 hover:text-white'
+            }`}
+          >
+            <svg className="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+            </svg>
+            <span className={`${isDesktopSidebar ? 'hidden lg:inline' : 'inline'}`}>
+              Management Overview
+            </span>
+          </Link>
+
+          {/* Group 1: Business Intelligence */}
+          <div className="space-y-1">
+            <div className="flex items-center justify-between px-3 py-1.5 text-xs font-bold text-slate-200">
+              <div className="flex items-center gap-2">
+                <svg className="h-4 w-4 text-slate-200 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                </svg>
+                <span className={`${isDesktopSidebar ? 'hidden lg:inline' : 'inline'}`}>
+                  Business Intelligence
+                </span>
+              </div>
+              <span className={`text-xs text-slate-200 ${isDesktopSidebar ? 'hidden lg:inline' : 'inline'}`}>▾</span>
+            </div>
+            <div className={`space-y-0.5 pl-7 ${isDesktopSidebar ? 'hidden lg:block' : 'block'}`}>
+              <Link
+                to="/admin/billing"
+                onClick={() => isDrawer && setMobileOpen(false)}
+                aria-current={location.pathname === '/admin/billing' ? 'page' : undefined}
+                className={`block rounded-lg px-2 py-1.5 text-xs font-medium transition-colors ${
+                  location.pathname === '/admin/billing' ? 'text-indigo-400 font-bold' : 'text-slate-200 hover:text-white'
+                }`}
+              >
+                &bull; Financial Reports
+              </Link>
+              <Link
+                to="/admin"
+                onClick={() => isDrawer && setMobileOpen(false)}
+                className="block rounded-lg px-2 py-1.5 text-xs font-medium text-slate-200 hover:text-white transition-colors"
+              >
+                &bull; Hospital Performance
+              </Link>
+              <Link
+                to="/admin"
+                onClick={() => isDrawer && setMobileOpen(false)}
+                className="block rounded-lg px-2 py-1.5 text-xs font-medium text-slate-200 hover:text-white transition-colors"
+              >
+                &bull; Department Analytics
+              </Link>
+              <Link
+                to="/admin"
+                onClick={() => isDrawer && setMobileOpen(false)}
+                className="block rounded-lg px-2 py-1.5 text-xs font-medium text-slate-200 hover:text-white transition-colors"
+              >
+                &bull; Resource Utilization
+              </Link>
+            </div>
+          </div>
+
+          {/* Group 2: Hospital Governance */}
+          <div className="space-y-1">
+            <div className="flex items-center justify-between px-3 py-1.5 text-xs font-bold text-slate-200">
+              <div className="flex items-center gap-2">
+                <svg className="h-4 w-4 text-slate-200 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                </svg>
+                <span className={`${isDesktopSidebar ? 'hidden lg:inline' : 'inline'}`}>
+                  Hospital Governance
+                </span>
+              </div>
+              <span className={`text-xs text-slate-200 ${isDesktopSidebar ? 'hidden lg:inline' : 'inline'}`}>▾</span>
+            </div>
+            <div className={`space-y-0.5 pl-7 ${isDesktopSidebar ? 'hidden lg:block' : 'block'}`}>
+              <Link
+                to="/admin/settings"
+                onClick={() => isDrawer && setMobileOpen(false)}
+                aria-current={location.pathname === '/admin/settings' ? 'page' : undefined}
+                className={`block rounded-lg px-2 py-1.5 text-xs font-medium transition-colors ${
+                  location.pathname === '/admin/settings' ? 'text-indigo-400 font-bold' : 'text-slate-200 hover:text-white'
+                }`}
+              >
+                &bull; Hospital Profile
+              </Link>
+              <Link
+                to="/admin/doctors"
+                onClick={() => isDrawer && setMobileOpen(false)}
+                aria-current={location.pathname === '/admin/doctors' ? 'page' : undefined}
+                className={`block rounded-lg px-2 py-1.5 text-xs font-medium transition-colors ${
+                  location.pathname === '/admin/doctors' ? 'text-indigo-400 font-bold' : 'text-slate-200 hover:text-white'
+                }`}
+              >
+                &bull; Departments & Services
+              </Link>
+              <Link
+                to="/admin/doctors"
+                onClick={() => isDrawer && setMobileOpen(false)}
+                className="block rounded-lg px-2 py-1.5 text-xs font-medium text-slate-200 hover:text-white transition-colors"
+              >
+                &bull; Doctors & Staff
+              </Link>
+              <Link
+                to="/admin/security"
+                onClick={() => isDrawer && setMobileOpen(false)}
+                aria-current={location.pathname === '/admin/security' ? 'page' : undefined}
+                className={`block rounded-lg px-2 py-1.5 text-xs font-medium transition-colors ${
+                  location.pathname === '/admin/security' ? 'text-indigo-400 font-bold' : 'text-slate-200 hover:text-white'
+                }`}
+              >
+                &bull; Policies & Approvals
+              </Link>
+              <Link
+                to="/admin/audit"
+                onClick={() => isDrawer && setMobileOpen(false)}
+                aria-current={location.pathname === '/admin/audit' ? 'page' : undefined}
+                className={`block rounded-lg px-2 py-1.5 text-xs font-medium transition-colors ${
+                  location.pathname === '/admin/audit' ? 'text-indigo-400 font-bold' : 'text-slate-200 hover:text-white'
+                }`}
+              >
+                &bull; Audit & Compliance
+              </Link>
+            </div>
+          </div>
+
+          {/* Group 3: System Administration */}
+          <div className="space-y-1">
+            <div className="flex items-center justify-between px-3 py-1.5 text-xs font-bold text-slate-200">
+              <div className="flex items-center gap-2">
+                <svg className="h-4 w-4 text-slate-200 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                </svg>
+                <span className={`${isDesktopSidebar ? 'hidden lg:inline' : 'inline'}`}>
+                  System Administration
+                </span>
+              </div>
+              <span className={`text-xs text-slate-200 ${isDesktopSidebar ? 'hidden lg:inline' : 'inline'}`}>▾</span>
+            </div>
+            <div className={`space-y-0.5 pl-7 ${isDesktopSidebar ? 'hidden lg:block' : 'block'}`}>
+              <Link
+                to="/admin/users"
+                onClick={() => isDrawer && setMobileOpen(false)}
+                aria-current={location.pathname === '/admin/users' ? 'page' : undefined}
+                className={`block rounded-lg px-2 py-1.5 text-xs font-medium transition-colors ${
+                  location.pathname === '/admin/users' ? 'text-indigo-400 font-bold' : 'text-slate-200 hover:text-white'
+                }`}
+              >
+                &bull; Users & Roles (RBAC)
+              </Link>
+              <Link
+                to="/admin/settings"
+                onClick={() => isDrawer && setMobileOpen(false)}
+                className="block rounded-lg px-2 py-1.5 text-xs font-medium text-slate-200 hover:text-white transition-colors"
+              >
+                &bull; Configuration Settings
+              </Link>
+              <Link
+                to="/admin/backups"
+                onClick={() => isDrawer && setMobileOpen(false)}
+                aria-current={location.pathname === '/admin/backups' ? 'page' : undefined}
+                className={`block rounded-lg px-2 py-1.5 text-xs font-medium transition-colors ${
+                  location.pathname === '/admin/backups' ? 'text-indigo-400 font-bold' : 'text-slate-200 hover:text-white'
+                }`}
+              >
+                &bull; Backup & Restore
+              </Link>
+              <Link
+                to="/admin/system"
+                onClick={() => isDrawer && setMobileOpen(false)}
+                aria-current={location.pathname === '/admin/system' ? 'page' : undefined}
+                className={`block rounded-lg px-2 py-1.5 text-xs font-medium transition-colors ${
+                  location.pathname === '/admin/system' ? 'text-indigo-400 font-bold' : 'text-slate-200 hover:text-white'
+                }`}
+              >
+                &bull; System Health
+              </Link>
+              <Link
+                to="/admin/audit"
+                onClick={() => isDrawer && setMobileOpen(false)}
+                className="block rounded-lg px-2 py-1.5 text-xs font-medium text-slate-200 hover:text-white transition-colors"
+              >
+                &bull; Audit Logs
+              </Link>
+              <Link
+                to="/admin/integrity"
+                onClick={() => isDrawer && setMobileOpen(false)}
+                aria-current={location.pathname === '/admin/integrity' ? 'page' : undefined}
+                className={`block rounded-lg px-2 py-1.5 text-xs font-medium transition-colors ${
+                  location.pathname === '/admin/integrity' ? 'text-indigo-400 font-bold' : 'text-slate-200 hover:text-white'
+                }`}
+              >
+                &bull; Updates & Maintenance
+              </Link>
+            </div>
+          </div>
+        </nav>
+
+        {/* Sidebar Footer Context */}
+        <div
+          className={`border-t border-white/10 p-3 text-xs text-slate-200 ${
+            isDesktopSidebar ? 'hidden lg:block' : 'block'
+          }`}
+        >
+          <p className="font-semibold text-slate-200">Local clinic network</p>
+          <p className="mt-0.5 text-xs text-slate-200">Kalyan Hospital · v1.16.0 LAN</p>
+        </div>
+      </aside>
+    )
+  }
+
+  const renderSidebar = (isDrawer = false) => {
+    if (role === 'ADMIN') {
+      return renderAdminSidebar(isDrawer)
+    }
+    const isDesktopSidebar = !isDrawer
+    return (
+      <aside
+        aria-label="Hospital workspace navigation"
+        className={`flex h-full flex-col bg-[#5D0B26] text-white transition-all duration-200 ${isDrawer ? 'w-72 max-w-[85vw] shadow-2xl' : 'w-16 lg:w-64 shrink-0'
+          }`}
+      >
+        {/* Sidebar Brand Header */}
+        <div
+          className={`flex min-h-[64px] items-center border-b border-white/15 ${isDesktopSidebar ? 'justify-center px-2 lg:justify-start lg:gap-3 lg:px-4' : 'justify-between px-4'
+            }`}
         >
           <div className="flex items-center gap-3 min-w-0">
             <img
@@ -557,9 +846,8 @@ export function AppShell({ name, role, children }: AppShellProps) {
                 )}
                 {sectionLabel && (
                   <div
-                    className={`pb-1.5 pt-2.5 text-xs font-bold uppercase tracking-wider text-rose-200 ${
-                      isDesktopSidebar ? 'hidden lg:block px-3' : 'px-3'
-                    }`}
+                    className={`pb-1.5 pt-2.5 text-xs font-bold uppercase tracking-wider text-rose-200 ${isDesktopSidebar ? 'hidden lg:block px-3' : 'px-3'
+                      }`}
                   >
                     {sectionLabel}
                   </div>
@@ -569,13 +857,11 @@ export function AppShell({ name, role, children }: AppShellProps) {
                   onClick={() => isDrawer && setMobileOpen(false)}
                   aria-current={active ? 'page' : undefined}
                   title={item.description}
-                  className={`group relative flex min-h-11 items-center gap-3 rounded-lg px-3 py-2 text-sm font-semibold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-white ${
-                    isDesktopSidebar ? 'justify-center lg:justify-start' : 'justify-start'
-                  } ${
-                    active
+                  className={`group relative flex min-h-11 items-center gap-3 rounded-lg px-3 py-2 text-sm font-semibold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-white ${isDesktopSidebar ? 'justify-center lg:justify-start' : 'justify-start'
+                    } ${active
                       ? 'bg-white text-[#5D0B26] shadow-sm font-bold'
                       : 'text-rose-100 hover:bg-white/10 hover:text-white'
-                  }`}
+                    }`}
                 >
                   <NavIcon name={item.icon} />
                   <span className={`truncate ${isDesktopSidebar ? 'hidden lg:inline' : 'inline'}`}>
@@ -595,9 +881,8 @@ export function AppShell({ name, role, children }: AppShellProps) {
 
         {/* Sidebar Footer Context */}
         <div
-          className={`border-t border-white/15 p-3 text-xs text-rose-100/80 ${
-            isDesktopSidebar ? 'hidden lg:block' : 'block'
-          }`}
+          className={`border-t border-white/15 p-3 text-xs text-rose-100/80 ${isDesktopSidebar ? 'hidden lg:block' : 'block'
+            }`}
         >
           <p className="font-semibold text-white">Local clinic network</p>
           <p className="mt-0.5 text-xs text-rose-200">Kalyan Hospital · v3.0 LAN</p>
@@ -653,29 +938,66 @@ export function AppShell({ name, role, children }: AppShellProps) {
           </div>
 
           <div className="flex shrink-0 items-center gap-3 sm:gap-4">
-            <div className="hidden text-right lg:block">
-              <p className="text-xs font-bold text-slate-800">{clock}</p>
-              <p className="text-xs text-slate-600 font-medium">{branding.locationLine}</p>
-            </div>
-            <div className="hidden sm:block text-right border-l border-slate-200 pl-3">
-              <p className="max-w-40 truncate text-xs font-bold text-slate-900">{name}</p>
-              <span className="inline-block px-2 py-0.5 rounded text-xs font-bold bg-rose-50 text-rose-950 border border-rose-200">
-                {role}
-              </span>
-            </div>
-            <button
-              type="button"
-              onClick={handleSignOut}
-              disabled={logout.isPending}
-              className="inline-flex min-h-9 items-center justify-center rounded-lg border border-slate-300 px-3.5 text-xs font-bold text-slate-800 hover:border-[#8E1C3D] hover:text-[#5D0B26] hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#8E1C3D] disabled:cursor-not-allowed disabled:opacity-50 transition-colors shadow-2xs"
-            >
-              <span className="hidden sm:inline">
-                {logout.isPending ? 'Signing out…' : 'Sign out'}
-              </span>
-              <span className="sm:hidden" aria-hidden="true">
-                ↗
-              </span>
-            </button>
+            {role === 'ADMIN' ? (
+              <>
+                <Link
+                  to="/admin/security"
+                  className="relative flex h-9 w-9 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 transition-colors"
+                  aria-label="View notifications"
+                >
+                  <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+                  </svg>
+                  <span className="absolute right-1 top-1 flex h-4 w-4 items-center justify-center rounded-full bg-rose-500 text-xs font-bold text-white">
+                    6
+                  </span>
+                </Link>
+
+                <div className="flex items-center gap-2">
+                  <div className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-900 text-xs font-bold text-white">
+                    A
+                  </div>
+                  <span className="hidden sm:inline text-xs font-bold text-slate-800">
+                    Administrator ▾
+                  </span>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={handleSignOut}
+                  disabled={logout.isPending}
+                  className="inline-flex min-h-9 items-center justify-center rounded-lg border border-slate-300 px-3 text-xs font-bold text-slate-800 hover:border-indigo-600 hover:text-indigo-600 hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 disabled:cursor-not-allowed disabled:opacity-50 transition-colors shadow-2xs"
+                >
+                  {logout.isPending ? 'Signing out…' : 'Sign out'}
+                </button>
+              </>
+            ) : (
+              <>
+                <div className="hidden text-right lg:block">
+                  <p className="text-xs font-bold text-slate-800">{clock}</p>
+                  <p className="text-xs text-slate-600 font-medium">{branding.locationLine}</p>
+                </div>
+                <div className="hidden sm:block text-right border-l border-slate-200 pl-3">
+                  <p className="max-w-40 truncate text-xs font-bold text-slate-900">{name}</p>
+                  <span className="inline-block px-2 py-0.5 rounded text-xs font-bold bg-rose-50 text-rose-950 border border-rose-200">
+                    {role}
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleSignOut}
+                  disabled={logout.isPending}
+                  className="inline-flex min-h-9 items-center justify-center rounded-lg border border-slate-300 px-3.5 text-xs font-bold text-slate-800 hover:border-[#8E1C3D] hover:text-[#5D0B26] hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#8E1C3D] disabled:cursor-not-allowed disabled:opacity-50 transition-colors shadow-2xs"
+                >
+                  <span className="hidden sm:inline">
+                    {logout.isPending ? 'Signing out…' : 'Sign out'}
+                  </span>
+                  <span className="sm:hidden" aria-hidden="true">
+                    ↗
+                  </span>
+                </button>
+              </>
+            )}
           </div>
         </div>
       </header>

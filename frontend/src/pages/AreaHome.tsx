@@ -2,11 +2,13 @@ import type { ReactNode } from 'react'
 import { Link } from 'react-router'
 import { AppShell } from '../components/AppShell'
 import { useOverview } from '../api/queries'
+import { ReceptionDashboard } from './ReceptionDashboard'
 import type {
   AdminOverview,
   DoctorOverview,
   OverviewAlertOut,
   RecentAdminActionOut,
+  ReceptionOverview,
   Role,
 } from '../api/types'
 import {
@@ -14,6 +16,8 @@ import {
   adminModulesInGroup,
   type AdminModule,
 } from '../admin/modules'
+
+import { ManagementOverviewDashboard } from '../components/admin/ManagementOverviewDashboard'
 
 interface AreaHomeProps {
   area: 'admin' | 'reception' | 'doctor'
@@ -52,69 +56,34 @@ export function AreaHome({ area }: AreaHomeProps) {
   return (
     <AppShell name={data.name} role={role}>
       <div className="space-y-6">
-        <div className="bg-white p-6 rounded-lg border border-neutral-200 shadow-xs">
-          <h1 className="text-xl font-bold text-neutral-900">
-            {area === 'admin' ? 'Administration Dashboard' : `${area[0].toUpperCase()}${area.slice(1)} Dashboard`}
-          </h1>
-          <p className="text-sm text-neutral-600 mt-1">
-            Welcome, {data.name} ({role})
-          </p>
-
-          {area === 'doctor' && (
-            <div className="mt-4 p-4 bg-neutral-50 rounded border border-neutral-200">
-              <p className="text-sm text-neutral-700">
-                Doctor ID: {(data as DoctorOverview).doctor_id}
+        {area === 'reception' ? (
+          <ReceptionDashboard overview={data as ReceptionOverview} />
+        ) : area === 'admin' ? (
+          <>
+            <h1 className="sr-only">Administration Dashboard</h1>
+            <ManagementOverviewDashboard overview={data as Partial<AdminOverview>} />
+          </>
+        ) : (
+          <div className="space-y-6">
+            <div className="bg-white p-6 rounded-lg border border-neutral-200 shadow-xs">
+              <h1 className="text-xl font-bold text-neutral-900">
+                Doctor Dashboard
+              </h1>
+              <p className="text-sm text-neutral-600 mt-1">
+                Welcome, {data.name} ({role})
               </p>
-              <p className="text-sm text-neutral-700">
-                Doctor Name: {(data as DoctorOverview).doctor_name_en}
-              </p>
-            </div>
-          )}
 
-          {area === 'reception' && (
-            <div className="mt-6 space-y-6">
-              <div className="text-sm text-neutral-600">
-                Reception area active. Ready for patient check-ins and appointments.
-              </div>
-              <div>
-                <h3 className="text-sm font-semibold text-neutral-700 uppercase tracking-wider mb-3">
-                  Reception Operations
-                </h3>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                  <Link
-                    to="/reception/appointments"
-                    className="p-4 bg-white rounded border border-neutral-300 hover:border-red-800 hover:shadow-xs transition-all block"
-                  >
-                    <p className="font-bold text-neutral-900">Appointments & Queue</p>
-                    <p className="text-xs text-neutral-500 mt-1">
-                      Book daily tokens, track arrived patients & manage waiting hall
-                    </p>
-                  </Link>
-                  <Link
-                    to="/reception/patients/new"
-                    className="p-4 bg-white rounded border border-neutral-300 hover:border-red-800 hover:shadow-xs transition-all block"
-                  >
-                    <p className="font-bold text-neutral-900">+ New Registration</p>
-                    <p className="text-xs text-neutral-500 mt-1">
-                      Register patient demographics, capture photo & generate URN
-                    </p>
-                  </Link>
-                  <Link
-                    to="/reception/patients"
-                    className="p-4 bg-white rounded border border-neutral-300 hover:border-red-800 hover:shadow-xs transition-all block"
-                  >
-                    <p className="font-bold text-neutral-900">Patient Directory</p>
-                    <p className="text-xs text-neutral-500 mt-1">
-                      Search patients by URN, mobile, or name & manage files
-                    </p>
-                  </Link>
-                </div>
+              <div className="mt-4 p-4 bg-neutral-50 rounded border border-neutral-200">
+                <p className="text-sm text-neutral-700">
+                  Doctor ID: {(data as DoctorOverview).doctor_id}
+                </p>
+                <p className="text-sm text-neutral-700">
+                  Doctor Name: {(data as DoctorOverview).doctor_name_en}
+                </p>
               </div>
             </div>
-          )}
-        </div>
-
-        {area === 'admin' && <AdminDashboard overview={data as Partial<AdminOverview>} />}
+          </div>
+        )}
       </div>
     </AppShell>
   )
@@ -230,11 +199,10 @@ function AlertsPanel({ alerts }: { alerts: OverviewAlertOut[] | undefined }) {
             return (
               <li
                 key={alert.code}
-                className={`flex items-start gap-3 rounded-lg border p-3 text-sm ${
-                  isError
+                className={`flex items-start gap-3 rounded-lg border p-3 text-sm ${isError
                     ? 'border-red-300 bg-red-50 text-red-900'
                     : 'border-amber-300 bg-amber-50 text-amber-900'
-                }`}
+                  }`}
               >
                 <span className="shrink-0 rounded px-2 py-0.5 font-bold uppercase">
                   {isError ? 'Error' : alert.severity === 'warning' ? 'Warning' : alert.severity}
@@ -546,9 +514,8 @@ function ModuleCard({ module }: { module: AdminModule }) {
   const isFixed = module.status === 'fixed'
   return (
     <li
-      className={`flex flex-col justify-between rounded-lg border p-4 transition-shadow ${
-        isFixed ? 'border-dashed border-slate-300 bg-slate-50' : 'border-slate-200 bg-white shadow-xs hover:shadow-sm'
-      }`}
+      className={`flex flex-col justify-between rounded-lg border p-4 transition-shadow ${isFixed ? 'border-dashed border-slate-300 bg-slate-50' : 'border-slate-200 bg-white shadow-xs hover:shadow-sm'
+        }`}
     >
       <div>
         <div className="flex items-center justify-between gap-2">
@@ -624,7 +591,7 @@ function ModuleGrid() {
   )
 }
 
-function AdminDashboard({ overview }: { overview: Partial<AdminOverview> }) {
+export function AdminDashboard({ overview }: { overview: Partial<AdminOverview> }) {
   return (
     <div className="space-y-6">
       <AlertsPanel alerts={overview.alerts} />

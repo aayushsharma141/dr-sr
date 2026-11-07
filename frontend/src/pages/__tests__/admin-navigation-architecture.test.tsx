@@ -5,8 +5,6 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { AreaHome } from '../AreaHome'
 import {
   ADMIN_MODULES,
-  ADMIN_MODULE_GROUPS,
-  adminModulesInGroup,
   findAdminModuleForPath,
 } from '../../admin/modules'
 
@@ -30,6 +28,62 @@ vi.mock('../../api/queries', () => ({
         storage_free: { data_volume_bytes: 1000000000, backup_volume_bytes: 1000000000 },
       },
       recent_admin_actions: [],
+    },
+    isPending: false,
+    isError: false,
+    error: null,
+  }),
+  useManagementOverview: () => ({
+    data: {
+      current_month_label: 'Nov 2026',
+      comparison_month_label: 'Oct 2026',
+      monthly_revenue: { value_paise: 84200000, prior_paise: 74900000, percent_change: 12.4 },
+      operating_expenses: { value_paise: 31600000, prior_paise: 30100000, percent_change: 5.1 },
+      net_surplus: { value_paise: 52600000, prior_paise: 44800000, percent_change: 17.6 },
+      outstanding_receivables_paise: 4260000,
+      financial_trends: [
+        { month: 'Jun', revenue_paise: 58000000, expenses_paise: 24000000 },
+        { month: 'Jul', revenue_paise: 70000000, expenses_paise: 27000000 },
+        { month: 'Aug', revenue_paise: 68000000, expenses_paise: 26000000 },
+        { month: 'Sep', revenue_paise: 74000000, expenses_paise: 29000000 },
+        { month: 'Oct', revenue_paise: 74900000, expenses_paise: 30100000 },
+        { month: 'Nov', revenue_paise: 84200000, expenses_paise: 31600000 },
+      ],
+      department_revenues: [
+        { name: 'Orthopaedics', percentage: 45, revenue_paise: 37890000, color: '#6366f1' },
+        { name: 'Physiotherapy', percentage: 20, revenue_paise: 16840000, color: '#38bdf8' },
+        { name: 'General Consultation', percentage: 15, revenue_paise: 12630000, color: '#10b981' },
+        { name: 'Follow-up & Reviews', percentage: 12, revenue_paise: 10104000, color: '#f59e0b' },
+        { name: 'Other Services', percentage: 8, revenue_paise: 6736000, color: '#94a3b8' },
+      ],
+      management_attention: [
+        { key: 'sec', label: 'Unreviewed security events', count: 3, badge_variant: 'danger', target_path: '/admin/security' },
+        { key: 'audit', label: 'Pending audit reviews', count: 6, badge_variant: 'warning', target_path: '/admin/audit' },
+        { key: 'adj', label: 'Unapproved financial adjustments', count: 2, badge_variant: 'warning', target_path: '/admin/billing' },
+        { key: 'users', label: 'Inactive user accounts', count: 4, badge_variant: 'neutral', target_path: '/admin/users' },
+        { key: 'backup', label: 'Backup verification due', count: 1, badge_variant: 'neutral', target_path: '/admin/backups' },
+      ],
+      management_attention_total: 6,
+      hospital_growth: { new_patients: 228, new_patients_change_pct: 14.6, returning_patients: 1034, returning_patients_change_pct: 8.9 },
+      doctor_utilization: { utilization_pct: 76, occupied_minutes: 2280, scheduled_minutes: 3000 },
+      patient_growth_trends: [
+        { month: 'Jun', count: 140 },
+        { month: 'Jul', count: 175 },
+        { month: 'Aug', count: 190 },
+        { month: 'Sep', count: 210 },
+        { month: 'Oct', count: 225 },
+        { month: 'Nov', count: 248 },
+      ],
+      patient_growth_pct: 11.2,
+      system_health: {
+        status: 'Healthy',
+        application_version: 'v1.16.0',
+        database_status: 'Healthy',
+        last_backup_time: 'Nov 5, 02:00',
+        storage_used_bytes: 186000000000,
+        storage_total_bytes: 300000000000,
+        storage_percentage: 62,
+      },
     },
     isPending: false,
     isError: false,
@@ -126,55 +180,90 @@ describe('Administration Dashboard & Single Sidebar Layout', () => {
     expect(screen.queryByRole('complementary', { name: 'Administration modules' })).not.toBeInTheDocument()
   })
 
-  it('renders both Hospital and System Administration module cards on the dashboard', () => {
+  it('renders the executive Management Overview dashboard and all KPI cards', () => {
     renderAreaHome()
 
-    // Dashboard heading
-    expect(screen.getByRole('heading', { name: 'Administration Dashboard' })).toBeInTheDocument()
+    // Dashboard heading and subtitle
+    expect(screen.getByRole('heading', { name: 'Management Overview' })).toBeInTheDocument()
+    expect(screen.getByText('Hospital performance, governance and system health at a glance.')).toBeInTheDocument()
 
-    // Modules section
-    const modulesSection = screen.getByRole('region', { name: 'Administration Modules' })
-    expect(within(modulesSection).getByRole('heading', { name: 'Administration Modules' })).toBeInTheDocument()
+    // 4 KPI cards
+    expect(screen.getByText('Monthly Revenue')).toBeInTheDocument()
+    expect(screen.getByText('₹8,42,000')).toBeInTheDocument()
 
-    // Both groups are rendered
-    for (const group of ADMIN_MODULE_GROUPS) {
-      expect(within(modulesSection).getByRole('heading', { name: group.label })).toBeInTheDocument()
-      for (const mod of adminModulesInGroup(group.id)) {
-        expect(within(modulesSection).getByText(mod.title)).toBeInTheDocument()
-        expect(within(modulesSection).getByText(mod.description)).toBeInTheDocument()
-      }
-    }
+    expect(screen.getByText('Operating Expenses')).toBeInTheDocument()
+    expect(screen.getByText('₹3,16,000')).toBeInTheDocument()
 
-    // Pending decision badges are visible on fixed modules
-    const pendingBadges = within(modulesSection).getAllByText('Pending Decision')
-    expect(pendingBadges.length).toBe(2)
+    expect(screen.getByText('Net Operating Surplus')).toBeInTheDocument()
+    expect(screen.getByText('₹5,26,000')).toBeInTheDocument()
 
-    // Action links navigate to canonical paths
-    expect(within(modulesSection).getByRole('link', { name: 'Clinic settings' })).toHaveAttribute('href', '/admin/settings')
-    expect(within(modulesSection).getByRole('link', { name: 'Doctors & fees' })).toHaveAttribute('href', '/admin/doctors')
-    expect(within(modulesSection).getByRole('link', { name: 'Billing & reversals' })).toHaveAttribute('href', '/admin/billing')
-    expect(within(modulesSection).getByRole('link', { name: 'User accounts' })).toHaveAttribute('href', '/admin/users')
-    expect(within(modulesSection).getByRole('link', { name: 'Roles & permissions' })).toHaveAttribute('href', '/admin/roles')
-    expect(within(modulesSection).getByRole('link', { name: 'Security & access' })).toHaveAttribute('href', '/admin/security')
-    expect(within(modulesSection).getByRole('link', { name: 'Audit log viewer' })).toHaveAttribute('href', '/admin/audit')
-    expect(within(modulesSection).getByRole('link', { name: 'Backup & restore' })).toHaveAttribute('href', '/admin/backups')
-    expect(within(modulesSection).getByRole('link', { name: 'Data integrity' })).toHaveAttribute('href', '/admin/integrity')
-    expect(within(modulesSection).getByRole('link', { name: 'System health' })).toHaveAttribute('href', '/admin/system')
+    expect(screen.getByText('Outstanding Receivables')).toBeInTheDocument()
+    expect(screen.getByText('₹42,600')).toBeInTheDocument()
+
+    // Ageing link
+    expect(screen.getByRole('link', { name: /View Ageing/ })).toHaveAttribute('href', '/reception/dues')
   })
 
-  it('sidebar and dashboard card destinations match for all canonical routes', () => {
+  it('renders executive performance charts, attention items, growth and system health', () => {
+    renderAreaHome()
+
+    // Middle Strip Panels
+    expect(screen.getByRole('heading', { name: 'Financial Performance Trend' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Revenue by Department' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Management Attention' })).toBeInTheDocument()
+
+    // Management Attention Rows
+    expect(screen.getByText('Unreviewed security events')).toBeInTheDocument()
+    expect(screen.getByText('Pending audit reviews')).toBeInTheDocument()
+    expect(screen.getByText('Unapproved financial adjustments')).toBeInTheDocument()
+    expect(screen.getByText('Inactive user accounts')).toBeInTheDocument()
+    expect(screen.getByText('Backup verification due')).toBeInTheDocument()
+
+    // Lower Strip Panels
+    expect(screen.getByText('Hospital Growth')).toBeInTheDocument()
+    expect(screen.getByText('New Patients')).toBeInTheDocument()
+    expect(screen.getByText('Returning Patients')).toBeInTheDocument()
+
+    expect(screen.getByText('Doctor Utilization')).toBeInTheDocument()
+    expect(screen.getByText('76%')).toBeInTheDocument()
+
+    expect(screen.getByText('Patient Growth Trend')).toBeInTheDocument()
+    expect(screen.getByText('System Health')).toBeInTheDocument()
+    expect(screen.getByText('v1.16.0')).toBeInTheDocument()
+  })
+
+  it('renders the Quick Access grid with canonical routes', () => {
+    renderAreaHome()
+
+    const quickAccess = screen.getByRole('region', { name: 'Quick Access' })
+    expect(within(quickAccess).getByRole('heading', { name: 'Quick Access' })).toBeInTheDocument()
+
+    // Quick access links
+    expect(within(quickAccess).getByRole('link', { name: /Financial Reports/ })).toHaveAttribute('href', '/admin/billing')
+    expect(within(quickAccess).getByRole('link', { name: /Audit & Compliance/ })).toHaveAttribute('href', '/admin/audit')
+    expect(within(quickAccess).getByRole('link', { name: /Users & Roles/ })).toHaveAttribute('href', '/admin/users')
+    expect(within(quickAccess).getByRole('link', { name: /Backup & Restore/ })).toHaveAttribute('href', '/admin/backups')
+    expect(within(quickAccess).getByRole('link', { name: /Configuration/ })).toHaveAttribute('href', '/admin/settings')
+    expect(within(quickAccess).getByRole('link', { name: /Hospital Profile/ })).toHaveAttribute('href', '/admin/settings')
+  })
+
+  it('sidebar renders Management Overview and grouped governance & system sections', () => {
     renderAreaHome()
 
     const primaryNav = screen.getByRole('navigation', { name: 'Primary navigation' })
 
     // Sidebar items match canonical routes
-    expect(within(primaryNav).getByRole('link', { name: 'Hospital Configuration' })).toHaveAttribute('href', '/admin/settings')
-    expect(within(primaryNav).getByRole('link', { name: 'Doctor & Clinical Configuration' })).toHaveAttribute('href', '/admin/doctors')
-    expect(within(primaryNav).getByRole('link', { name: 'Billing & Financial' })).toHaveAttribute('href', '/admin/billing')
-    expect(within(primaryNav).getByRole('link', { name: 'User & Authority' })).toHaveAttribute('href', '/admin/users')
-    expect(within(primaryNav).getByRole('link', { name: 'Security & Access' })).toHaveAttribute('href', '/admin/security')
-    expect(within(primaryNav).getByRole('link', { name: 'Audit & Compliance' })).toHaveAttribute('href', '/admin/audit')
-    expect(within(primaryNav).getByRole('link', { name: 'Backup, Restore & Data' })).toHaveAttribute('href', '/admin/backups')
-    expect(within(primaryNav).getByRole('link', { name: 'System Health & Maintenance' })).toHaveAttribute('href', '/admin/system')
+    expect(within(primaryNav).getByRole('link', { name: /Management Overview/ })).toHaveAttribute('href', '/admin')
+    expect(within(primaryNav).getByRole('link', { name: /Financial Reports/ })).toHaveAttribute('href', '/admin/billing')
+    expect(within(primaryNav).getByRole('link', { name: /Hospital Profile/ })).toHaveAttribute('href', '/admin/settings')
+    expect(within(primaryNav).getByRole('link', { name: /Departments & Services/ })).toHaveAttribute('href', '/admin/doctors')
+    expect(within(primaryNav).getByRole('link', { name: /Policies & Approvals/ })).toHaveAttribute('href', '/admin/security')
+    expect(within(primaryNav).getByRole('link', { name: /Audit & Compliance/ })).toHaveAttribute('href', '/admin/audit')
+    expect(within(primaryNav).getByRole('link', { name: /Users & Roles \(RBAC\)/ })).toHaveAttribute('href', '/admin/users')
+    expect(within(primaryNav).getByRole('link', { name: /Configuration Settings/ })).toHaveAttribute('href', '/admin/settings')
+    expect(within(primaryNav).getByRole('link', { name: /Backup & Restore/ })).toHaveAttribute('href', '/admin/backups')
+    expect(within(primaryNav).getByRole('link', { name: /System Health/ })).toHaveAttribute('href', '/admin/system')
+    expect(within(primaryNav).getByRole('link', { name: /Audit Logs/ })).toHaveAttribute('href', '/admin/audit')
+    expect(within(primaryNav).getByRole('link', { name: /Updates & Maintenance/ })).toHaveAttribute('href', '/admin/integrity')
   })
 })
