@@ -32,6 +32,39 @@ class MatrixRow:
     expected: dict[str, int]
 
 
+def _patch_demographics_payload(target: Any = None) -> dict[str, Any]:
+    ver = target.version_id if target and hasattr(target, "version_id") else 1
+    return {
+        "reason": "Administrative correction matrix test",
+        "version_id": ver,
+        "full_name": "Updated Matrix Patient",
+        "guardian_name": "Updated Guardian",
+        "gender": "M",
+        "age_years": 31,
+        "mobile": "9876543210",
+        "address": "Hospital Road, Ara",
+        "district": "Bhojpur",
+        "state": "Bihar",
+    }
+
+
+def _export_patients_payload(_target: Any = None) -> dict[str, Any]:
+    return {
+        "reason": "Annual statutory data audit",
+        "format": "csv",
+        "scope": {},
+        "fields": ["full_name"],
+    }
+
+
+def _patch_print_template_payload(target: Any = None) -> dict[str, Any]:
+    ver = target.version if target and hasattr(target, "version") else 1
+    return {
+        "header_en": "Kalyan Hospital Matrix",
+        "version": ver,
+    }
+
+
 def _change_password_payload(_target: User | None = None) -> dict[str, Any]:
     return {
         "current_password": "ValidTestPassword123!",
@@ -1542,6 +1575,235 @@ MATRIX: list[MatrixRow] = [
         method="GET",
         path="/api/system/status",
         body_factory=None,
+        expected={
+            "anonymous": 401,
+            "admin": 200,
+            "reception": 403,
+            "doctor_a": 403,
+            "doctor_b": 403,
+        },
+    ),
+    # Phase 20: Data Governance & Asset Management
+    MatrixRow(
+        method="GET",
+        path="/api/admin/management-overview",
+        body_factory=None,
+        expected={
+            "anonymous": 401,
+            "admin": 200,
+            "reception": 403,
+            "doctor_a": 403,
+            "doctor_b": 403,
+        },
+    ),
+    MatrixRow(
+        method="POST",
+        path="/api/admin/assets",
+        body_factory=None,
+        expected={
+            "anonymous": 401,
+            "admin": 200,
+            "reception": 403,
+            "doctor_a": 403,
+            "doctor_b": 403,
+        },
+    ),
+    MatrixRow(
+        method="GET",
+        path="/api/admin/assets",
+        body_factory=None,
+        expected={
+            "anonymous": 401,
+            "admin": 200,
+            "reception": 403,
+            "doctor_a": 403,
+            "doctor_b": 403,
+        },
+    ),
+    MatrixRow(
+        method="POST",
+        path="/api/admin/assets/{asset_id}/deactivate",
+        body_factory=None,
+        expected={
+            "anonymous": 401,
+            "admin": 200,
+            "reception": 403,
+            "doctor_a": 403,
+            "doctor_b": 403,
+        },
+    ),
+    MatrixRow(
+        method="GET",
+        path="/api/admin/assets/{asset_id}/file",
+        body_factory=None,
+        expected={
+            "anonymous": 401,
+            "admin": 200,
+            "reception": 403,
+            "doctor_a": 403,
+            "doctor_b": 403,
+        },
+    ),
+    MatrixRow(
+        method="GET",
+        path="/api/admin/patients/search",
+        body_factory=None,
+        expected={
+            "anonymous": 401,
+            "admin": 200,
+            "reception": 403,
+            "doctor_a": 403,
+            "doctor_b": 403,
+        },
+    ),
+    MatrixRow(
+        method="PATCH",
+        path="/api/admin/patients/{id}/demographics",
+        body_factory=_patch_demographics_payload,
+        expected={
+            "anonymous": 401,
+            "admin": 200,
+            "reception": 403,
+            "doctor_a": 403,
+            "doctor_b": 403,
+        },
+    ),
+    MatrixRow(
+        method="POST",
+        path="/api/admin/imports/inspect",
+        body_factory=None,
+        expected={
+            "anonymous": 401,
+            "admin": 200,
+            "reception": 403,
+            "doctor_a": 403,
+            "doctor_b": 403,
+        },
+    ),
+    MatrixRow(
+        method="POST",
+        path="/api/admin/imports",
+        body_factory=None,
+        expected={
+            "anonymous": 401,
+            "admin": 201,
+            "reception": 403,
+            "doctor_a": 403,
+            "doctor_b": 403,
+        },
+    ),
+    MatrixRow(
+        method="GET",
+        path="/api/admin/imports/{batch_id}",
+        body_factory=None,
+        expected={
+            "anonymous": 401,
+            "admin": 200,
+            "reception": 403,
+            "doctor_a": 403,
+            "doctor_b": 403,
+        },
+    ),
+    MatrixRow(
+        method="POST",
+        path="/api/admin/imports/{batch_id}/validate",
+        body_factory=None,
+        expected={
+            "anonymous": 401,
+            "admin": 200,
+            "reception": 403,
+            "doctor_a": 403,
+            "doctor_b": 403,
+        },
+    ),
+    MatrixRow(
+        method="GET",
+        path="/api/admin/imports/{batch_id}/duplicates",
+        body_factory=None,
+        expected={
+            "anonymous": 401,
+            "admin": 200,
+            "reception": 403,
+            "doctor_a": 403,
+            "doctor_b": 403,
+        },
+    ),
+    MatrixRow(
+        method="POST",
+        path="/api/admin/imports/{batch_id}/resolve",
+        body_factory=lambda _: {"resolutions": []},
+        expected={
+            "anonymous": 401,
+            "admin": 200,
+            "reception": 403,
+            "doctor_a": 403,
+            "doctor_b": 403,
+        },
+    ),
+    MatrixRow(
+        method="POST",
+        path="/api/admin/imports/{batch_id}/commit",
+        body_factory=None,
+        expected={
+            "anonymous": 401,
+            "admin": 200,
+            "reception": 403,
+            "doctor_a": 403,
+            "doctor_b": 403,
+        },
+    ),
+    MatrixRow(
+        method="GET",
+        path="/api/admin/imports/{batch_id}/errors",
+        body_factory=None,
+        expected={
+            "anonymous": 401,
+            "admin": 200,
+            "reception": 403,
+            "doctor_a": 403,
+            "doctor_b": 403,
+        },
+    ),
+    MatrixRow(
+        method="POST",
+        path="/api/admin/exports",
+        body_factory=_export_patients_payload,
+        expected={
+            "anonymous": 401,
+            "admin": 200,
+            "reception": 403,
+            "doctor_a": 403,
+            "doctor_b": 403,
+        },
+    ),
+    MatrixRow(
+        method="GET",
+        path="/api/admin/templates",
+        body_factory=None,
+        expected={
+            "anonymous": 401,
+            "admin": 200,
+            "reception": 403,
+            "doctor_a": 403,
+            "doctor_b": 403,
+        },
+    ),
+    MatrixRow(
+        method="GET",
+        path="/api/admin/templates/{doc_type}",
+        body_factory=None,
+        expected={
+            "anonymous": 401,
+            "admin": 200,
+            "reception": 403,
+            "doctor_a": 403,
+            "doctor_b": 403,
+        },
+    ),
+    MatrixRow(
+        method="PATCH",
+        path="/api/admin/templates/{doc_type}",
+        body_factory=_patch_print_template_payload,
         expected={
             "anonymous": 401,
             "admin": 200,

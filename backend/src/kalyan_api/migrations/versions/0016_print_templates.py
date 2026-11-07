@@ -96,7 +96,7 @@ def upgrade() -> None:
     """)
 
     # 3. Permissions for kalyan_app
-    op.execute("GRANT SELECT, INSERT, UPDATE ON print_templates TO kalyan_app;")
+    op.execute("GRANT SELECT, INSERT, UPDATE, DELETE ON print_templates TO kalyan_app;")
     op.execute("GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO kalyan_app;")
 
 

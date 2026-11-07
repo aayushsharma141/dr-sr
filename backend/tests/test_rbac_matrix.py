@@ -602,6 +602,78 @@ def test_rbac_matrix_cell(
         )
         target_entity = None
 
+    elif "/api/admin/patients" in row.path:
+        pat = Patient(
+            urn=f"KH-2026-{uuid.uuid4().hex[:4]}",
+            full_name="Matrix Admin Patient",
+            guardian_name="Guardian",
+            gender="M",
+            age_years=30,
+            mobile="9876543210",
+            address="Ara",
+            district="Bhojpur",
+            state="Bihar",
+        )
+        db_session.add(pat)
+        db_session.flush()
+        target_entity = pat
+        if "{id}" in row.path:
+            resolved_path = row.path.replace("{id}", str(pat.id))
+        elif "search" in row.path:
+            resolved_path = "/api/admin/patients/search?q=Matrix"
+
+    elif "{asset_id}" in row.path:
+        from kalyan_api.models import HospitalAsset
+
+        admin_u = make_user(db_session, test_settings, "ADMIN", f"adm_{uuid.uuid4().hex[:6]}")
+        test_settings.assets_dir.mkdir(parents=True, exist_ok=True)
+        asset_fname = f"asset_{uuid.uuid4().hex[:6]}.png"
+        (test_settings.assets_dir / asset_fname).write_bytes(
+            b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01\x08\x06\x00\x00\x00\x1f\x15c4"
+        )
+        asset = HospitalAsset(
+            asset_type="LOGO",
+            filename=asset_fname,
+            original_filename="logo.png",
+            mime_type="image/png",
+            file_size_bytes=33,
+            is_active=True,
+            version=1,
+            uploaded_by_user_id=admin_u.id,
+        )
+        db_session.add(asset)
+        db_session.flush()
+        target_entity = asset
+        resolved_path = row.path.replace("{asset_id}", str(asset.id))
+
+    elif "{batch_id}" in row.path:
+        from kalyan_api.models import PatientImportBatch
+
+        admin_u = make_user(db_session, test_settings, "ADMIN", f"adm_{uuid.uuid4().hex[:6]}")
+        batch = PatientImportBatch(
+            batch_id=str(uuid.uuid4()),
+            filename="matrix_import.csv",
+            total_rows=1,
+            status="STAGED",
+            created_by_user_id=admin_u.id,
+        )
+        db_session.add(batch)
+        db_session.flush()
+        target_entity = batch
+        resolved_path = row.path.replace("{batch_id}", batch.batch_id)
+
+    elif "{doc_type}" in row.path:
+        from kalyan_api.models import PrintTemplate
+        from kalyan_api.routers.templates import ensure_print_templates_seeded
+
+        admin_u = make_user(db_session, test_settings, "ADMIN", f"adm_{uuid.uuid4().hex[:6]}")
+        ensure_print_templates_seeded(db_session, admin_u.id)
+        tmpl = db_session.scalar(
+            select(PrintTemplate).where(PrintTemplate.document_type == "prescription")
+        )
+        target_entity = tmpl
+        resolved_path = row.path.replace("{doc_type}", "prescription")
+
     elif "{id}" in row.path:
         is_active = "reactivate" not in row.path
         target_user = make_user(
@@ -627,6 +699,33 @@ def test_rbac_matrix_cell(
             row.method,
             resolved_path,
             files={"file": ("test.jpg", b"\xff\xd8\xff\xe0testjpeg", "image/jpeg")},
+        )
+    elif row.path == "/api/admin/assets" and row.method == "POST":
+        test_settings.assets_dir.mkdir(parents=True, exist_ok=True)
+        resp = client.request(
+            row.method,
+            resolved_path,
+            files={
+                "file": (
+                    "test.png",
+                    b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01\x08\x06\x00\x00\x00\x1f\x15c4",
+                    "image/png",
+                )
+            },
+            data={"asset_type": "LOGO"},
+        )
+    elif row.path == "/api/admin/imports/inspect" and row.method == "POST":
+        resp = client.request(
+            row.method,
+            resolved_path,
+            files={"file": ("test.csv", b"full_name,mobile\nA,9876543210\n", "text/csv")},
+        )
+    elif row.path == "/api/admin/imports" and row.method == "POST":
+        resp = client.request(
+            row.method,
+            resolved_path,
+            files={"file": ("test.csv", b"full_name,mobile\nA,9876543210\n", "text/csv")},
+            data={"column_mapping": "{}"},
         )
     else:
         resp = client.request(row.method, resolved_path, json=body)

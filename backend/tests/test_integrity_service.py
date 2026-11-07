@@ -18,8 +18,12 @@ def test_integrity_audit_clean_database(db_session):
         for f in settings.photos_dir.glob("*"):
             if f.is_file() and not f.name.startswith("test_"):
                 f.unlink()
+    if settings.assets_dir.exists():
+        for f in settings.assets_dir.glob("*"):
+            if f.is_file() and not f.name.startswith("test_"):
+                f.unlink()
     report = run_integrity_audit(db_session, settings)
-    assert report.total_checks == 6
+    assert report.total_checks == 7
     assert report.is_healthy is True
     assert report.failed_checks == 0
     assert all(c.passed for c in report.checks)

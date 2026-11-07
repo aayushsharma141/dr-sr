@@ -35,7 +35,7 @@ def upgrade() -> None:
     op.create_table(
         "patient_import_batches",
         sa.Column("id", sa.BigInteger(), sa.Identity(always=False), primary_key=True),
-        sa.Column("batch_id", sa.String(length=64), nullable=False, unique=True),
+        sa.Column("batch_id", sa.String(length=64), nullable=False),
         sa.Column("filename", sa.String(length=255), nullable=False),
         sa.Column("total_rows", sa.Integer(), nullable=False, server_default=sa.text("0")),
         sa.Column("valid_rows", sa.Integer(), nullable=False, server_default=sa.text("0")),
@@ -64,9 +64,14 @@ def upgrade() -> None:
         ),
         sa.Column("committed_at", sa.DateTime(timezone=True), nullable=True),
     )
-    op.create_index("ix_patient_import_batches_batch_id", "patient_import_batches", ["batch_id"])
     op.create_index(
-        "ix_patient_import_batches_created_by",
+        "ix_patient_import_batches_batch_id",
+        "patient_import_batches",
+        ["batch_id"],
+        unique=True,
+    )
+    op.create_index(
+        "ix_patient_import_batches_created_by_user_id",
         "patient_import_batches",
         ["created_by_user_id"],
     )
@@ -124,3 +129,4 @@ def upgrade() -> None:
 def downgrade() -> None:
     op.drop_table("patient_import_rows")
     op.drop_table("patient_import_batches")
+

@@ -19,6 +19,10 @@ def test_cli_operations_workflow(tmp_path: Path, db_session):
         for f in settings.photos_dir.glob("*"):
             if f.is_file() and not f.name.startswith("test_"):
                 f.unlink()
+    if settings.assets_dir.exists():
+        for f in settings.assets_dir.glob("*"):
+            if f.is_file() and not f.name.startswith("test_"):
+                f.unlink()
 
     dest_dir = tmp_path / "cli_backups"
 

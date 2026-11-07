@@ -40,13 +40,12 @@ from pathlib import Path
 import tarfile
 from typing import Any
 import uuid
+from unittest.mock import patch
 
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import select, text
 from sqlalchemy.orm import Session
-
-from unittest.mock import patch
 
 from kalyan_api.config import Settings
 from kalyan_api.models import (
@@ -55,6 +54,7 @@ from kalyan_api.models import (
     ClinicalEncounter,
     HospitalAsset,
     Patient,
+    PatientImportBatch,
     Payment,
     Prescription,
     PrintDocumentType,
@@ -460,16 +460,11 @@ def test_phase20_hospital_asset_management(
     assert len(report.discrepancies) == 0
 
     # 3.5 Backup Bundle includes assets/ and assets_manifest
-    with patch("kalyan_api.services.backup_service.dump_database") as mock_dump:
-        def _fake_dump(dest: Path, _cfg: Any) -> None:
-            dest.write_text("-- test database dump\n")
-
-        mock_dump.side_effect = _fake_dump
-        archive_path = create_backup(
-            destination_dir=backup_dest,
-            label="gate_backup_assets",
-            settings=test_settings,
-        )
+    archive_path = create_backup(
+        destination_dir=backup_dest,
+        label="gate_backup_assets",
+        settings=test_settings,
+    )
     assert archive_path.is_file()
 
     is_valid, msg, manifest = verify_backup_bundle(archive_path)
@@ -658,14 +653,13 @@ def test_phase20_patient_import_pipeline(
     assert resolve_resp.status_code == 200
 
     # 5.5 Commit Batch: pre-commit safety backup, gap-free URN allocation, exactly 1 patient committed
-    fake_archive = backup_dest / "kalyan_backup_gate_preimport.tar.gz"
+    fake_archive = backup_dest / f"kalyan_backup_gate_preimport_{uid}.tar.gz"
     fake_archive.write_bytes(b"dummy_tar_archive")
     with patch("kalyan_api.services.backup_service.create_backup") as mock_backup:
         mock_backup.return_value = fake_archive
         commit_resp = admin_c.post(f"/api/admin/imports/{batch_id}/commit")
         assert commit_resp.status_code == 200, commit_resp.text
-        assert mock_backup.called, "Pre-commit safety backup must be triggered prior to inserting patients"
-    commit_data = commit_resp.json()
+        commit_data = commit_resp.json()
 
     assert commit_data["status"] == "COMMITTED"
     assert commit_data["committed_rows"] == 1
@@ -684,9 +678,13 @@ def test_phase20_patient_import_pipeline(
     assert committed_patient.legacy_urn == "OLD-IMP-V1"
     assert committed_patient.full_name == "Valid Imported Patient"
 
-    # Verify pre-commit backup bundle was produced
-    backup_files = list(backup_dest.glob("kalyan_backup_*.tar.gz"))
-    assert len(backup_files) >= 1
+    # Verify pre-commit safety backup gate was executed
+    assert mock_backup.called
+    db_batch = db_session.scalar(
+        select(PatientImportBatch).where(PatientImportBatch.batch_id == batch_id)
+    )
+    assert db_batch is not None
+    assert db_batch.safety_backup_file == fake_archive.name
 
     # Verify PATIENT_IMPORT_COMMITTED audit log
     audit_committed = db_session.scalar(
