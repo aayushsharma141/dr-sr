@@ -137,7 +137,7 @@ export function PrintTemplateEditor() {
                 aria-current={isActive ? 'page' : undefined}
               >
                 {tab.label}
-                <span className="ml-1.5 text-xs text-slate-400 font-normal">({tab.labelHi})</span>
+                <span className="ml-1.5 text-xs text-slate-500 font-normal">({tab.labelHi})</span>
               </button>
             )
           })}
@@ -280,13 +280,13 @@ export function PrintTemplateEditor() {
                 <p className="text-xs sm:text-sm font-semibold tracking-wide uppercase opacity-95">
                   {headerEn || 'Kalyan Hospital & Physiotherapy Centre'}
                 </p>
-                <div className="mt-1 border-t border-red-300/40 pt-1 text-[10px] text-red-100 uppercase tracking-widest font-mono">
+                <div className="mt-1 border-t border-red-300/40 pt-1 text-xs text-red-100 uppercase tracking-widest font-mono">
                   {DOCUMENT_TABS.find((t) => t.type === activeTab)?.label}
                 </div>
               </div>
 
               {/* Patient Identity Strip */}
-              <div className="mt-3 border-y border-slate-300 py-1.5 text-[11px] grid grid-cols-3 gap-2 text-slate-700 font-medium">
+              <div className="mt-3 border-y border-slate-300 py-1.5 text-xs grid grid-cols-3 gap-2 text-slate-700 font-medium">
                 <div>
                   <span className="text-slate-500">Patient:</span> <span className="font-semibold text-slate-900">Ram Kumar</span>
                 </div>
@@ -309,7 +309,7 @@ export function PrintTemplateEditor() {
                 {activeTab === 'prescription' && (
                   <div className="space-y-3">
                     <div className="text-base font-serif font-black text-[#9E1B42]">℞</div>
-                    <div className="space-y-1.5 pl-2 font-mono text-[11px] text-slate-800">
+                    <div className="space-y-1.5 pl-2 font-mono text-xs text-slate-800">
                       <div className="flex justify-between border-b border-dotted border-slate-200 pb-1">
                         <span>1. Tab. Paracetamol 500mg</span>
                         <span>1-0-1 (After Meals) × 5 Days</span>
@@ -324,7 +324,7 @@ export function PrintTemplateEditor() {
                       </div>
                     </div>
                     <div className="pt-6 flex justify-end">
-                      <div className="text-center text-[10px] text-slate-500 border-t border-slate-400 w-36 pt-1">
+                      <div className="text-center text-xs text-slate-500 border-t border-slate-500 w-36 pt-1">
                         Doctor Signature &amp; Stamp
                       </div>
                     </div>
@@ -335,9 +335,9 @@ export function PrintTemplateEditor() {
                   <div className="space-y-3">
                     <div className="flex justify-between items-center text-xs border-b border-slate-200 pb-2">
                       <span className="font-semibold text-slate-700">Receipt No: REC-2026-0089</span>
-                      <span className="rounded bg-slate-100 px-2 py-0.5 font-bold text-slate-800 text-[10px]">CASH</span>
+                      <span className="rounded bg-slate-100 px-2 py-0.5 font-bold text-slate-800 text-xs">CASH</span>
                     </div>
-                    <div className="space-y-1.5 text-[11px]">
+                    <div className="space-y-1.5 text-xs">
                       <div className="flex justify-between py-1">
                         <span>Consultation Fee (Dr. Madan Mohan Dwivedi)</span>
                         <span className="font-semibold">₹ 500.00</span>
@@ -348,7 +348,7 @@ export function PrintTemplateEditor() {
                       </div>
                     </div>
                     <div className="pt-6 flex justify-end">
-                      <div className="text-center text-[10px] text-slate-500 border-t border-slate-400 w-32 pt-1">
+                      <div className="text-center text-xs text-slate-500 border-t border-slate-500 w-32 pt-1">
                         Authorized Cashier
                       </div>
                     </div>
@@ -358,25 +358,25 @@ export function PrintTemplateEditor() {
                 {activeTab === 'registration_card' && (
                   <div className="space-y-3 p-2 bg-slate-50 rounded border border-slate-200">
                     <div className="flex items-center gap-3">
-                      <div className="w-16 h-20 bg-slate-200 rounded border border-slate-300 flex items-center justify-center text-[9px] text-slate-500 text-center">
+                      <div className="w-16 h-20 bg-slate-200 rounded border border-slate-300 flex items-center justify-center text-xs text-slate-500 text-center">
                         Photo Placeholder
                       </div>
-                      <div className="space-y-1 text-[11px]">
+                      <div className="space-y-1 text-xs">
                         <p className="font-bold text-slate-900">Ram Kumar</p>
                         <p className="font-mono text-slate-700">KH-2026-0042</p>
                         <p className="text-slate-600">Mobile: +91 9876543210</p>
-                        <p className="text-[10px] text-emerald-700 font-semibold">Active Hospital Card</p>
+                        <p className="text-xs text-emerald-700 font-semibold">Active Hospital Card</p>
                       </div>
                     </div>
-                    <div className="text-[10px] text-slate-500 font-mono text-center pt-2 border-t border-slate-200">
+                    <div className="text-xs text-slate-500 font-mono text-center pt-2 border-t border-slate-200">
                       ||| | ||||| || |||| |||||| ||| (Barcode)
                     </div>
                   </div>
                 )}
 
                 {activeTab === 'consultation_summary' && (
-                  <div className="space-y-2 text-[11px]">
-                    <div className="bg-slate-100 px-2 py-1 font-semibold text-slate-800 rounded text-[10px]">
+                  <div className="space-y-2 text-xs">
+                    <div className="bg-slate-100 px-2 py-1 font-semibold text-slate-800 rounded text-xs">
                       Physiotherapy Clinical Assessment
                     </div>
                     <p className="text-slate-700">
@@ -389,7 +389,7 @@ export function PrintTemplateEditor() {
                       <span className="font-semibold">Plan:</span> Lumbar traction 5 sessions, Core strengthening exercises.
                     </p>
                     <div className="pt-4 flex justify-end">
-                      <div className="text-center text-[10px] text-slate-500 border-t border-slate-400 w-36 pt-1">
+                      <div className="text-center text-xs text-slate-500 border-t border-slate-500 w-36 pt-1">
                         Consultant Doctor
                       </div>
                     </div>
@@ -399,7 +399,7 @@ export function PrintTemplateEditor() {
             </div>
 
             {/* Document Bottom: Letterhead Footer */}
-            <div className="mt-4 border-t-2 border-[#9E1B42] pt-2 text-center text-[10px] text-slate-600 space-y-0.5">
+            <div className="mt-4 border-t-2 border-[#9E1B42] pt-2 text-center text-xs text-slate-600 space-y-0.5">
               {footerHi ? (
                 <p lang="hi" className="font-medium text-slate-800">
                   {footerHi}
