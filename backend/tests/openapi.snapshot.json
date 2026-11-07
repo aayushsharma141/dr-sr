@@ -1721,6 +1721,35 @@
         "title": "CollectionsTodayOut",
         "type": "object"
       },
+      "DepartmentRevenueItem": {
+        "additionalProperties": false,
+        "properties": {
+          "color": {
+            "title": "Color",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "percentage": {
+            "title": "Percentage",
+            "type": "integer"
+          },
+          "revenue_paise": {
+            "title": "Revenue Paise",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "name",
+          "percentage",
+          "revenue_paise",
+          "color"
+        ],
+        "title": "DepartmentRevenueItem",
+        "type": "object"
+      },
       "DoctorCreate": {
         "additionalProperties": false,
         "description": "Payload for creating a new doctor profile.",
@@ -2306,6 +2335,30 @@
         "title": "DoctorUpdate",
         "type": "object"
       },
+      "DoctorUtilizationSummary": {
+        "additionalProperties": false,
+        "properties": {
+          "occupied_minutes": {
+            "title": "Occupied Minutes",
+            "type": "integer"
+          },
+          "scheduled_minutes": {
+            "title": "Scheduled Minutes",
+            "type": "integer"
+          },
+          "utilization_pct": {
+            "title": "Utilization Pct",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "utilization_pct",
+          "occupied_minutes",
+          "scheduled_minutes"
+        ],
+        "title": "DoctorUtilizationSummary",
+        "type": "object"
+      },
       "DuplicateCheckResponse": {
         "description": "Duplicate search check response.",
         "properties": {
@@ -2782,6 +2835,30 @@
         "title": "FeeUpdate",
         "type": "object"
       },
+      "FinancialTrendMonth": {
+        "additionalProperties": false,
+        "properties": {
+          "expenses_paise": {
+            "title": "Expenses Paise",
+            "type": "integer"
+          },
+          "month": {
+            "title": "Month",
+            "type": "string"
+          },
+          "revenue_paise": {
+            "title": "Revenue Paise",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "month",
+          "revenue_paise",
+          "expenses_paise"
+        ],
+        "title": "FinancialTrendMonth",
+        "type": "object"
+      },
       "FollowUpBookRequest": {
         "additionalProperties": false,
         "description": "Schema for booking an appointment from a follow-up recommendation.",
@@ -2888,6 +2965,35 @@
           }
         },
         "title": "HTTPValidationError",
+        "type": "object"
+      },
+      "HospitalGrowthSummary": {
+        "additionalProperties": false,
+        "properties": {
+          "new_patients": {
+            "title": "New Patients",
+            "type": "integer"
+          },
+          "new_patients_change_pct": {
+            "title": "New Patients Change Pct",
+            "type": "number"
+          },
+          "returning_patients": {
+            "title": "Returning Patients",
+            "type": "integer"
+          },
+          "returning_patients_change_pct": {
+            "title": "Returning Patients Change Pct",
+            "type": "number"
+          }
+        },
+        "required": [
+          "new_patients",
+          "new_patients_change_pct",
+          "returning_patients",
+          "returning_patients_change_pct"
+        ],
+        "title": "HospitalGrowthSummary",
         "type": "object"
       },
       "HourlyCollectionOut": {
@@ -3209,6 +3315,154 @@
         "title": "LoginRequest",
         "type": "object"
       },
+      "ManagementAttentionItem": {
+        "additionalProperties": false,
+        "properties": {
+          "badge_variant": {
+            "title": "Badge Variant",
+            "type": "string"
+          },
+          "count": {
+            "title": "Count",
+            "type": "integer"
+          },
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "target_path": {
+            "title": "Target Path",
+            "type": "string"
+          }
+        },
+        "required": [
+          "key",
+          "label",
+          "count",
+          "badge_variant",
+          "target_path"
+        ],
+        "title": "ManagementAttentionItem",
+        "type": "object"
+      },
+      "ManagementMetricChange": {
+        "additionalProperties": false,
+        "properties": {
+          "percent_change": {
+            "title": "Percent Change",
+            "type": "number"
+          },
+          "prior_paise": {
+            "title": "Prior Paise",
+            "type": "integer"
+          },
+          "value_paise": {
+            "title": "Value Paise",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "value_paise",
+          "prior_paise",
+          "percent_change"
+        ],
+        "title": "ManagementMetricChange",
+        "type": "object"
+      },
+      "ManagementOverviewResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "comparison_month_label": {
+            "title": "Comparison Month Label",
+            "type": "string"
+          },
+          "current_month_label": {
+            "title": "Current Month Label",
+            "type": "string"
+          },
+          "department_revenues": {
+            "items": {
+              "$ref": "#/components/schemas/DepartmentRevenueItem"
+            },
+            "title": "Department Revenues",
+            "type": "array"
+          },
+          "doctor_utilization": {
+            "$ref": "#/components/schemas/DoctorUtilizationSummary"
+          },
+          "financial_trends": {
+            "items": {
+              "$ref": "#/components/schemas/FinancialTrendMonth"
+            },
+            "title": "Financial Trends",
+            "type": "array"
+          },
+          "hospital_growth": {
+            "$ref": "#/components/schemas/HospitalGrowthSummary"
+          },
+          "management_attention": {
+            "items": {
+              "$ref": "#/components/schemas/ManagementAttentionItem"
+            },
+            "title": "Management Attention",
+            "type": "array"
+          },
+          "management_attention_total": {
+            "title": "Management Attention Total",
+            "type": "integer"
+          },
+          "monthly_revenue": {
+            "$ref": "#/components/schemas/ManagementMetricChange"
+          },
+          "net_surplus": {
+            "$ref": "#/components/schemas/ManagementMetricChange"
+          },
+          "operating_expenses": {
+            "$ref": "#/components/schemas/ManagementMetricChange"
+          },
+          "outstanding_receivables_paise": {
+            "title": "Outstanding Receivables Paise",
+            "type": "integer"
+          },
+          "patient_growth_pct": {
+            "title": "Patient Growth Pct",
+            "type": "number"
+          },
+          "patient_growth_trends": {
+            "items": {
+              "$ref": "#/components/schemas/PatientGrowthMonth"
+            },
+            "title": "Patient Growth Trends",
+            "type": "array"
+          },
+          "system_health": {
+            "$ref": "#/components/schemas/SystemHealthSummary"
+          }
+        },
+        "required": [
+          "current_month_label",
+          "comparison_month_label",
+          "monthly_revenue",
+          "operating_expenses",
+          "net_surplus",
+          "outstanding_receivables_paise",
+          "financial_trends",
+          "department_revenues",
+          "management_attention",
+          "management_attention_total",
+          "hospital_growth",
+          "doctor_utilization",
+          "patient_growth_trends",
+          "patient_growth_pct",
+          "system_health"
+        ],
+        "title": "ManagementOverviewResponse",
+        "type": "object"
+      },
       "MeResponse": {
         "description": "Authenticated user profile, active permissions, and CSRF token.",
         "properties": {
@@ -3424,6 +3678,25 @@
           "address"
         ],
         "title": "PatientCreate",
+        "type": "object"
+      },
+      "PatientGrowthMonth": {
+        "additionalProperties": false,
+        "properties": {
+          "count": {
+            "title": "Count",
+            "type": "integer"
+          },
+          "month": {
+            "title": "Month",
+            "type": "string"
+          }
+        },
+        "required": [
+          "month",
+          "count"
+        ],
+        "title": "PatientGrowthMonth",
         "type": "object"
       },
       "PatientOut": {
@@ -5480,6 +5753,57 @@
         "title": "StorageVolumeOut",
         "type": "object"
       },
+      "SystemHealthSummary": {
+        "additionalProperties": false,
+        "properties": {
+          "application_version": {
+            "title": "Application Version",
+            "type": "string"
+          },
+          "database_status": {
+            "title": "Database Status",
+            "type": "string"
+          },
+          "last_backup_time": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Backup Time"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "storage_percentage": {
+            "title": "Storage Percentage",
+            "type": "integer"
+          },
+          "storage_total_bytes": {
+            "title": "Storage Total Bytes",
+            "type": "integer"
+          },
+          "storage_used_bytes": {
+            "title": "Storage Used Bytes",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "status",
+          "application_version",
+          "database_status",
+          "last_backup_time",
+          "storage_used_bytes",
+          "storage_total_bytes",
+          "storage_percentage"
+        ],
+        "title": "SystemHealthSummary",
+        "type": "object"
+      },
       "SystemStatusOut": {
         "additionalProperties": false,
         "description": "Runtime, schema, database and storage status of the LAN server.",
@@ -6902,6 +7226,28 @@
   },
   "openapi": "3.1.0",
   "paths": {
+    "/api/admin/management-overview": {
+      "get": {
+        "description": "Return executive management overview metrics, financial trends, and governance health.",
+        "operationId": "get_management_overview_api_admin_management_overview_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ManagementOverviewResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Get Management Overview",
+        "tags": [
+          "areas"
+        ]
+      }
+    },
     "/api/admin/overview": {
       "get": {
         "description": "Return administrative overview metrics and user counts across all roles.",
