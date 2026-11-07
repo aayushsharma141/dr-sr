@@ -1,0 +1,58 @@
+{
+  "contract": "1.0.0",
+  "flavor": "core",
+  "milestone": "v3.0 — Centralized LAN Web Platform",
+  "phases": [
+    {
+      "number": "11",
+      "name": "Decisions Gate, Foundation & Auth",
+      "status": "complete"
+    },
+    {
+      "number": "12",
+      "name": "Clinic Settings & Patient Registration",
+      "status": "complete"
+    },
+    {
+      "number": "13",
+      "name": "Appointments & Clinical Encounters",
+      "status": "complete"
+    },
+    {
+      "number": "14",
+      "name": "Prescriptions, Treatment Plans & Sessions",
+      "status": "complete"
+    },
+    {
+      "number": "15",
+      "name": "Billing, Receipts & Reversals",
+      "status": "complete"
+    },
+    {
+      "number": "16",
+      "name": "Audit Viewer, Backup/Restore & Integrity",
+      "status": "complete"
+    },
+    {
+      "number": "17",
+      "name": "LAN Deployment, Printer & Acceptance",
+      "status": "complete"
+    },
+    {
+      "number": "18",
+      "name": "UI/UX Review Hardening",
+      "status": "in_progress"
+    },
+    {
+      "number": "19",
+      "name": "Universal Consultation Workspace",
+      "status": "complete"
+    }
+  ],
+  "next": {
+    "command": "/gsd-progress --next",
+    "label": "Advance to the next step (verify)",
+    "reason": "Phase 1 of 9 · 86% · ready to verify"
+  },
+  "updated_at": "2026-11-06T11:15:29.196Z"
+}
