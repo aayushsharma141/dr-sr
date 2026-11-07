@@ -1308,3 +1308,52 @@ class FollowUpRecommendation(Base):
     closed_by_user = relationship("User", foreign_keys=[closed_by_user_id], lazy="joined")
 
 
+class AssetType(StrEnum):
+    """Supported asset types for hospital identity and documentation."""
+
+    LOGO = "LOGO"
+    PHOTO = "PHOTO"
+    REGISTRATION_DOC = "REGISTRATION_DOC"
+
+
+class HospitalAsset(Base):
+    """Hospital identity, registration, and facility assets (SET-01, D-20-01).
+
+    Historical asset versions are never deleted from disk or database,
+    ensuring historical issued documents retain valid references.
+    """
+
+    __tablename__ = "hospital_assets"
+    __table_args__ = (
+        UniqueConstraint("filename", name="uq_hospital_assets_filename"),
+        CheckConstraint(
+            "asset_type IN ('LOGO', 'PHOTO', 'REGISTRATION_DOC')",
+            name="ck_hospital_assets_asset_type",
+        ),
+        Index("ix_hospital_assets_asset_type_active", "asset_type", "is_active"),
+        Index("ix_hospital_assets_uploaded_by", "uploaded_by_user_id"),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, Identity(always=False), primary_key=True)
+    asset_type: Mapped[str] = mapped_column(String(32), nullable=False)
+    filename: Mapped[str] = mapped_column(String(255), nullable=False)
+    original_filename: Mapped[str] = mapped_column(String(255), nullable=False)
+    mime_type: Mapped[str] = mapped_column(String(64), nullable=False)
+    file_size_bytes: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    is_active: Mapped[bool] = mapped_column(
+        Boolean, default=True, server_default=text("true"), nullable=False
+    )
+    version: Mapped[int] = mapped_column(
+        Integer, default=1, server_default=text("1"), nullable=False
+    )
+    uploaded_by_user_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("users.id", ondelete="RESTRICT"), nullable=False
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    uploaded_by_user = relationship("User", foreign_keys=[uploaded_by_user_id], lazy="joined")
+
+
+

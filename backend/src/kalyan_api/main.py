@@ -83,6 +83,8 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """Manage application startup and shutdown lifecycle."""
     settings: Settings = app.state.settings
+    settings.photos_dir.mkdir(parents=True, exist_ok=True)
+    settings.assets_dir.mkdir(parents=True, exist_ok=True)
     engine = build_engine(settings, owner=False)
     SessionLocal.configure(bind=engine)
     app.state.engine = engine

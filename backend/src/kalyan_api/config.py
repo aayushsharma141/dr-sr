@@ -6,7 +6,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
-from pydantic import field_validator, model_validator
+from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from sqlalchemy.engine import URL
 
@@ -63,6 +63,9 @@ class Settings(BaseSettings):
 
     # Patient photos storage location (PAT-05)
     photos_dir: Path = BACKEND_DIR / "var" / "photos"
+
+    # Hospital assets storage location (SET-01, D-20-01)
+    assets_dir: Path = Field(default=BACKEND_DIR / "var" / "assets")
 
     # Backup storage location (BAK-01)
     backup_dir: Path = BACKEND_DIR / "var" / "backups"
