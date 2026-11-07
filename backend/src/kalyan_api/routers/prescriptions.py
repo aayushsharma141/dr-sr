@@ -70,8 +70,10 @@ def _to_prescription_out(rx: Prescription) -> PrescriptionOut:
     return PrescriptionOut(
         id=rx.id,
         patient_id=rx.patient_id,
-        patient_urn=rx.patient.urn if rx.patient else "",
-        patient_name=rx.patient.full_name if rx.patient else "",
+        patient_urn=rx.patient_urn or (rx.patient.urn if rx.patient else ""),
+        patient_name=rx.patient_name or (rx.patient.full_name if rx.patient else ""),
+        patient_mobile=rx.patient_mobile or (rx.patient.mobile if rx.patient else None),
+        patient_address=rx.patient_address or (rx.patient.address if rx.patient else None),
         doctor_id=rx.doctor_id,
         doctor_name=rx.doctor.name_en if rx.doctor else "",
         encounter_id=rx.encounter_id,
@@ -183,6 +185,10 @@ def create_prescription(
     now_utc = datetime.now(timezone.utc)
     rx = Prescription(
         patient_id=payload.patient_id,
+        patient_name=patient.full_name,
+        patient_urn=patient.urn,
+        patient_mobile=patient.mobile,
+        patient_address=patient.address,
         doctor_id=principal.doctor_id,
         encounter_id=payload.encounter_id,
         status=target_status,

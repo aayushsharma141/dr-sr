@@ -76,6 +76,8 @@ class EncounterRead(BaseModel):
     patient_id: int
     patient_urn: str
     patient_name: str
+    patient_mobile: str | None = None
+    patient_address: str | None = None
     doctor_id: int
     doctor_name: str
     appointment_id: int | None = None

@@ -445,10 +445,12 @@ class Patient(Base):
         Index("ix_patients_urn", "urn"),
         Index("ix_patients_mobile", "mobile"),
         Index("ix_patients_full_name", "full_name"),
+        Index("ix_patients_legacy_urn", "legacy_urn"),
     )
 
     id: Mapped[int] = mapped_column(BigInteger, Identity(always=False), primary_key=True)
     urn: Mapped[str] = mapped_column(String(32), unique=True, nullable=False)
+    legacy_urn: Mapped[str | None] = mapped_column(String(64), nullable=True)
     full_name: Mapped[str] = mapped_column(String(120), nullable=False)
     guardian_name: Mapped[str] = mapped_column(String(120), nullable=False)
     gender: Mapped[str] = mapped_column(String(1), nullable=False)
@@ -601,6 +603,10 @@ class ClinicalEncounter(Base):
     patient_id: Mapped[int] = mapped_column(
         BigInteger, ForeignKey("patients.id", ondelete="RESTRICT"), nullable=False
     )
+    patient_name: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    patient_urn: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    patient_mobile: Mapped[str | None] = mapped_column(String(15), nullable=True)
+    patient_address: Mapped[str | None] = mapped_column(Text, nullable=True)
     doctor_id: Mapped[int] = mapped_column(
         BigInteger, ForeignKey("doctors.id", ondelete="RESTRICT"), nullable=False
     )
@@ -886,6 +892,10 @@ class Prescription(Base):
     patient_id: Mapped[int] = mapped_column(
         BigInteger, ForeignKey("patients.id", ondelete="RESTRICT"), nullable=False
     )
+    patient_name: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    patient_urn: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    patient_mobile: Mapped[str | None] = mapped_column(String(15), nullable=True)
+    patient_address: Mapped[str | None] = mapped_column(Text, nullable=True)
     doctor_id: Mapped[int] = mapped_column(
         BigInteger, ForeignKey("doctors.id", ondelete="RESTRICT"), nullable=False
     )
@@ -1017,6 +1027,10 @@ class Payment(Base):
     patient_id: Mapped[int] = mapped_column(
         BigInteger, ForeignKey("patients.id", ondelete="RESTRICT"), nullable=False
     )
+    patient_name: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    patient_urn: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    patient_mobile: Mapped[str | None] = mapped_column(String(15), nullable=True)
+    patient_address: Mapped[str | None] = mapped_column(Text, nullable=True)
     treatment_plan_id: Mapped[int | None] = mapped_column(
         BigInteger, ForeignKey("treatment_plans.id", ondelete="RESTRICT"), nullable=True
     )
