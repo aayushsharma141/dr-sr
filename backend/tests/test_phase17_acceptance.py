@@ -139,9 +139,13 @@ def test_disaster_recovery_rehearsal(
     """
     settings = get_settings()
 
-    # 1. Clean up any stale photos before test starts
+    # 1. Clean up any stale photos and assets before test starts
     if settings.photos_dir.exists():
         for f in settings.photos_dir.glob("*"):
+            if f.is_file():
+                f.unlink()
+    if settings.assets_dir.exists():
+        for f in settings.assets_dir.glob("*"):
             if f.is_file():
                 f.unlink()
 
@@ -203,11 +207,15 @@ def test_disaster_recovery_rehearsal(
         assert restored_patient is not None
         assert restored_patient.full_name == "Disaster Recovery Drill Patient"
 
-    # 8. Clean up any photo artifacts extracted during restore before running integrity check
+    # 8. Clean up any photo and asset artifacts extracted during restore before running integrity check
     if settings.photos_dir.exists():
         for photo in settings.photos_dir.glob("*"):
             if photo.is_file():
                 photo.unlink()
+    if settings.assets_dir.exists():
+        for asset in settings.assets_dir.glob("*"):
+            if asset.is_file():
+                asset.unlink()
 
     # 9. Verify full system integrity audit passes cleanly
     with session_scope(settings) as session:

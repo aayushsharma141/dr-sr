@@ -79,7 +79,7 @@ def test_operations_admin_lifecycle(
     assert integ_res.status_code == 200
     integ_data = integ_res.json()
     assert "is_healthy" in integ_data
-    assert integ_data["total_checks"] == 6
+    assert integ_data["total_checks"] == 7
 
     # 2. Trigger backup
     backup_res = admin_c.post("/api/operations/backups", json={"label": "api_test"})

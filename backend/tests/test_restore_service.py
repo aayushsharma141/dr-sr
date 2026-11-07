@@ -1,5 +1,6 @@
 """Tests for restore engine and pre-restore snapshots (BAK-02, Plan 16-03)."""
 
+import uuid
 from pathlib import Path
 
 import pytest
@@ -31,7 +32,7 @@ def test_restore_database_and_photos(tmp_path: Path):
     )
 
     # 2. Insert distinctive patient
-    test_urn = "KHM-2026-99999"
+    test_urn = f"KHM-2026-{uuid.uuid4().hex[:6]}"
     with session_scope(settings) as session:
         # Check if exists or delete
         existing = session.query(Patient).filter(Patient.urn == test_urn).first()
