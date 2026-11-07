@@ -169,6 +169,5 @@ ROLE_PERMISSIONS: dict[Role, frozenset[Permission]] = {
 
 # Mapping of future permissions reserved for upcoming phases
 RESERVED: dict[Permission, str] = {
-    Permission.PATIENT_IMPORT: "Phase 20 Plan 06: Admin import centre endpoint",
     Permission.PATIENT_EXPORT: "Phase 20 Plan 07: Admin export centre endpoint",
 }

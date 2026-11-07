@@ -308,6 +308,109 @@
         "title": "AdminOverviewResponse",
         "type": "object"
       },
+      "AdminPatientDemographicCorrection": {
+        "additionalProperties": false,
+        "description": "Payload for administrative demographic correction with mandatory reason and concurrency check (D-20-02, D-20-03).",
+        "properties": {
+          "address": {
+            "maxLength": 1000,
+            "minLength": 2,
+            "title": "Address",
+            "type": "string"
+          },
+          "age_years": {
+            "maximum": 150.0,
+            "minimum": 0.0,
+            "title": "Age Years",
+            "type": "integer"
+          },
+          "district": {
+            "default": "Bhojpur",
+            "maxLength": 64,
+            "minLength": 2,
+            "title": "District",
+            "type": "string"
+          },
+          "dob": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dob"
+          },
+          "emergency_contact": {
+            "anyOf": [
+              {
+                "maxLength": 120,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Emergency Contact"
+          },
+          "full_name": {
+            "maxLength": 120,
+            "minLength": 2,
+            "title": "Full Name",
+            "type": "string"
+          },
+          "gender": {
+            "pattern": "^[MFO]$",
+            "title": "Gender",
+            "type": "string"
+          },
+          "guardian_name": {
+            "maxLength": 120,
+            "minLength": 2,
+            "title": "Guardian Name",
+            "type": "string"
+          },
+          "mobile": {
+            "pattern": "^[0-9]{10}$",
+            "title": "Mobile",
+            "type": "string"
+          },
+          "reason": {
+            "description": "Documented reason for correction",
+            "maxLength": 1000,
+            "minLength": 5,
+            "title": "Reason",
+            "type": "string"
+          },
+          "state": {
+            "default": "Bihar",
+            "maxLength": 64,
+            "minLength": 2,
+            "title": "State",
+            "type": "string"
+          },
+          "version_id": {
+            "description": "Expected version_id for optimistic locking",
+            "minimum": 1.0,
+            "title": "Version Id",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "reason",
+          "version_id",
+          "full_name",
+          "guardian_name",
+          "gender",
+          "age_years",
+          "mobile",
+          "address"
+        ],
+        "title": "AdminPatientDemographicCorrection",
+        "type": "object"
+      },
       "AppointmentCreate": {
         "description": "Payload to book an appointment (APT-01).",
         "properties": {
@@ -546,6 +649,77 @@
           "version_id"
         ],
         "title": "AppointmentStatusUpdate",
+        "type": "object"
+      },
+      "AssetOut": {
+        "description": "Hospital asset response payload.",
+        "properties": {
+          "asset_type": {
+            "title": "Asset Type",
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "file_size_bytes": {
+            "title": "File Size Bytes",
+            "type": "integer"
+          },
+          "filename": {
+            "title": "Filename",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "is_active": {
+            "title": "Is Active",
+            "type": "boolean"
+          },
+          "mime_type": {
+            "title": "Mime Type",
+            "type": "string"
+          },
+          "original_filename": {
+            "title": "Original Filename",
+            "type": "string"
+          },
+          "uploaded_by_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Uploaded By Name"
+          },
+          "uploaded_by_user_id": {
+            "title": "Uploaded By User Id",
+            "type": "integer"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "asset_type",
+          "filename",
+          "original_filename",
+          "mime_type",
+          "file_size_bytes",
+          "is_active",
+          "version",
+          "uploaded_by_user_id",
+          "created_at"
+        ],
+        "title": "AssetOut",
         "type": "object"
       },
       "AuditLogListResponse": {
@@ -1167,6 +1341,96 @@
         "title": "BackupVerifyResponse",
         "type": "object"
       },
+      "BatchSummaryResponse": {
+        "description": "Metadata and row metrics for an import batch.",
+        "properties": {
+          "batch_id": {
+            "title": "Batch Id",
+            "type": "string"
+          },
+          "column_mapping": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Column Mapping"
+          },
+          "committed_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Committed At"
+          },
+          "committed_rows": {
+            "title": "Committed Rows",
+            "type": "integer"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "duplicate_rows": {
+            "title": "Duplicate Rows",
+            "type": "integer"
+          },
+          "filename": {
+            "title": "Filename",
+            "type": "string"
+          },
+          "invalid_rows": {
+            "title": "Invalid Rows",
+            "type": "integer"
+          },
+          "safety_backup_file": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Safety Backup File"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "total_rows": {
+            "title": "Total Rows",
+            "type": "integer"
+          },
+          "valid_rows": {
+            "title": "Valid Rows",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "batch_id",
+          "filename",
+          "total_rows",
+          "valid_rows",
+          "duplicate_rows",
+          "invalid_rows",
+          "committed_rows",
+          "status",
+          "created_at"
+        ],
+        "title": "BatchSummaryResponse",
+        "type": "object"
+      },
       "BillingConfigurationOut": {
         "additionalProperties": false,
         "description": "How billing works on this system today. Read-only: these are not editable settings.",
@@ -1211,6 +1475,58 @@
           "reversal_roles"
         ],
         "title": "BillingConfigurationOut",
+        "type": "object"
+      },
+      "Body_inspect_import_file_api_admin_imports_inspect_post": {
+        "properties": {
+          "file": {
+            "contentMediaType": "application/octet-stream",
+            "title": "File",
+            "type": "string"
+          }
+        },
+        "required": [
+          "file"
+        ],
+        "title": "Body_inspect_import_file_api_admin_imports_inspect_post",
+        "type": "object"
+      },
+      "Body_stage_import_batch_api_admin_imports_post": {
+        "properties": {
+          "column_mapping": {
+            "title": "Column Mapping",
+            "type": "string"
+          },
+          "file": {
+            "contentMediaType": "application/octet-stream",
+            "title": "File",
+            "type": "string"
+          }
+        },
+        "required": [
+          "file",
+          "column_mapping"
+        ],
+        "title": "Body_stage_import_batch_api_admin_imports_post",
+        "type": "object"
+      },
+      "Body_upload_asset_api_admin_assets_post": {
+        "properties": {
+          "asset_type": {
+            "title": "Asset Type",
+            "type": "string"
+          },
+          "file": {
+            "contentMediaType": "application/octet-stream",
+            "title": "File",
+            "type": "string"
+          }
+        },
+        "required": [
+          "file",
+          "asset_type"
+        ],
+        "title": "Body_upload_asset_api_admin_assets_post",
         "type": "object"
       },
       "ChangePasswordRequest": {
@@ -1719,6 +2035,64 @@
           "by_method"
         ],
         "title": "CollectionsTodayOut",
+        "type": "object"
+      },
+      "CommitBatchResponse": {
+        "additionalProperties": false,
+        "description": "Result of committing import batch.",
+        "properties": {
+          "batch_id": {
+            "title": "Batch Id",
+            "type": "string"
+          },
+          "committed_rows": {
+            "title": "Committed Rows",
+            "type": "integer"
+          },
+          "safety_backup_file": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Safety Backup File"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "urn_range_end": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Urn Range End"
+          },
+          "urn_range_start": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Urn Range Start"
+          }
+        },
+        "required": [
+          "batch_id",
+          "status",
+          "committed_rows"
+        ],
+        "title": "CommitBatchResponse",
         "type": "object"
       },
       "DepartmentRevenueItem": {
@@ -2359,6 +2733,66 @@
         "title": "DoctorUtilizationSummary",
         "type": "object"
       },
+      "DuplicateCandidatePatient": {
+        "description": "Demographics of existing patient candidate for side-by-side comparison.",
+        "properties": {
+          "address": {
+            "title": "Address",
+            "type": "string"
+          },
+          "age_years": {
+            "title": "Age Years",
+            "type": "integer"
+          },
+          "full_name": {
+            "title": "Full Name",
+            "type": "string"
+          },
+          "gender": {
+            "title": "Gender",
+            "type": "string"
+          },
+          "guardian_name": {
+            "title": "Guardian Name",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "legacy_urn": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Legacy Urn"
+          },
+          "mobile": {
+            "title": "Mobile",
+            "type": "string"
+          },
+          "urn": {
+            "title": "Urn",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "urn",
+          "full_name",
+          "guardian_name",
+          "gender",
+          "age_years",
+          "mobile",
+          "address"
+        ],
+        "title": "DuplicateCandidatePatient",
+        "type": "object"
+      },
       "DuplicateCheckResponse": {
         "description": "Duplicate search check response.",
         "properties": {
@@ -2381,6 +2815,122 @@
           "has_duplicate"
         ],
         "title": "DuplicateCheckResponse",
+        "type": "object"
+      },
+      "DuplicateListResponse": {
+        "additionalProperties": false,
+        "description": "List of duplicate candidate rows in a batch.",
+        "properties": {
+          "batch_id": {
+            "title": "Batch Id",
+            "type": "string"
+          },
+          "duplicates": {
+            "items": {
+              "$ref": "#/components/schemas/DuplicateRowItem"
+            },
+            "title": "Duplicates",
+            "type": "array"
+          }
+        },
+        "required": [
+          "batch_id",
+          "duplicates"
+        ],
+        "title": "DuplicateListResponse",
+        "type": "object"
+      },
+      "DuplicateResolutionItem": {
+        "additionalProperties": false,
+        "description": "Explicit decision for a single duplicate candidate row.",
+        "properties": {
+          "resolution": {
+            "enum": [
+              "SKIP",
+              "IMPORT_AS_NEW"
+            ],
+            "title": "Resolution",
+            "type": "string"
+          },
+          "row_id": {
+            "title": "Row Id",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "row_id",
+          "resolution"
+        ],
+        "title": "DuplicateResolutionItem",
+        "type": "object"
+      },
+      "DuplicateRowItem": {
+        "description": "A flagged duplicate row and its matched patient.",
+        "properties": {
+          "duplicate_patient": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DuplicateCandidatePatient"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "duplicate_patient_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Duplicate Patient Id"
+          },
+          "duplicate_resolution": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Duplicate Resolution"
+          },
+          "mapped_data": {
+            "additionalProperties": true,
+            "title": "Mapped Data",
+            "type": "object"
+          },
+          "row_id": {
+            "title": "Row Id",
+            "type": "integer"
+          },
+          "row_index": {
+            "title": "Row Index",
+            "type": "integer"
+          },
+          "validation_errors": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Validation Errors"
+          }
+        },
+        "required": [
+          "row_id",
+          "row_index",
+          "mapped_data"
+        ],
+        "title": "DuplicateRowItem",
         "type": "object"
       },
       "EncounterCreate": {
@@ -2561,9 +3111,31 @@
             "title": "Is Finalised",
             "type": "boolean"
           },
+          "patient_address": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Patient Address"
+          },
           "patient_id": {
             "title": "Patient Id",
             "type": "integer"
+          },
+          "patient_mobile": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Patient Mobile"
           },
           "patient_name": {
             "title": "Patient Name",
@@ -3019,6 +3591,86 @@
           "hour"
         ],
         "title": "HourlyCollectionOut",
+        "type": "object"
+      },
+      "InspectFileResponse": {
+        "additionalProperties": false,
+        "description": "Result of file inspection and encoding sniffing.",
+        "properties": {
+          "canonical_fields": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Canonical Fields",
+            "type": "array"
+          },
+          "delimiter": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Delimiter"
+          },
+          "encoding": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Encoding"
+          },
+          "file_type": {
+            "title": "File Type",
+            "type": "string"
+          },
+          "filename": {
+            "title": "Filename",
+            "type": "string"
+          },
+          "headers": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Headers",
+            "type": "array"
+          },
+          "sample_rows": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Sample Rows",
+            "type": "array"
+          },
+          "suggested_mapping": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Suggested Mapping",
+            "type": "object"
+          },
+          "total_rows": {
+            "title": "Total Rows",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "filename",
+          "file_type",
+          "total_rows",
+          "headers",
+          "sample_rows",
+          "suggested_mapping",
+          "canonical_fields"
+        ],
+        "title": "InspectFileResponse",
         "type": "object"
       },
       "IntegrityCheckItemOut": {
@@ -3766,6 +4418,17 @@
             "title": "Is Active",
             "type": "boolean"
           },
+          "legacy_urn": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Legacy Urn"
+          },
           "mobile": {
             "title": "Mobile",
             "type": "string"
@@ -4130,9 +4793,31 @@
             ],
             "title": "Notes"
           },
+          "patient_address": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Patient Address"
+          },
           "patient_id": {
             "title": "Patient Id",
             "type": "integer"
+          },
+          "patient_mobile": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Patient Mobile"
           },
           "patient_name": {
             "title": "Patient Name",
@@ -4781,9 +5466,31 @@
             "title": "Items",
             "type": "array"
           },
+          "patient_address": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Patient Address"
+          },
           "patient_id": {
             "title": "Patient Id",
             "type": "integer"
+          },
+          "patient_mobile": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Patient Mobile"
           },
           "patient_name": {
             "title": "Patient Name",
@@ -4987,6 +5694,139 @@
           }
         },
         "title": "PrescriptionUpdate",
+        "type": "object"
+      },
+      "PrintTemplateRead": {
+        "description": "Bilingual print template configuration schema (SET-01, BIL-04).",
+        "properties": {
+          "document_type": {
+            "title": "Document Type",
+            "type": "string"
+          },
+          "footer_en": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Footer En"
+          },
+          "footer_hi": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Footer Hi"
+          },
+          "header_en": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Header En"
+          },
+          "header_hi": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Header Hi"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "document_type",
+          "version",
+          "updated_at"
+        ],
+        "title": "PrintTemplateRead",
+        "type": "object"
+      },
+      "PrintTemplateUpdate": {
+        "description": "Payload to update bilingual print template header/footer.",
+        "properties": {
+          "footer_en": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Footer En"
+          },
+          "footer_hi": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Footer Hi"
+          },
+          "header_en": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Header En"
+          },
+          "header_hi": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Header Hi"
+          },
+          "version": {
+            "description": "Current template version for optimistic locking",
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "version"
+        ],
+        "title": "PrintTemplateUpdate",
         "type": "object"
       },
       "RecentAdminActionOut": {
@@ -5221,6 +6061,24 @@
           "role"
         ],
         "title": "ReceptionOverviewResponse",
+        "type": "object"
+      },
+      "ResolveDuplicatesRequest": {
+        "additionalProperties": false,
+        "description": "Batch duplicate decision submission.",
+        "properties": {
+          "resolutions": {
+            "items": {
+              "$ref": "#/components/schemas/DuplicateResolutionItem"
+            },
+            "title": "Resolutions",
+            "type": "array"
+          }
+        },
+        "required": [
+          "resolutions"
+        ],
+        "title": "ResolveDuplicatesRequest",
         "type": "object"
       },
       "RestoreRequest": {
@@ -6955,6 +7813,46 @@
         "title": "ValidationError",
         "type": "object"
       },
+      "ValidationSummaryResponse": {
+        "additionalProperties": false,
+        "description": "Result of batch row validation and duplicate matching.",
+        "properties": {
+          "batch_id": {
+            "title": "Batch Id",
+            "type": "string"
+          },
+          "duplicate_rows": {
+            "title": "Duplicate Rows",
+            "type": "integer"
+          },
+          "invalid_rows": {
+            "title": "Invalid Rows",
+            "type": "integer"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "total_rows": {
+            "title": "Total Rows",
+            "type": "integer"
+          },
+          "valid_rows": {
+            "title": "Valid Rows",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "batch_id",
+          "total_rows",
+          "valid_rows",
+          "duplicate_rows",
+          "invalid_rows",
+          "status"
+        ],
+        "title": "ValidationSummaryResponse",
+        "type": "object"
+      },
       "VitalObservationInput": {
         "description": "Payload to record or update vitals for a clinical encounter.",
         "properties": {
@@ -7226,6 +8124,552 @@
   },
   "openapi": "3.1.0",
   "paths": {
+    "/api/admin/assets": {
+      "get": {
+        "description": "List historical and active hospital assets.",
+        "operationId": "list_assets_api_admin_assets_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "asset_type",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Asset Type"
+            }
+          },
+          {
+            "in": "query",
+            "name": "is_active",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Is Active"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/AssetOut"
+                  },
+                  "title": "Response List Assets Api Admin Assets Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Assets",
+        "tags": [
+          "assets"
+        ]
+      },
+      "post": {
+        "description": "Upload and validate a new hospital logo, certificate, or photograph.",
+        "operationId": "upload_asset_api_admin_assets_post",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_upload_asset_api_admin_assets_post"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AssetOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Upload Asset",
+        "tags": [
+          "assets"
+        ]
+      }
+    },
+    "/api/admin/assets/{asset_id}/deactivate": {
+      "post": {
+        "description": "Deactivate an asset without physical file deletion.",
+        "operationId": "deactivate_asset_api_admin_assets__asset_id__deactivate_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "asset_id",
+            "required": true,
+            "schema": {
+              "title": "Asset Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AssetOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Deactivate Asset",
+        "tags": [
+          "assets"
+        ]
+      }
+    },
+    "/api/admin/assets/{asset_id}/file": {
+      "get": {
+        "description": "Stream raw asset file for authenticated admin review.",
+        "operationId": "get_asset_file_api_admin_assets__asset_id__file_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "asset_id",
+            "required": true,
+            "schema": {
+              "title": "Asset Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Asset File",
+        "tags": [
+          "assets"
+        ]
+      }
+    },
+    "/api/admin/imports": {
+      "post": {
+        "description": "Stage raw spreadsheet rows into staging table and record PATIENT_IMPORT_STAGED.",
+        "operationId": "stage_import_batch_api_admin_imports_post",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_stage_import_batch_api_admin_imports_post"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BatchSummaryResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Stage Import Batch",
+        "tags": [
+          "admin-imports"
+        ]
+      }
+    },
+    "/api/admin/imports/inspect": {
+      "post": {
+        "description": "Analyze uploaded spreadsheet file structure, detect encoding, and preview headers.",
+        "operationId": "inspect_import_file_api_admin_imports_inspect_post",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_inspect_import_file_api_admin_imports_inspect_post"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InspectFileResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Inspect Import File",
+        "tags": [
+          "admin-imports"
+        ]
+      }
+    },
+    "/api/admin/imports/{batch_id}": {
+      "get": {
+        "description": "Get metadata, row metrics, and staging status for an import batch.",
+        "operationId": "get_import_batch_api_admin_imports__batch_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "batch_id",
+            "required": true,
+            "schema": {
+              "title": "Batch Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BatchSummaryResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Import Batch",
+        "tags": [
+          "admin-imports"
+        ]
+      }
+    },
+    "/api/admin/imports/{batch_id}/commit": {
+      "post": {
+        "description": "Run pre-commit safety backup, mint gap-free URNs, insert patients, and record audit event.",
+        "operationId": "commit_import_batch_api_admin_imports__batch_id__commit_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "batch_id",
+            "required": true,
+            "schema": {
+              "title": "Batch Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommitBatchResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Commit Import Batch",
+        "tags": [
+          "admin-imports"
+        ]
+      }
+    },
+    "/api/admin/imports/{batch_id}/duplicates": {
+      "get": {
+        "description": "Retrieve duplicate candidate rows alongside existing patient records for side-by-side review.",
+        "operationId": "get_duplicate_candidates_api_admin_imports__batch_id__duplicates_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "batch_id",
+            "required": true,
+            "schema": {
+              "title": "Batch Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DuplicateListResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Duplicate Candidates",
+        "tags": [
+          "admin-imports"
+        ]
+      }
+    },
+    "/api/admin/imports/{batch_id}/errors": {
+      "get": {
+        "description": "Export CSV of invalid or skipped rows for offline administrative review.",
+        "operationId": "export_error_records_api_admin_imports__batch_id__errors_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "batch_id",
+            "required": true,
+            "schema": {
+              "title": "Batch Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Export Error Records",
+        "tags": [
+          "admin-imports"
+        ]
+      }
+    },
+    "/api/admin/imports/{batch_id}/resolve": {
+      "post": {
+        "description": "Record explicit duplicate resolution decisions ('SKIP' or 'IMPORT_AS_NEW').",
+        "operationId": "resolve_duplicates_api_admin_imports__batch_id__resolve_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "batch_id",
+            "required": true,
+            "schema": {
+              "title": "Batch Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResolveDuplicatesRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Resolve Duplicates Api Admin Imports  Batch Id  Resolve Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Resolve Duplicates",
+        "tags": [
+          "admin-imports"
+        ]
+      }
+    },
+    "/api/admin/imports/{batch_id}/validate": {
+      "post": {
+        "description": "Execute row validation, enforce required fields, and flag duplicate candidates.",
+        "operationId": "validate_import_batch_api_admin_imports__batch_id__validate_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "batch_id",
+            "required": true,
+            "schema": {
+              "title": "Batch Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationSummaryResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Validate Import Batch",
+        "tags": [
+          "admin-imports"
+        ]
+      }
+    },
     "/api/admin/management-overview": {
       "get": {
         "description": "Return executive management overview metrics, financial trends, and governance health.",
@@ -7267,6 +8711,242 @@
         "summary": "Get Admin Overview",
         "tags": [
           "areas"
+        ]
+      }
+    },
+    "/api/admin/patients/search": {
+      "get": {
+        "description": "Server-side patient search matching URN, legacy URN, full name, or mobile for correction.",
+        "operationId": "search_patients_for_correction_api_admin_patients_search_get",
+        "parameters": [
+          {
+            "description": "Search term for patient lookup",
+            "in": "query",
+            "name": "q",
+            "required": true,
+            "schema": {
+              "description": "Search term for patient lookup",
+              "maxLength": 100,
+              "minLength": 1,
+              "title": "Q",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/PatientOut"
+                  },
+                  "title": "Response Search Patients For Correction Api Admin Patients Search Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Search Patients For Correction",
+        "tags": [
+          "admin-patients"
+        ]
+      }
+    },
+    "/api/admin/patients/{id}/demographics": {
+      "patch": {
+        "description": "Administratively correct patient demographics with optimistic concurrency and permanent audit log.",
+        "operationId": "correct_patient_demographics_api_admin_patients__id__demographics_patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "title": "Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AdminPatientDemographicCorrection"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PatientOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Correct Patient Demographics",
+        "tags": [
+          "admin-patients"
+        ]
+      }
+    },
+    "/api/admin/templates": {
+      "get": {
+        "description": "Retrieve all document print templates.",
+        "operationId": "list_print_templates_api_admin_templates_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/PrintTemplateRead"
+                  },
+                  "title": "Response List Print Templates Api Admin Templates Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "List Print Templates",
+        "tags": [
+          "admin-templates"
+        ]
+      }
+    },
+    "/api/admin/templates/{doc_type}": {
+      "get": {
+        "description": "Retrieve print template configuration for a document type.",
+        "operationId": "get_print_template_api_admin_templates__doc_type__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "doc_type",
+            "required": true,
+            "schema": {
+              "title": "Doc Type",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PrintTemplateRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Print Template",
+        "tags": [
+          "admin-templates"
+        ]
+      },
+      "patch": {
+        "description": "Update print template header/footer text with optimistic concurrency check.",
+        "operationId": "update_print_template_api_admin_templates__doc_type__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "doc_type",
+            "required": true,
+            "schema": {
+              "title": "Doc Type",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PrintTemplateUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PrintTemplateRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Print Template",
+        "tags": [
+          "admin-templates"
         ]
       }
     },
@@ -7532,6 +9212,26 @@
         "summary": "Update Appointment Status",
         "tags": [
           "appointments"
+        ]
+      }
+    },
+    "/api/assets/active-logo": {
+      "get": {
+        "description": "Stream current active hospital logo crest or default crest for login and printouts.",
+        "operationId": "get_active_logo_endpoint_api_assets_active_logo_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Get Active Logo Endpoint",
+        "tags": [
+          "assets"
         ]
       }
     },
