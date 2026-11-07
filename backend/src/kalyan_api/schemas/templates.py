@@ -259,3 +259,29 @@ class TemplateResponseRead(BaseModel):
     response_data: dict[str, Any]
     created_at: datetime
     updated_at: datetime
+
+
+class PrintTemplateRead(BaseModel):
+    """Bilingual print template configuration schema (SET-01, BIL-04)."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    document_type: str
+    header_en: str | None = None
+    header_hi: str | None = None
+    footer_en: str | None = None
+    footer_hi: str | None = None
+    version: int
+    updated_at: datetime
+
+
+class PrintTemplateUpdate(BaseModel):
+    """Payload to update bilingual print template header/footer."""
+
+    header_en: str | None = None
+    header_hi: str | None = None
+    footer_en: str | None = None
+    footer_hi: str | None = None
+    version: int = Field(..., description="Current template version for optimistic locking")
+
