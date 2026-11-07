@@ -63,11 +63,7 @@ def test_no_orphan_permissions() -> None:
                     used_permissions.add(Permission(perm_str))
 
     # Invariant 1: No RESERVED permission is currently bound to any route
-    reserved_allowlist = set(RESERVED.keys()) | {
-        Permission.PATIENT_CORRECT,
-        Permission.PATIENT_IMPORT,
-        Permission.PATIENT_EXPORT,
-    }
+    reserved_allowlist = set(RESERVED.keys())
     conflict = used_permissions & reserved_allowlist
     assert not conflict, f"Permissions in RESERVED are actively used by routes: {conflict}"
 

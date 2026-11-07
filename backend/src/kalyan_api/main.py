@@ -17,6 +17,7 @@ from kalyan_api.core.setup_code import (
 )
 from kalyan_api.db.session import SessionLocal, build_engine
 from kalyan_api.db.startup import run_startup_checks, setup_completed
+from kalyan_api.routers.admin_patients import router as admin_patients_router
 from kalyan_api.routers.appointments import doctor_router
 from kalyan_api.routers.appointments import router as appointments_router
 from kalyan_api.routers.areas import router as areas_router
@@ -155,6 +156,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(assets_router, prefix="/api")
     app.include_router(doctors_router, prefix="/api")
     app.include_router(patients_router, prefix="/api")
+    app.include_router(admin_patients_router, prefix="/api")
     app.include_router(appointments_router, prefix="/api")
     app.include_router(doctor_router, prefix="/api")
     app.include_router(encounters_router, prefix="/api")

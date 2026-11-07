@@ -90,6 +90,8 @@ class AuditAction(StrEnum):
     ASSET_DEACTIVATED = "ASSET_DEACTIVATED"
     # Phase 20 print template actions
     PRINT_TEMPLATE_UPDATED = "PRINT_TEMPLATE_UPDATED"
+    # Phase 20 data governance actions
+    PATIENT_CORRECTED = "PATIENT_CORRECTED"
 
 
 class Outcome(StrEnum):
