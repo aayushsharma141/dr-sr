@@ -265,7 +265,7 @@ Phases execute in numeric order: 11 → 12 → 13 → 14 → 15 → 16 → 17 �
 | 17. LAN Deployment, Printer & Acceptance | 5/5 | Complete | 2026-11-05 |
 | 18. UI/UX Review Hardening | 5/8 | In progress (04 closed with printer waiver; 05 closed with criterion 4 unmet; 06-08 pending) | - |
 | 19. Universal Consultation Workspace | 7/7 | Complete | 2026-11-06 |
-| 20. Admin Data Governance & Asset Management | 0/0 | Planned | - |
+| 20. Admin Data Governance & Asset Management | 0/8 | Planned | - |
 | 21. Advanced Data Operations | 0/0 | Deferred — depends on Phase 20 | - |
 
 ---
@@ -290,52 +290,15 @@ All existing pages (`/admin/settings`, `/admin/doctors`, `/admin/billing`, `/adm
 `/admin/security`, `/admin/audit`, `/admin/backups`, `/admin/integrity`, `/admin/system`)
 are preserved and relocated — not removed or rewritten.
 
-#### Plans
+**Plans:** 8 plans (Waves 1-8)
 
-- [ ] 20-01: Audit existing admin routes, APIs, permissions, and database schemas — produce
-  a gap map confirming what exists vs. what Phase 20 must add. Freeze this inventory before
-  building anything new.
+Plans:
 
-- [ ] 20-02: Five-section Admin sidebar navigation reorganization — restructure
-  `renderAdminSidebar` in AppShell to reflect Hospital Configuration / Patient & Data
-  Management / Users, Security & Governance / System & Maintenance sections. Update
-  `app-shell.test.tsx` assertions. No existing pages removed.
-
-- [ ] 20-03: Hospital identity and logo asset management — extend `/admin/settings` to
-  support logo file upload (validate type/size, store in managed server directory, record
-  metadata in DB), hospital photographs, and registration document details. Keep bilingual
-  name/address/contact fields. Maintain previous logo versions; do not delete assets
-  referenced by historical documents.
-
-- [ ] 20-04: Per-document-type print template management — replace the current single
-  `print_header_en/hi` and `print_footer_en/hi` text fields with a template registry keyed
-  by document type (`prescription`, `receipt`, `registration_card`). Backend: new
-  `print_templates` table with `document_type`, `header_en`, `header_hi`, `footer_en`,
-  `footer_hi`, `version`, `updated_by`, `updated_at`. Frontend: template editor with
-  bilingual fields and live preview per document type.
-
-- [ ] 20-05: Patient demographic correction workflow — Admin-only page that allows correcting
-  permitted demographic fields (name, phone, DOB, address) with mandatory reason field,
-  before/after preview, and audit event written in the same transaction. Distinguish
-  demographic correction from clinical amendment (clinical notes are append-only with
-  addenda; demographic fields are correctable by admin). Backend: `PATCH
-  /api/admin/patients/{id}/demographics` with version check and audit.
-
-- [ ] 20-06: Patient import centre — 8-stage pipeline (upload → inspect → map → validate →
-  resolve → preview → commit → reconcile). Accept CSV and XLSX using a documented standard
-  template. Staging table holds the batch before commit. Duplicate candidates are flagged for
-  manual resolution; no auto-overwrite of existing records. Each import recorded as a batch
-  with ID, filename, operator, timestamp, mapping, validation results, and commit status.
-  Backend: `POST /api/admin/imports` (create batch), `GET /api/admin/imports/{id}` (status),
-  `POST /api/admin/imports/{id}/commit` (execute). Frontend: step-by-step import wizard.
-
-- [ ] 20-07: Patient export centre — permission-checked, field-selective, audited CSV/XLSX
-  export. Admin selects record scope (by date, department, search), field set, and enters a
-  mandatory export reason. Sensitive clinical fields excluded by default. Export creates an
-  audit event. Backend: `POST /api/admin/exports` (generate and stream). Frontend: export
-  configuration form with field checkboxes and confirmation.
-
-- [ ] 20-08: Phase 20 integration gate — full test suite pass, typecheck clean, all new
-  backend endpoints covered by tests, audit events verified for every new operation,
-  import/export round-trip tested with a sample CSV, logo upload and template preview
-  verified, existing admin pages confirmed unbroken.
+- [ ] 20-01-PLAN.md — Admin inventory audit, permissions foundation (patient:correct, patient:import, patient:export), and schema freeze (Wave 1)
+- [ ] 20-02-PLAN.md — Five-section Admin sidebar navigation reorganization in AppShell and module registry (Wave 2)
+- [ ] 20-03-PLAN.md — Hospital identity and logo asset management (upload, version history, asset directory, backup/integrity) (Wave 3)
+- [ ] 20-04-PLAN.md — Per-document-type print template management (prescription, receipt, registration_card, consultation_summary) (Wave 4)
+- [ ] 20-05-PLAN.md — Patient demographic correction workflow (PATCH route, reason, audit, print snapshot backfill) (Wave 5)
+- [ ] 20-06-PLAN.md — Patient import centre (8-stage pipeline, CSV/XLSX, staging, safety backup before commit, URN sequence) (Wave 6)
+- [ ] 20-07-PLAN.md — Patient export centre (stream to browser, field-selective, audited, formula sanitization) (Wave 7)
+- [ ] 20-08-PLAN.md — Phase 20 integration gate (all tests pass, typecheck clean, coverage floor maintained) (Wave 8)

@@ -205,10 +205,10 @@ Deferred; tracked but not in the current roadmap.
 | DWS-08 | Phase 19 | Complete |
 | DWS-09 | Phase 19 | Complete |
 | DWS-10 | Phase 19 | Complete |
-| REC-05 | Phase 18 / Phase 20 | Pending |
-| REC-06 | Phase 18 / Phase 20 | Pending |
-| REC-07 | Phase 18 / Phase 20 | Pending |
-| REC-08 | Phase 18 / Phase 20 | Pending |
+| REC-05 | Deferred (Post-v3.0) | Pending |
+| REC-06 | Deferred (Post-v3.0) | Pending |
+| REC-07 | Deferred (Post-v3.0) | Pending |
+| REC-08 | Deferred (Post-v3.0) | Pending |
 
 **Coverage:**
 - v1 requirements: 59 total
