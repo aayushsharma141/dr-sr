@@ -293,12 +293,26 @@ are preserved and relocated — not removed or rewritten.
 **Plans:** 8 plans (Waves 1-8)
 
 Plans:
-
+**Wave 1**
 - [ ] 20-01-PLAN.md — Admin inventory audit, permissions foundation (patient:correct, patient:import, patient:export), and schema freeze (Wave 1)
+
+**Wave 2** *(blocked on Wave 1 completion)*
 - [ ] 20-02-PLAN.md — Five-section Admin sidebar navigation reorganization in AppShell and module registry (Wave 2)
+
+**Wave 3** *(blocked on Wave 2 completion)*
 - [ ] 20-03-PLAN.md — Hospital identity and logo asset management (upload, version history, asset directory, backup/integrity) (Wave 3)
+
+**Wave 4** *(blocked on Wave 3 completion)*
 - [ ] 20-04-PLAN.md — Per-document-type print template management (prescription, receipt, registration_card, consultation_summary) (Wave 4)
+
+**Wave 5** *(blocked on Wave 4 completion)*
 - [ ] 20-05-PLAN.md — Patient demographic correction workflow (PATCH route, reason, audit, print snapshot backfill) (Wave 5)
+
+**Wave 6** *(blocked on Wave 5 completion)*
 - [ ] 20-06-PLAN.md — Patient import centre (8-stage pipeline, CSV/XLSX, staging, safety backup before commit, URN sequence) (Wave 6)
+
+**Wave 7** *(blocked on Wave 6 completion)*
 - [ ] 20-07-PLAN.md — Patient export centre (stream to browser, field-selective, audited, formula sanitization) (Wave 7)
+
+**Wave 8** *(blocked on Wave 7 completion)*
 - [ ] 20-08-PLAN.md — Phase 20 integration gate (all tests pass, typecheck clean, coverage floor maintained) (Wave 8)
