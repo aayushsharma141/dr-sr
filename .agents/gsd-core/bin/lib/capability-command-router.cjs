@@ -1,4 +1,4 @@
-﻿'use strict';
+'use strict';
 /**
  * capability-command-router.cjs — ADR-2346 P2 (#2368).
  *

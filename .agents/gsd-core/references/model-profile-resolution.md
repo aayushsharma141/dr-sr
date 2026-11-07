@@ -1,4 +1,4 @@
-﻿# Model Profile Resolution
+# Model Profile Resolution
 
 Resolve each agent's model through `gsd-tools`, then pass it to the `Agent()` spawn — or
 omit the parameter entirely when nothing resolved.
@@ -26,7 +26,7 @@ string** when nothing resolved.
 
 ## Lookup Table
 
-@.agents/gsd-core/references/model-profiles.md
+@~/.claude/gsd-core/references/model-profiles.md
 
 ## Passing the model to a spawn
 

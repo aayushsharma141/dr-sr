@@ -1,4 +1,4 @@
-﻿# SPIDR Story Splitting Rules
+# SPIDR Story Splitting Rules
 
 > Used by `mvp-phase` workflow when the user-supplied story is too large for a single phase. Per PRD decision Q3, SPIDR runs as a **full interactive flow** — not a lightweight check.
 

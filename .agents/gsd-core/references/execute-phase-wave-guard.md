@@ -1,4 +1,4 @@
-﻿0.5. **Inter-wave worktree base re-check (wave N+1 guard — #1369):**
+0.5. **Inter-wave worktree base re-check (wave N+1 guard — #1369):**
 
    After Wave N merges and tracking commits advance orchestrator HEAD, Claude Code's
    `isolation="worktree"` forks new worktrees from `origin/HEAD` (the "fresh" base) unless

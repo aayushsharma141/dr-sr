@@ -1,4 +1,4 @@
-﻿Apply response_language to all user-facing prose — narration between tool calls, status updates, progress notes, and findings included; preserve code, paths, and identifiers.
+Apply response_language to all user-facing prose — narration between tool calls, status updates, progress notes, and findings included; preserve code, paths, and identifiers.
 
 <step name="worktree_base_check">
 `USE_WORKTREES` and `ISOLATION` are also reset for the run when `worktree base-check` detects the

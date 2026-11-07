@@ -1,4 +1,4 @@
-﻿# Response-Language Directive (#2529)
+# Response-Language Directive (#2529)
 
 **If `response_language` is set** (in the init JSON this workflow parses, or in `.planning/config.json`): ALL user-facing output of this workflow MUST be in that language — narration between tool calls, status updates, progress notes, findings, banners, report prose, questions (AskUserQuestion or plain text), and summaries. Technical terms, code, file paths, commands, and identifiers stay in English.
 

@@ -1,4 +1,4 @@
-﻿<step name="dispatch_fix">
+<step name="dispatch_fix">
 If the `--fix` flag was passed (`FIX_FLAG=true`), delegate to the `code-review-fix.md` workflow
 to auto-apply findings from the REVIEW.md that was just written (or that already existed).
 

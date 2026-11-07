@@ -1,4 +1,4 @@
-﻿<step name="dispatch_monorepo_packages" condition="monorepo_workspaces is non-empty">
+<step name="dispatch_monorepo_packages" condition="monorepo_workspaces is non-empty">
 After Wave 2 collection, generate per-package READMEs for each monorepo workspace.
 
 **Condition:** Only run this step if `monorepo_workspaces` from the init JSON is non-empty.

@@ -1,4 +1,4 @@
-﻿# Developer Profile
+# Developer Profile
 
 > This profile was generated from session analysis. It contains behavioral directives
 > for Claude to follow when working with this developer. HIGH confidence dimensions

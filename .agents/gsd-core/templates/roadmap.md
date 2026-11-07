@@ -1,4 +1,4 @@
-﻿# Roadmap Template
+# Roadmap Template
 
 Template for `.planning/ROADMAP.md`.
 

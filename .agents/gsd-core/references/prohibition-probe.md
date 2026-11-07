@@ -1,7 +1,7 @@
-﻿# Prohibition-Probe — Spec-Completeness Must-NOT Reference
+# Prohibition-Probe — Spec-Completeness Must-NOT Reference
 
 Shared reference for the spec/requirements phase. Companion to
-`@.agents/gsd-core/references/edge-probe.md`: `edge-probe` reaches the
+`@~/.claude/gsd-core/references/edge-probe.md`: `edge-probe` reaches the
 **data/behavior-shape axis** (boundaries, adjacency, encoding, ordering) — the things a
 feature must *do*. This reference reaches the orthogonal **must-NOT axis** (product, values,
 safety, ethics) — the things a feature must *never silently become*. The edge-probe caught
@@ -228,7 +228,7 @@ both the reference implementation and any third-party port emit.
 | Docstring contract | a documented behavior | a negative assertion in the contract test | a documented must-NOT for reviewers |
 
 The portable invariant: a `resolved`/`test` prohibition produces **a checkable negative the
-verifier iterates over** (gsd- a `must_haves.prohibitions` item with a test); a
+verifier iterates over** (GSD: a `must_haves.prohibitions` item with a test); a
 `resolved`/`judgment` prohibition produces a recorded intent routed to judgment review. An
 `unresolved` prohibition is an explicit assumption the downstream planner must surface, not
 silently drop.

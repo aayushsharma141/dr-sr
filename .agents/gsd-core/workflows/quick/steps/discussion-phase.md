@@ -1,4 +1,4 @@
-﻿**Step 4.5: Discussion phase (only when `$DISCUSS_MODE`)**
+**Step 4.5: Discussion phase (only when `$DISCUSS_MODE`)**
 
 Skip this step entirely if NOT `$DISCUSS_MODE`.
 

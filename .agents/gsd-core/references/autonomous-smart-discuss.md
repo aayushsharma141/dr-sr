@@ -1,4 +1,4 @@
-﻿# Smart Discuss — Autonomous Mode
+# Smart Discuss — Autonomous Mode
 
 Smart discuss is the autonomous-optimized variant of `gsd-discuss-phase`. It proposes grey area answers in batch tables — the user accepts or overrides per area — then writes an identical CONTEXT.md to what discuss-phase produces.
 

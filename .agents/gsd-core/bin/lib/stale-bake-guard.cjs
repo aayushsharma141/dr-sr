@@ -1,4 +1,4 @@
-﻿'use strict';
+'use strict';
 
 /**
  * Stale-bake guard for static-frontmatter runtimes (#1688, follow-up to #1650).

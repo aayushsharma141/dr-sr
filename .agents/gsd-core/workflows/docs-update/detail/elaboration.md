@@ -1,4 +1,4 @@
-﻿# docs-update.md — deferred elaboration
+# docs-update.md — deferred elaboration
 
 Read in full when `workflow.compact_content` is `false` (the default) — see
 `gsd-core/references/compact-content-gate.md` for the check and resolution rule this

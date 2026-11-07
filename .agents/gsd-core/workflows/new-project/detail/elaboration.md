@@ -1,4 +1,4 @@
-﻿# new-project.md — deferred elaboration
+# new-project.md — deferred elaboration
 
 Read in full when `workflow.compact_content` is `false` (the default) — see
 `gsd-core/references/compact-content-gate.md` for the check and resolution rule this
@@ -11,10 +11,10 @@ Check for existing spike and sketch work that should inform project setup:
 
 ```bash
 # Check for spike findings skill (project-local)
-SPIKE_SKILL=$(ls ./.agents/skills/spike-findings-*/SKILL.md 2>/dev/null | head -1 || true)
+SPIKE_SKILL=$(ls ./.claude/skills/spike-findings-*/SKILL.md 2>/dev/null | head -1 || true)
 
 # Check for sketch findings skill (project-local)
-SKETCH_SKILL=$(ls ./.agents/skills/sketch-findings-*/SKILL.md 2>/dev/null | head -1 || true)
+SKETCH_SKILL=$(ls ./.claude/skills/sketch-findings-*/SKILL.md 2>/dev/null | head -1 || true)
 
 # Check for raw spikes/sketches in .planning/
 HAS_SPIKES=$(ls .planning/spikes/MANIFEST.md 2>/dev/null)
@@ -84,7 +84,7 @@ Your STACK.md feeds into roadmap creation. Be prescriptive:
 
 <output>
 Write to: {research_dir}/STACK.md
-Use template: .agents/gsd-core/templates/research-project/STACK.md
+Use template: $HOME/.claude/gsd-core/templates/research-project/STACK.md
 </output>
 ", subagent_type="gsd-project-researcher", model="{researcher_model}", description="Stack research")
 
@@ -124,7 +124,7 @@ Your FEATURES.md feeds into requirements definition. Categorize clearly:
 
 <output>
 Write to: {research_dir}/FEATURES.md
-Use template: .agents/gsd-core/templates/research-project/FEATURES.md
+Use template: $HOME/.claude/gsd-core/templates/research-project/FEATURES.md
 </output>
 ", subagent_type="gsd-project-researcher", model="{researcher_model}", description="Features research")
 
@@ -164,7 +164,7 @@ Your ARCHITECTURE.md informs phase structure in roadmap. Include:
 
 <output>
 Write to: {research_dir}/ARCHITECTURE.md
-Use template: .agents/gsd-core/templates/research-project/ARCHITECTURE.md
+Use template: $HOME/.claude/gsd-core/templates/research-project/ARCHITECTURE.md
 </output>
 ", subagent_type="gsd-project-researcher", model="{researcher_model}", description="Architecture research")
 
@@ -204,7 +204,7 @@ Your PITFALLS.md prevents mistakes in roadmap/planning. For each pitfall:
 
 <output>
 Write to: {research_dir}/PITFALLS.md
-Use template: .agents/gsd-core/templates/research-project/PITFALLS.md
+Use template: $HOME/.claude/gsd-core/templates/research-project/PITFALLS.md
 </output>
 ", subagent_type="gsd-project-researcher", model="{researcher_model}", description="Pitfalls research")
 ```

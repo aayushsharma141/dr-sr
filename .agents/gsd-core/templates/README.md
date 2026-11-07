@@ -1,4 +1,4 @@
-﻿# GSD Canonical Artifact Registry
+# GSD Canonical Artifact Registry
 
 This directory contains the template files for every artifact that GSD workflows officially produce. The table below is the authoritative index: **if a `.planning/` root file is not listed here, `gsd-health` will flag it as W019** (unrecognized artifact).
 
@@ -21,7 +21,7 @@ These files live directly at `.planning/` — not inside phase subdirectories.
 | `LEARNINGS.md` | *(inline)* | `/gsd-extract-learnings`, `/gsd-execute-phase` (gated: `features.global_learnings`) | Phase retrospective learnings for future plans |
 | `THREADS.md` | *(inline)* | `/gsd-thread` | Persistent discussion threads |
 | `config.json` | `config.json` | `/gsd-new-project`, `/gsd-health --repair` | Project-specific GSD configuration |
-| `GEMINI.md` | *(inline)* | `/gsd-profile` | Auto-assembled Claude Code context file |
+| `CLAUDE.md` | *(inline)* | `/gsd-profile` | Auto-assembled Claude Code context file |
 | `RETROSPECTIVE.md` | *(inline)* | `/gsd-complete-milestone` | Living milestone retrospective updated at each milestone close |
 | `WINDOWS.md` | *(none)* | broken-windows ledger (`src/broken-windows.cts`) | Tracked known-broken items pending resolution (#3224) |
 | `STATE-ARCHIVE.md` | *(none)* | `state.cts`'s `cmdStatePrune` | Pruned historical STATE.md entries |

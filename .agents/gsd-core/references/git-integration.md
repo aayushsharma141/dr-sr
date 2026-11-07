@@ -1,4 +1,4 @@
-﻿<overview>
+<overview>
 Git integration for GSD framework.
 </overview>
 
@@ -64,7 +64,7 @@ Each task gets its own commit immediately after completion.
 > **Parallel agents:** When running as a parallel executor (spawned by execute-phase),
 > run commits normally — let pre-commit hooks run. Do NOT pass `--no-verify` by default
 > (#2924). Hooks should fire on the introducing commit; silent bypass violates project
-> GEMINI.md guidance. If a project explicitly opts out via
+> CLAUDE.md guidance. If a project explicitly opts out via
 > `workflow.worktree_skip_hooks=true`, the orchestrator surfaces that flag in the
 > executor prompt; absent that signal, hooks run normally.
 

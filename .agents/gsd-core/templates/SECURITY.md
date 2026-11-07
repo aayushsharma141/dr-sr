@@ -1,4 +1,4 @@
-﻿---
+---
 phase: "{N}"
 slug: "{phase-slug}"
 status: draft

@@ -1,4 +1,4 @@
-﻿# Domain-Aware Probing Patterns
+# Domain-Aware Probing Patterns
 
 Shared reference for `/gsd-begin`, `/gsd-discuss-phase`, and domain exploration workflows.
 

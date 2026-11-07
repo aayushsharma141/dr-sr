@@ -1,4 +1,4 @@
-﻿# Reviewer Instances (#1517)
+# Reviewer Instances (#1517)
 
 Custom reviewer instances for `/gsd-review`: run one model-capable adapter (e.g. OpenCode)
 as several independent reviewer identities in a single review pass. Loaded lazily by

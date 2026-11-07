@@ -1,4 +1,4 @@
-﻿# Phase {PHASE_NUM}: {Phase Name} - Context
+# Phase {PHASE_NUM}: {Phase Name} - Context
 
 **Gathered:** {date}
 **Status:** Ready for planning

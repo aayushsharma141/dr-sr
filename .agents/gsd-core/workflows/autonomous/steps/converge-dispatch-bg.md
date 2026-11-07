@@ -1,4 +1,4 @@
-﻿## Converge Dispatch (Background)
+## Converge Dispatch (Background)
 
 If `PLAN_STRATEGY=converge`, print: `◆ Spawning background plan-convergence loop for phase ${PHASE_NUM}... (runs in a subagent — no output until it returns, ~1–5 min; expected, not a freeze)`
 

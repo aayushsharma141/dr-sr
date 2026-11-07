@@ -1,4 +1,4 @@
-﻿# Verify Command Grounding (#2401)
+# Verify Command Grounding (#2401)
 
 > Reference file for gsd-planner agent. Loaded on-demand via `@` reference.
 

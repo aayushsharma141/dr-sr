@@ -1,4 +1,4 @@
-﻿#!/usr/bin/env sh
+#!/usr/bin/env sh
 # gsd_run — standalone launcher so workflow bash blocks can invoke the GSD tools
 # in a fresh shell. Claude Code (and similar runtimes) runs each fenced bash block
 # in a separate process, so an inline gsd_run() function defined in an earlier

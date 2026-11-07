@@ -1,4 +1,4 @@
-﻿---
+---
 phase: "{N}"
 slug: "{phase-slug}"
 # status lifecycle: draft (seeded by plan-phase) → validated (set by validate-phase §6)

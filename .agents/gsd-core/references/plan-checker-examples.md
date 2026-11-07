@@ -1,4 +1,4 @@
-﻿# Plan-Checker Examples
+# Plan-Checker Examples
 
 > Progressive-disclosure reference for `agents/gsd-plan-checker.md`. The checker
 > inlines this file from its `<examples>` block via `@`; the calibrated few-shot

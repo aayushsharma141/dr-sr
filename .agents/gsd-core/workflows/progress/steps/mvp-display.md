@@ -1,4 +1,4 @@
-﻿<step name="mvp_display">
+<step name="mvp_display">
 **MVP-mode display (when phase has `**Mode:** mvp` in ROADMAP.md).**
 
 `init.progress` already resolved `phase_mvp_mode` for the current phase (progress has no `--mvp` CLI flag — mode is inherited from the planned phase), and this step is only read at all when that same fact is `true` (`section_manifest`'s `mvp-display` inclusion gates on it) — so there is no need to re-resolve `MVP_MODE` here via a fresh `gsd_run query phase.mvp-mode` call; that would gate this section on a fact its own body recomputes, which is circular and self-disabling. Simply consume `$phase_mvp_mode` (already extracted from init JSON in `init_context`) as `true` for the remainder of this step.

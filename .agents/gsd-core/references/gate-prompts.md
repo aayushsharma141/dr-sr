@@ -1,4 +1,4 @@
-﻿# Gate Prompt Patterns
+# Gate Prompt Patterns
 
 Reusable prompt patterns for structured gate checks in workflows and agents.
 

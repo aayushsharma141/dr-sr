@@ -1,4 +1,4 @@
-﻿# Verifier wiring and data-flow patterns
+# Verifier wiring and data-flow patterns
 
 Full pattern bodies for `agents/gsd-verifier.md`, extracted per
 `DEFECT.AGENT-FILE-SIZE-CAP-BREACH` (issue #2995, epic #1671 Phase 6.4). The agent

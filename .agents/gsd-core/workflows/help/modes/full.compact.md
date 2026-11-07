@@ -1,4 +1,4 @@
-﻿Apply response_language to all user-facing prose — narration between tool calls, status updates, progress notes, and findings included; preserve code, paths, and identifiers.
+Apply response_language to all user-facing prose — narration between tool calls, status updates, progress notes, and findings included; preserve code, paths, and identifiers.
 
 <purpose>
 Display the complete GSD Core command reference. Output ONLY the reference content. Do NOT add project-specific analysis, git status, next-step suggestions, or any commentary beyond the reference.
@@ -161,11 +161,11 @@ Usage: `/gsd-spike "can we stream LLM output over WebSockets?"`
 
 Usage: `/gsd-sketch "dashboard layout for the admin panel"`
 
-**`/gsd-spike --wrap-up`** — Curates spikes one-at-a-time (include/exclude/partial/UAT), generates a project skill under `./.agents/skills/spike-findings-[project]/`, writes `.planning/spikes/WRAP-UP-SUMMARY.md`, adds a GEMINI.md auto-load line.
+**`/gsd-spike --wrap-up`** — Curates spikes one-at-a-time (include/exclude/partial/UAT), generates a project skill under `./.claude/skills/spike-findings-[project]/`, writes `.planning/spikes/WRAP-UP-SUMMARY.md`, adds a CLAUDE.md auto-load line.
 
 Usage: `/gsd-spike --wrap-up`
 
-**`/gsd-sketch --wrap-up`** — Same curation flow for sketches, generating `./.agents/skills/sketch-findings-[project]/` with design decisions/CSS/HTML structures.
+**`/gsd-sketch --wrap-up`** — Same curation flow for sketches, generating `./.claude/skills/sketch-findings-[project]/` with design decisions/CSS/HTML structures.
 
 Usage: `/gsd-sketch --wrap-up`
 
@@ -175,7 +175,7 @@ Usage: `/gsd-sketch --wrap-up`
 
 Usage: `/gsd-capture Add auth token refresh`
 
-**`/gsd-capture --note <text>`** — Zero-friction timestamped note to `.planning/notes/` (or `.agents/notes/` globally). Subcommands: append (default), list, promote (note → todo). Works without a project.
+**`/gsd-capture --note <text>`** — Zero-friction timestamped note to `.planning/notes/` (or `$HOME/.claude/notes/` globally). Subcommands: append (default), list, promote (note → todo). Works without a project.
 
 Usage: `/gsd-capture --note refactor the hook system`
 Usage: `/gsd-capture --note promote 3`

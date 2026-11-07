@@ -1,4 +1,4 @@
-﻿# Debugger technique catalog
+# Debugger technique catalog
 
 Full technique bodies for `agents/gsd-debugger.md`, extracted per
 `DEFECT.AGENT-FILE-SIZE-CAP-BREACH` (issue #2995, epic #1671 Phase 6.4). The agent
@@ -241,12 +241,12 @@ git bisect bad              # or good, based on testing
 **Example:** Stale hook warning persists after update
 ```
 Check code says:  hooksDir = path.join(configDir, 'hooks')
-                  configDir = .agents
-                  → checks .agents/hooks/
+                  configDir = $HOME/.claude
+                  → checks $HOME/.claude/hooks/
 
 Installer says:   hooksDest = path.join(targetDir, 'hooks')
-                  targetDir = .agents/gsd-core
-                  → writes to .agents/gsd-core/hooks/
+                  targetDir = $HOME/.claude/gsd-core
+                  → writes to $HOME/.claude/gsd-core/hooks/
 
 MISMATCH: Checker looks in wrong directory → hooks "not found" → reported as stale
 ```

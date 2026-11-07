@@ -1,4 +1,4 @@
-﻿# Compact Content Gate
+# Compact Content Gate
 
 Shared by every workflow spine split under ADR-4139, and by every lazily-read fragment or
 planning-artifact template given a compact variant under Phase 6 (#4406). States the config check
@@ -62,5 +62,5 @@ named subagent.
 Same two rules as streams 1b/4, enforced in code instead of prose: `workflow.compact_content` off,
 or no registered `.compact.md` sibling for that agent, serves the canonical persona unchanged; on,
 with a sibling registered, serves the compact one. The one addition code gives that prose could
-not: a missing sibling is disclosed in the served payload itself (a leading `<!-- gsd- no compact
+not: a missing sibling is disclosed in the served payload itself (a leading `<!-- gsd: no compact
 payload registered ... -->` comment) rather than silently serving canonical with no signal at all.

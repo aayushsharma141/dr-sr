@@ -1,4 +1,4 @@
-﻿# Workstream Flag (`--ws`)
+# Workstream Flag (`--ws`)
 
 ## Overview
 

@@ -1,4 +1,4 @@
-﻿# State Template
+# State Template
 
 Template for `.planning/STATE.md` — the project's living memory.
 

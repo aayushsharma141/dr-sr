@@ -1,4 +1,4 @@
-﻿# API Coverage Gate (Full Coverage by Default — Opt Out, Never Opt In)
+# API Coverage Gate (Full Coverage by Default — Opt Out, Never Opt In)
 
 > Reference for the `api-coverage` gate on the `ai-integration` capability (#1562).
 > Config key: `workflow.api_coverage_gate` (default `true`). Gate point: `verify:pre`.

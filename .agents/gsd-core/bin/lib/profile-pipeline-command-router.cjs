@@ -1,4 +1,4 @@
-﻿'use strict';
+'use strict';
 /**
  * Profile-pipeline command router — CLI dispatcher for gsd-tools profiling commands.
  *

@@ -1,7 +1,7 @@
-﻿# Edge-Probe — Spec-Completeness Reference
+# Edge-Probe — Spec-Completeness Reference
 
 Shared reference for the spec/requirements phase. Companion to
-`@.agents/gsd-core/references/domain-probes.md`: `domain-probes` covers the
+`@~/.claude/gsd-core/references/domain-probes.md`: `domain-probes` covers the
 **technology axis** (auth, search, caching, deployment); this covers the
 **data/behavior-shape axis** (boundaries, adjacency, encoding, ordering…). Walk each
 requirement against the closed taxonomy below, propose a concrete candidate edge for each
@@ -150,7 +150,7 @@ implementation and any third-party port emit.
 | Docstring contract | a documented behavior | an assertion in the contract test | a property-based test for the function |
 
 The portable invariant: a `resolved`/`explicit` edge produces **the unit your verifier
-iterates over** (gsd- a `must_haves.truth`); a `resolved`/`backstop` edge produces a test
+iterates over** (GSD: a `must_haves.truth`); a `resolved`/`backstop` edge produces a test
 added to that same set as a non-inferable check. An `unresolved` edge is an explicit
 assumption the downstream planner must surface, not silently drop.
 

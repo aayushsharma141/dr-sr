@@ -1,4 +1,4 @@
-﻿# Git Planning Commit
+# Git Planning Commit
 
 Commit planning artifacts via `gsd_run query commit`, which checks `commit_docs` config and gitignore status.
 

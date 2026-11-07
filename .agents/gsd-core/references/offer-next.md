@@ -1,4 +1,4 @@
-﻿<!--
+<!--
   offer-next.md — extracted from execute-phase.md step "offer_next" (#2537).
   Eagerly @-referenced from execute-phase.md so runtime behavior is unchanged; the
   extraction restores byte-budget headroom the frozen ceiling exists to provide.
@@ -47,7 +47,7 @@ Phase {X} verified, continuing chain
 
 Execute the transition workflow inline (do NOT use Agent — orchestrator context is ~10-15%, transition needs phase completion data already in context):
 
-Read and follow `.agents/gsd-core/workflows/transition.md`, passing through the `--auto` flag so it propagates to the next phase invocation.
+Read and follow `$HOME/.claude/gsd-core/workflows/transition.md`, passing through the `--auto` flag so it propagates to the next phase invocation.
 
 **If neither `--auto` nor `AUTO_MODE` is true:**
 

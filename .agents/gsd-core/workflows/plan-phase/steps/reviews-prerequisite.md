@@ -1,4 +1,4 @@
-﻿## 2.5. Validate `--reviews` Prerequisite
+## 2.5. Validate `--reviews` Prerequisite
 
 **Skip if:** No `--reviews` flag.
 

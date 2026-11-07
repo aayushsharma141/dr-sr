@@ -1,4 +1,4 @@
-﻿// Generated from locked npm dependencies by lint-vendored-deps.cjs --fix. Do not edit.
+// Generated from locked npm dependencies by lint-vendored-deps.cjs --fix. Do not edit.
 "use strict";
 var __getOwnPropNames = Object.getOwnPropertyNames;
 var __commonJS = (cb, mod) => function __require() {

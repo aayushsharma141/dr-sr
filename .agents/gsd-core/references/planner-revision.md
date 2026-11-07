@@ -1,4 +1,4 @@
-﻿# Revision Mode — Planner Reference
+# Revision Mode — Planner Reference
 
 Triggered when orchestrator provides `<revision_context>` with checker issues. NOT starting fresh — making targeted updates to existing plans.
 
@@ -46,7 +46,7 @@ addressed, naming the property satisfied and the mechanism used.
 Before editing, re-read the constraints already in force:
 
 - Locked decisions in CONTEXT.md (`## Decisions`) and deferred ideas (`## Deferred Ideas`)
-- Active capability / project guidance (GEMINI.md, `.agents/skills/`, `.agents/skills/`)
+- Active capability / project guidance (CLAUDE.md, `.claude/skills/`, `.agents/skills/`)
 - Constraints the existing plans already encode (chosen mechanism, scope boundary, must_haves)
 
 A `fix_hint` conflicts when applying it would contradict any of those. Applying it anyway is
@@ -141,7 +141,7 @@ configured plan-review convergence loop; it does not count as a failed revision 
 
 | Issue | required_property | Conflicts with | Why the hint cannot be applied |
 |-------|-------------------|----------------|-------------------------------|
-| {dimension}/{plan} | {property} | {locked decision D-nn / GEMINI.md rule / plan constraint} | {one line} |
+| {dimension}/{plan} | {property} | {locked decision D-nn / CLAUDE.md rule / plan constraint} | {one line} |
 
 ### Alternatives Considered
 

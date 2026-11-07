@@ -1,4 +1,4 @@
-﻿# Worktree Path Safety
+# Worktree Path Safety
 
 Guards for executor agents running inside Claude Code worktrees. The
 supplied-root pin (step 0p) runs in EVERY mode; the remaining checks run before
@@ -52,7 +52,7 @@ git's own stderr in a `Diagnostic` line, so a platform failure self-describes
 instead of surfacing as a bare `Actual root: <none>`.
 
 ```bash
-# gsd-guard=supplied-root-pin (#4254) — run before the first Edit/Write and before every commit.
+# gsd:guard=supplied-root-pin (#4254) — run before the first Edit/Write and before every commit.
 PINNED_ROOT='{PINNED_ROOT}'  # orchestrator build-time substitution — the only valid source of this value
 PIN_STAGE=''
 PIN_DIAG=''

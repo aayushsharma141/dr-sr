@@ -1,4 +1,4 @@
-﻿**Step 4.75: Research phase (only when `$RESEARCH_MODE`)**
+**Step 4.75: Research phase (only when `$RESEARCH_MODE`)**
 
 Skip this step entirely if NOT `$RESEARCH_MODE`.
 
@@ -31,7 +31,7 @@ Agent(
 <required_reading>
 - ${STATE_PATH} (Project state — what's already built)
 - ${PROJECT_PATH} (Project context)
-- ./GEMINI.md or ./.agents/GEMINI.md (if exists — project-specific guidelines)
+- ./CLAUDE.md or ./.claude/CLAUDE.md (if exists — project-specific guidelines)
 ${DISCUSS_MODE ? '- ' + QUICK_DIR + '/' + quick_id + '-CONTEXT.md (User decisions — research should align with these. #3894: when workflow.research_before_questions is enabled research runs BEFORE discussion, so this file will not exist yet — read it only if present)' : ''}
 </required_reading>
 

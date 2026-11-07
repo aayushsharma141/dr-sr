@@ -1,4 +1,4 @@
-﻿# Milestone Entry Template
+# Milestone Entry Template
 
 Add this entry to `.planning/MILESTONES.md` when completing a milestone:
 

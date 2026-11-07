@@ -1,4 +1,4 @@
-﻿# Loop Hook Dispatch Contract
+# Loop Hook Dispatch Contract
 
 Generic reference for consuming the `--raw` JSON output of `gsd_run loop render-hooks <point>`
 in any host-loop workflow. This document is point-agnostic — it applies to every loop

@@ -1,4 +1,4 @@
-﻿## Converge Loop
+## Converge Loop
 
 If `PLAN_STRATEGY=converge`, run the convergence loop:
 

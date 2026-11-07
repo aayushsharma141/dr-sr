@@ -1,4 +1,4 @@
-﻿# Convergence Evidence Gate (#3304)
+# Convergence Evidence Gate (#3304)
 
 Bounds Step 7's anti-pattern scan so an approved gap-closure contract can
 actually close. Applies **only** when `is_re_verification = true` (Step 0) —

@@ -1,4 +1,4 @@
-﻿# Instructions for GSD
+# Instructions for GSD
 
 - Use the gsd-core skill when the user asks for GSD or uses a `gsd-*` command.
 - Treat `/gsd-...` or `gsd-...` as command invocations and load the matching file from `.github/skills/gsd-*`.

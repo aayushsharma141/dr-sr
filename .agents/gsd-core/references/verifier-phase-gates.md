@@ -1,4 +1,4 @@
-﻿# Verifier Phase Gates
+# Verifier Phase Gates
 
 > Loaded eagerly by `agents/gsd-verifier.md` (`<required_reading>`). Carries the three
 > verification-time gates that lived in the retired `verify-phase` workflow
@@ -198,5 +198,5 @@ Full protocol and rationale: `gsd-core/references/honest-verifier.md`.
 
 ## Lazy references
 
-- **Per-stack verification patterns:** before Step 4 (artifact verification) on an unfamiliar stack, Read `.agents/gsd-core/references/verification-patterns.md` — the grep catalog for React/Next.js components, API routes, database schema, and the universal stub patterns. Read it lazily (only the sections for the stack under verification); it is too large to load wholesale on every run.
-- **Canonical report shape:** the emitted VERIFICATION.md follows `@.agents/gsd-core/templates/verification-report.md` — the template whose Guidelines and row shapes `src/uat.cts` treats as canonical when consuming verification output.
+- **Per-stack verification patterns:** before Step 4 (artifact verification) on an unfamiliar stack, Read `$HOME/.claude/gsd-core/references/verification-patterns.md` — the grep catalog for React/Next.js components, API routes, database schema, and the universal stub patterns. Read it lazily (only the sections for the stack under verification); it is too large to load wholesale on every run.
+- **Canonical report shape:** the emitted VERIFICATION.md follows `@~/.claude/gsd-core/templates/verification-report.md` — the template whose Guidelines and row shapes `src/uat.cts` treats as canonical when consuming verification output.

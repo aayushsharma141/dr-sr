@@ -1,4 +1,4 @@
-﻿# Sequential root pin (#4254)
+# Sequential root pin (#4254)
 
 Apply response_language to all user-facing prose — narration between tool calls, status
 updates, progress notes, and findings included; preserve code, paths, and identifiers.

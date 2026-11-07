@@ -1,4 +1,4 @@
-﻿# MVP Concepts — index
+# MVP Concepts — index
 
 Cross-reference for the six MVP-related reference files. Each file has a single, narrow purpose. This index exists so future readers (and agents resolving `@`-refs) can find the right file without grepping the directory.
 

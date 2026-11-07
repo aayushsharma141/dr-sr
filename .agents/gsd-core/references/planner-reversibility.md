@@ -1,4 +1,4 @@
-﻿# Planner: Reversibility Tagging
+# Planner: Reversibility Tagging
 
 > Loaded by `gsd-planner`. Owns the canonical reversibility taxonomy — the
 > single source of truth for the three ratings. Issue #1951, *The Pragmatic

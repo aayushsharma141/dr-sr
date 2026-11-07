@@ -1,4 +1,4 @@
-﻿# Debug Template
+# Debug Template
 
 Template for `.planning/debug/[slug].md` — active debug session tracking.
 

@@ -1,4 +1,4 @@
-﻿# Stated Failing Direction (#3172)
+# Stated Failing Direction (#3172)
 
 > Reference file for the gsd-planner agent. Loaded on-demand via `@` reference from the
 > `<failing_direction_contract>` block of the planner spawn prompt in

@@ -1,4 +1,4 @@
-﻿## 7.5 Reset-phase safety (only when `--reset-phase-numbers`)
+## 7.5 Reset-phase safety (only when `--reset-phase-numbers`)
 
 If `--reset-phase-numbers` is active:
 

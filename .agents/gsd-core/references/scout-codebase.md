@@ -1,4 +1,4 @@
-﻿# Codebase scout — map selection table
+# Codebase scout — map selection table
 
 > Lazy-loaded reference for the `scout_codebase` step in
 > `workflows/discuss-phase.md` (extracted via the discuss-phase/modes progressive-disclosure split, #717).

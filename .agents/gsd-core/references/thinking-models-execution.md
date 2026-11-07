@@ -1,4 +1,4 @@
-﻿# Thinking Models: Execution Cluster
+# Thinking Models: Execution Cluster
 
 Structured reasoning models for the **executor** agent. Apply these at decision points during task execution, not continuously. Each model counters a specific documented failure mode.
 

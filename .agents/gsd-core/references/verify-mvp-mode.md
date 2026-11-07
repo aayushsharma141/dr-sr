@@ -1,4 +1,4 @@
-﻿# Verify-Work — MVP Mode UAT Framing
+# Verify-Work — MVP Mode UAT Framing
 
 > Loaded by `verify-work` workflow and `gsd-verifier` agent only when the phase under verification has `mode: mvp` in ROADMAP.md. Reframes UAT generation from technical checks to user-flow walk-throughs.
 

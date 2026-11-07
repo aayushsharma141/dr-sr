@@ -1,4 +1,4 @@
-﻿# Phase Spec Template
+# Phase Spec Template
 
 Template for `.planning/phases/XX-name/{phase_num}-SPEC.md` — locks requirements before discuss-phase.
 

@@ -1,4 +1,4 @@
-﻿# Multi-Variant HTML Patterns
+# Multi-Variant HTML Patterns
 
 Every sketch produces 2-3 variants in the same HTML file. The user switches between them to compare.
 

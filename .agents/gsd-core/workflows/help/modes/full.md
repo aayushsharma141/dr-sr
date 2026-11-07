@@ -1,4 +1,4 @@
-﻿Apply response_language to all user-facing prose — narration between tool calls, status updates, progress notes, and findings included; preserve code, paths, and identifiers.
+Apply response_language to all user-facing prose — narration between tool calls, status updates, progress notes, and findings included; preserve code, paths, and identifiers.
 
 <purpose>
 Display the complete GSD Core command reference. Output ONLY the reference content. Do NOT add project-specific analysis, git status, next-step suggestions, or any commentary beyond the reference.
@@ -383,9 +383,9 @@ Package spike findings into a persistent project skill.
 
 - Curates each spike one-at-a-time (include/exclude/partial/UAT)
 - Groups findings by feature area
-- Generates `./.agents/skills/spike-findings-[project]/` with references and sources
+- Generates `./.claude/skills/spike-findings-[project]/` with references and sources
 - Writes summary to `.planning/spikes/WRAP-UP-SUMMARY.md`
-- Adds auto-load routing line to project GEMINI.md
+- Adds auto-load routing line to project CLAUDE.md
 
 Usage: `/gsd-spike --wrap-up`
 
@@ -394,9 +394,9 @@ Package sketch design findings into a persistent project skill.
 
 - Curates each sketch one-at-a-time (include/exclude/partial/revisit)
 - Groups findings by design area
-- Generates `./.agents/skills/sketch-findings-[project]/` with design decisions, CSS patterns, HTML structures
+- Generates `./.claude/skills/sketch-findings-[project]/` with design decisions, CSS patterns, HTML structures
 - Writes summary to `.planning/sketches/WRAP-UP-SUMMARY.md`
-- Adds auto-load routing line to project GEMINI.md
+- Adds auto-load routing line to project CLAUDE.md
 
 Usage: `/gsd-sketch --wrap-up`
 
@@ -417,7 +417,7 @@ Usage: `/gsd-capture Add auth token refresh`
 **`/gsd-capture --note <text>`**
 Zero-friction note capture — one command, instant save, no questions.
 
-- Saves timestamped note to `.planning/notes/` (or `.agents/notes/` globally)
+- Saves timestamped note to `.planning/notes/` (or `$HOME/.claude/notes/` globally)
 - Three subcommands: append (default), list, promote
 - Promote converts a note into a structured todo
 - Works without a project (falls back to global scope)

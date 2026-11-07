@@ -1,4 +1,4 @@
-﻿---
+---
 component: plan-checker
 version: 1
 last_calibrated: 2026-03-24

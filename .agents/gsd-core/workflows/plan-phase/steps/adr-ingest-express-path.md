@@ -1,4 +1,4 @@
-﻿## 3.6. Handle ADR Ingest Express Path
+## 3.6. Handle ADR Ingest Express Path
 
 **Skip if:** No `--ingest` flag in arguments.
 

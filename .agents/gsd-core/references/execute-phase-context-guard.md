@@ -1,4 +1,4 @@
-﻿0. **Context exhaustion guard — `context_guard` (BEFORE spawning, #1452):**
+0. **Context exhaustion guard — `context_guard` (BEFORE spawning, #1452):**
 
    Before spawning any agents for this wave, self-assess context pressure using the
    degradation signals in `gsd-core/references/context-budget.md`. Signs of POOR tier (70%+):

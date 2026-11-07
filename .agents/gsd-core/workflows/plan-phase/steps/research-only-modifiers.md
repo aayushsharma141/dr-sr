@@ -1,4 +1,4 @@
-﻿### 5.0. Research-Only Modifiers (`--view`, `--research`)
+### 5.0. Research-Only Modifiers (`--view`, `--research`)
 
 **Skip if:** `RESEARCH_ONLY` is `false`.
 

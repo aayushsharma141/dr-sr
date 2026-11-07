@@ -1,4 +1,4 @@
-﻿# Interface Context for Executors
+# Interface Context for Executors
 
 **Key insight:** "The difference between handing a contractor blueprints versus telling them 'build me a house.'"
 

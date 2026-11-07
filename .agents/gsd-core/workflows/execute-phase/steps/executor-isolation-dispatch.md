@@ -1,4 +1,4 @@
-﻿# Executor isolation dispatch (ADR-1239 / #2584 Phase 3)
+# Executor isolation dispatch (ADR-1239 / #2584 Phase 3)
 
 Read and follow this fragment from `execute-phase.md` step 3 when dispatching a wave.
 It owns the per-host dispatch detail so the host workflow stays inside its
@@ -15,7 +15,7 @@ extras (`worktree.reap-orphans`, the `worktree.base-check` auto-degrade) inline 
 Run this in the config-gate step, right after `RUNTIME`/`USE_WORKTREES` are read.
 
 ```bash
-_GSD_SHIM_NAME="gsd-tools.cjs"; _GSD_RUNTIME_ROOT="${RUNTIME_DIR:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}"; GSD_TOOLS="${_GSD_RUNTIME_ROOT}/gsd-core/bin/${_GSD_SHIM_NAME}"; _gsd_at() { for _p; do if [ -f "$_p" ]; then GSD_TOOLS="$_p"; return 0; fi; done; return 1; }; _gsd_id_ok() { case "$("$1" runtime-identity --raw 2>/dev/null || true)" in '{"packageName":"@opengsd/gsd-core"'*'}') return 0;; *) return 1;; esac; }; _gsd_homes() { set -- "${CLAUDE_CONFIG_DIR:-.agents}" "${ANTIGRAVITY_CONFIG_DIR:-$HOME/.gemini/antigravity}" "$HOME/.gemini/antigravity-ide" "$HOME/.gemini/antigravity-cli" "${AUGMENT_CONFIG_DIR:-$HOME/.augment}" "${CLINE_CONFIG_DIR:-$HOME/.cline}" "${CODEBUDDY_CONFIG_DIR:-$HOME/.codebuddy}" "${CODEX_HOME:-$HOME/.codex}" "${COPILOT_CONFIG_DIR:-${COPILOT_HOME:-$HOME/.copilot}}" "${CURSOR_CONFIG_DIR:-$HOME/.cursor}" "${HERMES_HOME:-$HOME/.hermes}" "${KILO_CONFIG_DIR:-${XDG_CONFIG_HOME:-$HOME/.config}/kilo}" "${KIMI_CONFIG_DIR:-$HOME/.config/agents}" "$HOME/.agents" "${KIMI_CODE_HOME:-$HOME/.kimi-code}" "${OPENCODE_CONFIG_DIR:-${XDG_CONFIG_HOME:-$HOME/.config}/opencode}" "${PI_CODING_AGENT_DIR:-$HOME/.pi/agent}" "${QWEN_CONFIG_DIR:-$HOME/.qwen}" "${TRAE_CONFIG_DIR:-$HOME/.trae}" "${WINDSURF_CONFIG_DIR:-$HOME/.codeium/windsurf}" "${ZCODE_CONFIG_DIR:-$HOME/.zcode}" "${GROK_AGENTS_HOME:-$HOME/.agents}"; for _h; do _gsd_at "$_h/gsd-core/bin/${_GSD_SHIM_NAME}" && return 0; done; return 1; }; if _gsd_at "${_GSD_RUNTIME_ROOT}/gsd-core/bin/${_GSD_SHIM_NAME}" "${_GSD_RUNTIME_ROOT}/.agents/gsd-core/bin/${_GSD_SHIM_NAME}" "${_GSD_RUNTIME_ROOT}/.codex/gsd-core/bin/${_GSD_SHIM_NAME}"; then gsd_run() { node "$GSD_TOOLS" "$@"; }; elif _gsd_homes; then gsd_run() { node "$GSD_TOOLS" "$@"; }; elif unset -f gsd_run; _G="$(command -v gsd_run)"; [ -n "$_G" ] && _gsd_id_ok "$_G"; then GSD_TOOLS="$_G"; gsd_run() { "$GSD_TOOLS" "$@"; }; else echo "ERROR: gsd-tools.cjs not found at $GSD_TOOLS and no identity-proving gsd_run is on PATH. Run: npx -y @opengsd/gsd-core@latest --claude --local" >&2; exit 1; fi; GSD_IDENTITY_STATUS=unverified; _gsd_id_ok gsd_run && GSD_IDENTITY_STATUS=ok; export GSD_IDENTITY_STATUS; [ "$GSD_IDENTITY_STATUS" = ok ] || echo "WARNING: \"$GSD_TOOLS\" did not prove it is @opengsd/gsd-core - it is either a different package or an @opengsd/gsd-core older than the runtime-identity verb. See docs/how-to/diagnose-a-foreign-gsd-tools.md" >&2; if [ -n "${CLAUDE_ENV_FILE:-}" ] && [ -n "${GSD_TOOLS:-}" ]; then printf "export PATH='%s':\"\$PATH\"\n" "${GSD_TOOLS%/*}" >> "$CLAUDE_ENV_FILE" 2>/dev/null || true; fi
+_GSD_SHIM_NAME="gsd-tools.cjs"; _GSD_RUNTIME_ROOT="${RUNTIME_DIR:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}"; GSD_TOOLS="${_GSD_RUNTIME_ROOT}/gsd-core/bin/${_GSD_SHIM_NAME}"; _gsd_at() { for _p; do if [ -f "$_p" ]; then GSD_TOOLS="$_p"; return 0; fi; done; return 1; }; _gsd_id_ok() { case "$("$1" runtime-identity --raw 2>/dev/null || true)" in '{"packageName":"@opengsd/gsd-core"'*'}') return 0;; *) return 1;; esac; }; _gsd_homes() { set -- "${CLAUDE_CONFIG_DIR:-$HOME/.claude}" "${ANTIGRAVITY_CONFIG_DIR:-$HOME/.gemini/antigravity}" "$HOME/.gemini/antigravity-ide" "$HOME/.gemini/antigravity-cli" "${AUGMENT_CONFIG_DIR:-$HOME/.augment}" "${CLINE_CONFIG_DIR:-$HOME/.cline}" "${CODEBUDDY_CONFIG_DIR:-$HOME/.codebuddy}" "${CODEX_HOME:-$HOME/.codex}" "${COPILOT_CONFIG_DIR:-${COPILOT_HOME:-$HOME/.copilot}}" "${CURSOR_CONFIG_DIR:-$HOME/.cursor}" "${HERMES_HOME:-$HOME/.hermes}" "${KILO_CONFIG_DIR:-${XDG_CONFIG_HOME:-$HOME/.config}/kilo}" "${KIMI_CONFIG_DIR:-$HOME/.config/agents}" "$HOME/.agents" "${KIMI_CODE_HOME:-$HOME/.kimi-code}" "${OPENCODE_CONFIG_DIR:-${XDG_CONFIG_HOME:-$HOME/.config}/opencode}" "${PI_CODING_AGENT_DIR:-$HOME/.pi/agent}" "${QWEN_CONFIG_DIR:-$HOME/.qwen}" "${TRAE_CONFIG_DIR:-$HOME/.trae}" "${WINDSURF_CONFIG_DIR:-$HOME/.codeium/windsurf}" "${ZCODE_CONFIG_DIR:-$HOME/.zcode}" "${GROK_AGENTS_HOME:-$HOME/.agents}"; for _h; do _gsd_at "$_h/gsd-core/bin/${_GSD_SHIM_NAME}" && return 0; done; return 1; }; if _gsd_at "${_GSD_RUNTIME_ROOT}/gsd-core/bin/${_GSD_SHIM_NAME}" "${_GSD_RUNTIME_ROOT}/.claude/gsd-core/bin/${_GSD_SHIM_NAME}" "${_GSD_RUNTIME_ROOT}/.codex/gsd-core/bin/${_GSD_SHIM_NAME}"; then gsd_run() { node "$GSD_TOOLS" "$@"; }; elif _gsd_homes; then gsd_run() { node "$GSD_TOOLS" "$@"; }; elif unset -f gsd_run; _G="$(command -v gsd_run)"; [ -n "$_G" ] && _gsd_id_ok "$_G"; then GSD_TOOLS="$_G"; gsd_run() { "$GSD_TOOLS" "$@"; }; else echo "ERROR: gsd-tools.cjs not found at $GSD_TOOLS and no identity-proving gsd_run is on PATH. Run: npx -y @opengsd/gsd-core@latest --claude --local" >&2; exit 1; fi; GSD_IDENTITY_STATUS=unverified; _gsd_id_ok gsd_run && GSD_IDENTITY_STATUS=ok; export GSD_IDENTITY_STATUS; [ "$GSD_IDENTITY_STATUS" = ok ] || echo "WARNING: \"$GSD_TOOLS\" did not prove it is @opengsd/gsd-core - it is either a different package or an @opengsd/gsd-core older than the runtime-identity verb. See docs/how-to/diagnose-a-foreign-gsd-tools.md" >&2; if [ -n "${CLAUDE_ENV_FILE:-}" ] && [ -n "${GSD_TOOLS:-}" ]; then printf "export PATH='%s':\"\$PATH\"\n" "${GSD_TOOLS%/*}" >> "$CLAUDE_ENV_FILE" 2>/dev/null || true; fi
 # Isolation is a NEGOTIATED CAPABILITY, not a runtime id (#2584). Fail-closed to none.
 # #3045 CORE REDESIGN: `dispatch-isolation` PERSISTS this resolution to the
 # run-scoped sentinel the isolation guard hooks read, as an unconditional
@@ -129,7 +129,7 @@ The host has no harness-native isolation primitive, so **GSD** creates each work
 **Resume-first guard (#4624).** The launching turn may end while external workers are still live — that is expected here, not an error. So before dispatching ANY plan in this section, sweep for workers a previous session left behind:
 
 ```bash
-gsd_run query worktree.worker-status --root "${ORCH_ROOT}/.agents/worktrees" 2>/dev/null || true
+gsd_run query worktree.worker-status --root "${ORCH_ROOT}/.claude/worktrees" 2>/dev/null || true
 ```
 
 (An older installed shim without these verbs reports nothing here — its waves stay owned by the #3707 orphan sweep, as before.)
@@ -189,7 +189,7 @@ TDD_APPLICABLE="$_TDD_APPLICABLE_RAW"
 
 EXECUTOR_PROMPT='<objective>
 Execute plan {plan_number} of phase {phase_number}-{phase_name}.
-[gsd-dispatch phase="{phase_number}" plan="{plan_id}"]
+[gsd:dispatch phase="{phase_number}" plan="{plan_id}"]
 Commit each task atomically. Create SUMMARY.md.
 Do NOT update STATE.md or ROADMAP.md — the orchestrator owns those writes after all worktree agents in the wave complete.
 </objective>
@@ -229,15 +229,15 @@ PROJECT_ROOT=$(git rev-parse --show-toplevel 2>/dev/null)
 - ${PROJECT_ROOT}/.planning/PROJECT.md (Project context — core value, requirements, evolution rules)
 - ${PROJECT_ROOT}/.planning/STATE.md (State)
 - ${PROJECT_ROOT}/.planning/config.json (Config, if exists)
-- ${PROJECT_ROOT}/GEMINI.md (Project instructions, if exists — follow project-specific guidelines and coding conventions)
-- ${PROJECT_ROOT}/.agents/skills/ or ${PROJECT_ROOT}/.agents/skills/ (Project skills, if either exists — list skills, read SKILL.md for each, follow relevant rules during implementation)
+- ${PROJECT_ROOT}/CLAUDE.md (Project instructions, if exists — follow project-specific guidelines and coding conventions)
+- ${PROJECT_ROOT}/.claude/skills/ or ${PROJECT_ROOT}/.agents/skills/ (Project skills, if either exists — list skills, read SKILL.md for each, follow relevant rules during implementation)
 - ${PROJECT_ROOT}/{phase_dir}/*-CONTEXT.md (User decisions from discuss-phase — honors locked choices; skip silently when none exist)
 - ${PROJECT_ROOT}/{phase_dir}/*-RESEARCH.md (Technical research — pitfalls and patterns to follow; skip silently when none exist)
 - ${PROJECT_ROOT}/{prior_wave_summaries} (SUMMARY.md files from earlier waves in this phase — what was already built; PARALLEL WAVES especially must not duplicate or clobber sibling work; substitute the empty string when this is wave 1)
 </required_reading>
 
 <mcp_tools>
-If GEMINI.md or project instructions reference MCP tools, prefer those tools
+If CLAUDE.md or project instructions reference MCP tools, prefer those tools
 over Grep/Glob for code navigation when available. Check tool availability
 first — fall back to Grep/Glob if not accessible.
 </mcp_tools>
@@ -299,7 +299,7 @@ Then create the worktree and resolve the spawn:
 #    root-confined by the verb itself — never hand-roll `git worktree add`.
 AGENT_ID="agent-p{plan_number}-$(date -u +%s)"
 WT_BRANCH="worktree-${AGENT_ID}"
-WT_PATH="${ORCH_ROOT}/.agents/worktrees/${AGENT_ID}"
+WT_PATH="${ORCH_ROOT}/.claude/worktrees/${AGENT_ID}"
 CREATE_JSON=$(gsd_run query worktree.create \
   --manifest "$WAVE_WORKTREE_MANIFEST" \
   --agent-id "$AGENT_ID" \
@@ -357,7 +357,7 @@ gsd_run query worktree.worker-record \
   }
 ```
 
-**Wait until terminal, reconcile BEFORE recording the outcome (#4217/#4624).** Wait for the wave's executors to reach a terminal process state (`wait` on the captured PIDs, or poll `worktree.worker-status --root "${ORCH_ROOT}/.agents/worktrees"` and read `pidAlive`). While a worker's record is `running`, it is a reconciliation candidate the moment its process dies — a crash between classification and recording can never strand it. So the ordering is: run the **existing** artifact reconciliation (`execute-phase/steps/completion-reconciliation.md`) FIRST — SUMMARY + plan-scoped commits + branch state decide the outcome: a worker that exits 0 with no artifacts is not done, and one that exits non-zero with artifacts complete may still merge. Merge artifact-complete workers through the manifest-only gauntlet below; preserve a blocked/failed worktree untouched. Only then record the terminal outcome, carrying the recovery information:
+**Wait until terminal, reconcile BEFORE recording the outcome (#4217/#4624).** Wait for the wave's executors to reach a terminal process state (`wait` on the captured PIDs, or poll `worktree.worker-status --root "${ORCH_ROOT}/.claude/worktrees"` and read `pidAlive`). While a worker's record is `running`, it is a reconciliation candidate the moment its process dies — a crash between classification and recording can never strand it. So the ordering is: run the **existing** artifact reconciliation (`execute-phase/steps/completion-reconciliation.md`) FIRST — SUMMARY + plan-scoped commits + branch state decide the outcome: a worker that exits 0 with no artifacts is not done, and one that exits non-zero with artifacts complete may still merge. Merge artifact-complete workers through the manifest-only gauntlet below; preserve a blocked/failed worktree untouched. Only then record the terminal outcome, carrying the recovery information:
 
 ```bash
 gsd_run query worktree.worker-complete --path "$WT_PATH" --exit-code "$WORKER_EXIT" \

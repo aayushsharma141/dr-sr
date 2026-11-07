@@ -1,4 +1,4 @@
-﻿# Planner Preconditions — `<precondition>` Element
+# Planner Preconditions — `<precondition>` Element
 
 > Progressive-disclosure reference for `agents/gsd-planner.md`. The planner agent
 > reads this file when it needs the full emission rules for the `<precondition>`
