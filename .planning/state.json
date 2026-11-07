@@ -47,12 +47,22 @@
       "number": "19",
       "name": "Universal Consultation Workspace",
       "status": "complete"
+    },
+    {
+      "number": "20",
+      "name": "Admin Data Governance & Asset Management",
+      "status": "in_progress"
+    },
+    {
+      "number": "21",
+      "name": "Advanced Data Operations",
+      "status": "pending"
     }
   ],
   "next": {
     "command": "/gsd-progress --next",
-    "label": "Advance to the next step (verify)",
-    "reason": "Phase 1 of 9 · 86% · ready to verify"
+    "label": "Advance to the next step",
+    "reason": "Phase 10 of 11 · 77% · executing"
   },
-  "updated_at": "2026-11-06T11:15:29.196Z"
+  "updated_at": "2026-11-07T19:38:49.571Z"
 }
