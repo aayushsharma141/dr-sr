@@ -206,6 +206,8 @@ class BackupManifest:
     database_dump_bytes: int
     photos_count: int
     photos_manifest: list[dict[str, Any]]
+    assets_count: int = 0
+    assets_manifest: list[dict[str, Any]] | None = None
     label: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
@@ -217,6 +219,8 @@ class BackupManifest:
             "database_dump_bytes": self.database_dump_bytes,
             "photos_count": self.photos_count,
             "photos_manifest": self.photos_manifest,
+            "assets_count": self.assets_count,
+            "assets_manifest": self.assets_manifest if self.assets_manifest is not None else [],
             "label": self.label,
         }
 
@@ -320,6 +324,7 @@ RUNTIME_TABLE_GRANTS: dict[str, tuple[str, ...]] = {
     "clinical_template_responses": ("SELECT", "INSERT", "UPDATE", "DELETE"),
     "vital_observations": ("SELECT", "INSERT", "UPDATE", "DELETE"),
     "follow_up_recommendations": ("SELECT", "INSERT", "UPDATE", "DELETE"),
+    "hospital_assets": ("SELECT", "INSERT", "UPDATE"),
 }
 
 
@@ -471,7 +476,25 @@ def create_backup(
                         }
                     )
 
-        # 3. Create manifest.json
+        # 3. Copy hospital assets
+        assets_target_dir = payload_dir / "assets"
+        assets_target_dir.mkdir()
+        assets_manifest: list[dict[str, Any]] = []
+
+        if cfg.assets_dir.exists() and cfg.assets_dir.is_dir():
+            for asset_path in cfg.assets_dir.glob("*"):
+                if asset_path.is_file():
+                    dest_asset = assets_target_dir / asset_path.name
+                    shutil.copy2(asset_path, dest_asset)
+                    assets_manifest.append(
+                        {
+                            "filename": asset_path.name,
+                            "sha256": compute_sha256(dest_asset),
+                            "bytes": dest_asset.stat().st_size,
+                        }
+                    )
+
+        # 4. Create manifest.json
         manifest = BackupManifest(
             version="1.0",
             created_at=now.isoformat(),
@@ -480,12 +503,14 @@ def create_backup(
             database_dump_bytes=db_size,
             photos_count=len(photos_manifest),
             photos_manifest=photos_manifest,
+            assets_count=len(assets_manifest),
+            assets_manifest=assets_manifest,
             label=safe_label,
         )
         manifest_path = payload_dir / "manifest.json"
         manifest_path.write_text(json.dumps(manifest.to_dict(), indent=2), encoding="utf-8")
 
-        # 4. Create .tar.gz bundle
+        # 5. Create .tar.gz bundle
         with tarfile.open(final_archive_path, "w:gz") as tar:
             # Add manifest
             tar.add(manifest_path, arcname="manifest.json")
@@ -493,6 +518,8 @@ def create_backup(
             tar.add(db_dump_file, arcname="db.sql")
             # Add photos dir
             tar.add(photos_target_dir, arcname="photos")
+            # Add assets dir
+            tar.add(assets_target_dir, arcname="assets")
 
     return final_archive_path
 
@@ -561,6 +588,25 @@ def verify_backup_bundle(archive_path: Path) -> tuple[bool, str, dict[str, Any] 
                         manifest_data,
                     )
 
+            # Verify assets (backward compatibility: optional in manifest)
+            for asset_entry in manifest_data.get("assets_manifest", []):
+                fname = asset_entry["filename"]
+                arcname = f"assets/{fname}"
+                if arcname not in names:
+                    return False, f"Missing asset file declared in manifest: {fname}", manifest_data
+                a_file = tar.extractfile(arcname)
+                if not a_file:
+                    return False, f"Failed to extract asset {fname}", manifest_data
+                a_hasher = hashlib.sha256()
+                while chunk := a_file.read(65536):
+                    a_hasher.update(chunk)
+                if a_hasher.hexdigest() != asset_entry["sha256"]:
+                    return (
+                        False,
+                        f"Checksum mismatch for asset {fname}",
+                        manifest_data,
+                    )
+
             return True, "Backup bundle is cryptographically verified and intact", manifest_data
 
     except Exception as e:
@@ -624,11 +670,22 @@ def restore_backup(
                     shutil.copy2(photo_file, cfg.photos_dir / photo_file.name)
                     photos_restored += 1
 
+        # Restore assets
+        assets_src_dir = extract_dir / "assets"
+        cfg.assets_dir.mkdir(parents=True, exist_ok=True)
+        assets_restored = 0
+        if assets_src_dir.exists() and assets_src_dir.is_dir():
+            for asset_file in assets_src_dir.glob("*"):
+                if asset_file.is_file():
+                    shutil.copy2(asset_file, cfg.assets_dir / asset_file.name)
+                    assets_restored += 1
+
     return {
         "status": "SUCCESS",
         "archive_restored": str(path.resolve()),
         "prerestore_snapshot": str(prerestore_path.resolve()),
         "database_restored": True,
         "photos_restored_count": photos_restored,
+        "assets_restored_count": assets_restored,
         "manifest": manifest_data,
     }

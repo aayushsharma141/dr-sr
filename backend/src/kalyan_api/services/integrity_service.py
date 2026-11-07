@@ -31,7 +31,14 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from kalyan_api.config import Settings, get_settings
-from kalyan_api.models import Patient, Payment, TreatmentPlan, TreatmentSession, UrnSequence
+from kalyan_api.models import (
+    HospitalAsset,
+    Patient,
+    Payment,
+    TreatmentPlan,
+    TreatmentSession,
+    UrnSequence,
+)
 
 Severity = Literal["ERROR", "WARNING"]
 
@@ -362,6 +369,59 @@ def check_photo_storage_integrity(
     )
 
 
+def check_asset_storage_integrity(
+    session: Session, settings: Settings | None = None
+) -> CheckResult:
+    """Verify hospital asset files exist on disk and identify orphan files (SET-01, BAK-03)."""
+    cfg = settings or get_settings()
+    discrepancies: list[dict[str, Any]] = []
+
+    # 1. Check all DB assets have corresponding file on disk
+    assets = session.execute(select(HospitalAsset)).scalars().all()
+    db_asset_filenames: set[str] = set()
+
+    for a in assets:
+        fname = a.filename
+        db_asset_filenames.add(fname)
+        expected_file = cfg.assets_dir / fname
+        if not expected_file.exists():
+            discrepancies.append(
+                {
+                    "asset_id": a.id,
+                    "filename": fname,
+                    "asset_type": a.asset_type,
+                    "issue": "missing_asset_file",
+                }
+            )
+
+    # 2. Check for orphan files on disk
+    if cfg.assets_dir.exists() and cfg.assets_dir.is_dir():
+        for disk_file in cfg.assets_dir.glob("*"):
+            if disk_file.is_file():
+                if disk_file.name not in db_asset_filenames and not disk_file.name.startswith(
+                    "test_"
+                ):
+                    discrepancies.append(
+                        {
+                            "issue": "orphan_asset_file",
+                            "filename": disk_file.name,
+                            "bytes": disk_file.stat().st_size,
+                        }
+                    )
+
+    passed = len(discrepancies) == 0
+    return CheckResult(
+        name="Hospital Asset Storage Consistency",
+        passed=passed,
+        details=(
+            "All hospital assets exist on disk and no untracked orphans found"
+            if passed
+            else f"Found {len(discrepancies)} asset storage discrepancies"
+        ),
+        discrepancies=discrepancies,
+    )
+
+
 def run_integrity_audit(session: Session, settings: Settings | None = None) -> IntegrityReport:
     """Execute complete suite of clinical and financial integrity checks (BAK-03)."""
     cfg = settings or get_settings()
@@ -373,6 +433,7 @@ def run_integrity_audit(session: Session, settings: Settings | None = None) -> I
         check_receipt_uniqueness(session),
         check_session_progress_synchronization(session),
         check_photo_storage_integrity(session, cfg),
+        check_asset_storage_integrity(session, cfg),
     ]
 
     total = len(checks)

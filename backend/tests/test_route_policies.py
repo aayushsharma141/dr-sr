@@ -23,6 +23,7 @@ PUBLIC_ALLOWLIST: set[tuple[str, str]] = {
     ("POST", "/api/auth/login"),
     ("GET", "/api/setup/status"),
     ("POST", "/api/setup/admin"),
+    ("GET", "/api/assets/active-logo"),
 }
 
 MUST_EXIST: set[tuple[str, str]] = {
