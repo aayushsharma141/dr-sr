@@ -126,41 +126,51 @@ describe('Administration Module Registry Invariants', () => {
       expect(orders.has(mod.displayOrder), `Duplicate displayOrder: ${mod.displayOrder}`).toBe(false)
       orders.add(mod.displayOrder)
 
-      expect(['hospital', 'system']).toContain(mod.group)
+      expect([
+        'overview',
+        'hospital-config',
+        'patient-data',
+        'billing-finance',
+        'users-security',
+        'system-maintenance',
+      ]).toContain(mod.group)
       expect(['available', 'partial', 'fixed']).toContain(mod.status)
     }
   })
 
-  it('unimplemented/fixed modules have zero navigation actions (no misleading destinations)', () => {
-    const fixedModules = ADMIN_MODULES.filter((m) => m.status === 'fixed')
-    expect(fixedModules.length).toBeGreaterThanOrEqual(2)
-
-    for (const mod of fixedModules) {
-      expect(mod.actions, `Fixed module ${mod.id} must not have actions`).toHaveLength(0)
-      expect(mod.statusReason).toBeTruthy()
+  it('all modules are available with canonical navigation actions', () => {
+    for (const mod of ADMIN_MODULES) {
+      expect(mod.status).toBe('available')
+      expect(mod.actions.length).toBeGreaterThan(0)
     }
   })
 
   it('implemented modules map to canonical, existing routes', () => {
-    const activeModules = ADMIN_MODULES.filter((m) => m.status !== 'fixed')
-    for (const mod of activeModules) {
+    for (const mod of ADMIN_MODULES) {
       expect(mod.actions.length).toBeGreaterThan(0)
       for (const action of mod.actions) {
-        expect(action.path).toMatch(/^\/(admin|reception)\//)
+        expect(action.path).toMatch(/^\/(admin|reception)(\/|$)/)
       }
     }
   })
 
   it('findAdminModuleForPath matches canonical routes correctly', () => {
-    expect(findAdminModuleForPath('/admin/settings')?.module.id).toBe('hospital-configuration')
-    expect(findAdminModuleForPath('/admin/doctors')?.module.id).toBe('doctor-clinical')
-    expect(findAdminModuleForPath('/admin/billing')?.module.id).toBe('billing-financial')
-    expect(findAdminModuleForPath('/admin/users')?.module.id).toBe('user-authority')
-    expect(findAdminModuleForPath('/admin/roles')?.module.id).toBe('user-authority')
-    expect(findAdminModuleForPath('/admin/security')?.module.id).toBe('security-access')
-    expect(findAdminModuleForPath('/admin/audit')?.module.id).toBe('audit-compliance')
-    expect(findAdminModuleForPath('/admin/backups')?.module.id).toBe('backup-data')
-    expect(findAdminModuleForPath('/admin/integrity')?.module.id).toBe('backup-data')
+    expect(findAdminModuleForPath('/admin')?.module.id).toBe('overview')
+    expect(findAdminModuleForPath('/admin/settings')?.module.id).toBe('clinic-settings')
+    expect(findAdminModuleForPath('/admin/assets')?.module.id).toBe('hospital-assets')
+    expect(findAdminModuleForPath('/admin/templates')?.module.id).toBe('print-templates')
+    expect(findAdminModuleForPath('/admin/doctors')?.module.id).toBe('doctors-fees')
+    expect(findAdminModuleForPath('/admin/patients/correct')?.module.id).toBe('patient-correct')
+    expect(findAdminModuleForPath('/admin/imports')?.module.id).toBe('patient-imports')
+    expect(findAdminModuleForPath('/admin/exports')?.module.id).toBe('patient-exports')
+    expect(findAdminModuleForPath('/admin/billing')?.module.id).toBe('billing-reversals')
+    expect(findAdminModuleForPath('/reception/dues')?.module.id).toBe('pending-dues')
+    expect(findAdminModuleForPath('/admin/users')?.module.id).toBe('user-accounts')
+    expect(findAdminModuleForPath('/admin/roles')?.module.id).toBe('roles-matrix')
+    expect(findAdminModuleForPath('/admin/security')?.module.id).toBe('security-sessions')
+    expect(findAdminModuleForPath('/admin/audit')?.module.id).toBe('audit-trail')
+    expect(findAdminModuleForPath('/admin/backups')?.module.id).toBe('backups-restore')
+    expect(findAdminModuleForPath('/admin/integrity')?.module.id).toBe('data-integrity')
     expect(findAdminModuleForPath('/admin/system')?.module.id).toBe('system-health')
   })
 })
@@ -228,7 +238,7 @@ describe('Administration Dashboard & Single Sidebar Layout', () => {
     expect(screen.getByText('76%')).toBeInTheDocument()
 
     expect(screen.getByText('Patient Growth Trend')).toBeInTheDocument()
-    expect(screen.getByText('System Health')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'System Health' })).toBeInTheDocument()
     expect(screen.getByText('v1.16.0')).toBeInTheDocument()
   })
 
@@ -247,23 +257,41 @@ describe('Administration Dashboard & Single Sidebar Layout', () => {
     expect(within(quickAccess).getByRole('link', { name: /Hospital Profile/ })).toHaveAttribute('href', '/admin/settings')
   })
 
-  it('sidebar renders Management Overview and grouped governance & system sections', () => {
+  it('sidebar renders Management Overview and five canonical sections', () => {
     renderAreaHome()
 
     const primaryNav = screen.getByRole('navigation', { name: 'Primary navigation' })
 
-    // Sidebar items match canonical routes
+    // Top link
     expect(within(primaryNav).getByRole('link', { name: /Management Overview/ })).toHaveAttribute('href', '/admin')
-    expect(within(primaryNav).getByRole('link', { name: /Financial Reports/ })).toHaveAttribute('href', '/admin/billing')
-    expect(within(primaryNav).getByRole('link', { name: /Hospital Profile/ })).toHaveAttribute('href', '/admin/settings')
-    expect(within(primaryNav).getByRole('link', { name: /Departments & Services/ })).toHaveAttribute('href', '/admin/doctors')
-    expect(within(primaryNav).getByRole('link', { name: /Policies & Approvals/ })).toHaveAttribute('href', '/admin/security')
-    expect(within(primaryNav).getByRole('link', { name: /Audit & Compliance/ })).toHaveAttribute('href', '/admin/audit')
-    expect(within(primaryNav).getByRole('link', { name: /Users & Roles \(RBAC\)/ })).toHaveAttribute('href', '/admin/users')
-    expect(within(primaryNav).getByRole('link', { name: /Configuration Settings/ })).toHaveAttribute('href', '/admin/settings')
+
+    // Five section headers
+    expect(within(primaryNav).getByText('Hospital Configuration')).toBeInTheDocument()
+    expect(within(primaryNav).getByText('Patient & Data Management')).toBeInTheDocument()
+    expect(within(primaryNav).getByText('Billing & Finance')).toBeInTheDocument()
+    expect(within(primaryNav).getByText('Users, Security & Governance')).toBeInTheDocument()
+    expect(within(primaryNav).getByText('System & Maintenance')).toBeInTheDocument()
+
+    // Sidebar items match canonical routes
+    expect(within(primaryNav).getByRole('link', { name: /Clinic Settings/ })).toHaveAttribute('href', '/admin/settings')
+    expect(within(primaryNav).getByRole('link', { name: /Hospital Identity & Logo/ })).toHaveAttribute('href', '/admin/assets')
+    expect(within(primaryNav).getByRole('link', { name: /Print Templates/ })).toHaveAttribute('href', '/admin/templates')
+    expect(within(primaryNav).getByRole('link', { name: /Doctors & Fees/ })).toHaveAttribute('href', '/admin/doctors')
+
+    expect(within(primaryNav).getByRole('link', { name: /Patient Demographic Correction/ })).toHaveAttribute('href', '/admin/patients/correct')
+    expect(within(primaryNav).getByRole('link', { name: /Import Centre/ })).toHaveAttribute('href', '/admin/imports')
+    expect(within(primaryNav).getByRole('link', { name: /Export Centre/ })).toHaveAttribute('href', '/admin/exports')
+
+    expect(within(primaryNav).getByRole('link', { name: /Billing & Reversals/ })).toHaveAttribute('href', '/admin/billing')
+    expect(within(primaryNav).getByRole('link', { name: /Pending Dues/ })).toHaveAttribute('href', '/reception/dues')
+
+    expect(within(primaryNav).getByRole('link', { name: /User Accounts/ })).toHaveAttribute('href', '/admin/users')
+    expect(within(primaryNav).getByRole('link', { name: /Roles & Permissions/ })).toHaveAttribute('href', '/admin/roles')
+    expect(within(primaryNav).getByRole('link', { name: /Security & Sessions/ })).toHaveAttribute('href', '/admin/security')
+    expect(within(primaryNav).getByRole('link', { name: /Audit Trail/ })).toHaveAttribute('href', '/admin/audit')
+
     expect(within(primaryNav).getByRole('link', { name: /Backup & Restore/ })).toHaveAttribute('href', '/admin/backups')
+    expect(within(primaryNav).getByRole('link', { name: /Data Integrity/ })).toHaveAttribute('href', '/admin/integrity')
     expect(within(primaryNav).getByRole('link', { name: /System Health/ })).toHaveAttribute('href', '/admin/system')
-    expect(within(primaryNav).getByRole('link', { name: /Audit Logs/ })).toHaveAttribute('href', '/admin/audit')
-    expect(within(primaryNav).getByRole('link', { name: /Updates & Maintenance/ })).toHaveAttribute('href', '/admin/integrity')
   })
 })

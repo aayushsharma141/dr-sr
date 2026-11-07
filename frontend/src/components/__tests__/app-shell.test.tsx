@@ -76,27 +76,45 @@ describe('AppShell clinical navigation hierarchy', () => {
     expect(navigations.length).toBeGreaterThanOrEqual(1)
     const primaryNav = navigations[0]
 
-    // Verify sections and links for ADMIN
+    // Verify Management Overview is at the top
     expect(within(primaryNav).getByRole('link', { name: 'Management Overview' })).toHaveAttribute('href', '/admin')
-    expect(within(primaryNav).getByRole('link', { name: /Financial Reports/ })).toHaveAttribute('href', '/admin/billing')
-    expect(within(primaryNav).getByRole('link', { name: /Hospital Performance/ })).toHaveAttribute('href', '/admin')
-    expect(within(primaryNav).getByRole('link', { name: /Department Analytics/ })).toHaveAttribute('href', '/admin')
-    expect(within(primaryNav).getByRole('link', { name: /Resource Utilization/ })).toHaveAttribute('href', '/admin')
 
-    // Hospital Governance
-    expect(within(primaryNav).getByRole('link', { name: /Hospital Profile/ })).toHaveAttribute('href', '/admin/settings')
-    expect(within(primaryNav).getByRole('link', { name: /Departments & Services/ })).toHaveAttribute('href', '/admin/doctors')
-    expect(within(primaryNav).getByRole('link', { name: /Doctors & Staff/ })).toHaveAttribute('href', '/admin/doctors')
-    expect(within(primaryNav).getByRole('link', { name: /Policies & Approvals/ })).toHaveAttribute('href', '/admin/security')
-    expect(within(primaryNav).getByRole('link', { name: /Audit & Compliance/ })).toHaveAttribute('href', '/admin/audit')
+    // Section 1: Hospital Configuration
+    expect(within(primaryNav).getByText('Hospital Configuration')).toBeInTheDocument()
+    expect(within(primaryNav).getByRole('link', { name: 'Clinic Settings' })).toHaveAttribute('href', '/admin/settings')
+    expect(within(primaryNav).getByRole('link', { name: 'Hospital Identity & Logo' })).toHaveAttribute('href', '/admin/assets')
+    expect(within(primaryNav).getByRole('link', { name: 'Print Templates' })).toHaveAttribute('href', '/admin/templates')
+    expect(within(primaryNav).getByRole('link', { name: 'Doctors & Fees' })).toHaveAttribute('href', '/admin/doctors')
 
-    // System Administration
-    expect(within(primaryNav).getByRole('link', { name: /Users & Roles/ })).toHaveAttribute('href', '/admin/users')
-    expect(within(primaryNav).getByRole('link', { name: /Configuration Settings/ })).toHaveAttribute('href', '/admin/settings')
-    expect(within(primaryNav).getByRole('link', { name: /Backup & Restore/ })).toHaveAttribute('aria-current', 'page')
-    expect(within(primaryNav).getByRole('link', { name: /System Health/ })).toHaveAttribute('href', '/admin/system')
-    expect(within(primaryNav).getByRole('link', { name: /Audit Logs/ })).toHaveAttribute('href', '/admin/audit')
-    expect(within(primaryNav).getByRole('link', { name: /Updates & Maintenance/ })).toHaveAttribute('href', '/admin/integrity')
+    // Section 2: Patient & Data Management
+    expect(within(primaryNav).getByText('Patient & Data Management')).toBeInTheDocument()
+    expect(within(primaryNav).getByRole('link', { name: 'Patient Demographic Correction' })).toHaveAttribute('href', '/admin/patients/correct')
+    expect(within(primaryNav).getByRole('link', { name: 'Import Centre' })).toHaveAttribute('href', '/admin/imports')
+    expect(within(primaryNav).getByRole('link', { name: 'Export Centre' })).toHaveAttribute('href', '/admin/exports')
+
+    // Section 3: Billing & Finance
+    expect(within(primaryNav).getByText('Billing & Finance')).toBeInTheDocument()
+    expect(within(primaryNav).getByRole('link', { name: 'Billing & Reversals' })).toHaveAttribute('href', '/admin/billing')
+    expect(within(primaryNav).getByRole('link', { name: 'Pending Dues' })).toHaveAttribute('href', '/reception/dues')
+
+    // Section 4: Users, Security & Governance
+    expect(within(primaryNav).getByText('Users, Security & Governance')).toBeInTheDocument()
+    expect(within(primaryNav).getByRole('link', { name: 'User Accounts' })).toHaveAttribute('href', '/admin/users')
+    expect(within(primaryNav).getByRole('link', { name: 'Roles & Permissions' })).toHaveAttribute('href', '/admin/roles')
+    expect(within(primaryNav).getByRole('link', { name: 'Security & Sessions' })).toHaveAttribute('href', '/admin/security')
+    expect(within(primaryNav).getByRole('link', { name: 'Audit Trail' })).toHaveAttribute('href', '/admin/audit')
+
+    // Section 5: System & Maintenance
+    expect(within(primaryNav).getByText('System & Maintenance')).toBeInTheDocument()
+    expect(within(primaryNav).getByRole('link', { name: 'Backup & Restore' })).toHaveAttribute('href', '/admin/backups')
+    expect(within(primaryNav).getByRole('link', { name: 'Backup & Restore' })).toHaveAttribute('aria-current', 'page')
+    expect(within(primaryNav).getByRole('link', { name: 'Data Integrity' })).toHaveAttribute('href', '/admin/integrity')
+    expect(within(primaryNav).getByRole('link', { name: 'System Health' })).toHaveAttribute('href', '/admin/system')
+
+    // Dead placeholder links must NOT be in the document
+    expect(within(primaryNav).queryByRole('link', { name: /Hospital Performance/ })).not.toBeInTheDocument()
+    expect(within(primaryNav).queryByRole('link', { name: /Department Analytics/ })).not.toBeInTheDocument()
+    expect(within(primaryNav).queryByRole('link', { name: /Resource Utilization/ })).not.toBeInTheDocument()
 
     // No second Administration sidebar / subnavigation
     expect(screen.queryByRole('navigation', { name: 'Administration sections' })).not.toBeInTheDocument()
@@ -104,7 +122,7 @@ describe('AppShell clinical navigation hierarchy', () => {
 
     // No duplicate destinations across the screen
     expect(within(primaryNav).getAllByRole('link', { name: /Backup & Restore/ })).toHaveLength(1)
-    expect(within(primaryNav).getAllByRole('link', { name: /Hospital Profile/ })).toHaveLength(1)
+    expect(within(primaryNav).getAllByRole('link', { name: /Clinic Settings/ })).toHaveLength(1)
 
     // Doctor/Reception specific items not exposed
     expect(within(primaryNav).queryByRole('link', { name: 'Patient Registration' })).not.toBeInTheDocument()
