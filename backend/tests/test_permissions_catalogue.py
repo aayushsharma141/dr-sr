@@ -63,11 +63,16 @@ def test_no_orphan_permissions() -> None:
                     used_permissions.add(Permission(perm_str))
 
     # Invariant 1: No RESERVED permission is currently bound to any route
-    conflict = used_permissions & set(RESERVED.keys())
+    reserved_allowlist = set(RESERVED.keys()) | {
+        Permission.PATIENT_CORRECT,
+        Permission.PATIENT_IMPORT,
+        Permission.PATIENT_EXPORT,
+    }
+    conflict = used_permissions & reserved_allowlist
     assert not conflict, f"Permissions in RESERVED are actively used by routes: {conflict}"
 
     # Invariant 2: Active permissions + RESERVED permissions cover the entire Permission enum
-    total_covered = used_permissions | set(RESERVED.keys())
+    total_covered = used_permissions | reserved_allowlist
     missing = set(Permission) - total_covered
     assert not missing, f"Permissions orphaned (not in active routes or RESERVED): {missing}"
     assert total_covered == set(Permission)
@@ -108,6 +113,9 @@ def test_golden_role_permissions_snapshot() -> None:
                 Permission.SECURITY_WRITE,
                 Permission.BACKUP_CONFIGURE,
                 Permission.SYSTEM_READ,
+                Permission.PATIENT_CORRECT,
+                Permission.PATIENT_IMPORT,
+                Permission.PATIENT_EXPORT,
             }
         ),
         Role.RECEPTION: frozenset(
@@ -151,3 +159,17 @@ def test_golden_role_permissions_snapshot() -> None:
         ),
     }
     assert ROLE_PERMISSIONS == expected
+
+
+def test_admin_does_not_have_patient_update() -> None:
+    """D-20-01: Admin must NOT possess patient:update so reception route remains closed."""
+    assert Permission.PATIENT_UPDATE not in ROLE_PERMISSIONS[Role.ADMIN]
+    assert Permission.PATIENT_CORRECT in ROLE_PERMISSIONS[Role.ADMIN]
+    assert Permission.PATIENT_IMPORT in ROLE_PERMISSIONS[Role.ADMIN]
+    assert Permission.PATIENT_EXPORT in ROLE_PERMISSIONS[Role.ADMIN]
+    assert Permission.PATIENT_CORRECT not in ROLE_PERMISSIONS[Role.RECEPTION]
+    assert Permission.PATIENT_IMPORT not in ROLE_PERMISSIONS[Role.RECEPTION]
+    assert Permission.PATIENT_EXPORT not in ROLE_PERMISSIONS[Role.RECEPTION]
+    assert Permission.PATIENT_CORRECT not in ROLE_PERMISSIONS[Role.DOCTOR]
+    assert Permission.PATIENT_IMPORT not in ROLE_PERMISSIONS[Role.DOCTOR]
+    assert Permission.PATIENT_EXPORT not in ROLE_PERMISSIONS[Role.DOCTOR]

@@ -81,6 +81,11 @@ class Permission(StrEnum):
     BACKUP_CONFIGURE = "backup:configure"
     SYSTEM_READ = "system:read"
 
+    # Phase 20: Admin Data Governance & Asset Management (D-20-01)
+    PATIENT_CORRECT = "patient:correct"
+    PATIENT_IMPORT = "patient:import"
+    PATIENT_EXPORT = "patient:export"
+
 
 # Authoritative role-to-permissions catalog
 ROLE_PERMISSIONS: dict[Role, frozenset[Permission]] = {
@@ -116,6 +121,9 @@ ROLE_PERMISSIONS: dict[Role, frozenset[Permission]] = {
             Permission.SECURITY_WRITE,
             Permission.BACKUP_CONFIGURE,
             Permission.SYSTEM_READ,
+            Permission.PATIENT_CORRECT,
+            Permission.PATIENT_IMPORT,
+            Permission.PATIENT_EXPORT,
         }
     ),
     Role.RECEPTION: frozenset(
@@ -160,4 +168,8 @@ ROLE_PERMISSIONS: dict[Role, frozenset[Permission]] = {
 }
 
 # Mapping of future permissions reserved for upcoming phases
-RESERVED: dict[Permission, str] = {}
+RESERVED: dict[Permission, str] = {
+    Permission.PATIENT_CORRECT: "Phase 20 Plan 05: Admin demographic correction endpoint",
+    Permission.PATIENT_IMPORT: "Phase 20 Plan 06: Admin import centre endpoint",
+    Permission.PATIENT_EXPORT: "Phase 20 Plan 07: Admin export centre endpoint",
+}

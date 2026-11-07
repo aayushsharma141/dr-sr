@@ -92,6 +92,9 @@ PERMISSION_LABELS: dict[Permission, str] = {
     Permission.SECURITY_WRITE: "Tighten security policy",
     Permission.BACKUP_CONFIGURE: "Configure backup schedule and retention",
     Permission.SYSTEM_READ: "View system health",
+    Permission.PATIENT_CORRECT: "Correct patient demographics",
+    Permission.PATIENT_IMPORT: "Import patients",
+    Permission.PATIENT_EXPORT: "Export patient data",
 }
 
 
