@@ -1368,5 +1368,21 @@ export interface PrintTemplateUpdatePayload {
   version: number
 }
 
+// Phase 20 Data Governance: Export Centre
+export interface ExportScope {
+  start_date?: string | null
+  end_date?: string | null
+  department_id?: number | null
+  search_query?: string | null
+}
+
+export interface PatientExportRequest {
+  reason: string
+  format: 'csv' | 'xlsx'
+  scope: ExportScope
+  fields: string[]
+}
+
+
 
 

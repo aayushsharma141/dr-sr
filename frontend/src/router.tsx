@@ -196,18 +196,12 @@ export const router = createBrowserRouter([
           },
           {
             path: '/admin/exports',
-            lazy: async () => ({
-              Component: function ExportCentrePage() {
-                return (
-                  <div className="space-y-4 rounded-xl border border-slate-200 bg-white p-6 shadow-xs">
-                    <h1 className="text-xl font-bold text-slate-900">Export Centre</h1>
-                    <p className="text-sm text-slate-600">
-                      Field-selective patient dataset export and reporting.
-                    </p>
-                  </div>
-                )
-              },
-            }),
+            lazy: async () => {
+              const { PatientExportPage } = await import('./pages/admin/PatientExportPage')
+              return {
+                Component: PatientExportPage,
+              }
+            },
           },
         ],
       },
