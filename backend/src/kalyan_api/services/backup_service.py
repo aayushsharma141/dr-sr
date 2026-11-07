@@ -325,6 +325,8 @@ RUNTIME_TABLE_GRANTS: dict[str, tuple[str, ...]] = {
     "vital_observations": ("SELECT", "INSERT", "UPDATE", "DELETE"),
     "follow_up_recommendations": ("SELECT", "INSERT", "UPDATE", "DELETE"),
     "hospital_assets": ("SELECT", "INSERT", "UPDATE"),
+    "patient_import_batches": ("SELECT", "INSERT", "UPDATE", "DELETE"),
+    "patient_import_rows": ("SELECT", "INSERT", "UPDATE", "DELETE"),
 }
 
 
@@ -522,6 +524,10 @@ def create_backup(
             tar.add(assets_target_dir, arcname="assets")
 
     return final_archive_path
+
+
+# Alias for callers referring to create_backup as create_backup_bundle (D-20-12)
+create_backup_bundle = create_backup
 
 
 def verify_backup_bundle(archive_path: Path) -> tuple[bool, str, dict[str, Any] | None]:

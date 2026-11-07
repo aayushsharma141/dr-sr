@@ -1419,5 +1419,75 @@ class PrintTemplate(Base):
     updated_by_user = relationship("User", foreign_keys=[updated_by_user_id], lazy="joined")
 
 
+class PatientImportBatch(Base):
+    """Patient spreadsheet import batch metadata and staging lifecycle (D-20-08, D-20-14)."""
+
+    __tablename__ = "patient_import_batches"
+
+    id: Mapped[int] = mapped_column(BigInteger, Identity(always=False), primary_key=True)
+    batch_id: Mapped[str] = mapped_column(String(64), unique=True, nullable=False, index=True)
+    filename: Mapped[str] = mapped_column(String(255), nullable=False)
+    total_rows: Mapped[int] = mapped_column(Integer, default=0, server_default=text("0"), nullable=False)
+    valid_rows: Mapped[int] = mapped_column(Integer, default=0, server_default=text("0"), nullable=False)
+    duplicate_rows: Mapped[int] = mapped_column(Integer, default=0, server_default=text("0"), nullable=False)
+    invalid_rows: Mapped[int] = mapped_column(Integer, default=0, server_default=text("0"), nullable=False)
+    committed_rows: Mapped[int] = mapped_column(Integer, default=0, server_default=text("0"), nullable=False)
+    status: Mapped[str] = mapped_column(
+        String(32), default="STAGED", server_default=text("'STAGED'"), nullable=False
+    )
+    column_mapping: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    safety_backup_file: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    created_by_user_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("users.id", ondelete="RESTRICT"), nullable=False, index=True
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    committed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    created_by_user = relationship("User", foreign_keys=[created_by_user_id], lazy="select")
+    rows: Mapped[list["PatientImportRow"]] = relationship(
+        "PatientImportRow",
+        back_populates="batch",
+        cascade="all, delete-orphan",
+        order_by="PatientImportRow.row_index",
+    )
+
+
+class PatientImportRow(Base):
+    """Individual staged row for spreadsheet import (D-20-10, D-20-11, D-20-13)."""
+
+    __tablename__ = "patient_import_rows"
+
+    id: Mapped[int] = mapped_column(BigInteger, Identity(always=False), primary_key=True)
+    batch_id: Mapped[str] = mapped_column(
+        String(64),
+        ForeignKey("patient_import_batches.batch_id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    row_index: Mapped[int] = mapped_column(Integer, nullable=False)
+    raw_data: Mapped[dict] = mapped_column(JSONB, nullable=False)
+    mapped_data: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    validation_status: Mapped[str] = mapped_column(
+        String(32), default="PENDING", server_default=text("'PENDING'"), nullable=False
+    )
+    validation_errors: Mapped[dict | list | None] = mapped_column(JSONB, nullable=True)
+    duplicate_patient_id: Mapped[int | None] = mapped_column(
+        BigInteger, ForeignKey("patients.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    duplicate_resolution: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    allocated_urn: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    batch: Mapped["PatientImportBatch"] = relationship("PatientImportBatch", back_populates="rows")
+    duplicate_patient: Mapped["Patient | None"] = relationship(
+        "Patient", foreign_keys=[duplicate_patient_id], lazy="select"
+    )
+
+
+
 
 
