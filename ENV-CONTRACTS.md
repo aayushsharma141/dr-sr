@@ -18,7 +18,7 @@ The **Kalyan Hospital Management System** operates as a zero-cloud, offline-firs
   - `kalyan_app`: Runtime DML-only user (no table creation, alteration, or dropping permissions).
   - `kalyan_owner`: Schema owner role used strictly for Alembic database migrations and PostgreSQL native dump/restore utilities (`pg_dump`, `psql`).
 - **Frontend Architecture:** Single Page Application (React 19 + TypeScript + Vite + Tailwind CSS). Served statically by FastAPI in production environments via Starlette static file hosting (`app.frontend`), eliminating the need for a separate reverse proxy or Node.js production server.
-- **Legacy Desktop Client:** Standalone PySide6 (Qt 6) application (`app/`), operating in maintenance mode with local SQLite database fallback and direct thermal printing capabilities.
+- **Legacy Desktop Client:** Standalone PySide6 (Qt 6) application (`legacy/app/`), operating in maintenance mode with local SQLite database fallback and direct thermal printing capabilities.
 
 ### 1.2 Configuration Philosophy
 Configuration follows the **12-Factor App** methodology adapted for hardened, on-premise clinical desktop environments:

@@ -22,7 +22,7 @@ Ordering notes:
 - [ ] **Phase 17: LAN Deployment, Printer & Acceptance** - One-time server install, auto-recovery after power cut, LAN multi-PC offline operation, real-printer sign-off, full acceptance suite.
 - [ ] **Phase 18: UI/UX Review Hardening** - Receipt printing from the app, native modal dialogs, non-blocking errors, 12px text and contrast floor, bundled Hindi font and language marking, form accessibility, webcam HTTPS decision, headless print verification.
 - [x] **Phase 19: Universal Consultation Workspace** - One consultation for Physiotherapy and Ophthalmology: real drafts with auto-save, new and follow-up encounters, versioned specialty templates, vitals, integrated prescription, follow-up recommendations, read-all edit-own access, one login at a time and a printed summary. (completed 2026-11-06)
-- [ ] **Phase 20: Admin Data Governance & Asset Management** - Patient demographic correction with audit; CSV/XLSX import centre (8-stage staging pipeline: upload → inspect → map → validate → resolve → preview → commit → reconcile); controlled patient export (permission-checked, field-selective, audited); hospital identity and logo/asset CRUD with version history; bilingual print template management per document type (prescription, receipt, registration card); five-section Admin navigation reorganization (Hospital Configuration, Patient & Data Management, Users/Security/Governance, System & Maintenance). Uses existing RBAC; no new permission system. All existing admin pages preserved and reorganized, not removed.
+- [x] **Phase 20: Admin Data Governance & Asset Management** - Patient demographic correction with audit; CSV/XLSX import centre (8-stage staging pipeline: upload → inspect → map → validate → resolve → preview → commit → reconcile); controlled patient export (permission-checked, field-selective, audited); hospital identity and logo/asset CRUD with version history; bilingual print template management per document type (prescription, receipt, registration card); five-section Admin navigation reorganization (Hospital Configuration, Patient & Data Management, Users/Security/Governance, System & Maintenance). Uses existing RBAC; no new permission system. All existing admin pages preserved and reorganized, not removed. (completed 2026-11-08)
 - [ ] **Phase 21: Advanced Data Operations** (deferred) - Duplicate patient detection and merge workflow (high-risk FK cascade; dedicated transaction design); bulk archive and bulk delete for eligible records; extended data-edit permission controls; LAN workstation status monitoring. Depends on Phase 20 stable data foundation.
 
 ## Phase Details
@@ -265,7 +265,7 @@ Phases execute in numeric order: 11 → 12 → 13 → 14 → 15 → 16 → 17 �
 | 17. LAN Deployment, Printer & Acceptance | 5/5 | Complete | 2026-11-05 |
 | 18. UI/UX Review Hardening | 5/8 | In progress (04 closed with printer waiver; 05 closed with criterion 4 unmet; 06-08 pending) | - |
 | 19. Universal Consultation Workspace | 7/7 | Complete | 2026-11-06 |
-| 20. Admin Data Governance & Asset Management | 0/8 | Planned | - |
+| 20. Admin Data Governance & Asset Management | 8/8 | Complete | 2026-11-08 |
 | 21. Advanced Data Operations | 0/0 | Deferred — depends on Phase 20 | - |
 
 ---
@@ -290,29 +290,15 @@ All existing pages (`/admin/settings`, `/admin/doctors`, `/admin/billing`, `/adm
 `/admin/security`, `/admin/audit`, `/admin/backups`, `/admin/integrity`, `/admin/system`)
 are preserved and relocated — not removed or rewritten.
 
-**Plans:** 8 plans (Waves 1-8)
+**Plans:** 8/8 plans complete
 
 Plans:
-**Wave 1**
-- [ ] 20-01-PLAN.md — Admin inventory audit, permissions foundation (patient:correct, patient:import, patient:export), and schema freeze (Wave 1)
 
-**Wave 2** *(blocked on Wave 1 completion)*
-- [ ] 20-02-PLAN.md — Five-section Admin sidebar navigation reorganization in AppShell and module registry (Wave 2)
-
-**Wave 3** *(blocked on Wave 2 completion)*
-- [ ] 20-03-PLAN.md — Hospital identity and logo asset management (upload, version history, asset directory, backup/integrity) (Wave 3)
-
-**Wave 4** *(blocked on Wave 3 completion)*
-- [ ] 20-04-PLAN.md — Per-document-type print template management (prescription, receipt, registration_card, consultation_summary) (Wave 4)
-
-**Wave 5** *(blocked on Wave 4 completion)*
-- [ ] 20-05-PLAN.md — Patient demographic correction workflow (PATCH route, reason, audit, print snapshot backfill) (Wave 5)
-
-**Wave 6** *(blocked on Wave 5 completion)*
-- [ ] 20-06-PLAN.md — Patient import centre (8-stage pipeline, CSV/XLSX, staging, safety backup before commit, URN sequence) (Wave 6)
-
-**Wave 7** *(blocked on Wave 6 completion)*
-- [ ] 20-07-PLAN.md — Patient export centre (stream to browser, field-selective, audited, formula sanitization) (Wave 7)
-
-**Wave 8** *(blocked on Wave 7 completion)*
-- [ ] 20-08-PLAN.md — Phase 20 integration gate (all tests pass, typecheck clean, coverage floor maintained) (Wave 8)
+- [x] 20-01-PLAN.md — Admin inventory audit, permissions foundation (patient:correct, patient:import, patient:export), and schema freeze (Wave 1)
+- [x] 20-02-PLAN.md — Five-section Admin sidebar navigation reorganization in AppShell and module registry (Wave 2)
+- [x] 20-03-PLAN.md — Hospital identity and logo asset management (upload, version history, asset directory, backup/integrity) (Wave 3)
+- [x] 20-04-PLAN.md — Per-document-type print template management (prescription, receipt, registration_card, consultation_summary) (Wave 4)
+- [x] 20-05-PLAN.md — Patient demographic correction workflow (PATCH route, reason, audit, print snapshot backfill) (Wave 5)
+- [x] 20-06-PLAN.md — Patient import centre (8-stage pipeline, CSV/XLSX, staging, safety backup before commit, URN sequence) (Wave 6)
+- [x] 20-07-PLAN.md — Patient export centre (stream to browser, field-selective, audited, formula sanitization) (Wave 7)
+- [x] 20-08-PLAN.md — Phase 20 integration gate (all tests pass, typecheck clean, coverage floor maintained) (Wave 8)

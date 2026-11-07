@@ -1,7 +1,9 @@
 # Phase 20 Plan 06 Summary: Patient Import Centre (8-Stage Staging Pipeline)
 
 ## Overview
+
 Phase 20 Plan 06 establishes the administrative Patient Import Centre implementing the complete 8-stage staging pipeline (Upload, Inspect, Map, Validate, Resolve, Preview, Commit, Reconcile) supporting CSV and XLSX files per D-20-08 through D-20-14, BAK-01, AUD-01, UX-04, and UX-06:
+
 - **Migration 0018** (`0018_patient_import_staging.py`): Creates staging tables `patient_import_batches` and `patient_import_rows` with JSONB/JSON columns and dialect-safe grants for `kalyan_app`.
 - **Import Engine** (`import_service.py`):
   - Sniffs file encoding (`utf-8`, `utf-8-sig` / BOM, `windows-1252`) and delimiters for CSV, plus native XLSX parsing via `openpyxl` (D-20-08).
@@ -22,6 +24,7 @@ Phase 20 Plan 06 establishes the administrative Patient Import Centre implementi
 ## Tasks Completed
 
 ### Task 1: Migration 0018, Models, and Import Engine
+
 - **Files Created / Modified:**
   - `backend/src/kalyan_api/migrations/versions/0018_patient_import_staging.py`
   - `backend/src/kalyan_api/models.py`
@@ -49,6 +52,7 @@ Phase 20 Plan 06 establishes the administrative Patient Import Centre implementi
 ---
 
 ### Task 2: Import API Endpoints and Batch Audit Events
+
 - **Files Created / Modified:**
   - `backend/src/kalyan_api/core/permissions.py`
   - `backend/src/kalyan_api/services/audit_service.py`
@@ -81,6 +85,7 @@ Phase 20 Plan 06 establishes the administrative Patient Import Centre implementi
 ---
 
 ### Task 3: Frontend ImportWizard, DuplicateResolutionTable, and Import Page
+
 - **Files Created / Modified:**
   - `frontend/src/components/admin/DuplicateResolutionTable.tsx`
   - `frontend/src/components/admin/ImportWizard.tsx`
@@ -118,7 +123,7 @@ Phase 20 Plan 06 establishes the administrative Patient Import Centre implementi
 ## Verification Summary Table
 
 | Test Suite / Verification Step | Scope | Command | Result |
-|--------------------------------|-------|---------|--------|
+| -------------------------------- | ------- | --------- | -------- |
 | Import Engine Unit Tests | Service logic, encodings, XLSX, validation, URN minting, backup gate | `pytest backend/tests/test_patient_import_service.py` | PASS (7 tests) |
 | Import API Integration Tests | RBAC, 8 REST endpoints, audit logs, backup abort | `pytest backend/tests/test_patient_import_api.py` | PASS (4 tests) |
 | RBAC Catalog & Route Policies | Permission bounds, orphan checks, OpenAPI snapshot | `pytest backend/tests/test_permissions_catalogue.py ...` | PASS (10 tests) |

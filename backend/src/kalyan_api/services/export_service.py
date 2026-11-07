@@ -386,3 +386,4 @@ def generate_xlsx_stream(
 
     while chunk := bio.read(chunk_size):
         yield chunk
+

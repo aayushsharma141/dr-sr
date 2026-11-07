@@ -21,6 +21,7 @@ dependencies = [
     "argon2-cffi==25.1.0",
     "tzdata==2026.6",
     "python-multipart>=0.0.20",
+    "openpyxl==3.1.5",
 ]
 
 [project.optional-dependencies]

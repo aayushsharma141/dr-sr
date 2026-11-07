@@ -71,3 +71,4 @@ def export_patients(
                 "Content-Disposition": f'attachment; filename="{filename}"',
             },
         )
+

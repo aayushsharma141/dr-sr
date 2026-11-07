@@ -294,3 +294,4 @@ def test_export_error_records_csv(
     assert "guardian_name" in csv_text
     # Formula injection sanitized with leading quote
     assert "'=Malformed Formula Name" in csv_text
+

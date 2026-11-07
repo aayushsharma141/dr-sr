@@ -127,3 +127,4 @@ Phase 20 Plan 07 implements the administrative Patient Export Centre providing p
 6. `frontend/src/components/admin/PatientExportDialog.tsx`: Modal dialog for scoped export with field matrix and amber security alert.
 7. `frontend/src/pages/admin/PatientExportPage.tsx`: Admin export centre workspace page at `/admin/exports`.
 8. `frontend/src/pages/__tests__/patient-export.test.tsx`: Frontend unit tests.
+

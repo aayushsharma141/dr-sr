@@ -1,5 +1,7 @@
 # COLD-PATHS — Repository Analysis
 
+> **Path note (2026-11-08):** the legacy desktop app now lives under `legacy/`. Paths below such as `app/…` and root `main.py` refer to `legacy/app/…` and `legacy/main.py`.
+
 **Repository:** `D:\dr-sr`  
 **Analysis basis:** Read-only static inspection of the currently present source tree. No application was launched and no tests were run.  
 **Status labels:** **Confirmed** means the source explicitly implements the path. **Potential** means the source indicates a path or condition but reachability or operational use is not established statically. **Unknown** means runtime/deployment evidence is needed.

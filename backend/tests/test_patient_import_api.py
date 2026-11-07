@@ -254,3 +254,4 @@ def test_commit_halts_on_precommit_backup_failure(
     # Verify no patient was created
     pt = db_session.scalar(select(Patient).where(Patient.mobile == "9876588888"))
     assert pt is None
+

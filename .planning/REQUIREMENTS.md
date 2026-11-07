@@ -128,7 +128,7 @@ Deferred; tracked but not in the current roadmap.
 ## Out of Scope
 
 | Feature | Reason |
-|---------|--------|
+| --------- | -------- |
 | Inpatient/IPD, pharmacy inventory, lab and other advanced modules | Excluded unless separately agreed |
 | Aadhaar number or ID-card storage | Legal exposure and not needed for outpatient physiotherapy |
 | SMS / WhatsApp, cloud backup, patient portal | Needs internet; system is offline and LAN-only |
@@ -149,7 +149,7 @@ Deferred; tracked but not in the current roadmap.
 ## Traceability
 
 | Requirement | Phase | Status |
-|-------------|-------|--------|
+| ------------- | ------- | -------- |
 | SEC-01 | Phase 11 | Pending |
 | SEC-02 | Phase 11 | Pending |
 | SEC-03 | Phase 11 | Pending |
@@ -211,6 +211,7 @@ Deferred; tracked but not in the current roadmap.
 | REC-08 | Deferred (Post-v3.0) | Pending |
 
 **Coverage:**
+
 - v1 requirements: 59 total
 - Mapped to phases: 59
 - Unmapped: 0

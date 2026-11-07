@@ -66,7 +66,7 @@ For each run record:
 
 ## 6. Legacy desktop tests
 
-Existing tests under tests/ validate portions of the prior PySide6/SQLite app. They may remain useful for regression/reference but do not verify the v3 API, LAN concurrency, role enforcement or PostgreSQL backup system.
+Existing tests under `legacy/tests/` validate portions of the prior PySide6/SQLite app. They may remain useful for regression/reference but do not verify the v3 API, LAN concurrency, role enforcement or PostgreSQL backup system.
 
 ---
 *No v3 test result is claimed by this document.*

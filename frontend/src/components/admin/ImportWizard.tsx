@@ -333,13 +333,12 @@ export function ImportWizard() {
             return (
               <li key={s.id} className="flex items-center gap-2">
                 <div
-                  className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-bold transition-all ${
-                    isCompleted
+                  className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-bold transition-all ${isCompleted
                       ? 'bg-emerald-700 text-white'
                       : isActive
                         ? 'bg-[#8E1C3D] text-white shadow-xs'
                         : 'border border-slate-300 text-slate-500 dark:border-slate-600 dark:text-slate-400'
-                  }`}
+                    }`}
                 >
                   {isCompleted ? (
                     <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -350,13 +349,12 @@ export function ImportWizard() {
                   )}
                 </div>
                 <span
-                  className={`text-xs font-semibold ${
-                    isActive
+                  className={`text-xs font-semibold ${isActive
                       ? 'text-slate-900 font-bold dark:text-slate-100'
                       : isCompleted
                         ? 'text-emerald-800 dark:text-emerald-400'
                         : 'text-slate-500 dark:text-slate-400'
-                  }`}
+                    }`}
                 >
                   {s.label}
                 </span>
