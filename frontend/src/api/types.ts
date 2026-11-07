@@ -1305,3 +1305,20 @@ export interface ReceptionFollowUpResponse {
   created_at: string
 }
 
+export type AssetType = 'LOGO' | 'PHOTO' | 'REGISTRATION_DOC'
+
+export interface HospitalAssetOut {
+  id: number
+  asset_type: AssetType
+  filename: string
+  original_filename: string
+  mime_type: string
+  file_size_bytes: number
+  is_active: boolean
+  version: number
+  uploaded_by_user_id: number
+  uploaded_by_name: string | null
+  created_at: string
+}
+
+

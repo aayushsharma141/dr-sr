@@ -7,6 +7,7 @@ import type {
   BackupArchiveListResponse,
   BackupCreateRequest,
   BackupVerifyResponse,
+  HospitalAssetOut,
   IntegrityReportOut,
   LoginHistoryEntry,
   PasswordPolicyOut,
@@ -1403,3 +1404,44 @@ export function useIntegrityCheck() {
     queryFn: () => apiFetch<IntegrityReportOut>('/api/operations/integrity'),
   })
 }
+
+export function useHospitalAssets(params?: { asset_type?: string; is_active?: boolean }) {
+  return useQuery({
+    queryKey: ['admin', 'assets', params],
+    queryFn: () => {
+      const query = new URLSearchParams()
+      if (params?.asset_type) query.set('asset_type', params.asset_type)
+      if (params?.is_active !== undefined) query.set('is_active', String(params.is_active))
+      const qs = query.toString() ? `?${query.toString()}` : ''
+      return apiFetch<HospitalAssetOut[]>(`/api/admin/assets${qs}`)
+    },
+  })
+}
+
+export function useUploadAsset() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (formData: FormData) =>
+      apiFetch<HospitalAssetOut>('/api/admin/assets', {
+        method: 'POST',
+        body: formData,
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin', 'assets'] })
+    },
+  })
+}
+
+export function useDeactivateAsset() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (assetId: number) =>
+      apiFetch<HospitalAssetOut>(`/api/admin/assets/${assetId}/deactivate`, {
+        method: 'POST',
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin', 'assets'] })
+    },
+  })
+}
+

@@ -160,18 +160,12 @@ export const router = createBrowserRouter([
           },
           {
             path: '/admin/assets',
-            lazy: async () => ({
-              Component: function HospitalAssetsPage() {
-                return (
-                  <div className="space-y-4 rounded-xl border border-slate-200 bg-white p-6 shadow-xs">
-                    <h1 className="text-xl font-bold text-slate-900">Hospital Identity & Logo</h1>
-                    <p className="text-sm text-slate-600">
-                      Manage official hospital logos, crests, and identity assets.
-                    </p>
-                  </div>
-                )
-              },
-            }),
+            lazy: async () => {
+              const { HospitalAssetsPage } = await import('./pages/admin/HospitalAssetsPage')
+              return {
+                Component: HospitalAssetsPage,
+              }
+            },
           },
           {
             path: '/admin/templates',
