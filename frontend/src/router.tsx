@@ -187,18 +187,12 @@ export const router = createBrowserRouter([
           },
           {
             path: '/admin/imports',
-            lazy: async () => ({
-              Component: function ImportCentrePage() {
-                return (
-                  <div className="space-y-4 rounded-xl border border-slate-200 bg-white p-6 shadow-xs">
-                    <h1 className="text-xl font-bold text-slate-900">Import Centre</h1>
-                    <p className="text-sm text-slate-600">
-                      Staged CSV and XLSX patient register import pipeline.
-                    </p>
-                  </div>
-                )
-              },
-            }),
+            lazy: async () => {
+              const { PatientImportPage } = await import('./pages/admin/PatientImportPage')
+              return {
+                Component: PatientImportPage,
+              }
+            },
           },
           {
             path: '/admin/exports',
