@@ -495,6 +495,17 @@ export function AppShell({ name, role, children }: AppShellProps) {
     return () => window.clearInterval(timer)
   }, [])
 
+  useEffect(() => {
+    if (!mobileOpen) return
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setMobileOpen(false)
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [mobileOpen])
+
   const clock = useMemo(() => formatClock(now), [now])
 
   const visibleItems = useMemo(
@@ -515,28 +526,33 @@ export function AppShell({ name, role, children }: AppShellProps) {
     return (
       <aside
         aria-label="Primary navigation"
-        className={`flex h-full flex-col bg-[#131b2e] text-white transition-all duration-200 ${
+        className={`flex h-full flex-col bg-[#5D0B26] text-white transition-all duration-200 ${
           isDrawer ? 'w-72 max-w-[85vw] shadow-2xl' : 'w-16 lg:w-64 shrink-0'
         }`}
       >
         {/* Sidebar Brand Header */}
         <div
-          className={`flex min-h-[64px] items-center border-b border-white/10 ${
+          className={`flex min-h-[64px] shrink-0 items-center border-b border-white/15 ${
             isDesktopSidebar ? 'justify-center px-2 lg:justify-start lg:gap-3 lg:px-4' : 'justify-between px-4'
           }`}
         >
           <div className="flex items-center gap-3 min-w-0">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-indigo-500/20 text-indigo-400 border border-indigo-500/30">
-              <svg className="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 2v20M8 5a4 4 0 018 0c0 4-8 6-8 10a4 4 0 008 0M8 7a4 4 0 008 0" />
-              </svg>
-            </div>
+            <img
+              src="/kalyan-hospital-crest.webp"
+              alt="Sri Vashishtha Kalyan Trust crest"
+              className="h-10 w-10 shrink-0 rounded-full border border-[#C39A35] bg-white object-contain shadow-xs"
+              width={40}
+              height={40}
+            />
             <div className={`min-w-0 ${isDesktopSidebar ? 'hidden lg:block' : 'block'}`}>
-              <div className="truncate text-xs font-bold uppercase tracking-wider text-white">
-                Kalyan Hospital
+              <div className="truncate text-sm font-extrabold tracking-wide text-white" lang="hi">
+                कल्याण हॉस्पीटल
               </div>
-              <p className="truncate text-xs font-medium text-slate-200">
-                Admin Panel
+              <p className="truncate text-xs font-semibold text-rose-100/90 tracking-wider">
+                KALYAN HOSPITAL
+              </p>
+              <p className="truncate text-xs text-amber-200 font-medium">
+                Administration Panel
               </p>
             </div>
           </div>
@@ -545,7 +561,7 @@ export function AppShell({ name, role, children }: AppShellProps) {
               type="button"
               onClick={() => setMobileOpen(false)}
               aria-label="Close navigation menu"
-              className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-white/20 text-white hover:bg-white/10"
+              className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-white/20 text-white hover:bg-white/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-white"
             >
               ✕
             </button>
@@ -555,19 +571,19 @@ export function AppShell({ name, role, children }: AppShellProps) {
         {/* Scrollable Navigation Items */}
         <nav
           aria-label="Primary navigation"
-          className="flex-1 space-y-3 overflow-y-auto px-3 py-4"
+          className="flex-1 space-y-3 overflow-y-auto px-3 py-4 custom-scrollbar-dark"
         >
           {/* Management Overview (Home) */}
           <Link
             to="/admin"
             onClick={() => isDrawer && setMobileOpen(false)}
             aria-current={location.pathname === '/admin' ? 'page' : undefined}
-            className={`flex min-h-11 items-center gap-3 rounded-xl px-3 py-2 text-xs font-bold transition-colors ${
+            className={`group relative flex min-h-11 items-center gap-3 rounded-lg px-3 py-2 text-xs font-semibold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-white ${
               isDesktopSidebar ? 'justify-center lg:justify-start' : 'justify-start'
             } ${
               location.pathname === '/admin'
-                ? 'bg-indigo-600 text-white shadow-xs'
-                : 'text-slate-200 hover:bg-slate-800 hover:text-white'
+                ? 'bg-white text-[#5D0B26] font-bold shadow-sm'
+                : 'text-rose-100 hover:bg-white/10 hover:text-white'
             }`}
           >
             <svg className="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -576,6 +592,12 @@ export function AppShell({ name, role, children }: AppShellProps) {
             <span className={`${isDesktopSidebar ? 'hidden lg:inline' : 'inline'}`}>
               Management Overview
             </span>
+            {location.pathname === '/admin' && (
+              <span
+                aria-hidden="true"
+                className="absolute left-0 top-2 bottom-2 w-1.5 rounded-r bg-[#C39A35]"
+              />
+            )}
           </Link>
 
           {/* Five Canonical Admin Sections */}
@@ -586,7 +608,7 @@ export function AppShell({ name, role, children }: AppShellProps) {
                 <div
                   role="heading"
                   aria-level={3}
-                  className={`px-3 py-2 text-xs font-semibold uppercase tracking-wider text-slate-200 dark:text-slate-400 ${
+                  className={`px-3 py-2 text-xs font-bold uppercase tracking-wider text-rose-200 ${
                     isDesktopSidebar ? 'hidden lg:block' : 'block'
                   }`}
                 >
@@ -609,23 +631,29 @@ export function AppShell({ name, role, children }: AppShellProps) {
                         onClick={() => isDrawer && setMobileOpen(false)}
                         aria-current={active ? 'page' : undefined}
                         title={mod.title}
-                        className={`flex min-h-11 items-center gap-2.5 rounded-lg px-3 py-2 text-xs font-medium transition-colors ${
+                        className={`group relative flex min-h-11 items-center gap-2.5 rounded-lg px-3 py-2 text-xs font-medium transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-white ${
                           isDesktopSidebar ? 'justify-center lg:justify-start' : 'justify-start'
                         } ${
                           active
-                            ? 'bg-indigo-600 text-white font-bold shadow-xs'
-                            : 'text-slate-200 hover:bg-slate-800 hover:text-white'
+                            ? 'bg-white text-[#5D0B26] font-bold shadow-sm'
+                            : 'text-rose-100 hover:bg-white/10 hover:text-white'
                         }`}
                       >
                         <span
                           className={`h-1.5 w-1.5 shrink-0 rounded-full ${
-                            active ? 'bg-white' : 'bg-indigo-400'
+                            active ? 'bg-[#5D0B26]' : 'bg-rose-200/60'
                           }`}
                           aria-hidden="true"
                         />
                         <span className={`truncate ${isDesktopSidebar ? 'hidden lg:inline' : 'inline'}`}>
                           {mod.title}
                         </span>
+                        {active && (
+                          <span
+                            aria-hidden="true"
+                            className="absolute left-0 top-2 bottom-2 w-1.5 rounded-r bg-[#C39A35]"
+                          />
+                        )}
                       </Link>
                     )
                   })}
@@ -637,12 +665,12 @@ export function AppShell({ name, role, children }: AppShellProps) {
 
         {/* Sidebar Footer Context */}
         <div
-          className={`border-t border-white/10 p-3 text-xs text-slate-200 ${
+          className={`border-t border-white/15 p-3 text-xs text-rose-100/80 shrink-0 ${
             isDesktopSidebar ? 'hidden lg:block' : 'block'
           }`}
         >
-          <p className="font-semibold text-slate-200">Local clinic network</p>
-          <p className="mt-0.5 text-xs text-slate-200">Kalyan Hospital · v1.16.0 LAN</p>
+          <p className="font-semibold text-white">Local clinic network</p>
+          <p className="mt-0.5 text-xs text-rose-200">Kalyan Hospital · v3.0 LAN</p>
         </div>
       </aside>
     )
@@ -661,7 +689,7 @@ export function AppShell({ name, role, children }: AppShellProps) {
       >
         {/* Sidebar Brand Header */}
         <div
-          className={`flex min-h-[64px] items-center border-b border-white/15 ${isDesktopSidebar ? 'justify-center px-2 lg:justify-start lg:gap-3 lg:px-4' : 'justify-between px-4'
+          className={`flex min-h-[64px] shrink-0 items-center border-b border-white/15 ${isDesktopSidebar ? 'justify-center px-2 lg:justify-start lg:gap-3 lg:px-4' : 'justify-between px-4'
             }`}
         >
           <div className="flex items-center gap-3 min-w-0">
@@ -679,7 +707,11 @@ export function AppShell({ name, role, children }: AppShellProps) {
               <p className="truncate text-xs font-semibold text-rose-100/90 tracking-wider">
                 KALYAN HOSPITAL
               </p>
-              <p className="truncate text-xs text-amber-200 font-medium">Physiotherapy Department</p>
+              <p className="truncate text-xs text-amber-200 font-medium">
+                {role === 'RECEPTION'
+                  ? 'Reception & Registration'
+                  : 'Clinical Consultation'}
+              </p>
             </div>
           </div>
           {isDrawer && (
@@ -697,7 +729,7 @@ export function AppShell({ name, role, children }: AppShellProps) {
         {/* Scrollable Navigation Items */}
         <nav
           aria-label="Primary navigation"
-          className="flex-1 space-y-1 overflow-y-auto px-2 py-4"
+          className="flex-1 space-y-1 overflow-y-auto px-2 py-4 custom-scrollbar-dark"
         >
           {visibleItems.map((item, index) => {
             const href = navigationHref(item, role)
@@ -757,7 +789,7 @@ export function AppShell({ name, role, children }: AppShellProps) {
 
         {/* Sidebar Footer Context */}
         <div
-          className={`border-t border-white/15 p-3 text-xs text-rose-100/80 ${isDesktopSidebar ? 'hidden lg:block' : 'block'
+          className={`border-t border-white/15 p-3 text-xs text-rose-100/80 shrink-0 ${isDesktopSidebar ? 'hidden lg:block' : 'block'
             }`}
         >
           <p className="font-semibold text-white">Local clinic network</p>
@@ -768,7 +800,7 @@ export function AppShell({ name, role, children }: AppShellProps) {
   }
 
   return (
-    <div className="flex h-screen overflow-hidden print:h-auto print:overflow-visible flex-col bg-[#F5F7FA] text-slate-900">
+    <div className="flex h-full w-full overflow-hidden print:h-auto print:overflow-visible flex-col bg-[#F5F7FA] text-slate-900">
       {/* Top Banner Header */}
       <header className="relative z-20 shrink-0 print:hidden border-b border-slate-200 bg-white shadow-2xs">
         <div className="flex min-h-[56px] items-center justify-between gap-3 px-4 py-2 sm:px-6">
@@ -814,66 +846,42 @@ export function AppShell({ name, role, children }: AppShellProps) {
           </div>
 
           <div className="flex shrink-0 items-center gap-3 sm:gap-4">
-            {role === 'ADMIN' ? (
-              <>
-                <Link
-                  to="/admin/security"
-                  className="relative flex h-9 w-9 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 transition-colors"
-                  aria-label="View notifications"
-                >
-                  <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
-                  </svg>
-                  <span className="absolute right-1 top-1 flex h-4 w-4 items-center justify-center rounded-full bg-rose-500 text-xs font-bold text-white">
-                    6
-                  </span>
-                </Link>
-
-                <div className="flex items-center gap-2">
-                  <div className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-900 text-xs font-bold text-white">
-                    A
-                  </div>
-                  <span className="hidden sm:inline text-xs font-bold text-slate-800">
-                    Administrator ▾
-                  </span>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={handleSignOut}
-                  disabled={logout.isPending}
-                  className="inline-flex min-h-9 items-center justify-center rounded-lg border border-slate-300 px-3 text-xs font-bold text-slate-800 hover:border-indigo-600 hover:text-indigo-600 hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 disabled:cursor-not-allowed disabled:opacity-50 transition-colors shadow-2xs"
-                >
-                  {logout.isPending ? 'Signing out…' : 'Sign out'}
-                </button>
-              </>
-            ) : (
-              <>
-                <div className="hidden text-right lg:block">
-                  <p className="text-xs font-bold text-slate-800">{clock}</p>
-                  <p className="text-xs text-slate-600 font-medium">{branding.locationLine}</p>
-                </div>
-                <div className="hidden sm:block text-right border-l border-slate-200 pl-3">
-                  <p className="max-w-40 truncate text-xs font-bold text-slate-900">{name}</p>
-                  <span className="inline-block px-2 py-0.5 rounded text-xs font-bold bg-rose-50 text-rose-950 border border-rose-200">
-                    {role}
-                  </span>
-                </div>
-                <button
-                  type="button"
-                  onClick={handleSignOut}
-                  disabled={logout.isPending}
-                  className="inline-flex min-h-9 items-center justify-center rounded-lg border border-slate-300 px-3.5 text-xs font-bold text-slate-800 hover:border-[#8E1C3D] hover:text-[#5D0B26] hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#8E1C3D] disabled:cursor-not-allowed disabled:opacity-50 transition-colors shadow-2xs"
-                >
-                  <span className="hidden sm:inline">
-                    {logout.isPending ? 'Signing out…' : 'Sign out'}
-                  </span>
-                  <span className="sm:hidden" aria-hidden="true">
-                    ↗
-                  </span>
-                </button>
-              </>
-            )}
+            <div className="hidden text-right lg:block">
+              <p className="text-xs font-bold text-slate-800">{clock}</p>
+              <p className="text-xs text-slate-600 font-medium">{branding.locationLine}</p>
+            </div>
+            <div className="hidden sm:block text-right border-l border-slate-200 pl-3">
+              <p className="max-w-40 truncate text-xs font-bold text-slate-900">{name}</p>
+              <span className="inline-block px-2 py-0.5 rounded text-xs font-bold bg-rose-50 text-rose-950 border border-rose-200">
+                {role === 'ADMIN' ? 'Administrator' : role === 'RECEPTION' ? 'Reception' : 'Doctor'}
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={handleSignOut}
+              disabled={logout.isPending}
+              aria-label="Sign out"
+              title="Sign out of hospital workspace"
+              className="inline-flex min-h-11 min-w-11 sm:min-w-0 items-center justify-center gap-1.5 rounded-lg border border-slate-300 px-3.5 text-xs font-bold text-slate-800 hover:border-[#8E1C3D] hover:text-[#5D0B26] hover:bg-rose-50/50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#8E1C3D] disabled:cursor-not-allowed disabled:opacity-50 transition-colors shadow-2xs"
+            >
+              <svg
+                viewBox="0 0 24 24"
+                className="h-4 w-4 shrink-0 text-slate-600"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+              >
+                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                <polyline points="16 17 21 12 16 7" />
+                <line x1="21" y1="12" x2="9" y2="12" />
+              </svg>
+              <span className="hidden sm:inline">
+                {logout.isPending ? 'Signing out…' : 'Sign out'}
+              </span>
+            </button>
           </div>
         </div>
       </header>
@@ -884,12 +892,12 @@ export function AppShell({ name, role, children }: AppShellProps) {
         <div className="hidden md:flex h-full shrink-0 print:hidden">{renderSidebar()}</div>
 
         {/* Scrollable Main Content Workspace */}
-        <main className="min-w-0 flex-1 overflow-y-auto print:overflow-visible px-4 py-5 sm:px-6 xl:px-8">
-          <div className="mx-auto w-full max-w-[1720px] space-y-5">
+        <main className="min-w-0 flex-1 overflow-y-auto print:overflow-visible px-4 py-5 sm:px-6 xl:px-8 flex flex-col justify-between">
+          <div className="mx-auto w-full max-w-[1720px] space-y-5 flex-1">
             <Breadcrumbs pathname={location.pathname} role={role} />
             {children}
           </div>
-          <footer className="mx-auto mt-8 flex max-w-[1720px] flex-wrap items-center justify-between gap-2 border-t border-slate-200 pt-3.5 pb-6 text-xs text-slate-600 font-medium">
+          <footer className="mx-auto mt-8 flex w-full max-w-[1720px] flex-wrap items-center justify-between gap-2 border-t border-slate-200 pt-3.5 pb-6 text-xs text-slate-600 font-medium shrink-0">
             <span>Kalyan Hospital · Local clinical workspace</span>
             <span>Patient information is available according to your role permissions.</span>
           </footer>
@@ -900,6 +908,9 @@ export function AppShell({ name, role, children }: AppShellProps) {
       {mobileOpen && (
         <div
           id="mobile-hospital-navigation"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Hospital workspace navigation"
           className="fixed inset-0 z-50 flex md:hidden"
         >
           <button

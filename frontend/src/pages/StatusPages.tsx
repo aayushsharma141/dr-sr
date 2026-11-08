@@ -2,7 +2,7 @@ import { Link } from 'react-router'
 
 export function Forbidden() {
   return (
-    <div className="min-h-screen bg-neutral-100 flex items-center justify-center p-6 text-neutral-900">
+    <div className="min-h-screen h-full w-full overflow-y-auto bg-neutral-100 flex items-center justify-center p-6 text-neutral-900">
       <div className="max-w-md w-full bg-white p-6 rounded-lg border border-neutral-200 text-center space-y-4">
         <h1 className="text-2xl font-bold text-red-900">403 - Forbidden</h1>
         <p className="text-sm text-neutral-600">
@@ -23,7 +23,7 @@ export function Forbidden() {
 
 export function NotFound() {
   return (
-    <div className="min-h-screen bg-neutral-100 flex items-center justify-center p-6 text-neutral-900">
+    <div className="min-h-screen h-full w-full overflow-y-auto bg-neutral-100 flex items-center justify-center p-6 text-neutral-900">
       <div className="max-w-md w-full bg-white p-6 rounded-lg border border-neutral-200 text-center space-y-4">
         <h1 className="text-2xl font-bold text-neutral-900">404 - Not found</h1>
         <p className="text-sm text-neutral-600">

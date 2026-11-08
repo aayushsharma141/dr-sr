@@ -77,7 +77,7 @@ export function ChangePassword() {
   }
 
   return (
-    <div className="min-h-screen bg-neutral-100 flex items-center justify-center p-6 text-neutral-900">
+    <div className="min-h-screen h-full w-full overflow-y-auto bg-neutral-100 flex items-center justify-center p-6 text-neutral-900">
       <div className="max-w-md w-full bg-white p-8 rounded-lg border border-neutral-200 shadow-sm space-y-6">
         <div className="flex items-start justify-between">
           <div>

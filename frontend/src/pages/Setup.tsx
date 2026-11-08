@@ -78,7 +78,7 @@ export function Setup() {
 
   if (isCheckingStatus) {
     return (
-      <div className="min-h-screen bg-neutral-100 flex items-center justify-center p-6 text-neutral-900">
+      <div className="min-h-screen h-full w-full overflow-y-auto bg-neutral-100 flex items-center justify-center p-6 text-neutral-900">
         <p role="status" className="text-sm text-neutral-600">
           Checking system setup status...
         </p>
@@ -87,7 +87,7 @@ export function Setup() {
   }
 
   return (
-    <div className="min-h-screen bg-neutral-100 flex items-center justify-center p-6 text-neutral-900">
+    <div className="min-h-screen h-full w-full overflow-y-auto bg-neutral-100 flex items-center justify-center p-6 text-neutral-900">
       <div className="max-w-md w-full bg-white p-8 rounded-lg border border-neutral-200 shadow-sm space-y-6">
         <div>
           <h1 className="text-2xl font-bold text-red-900 tracking-tight">

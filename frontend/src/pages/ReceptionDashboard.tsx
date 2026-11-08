@@ -814,7 +814,7 @@ export function ReceptionDashboard({ overview: initialOverview }: ReceptionDashb
                     <div>
                       <div className="flex items-center gap-1.5">
                         <span className="w-2 h-2 rounded-full bg-emerald-600" />
-                        <h4 className="text-xs font-bold text-neutral-900">{doc.name}</h4>
+                        <h3 className="text-xs font-bold text-neutral-900">{doc.name}</h3>
                       </div>
                       <p className="text-xs text-neutral-500 mt-0.5">{doc.department || 'Physiotherapy'}</p>
                     </div>
