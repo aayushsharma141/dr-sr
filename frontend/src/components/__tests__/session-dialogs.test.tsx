@@ -13,7 +13,8 @@ vi.mock('../../api/queries', () => ({
   useLogTreatmentSession: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useAddSessionAddendum: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useBookAppointment: () => ({ mutateAsync: vi.fn(), isPending: false }),
-  useDoctors: () => ({ data: [] }),
+  useDepartments: () => ({ data: [] }),
+  useDepartmentDoctors: () => ({ data: [] }),
   usePatients: () => ({ data: [patient], isPending: false }),
 }))
 

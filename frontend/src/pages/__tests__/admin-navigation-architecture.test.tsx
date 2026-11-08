@@ -156,13 +156,13 @@ describe('Administration Module Registry Invariants', () => {
 
   it('findAdminModuleForPath matches canonical routes correctly', () => {
     expect(findAdminModuleForPath('/admin')?.module.id).toBe('overview')
-    expect(findAdminModuleForPath('/admin/settings')?.module.id).toBe('clinic-settings')
-    expect(findAdminModuleForPath('/admin/assets')?.module.id).toBe('hospital-assets')
+    expect(findAdminModuleForPath('/admin/settings')?.module.id).toBe('hospital-settings')
+    expect(findAdminModuleForPath('/admin/assets')).toBeNull()
     expect(findAdminModuleForPath('/admin/templates')?.module.id).toBe('print-templates')
     expect(findAdminModuleForPath('/admin/doctors')?.module.id).toBe('doctors-fees')
     expect(findAdminModuleForPath('/admin/patients/correct')?.module.id).toBe('patient-correct')
-    expect(findAdminModuleForPath('/admin/imports')?.module.id).toBe('patient-imports')
-    expect(findAdminModuleForPath('/admin/exports')?.module.id).toBe('patient-exports')
+    expect(findAdminModuleForPath('/admin/imports')).toBeNull()
+    expect(findAdminModuleForPath('/admin/exports')).toBeNull()
     expect(findAdminModuleForPath('/admin/billing')?.module.id).toBe('billing-reversals')
     expect(findAdminModuleForPath('/reception/dues')?.module.id).toBe('pending-dues')
     expect(findAdminModuleForPath('/admin/users')?.module.id).toBe('user-accounts')
@@ -273,14 +273,13 @@ describe('Administration Dashboard & Single Sidebar Layout', () => {
     expect(within(primaryNav).getByText('System & Maintenance')).toBeInTheDocument()
 
     // Sidebar items match canonical routes
-    expect(within(primaryNav).getByRole('link', { name: /Clinic Settings/ })).toHaveAttribute('href', '/admin/settings')
-    expect(within(primaryNav).getByRole('link', { name: /Hospital Identity & Logo/ })).toHaveAttribute('href', '/admin/assets')
+    expect(within(primaryNav).getByRole('link', { name: /Hospital Settings/ })).toHaveAttribute('href', '/admin/settings')
+    expect(within(primaryNav).queryByRole('link', { name: /Hospital Identity & Logo/ })).toBeNull()
     expect(within(primaryNav).getByRole('link', { name: /Print Templates/ })).toHaveAttribute('href', '/admin/templates')
     expect(within(primaryNav).getByRole('link', { name: /Doctors & Fees/ })).toHaveAttribute('href', '/admin/doctors')
 
     expect(within(primaryNav).getByRole('link', { name: /Patient Demographic Correction/ })).toHaveAttribute('href', '/admin/patients/correct')
-    expect(within(primaryNav).getByRole('link', { name: /Import Centre/ })).toHaveAttribute('href', '/admin/imports')
-    expect(within(primaryNav).getByRole('link', { name: /Export Centre/ })).toHaveAttribute('href', '/admin/exports')
+    expect(within(primaryNav).queryByRole('link', { name: /Import Centre|Export Centre/ })).toBeNull()
 
     expect(within(primaryNav).getByRole('link', { name: /Billing & Reversals/ })).toHaveAttribute('href', '/admin/billing')
     expect(within(primaryNav).getByRole('link', { name: /Pending Dues/ })).toHaveAttribute('href', '/reception/dues')

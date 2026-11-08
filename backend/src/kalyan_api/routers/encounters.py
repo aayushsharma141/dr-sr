@@ -9,6 +9,7 @@ Guarantees:
 
 from fastapi import APIRouter, Depends, Request, Response
 from sqlalchemy import select
+from sqlalchemy.orm import object_session
 
 from kalyan_api import clock
 from kalyan_api.core.errors import ApiError, require_version
@@ -26,8 +27,10 @@ from kalyan_api.models import (
     AppointmentStatus,
     ClinicalAddendum,
     ClinicalEncounter,
+    ClinicalTemplate,
     ClinicalTemplateResponse,
     ClinicalTemplateVersion,
+    Doctor,
     Patient,
 )
 from kalyan_api.schemas.encounters import (
@@ -45,6 +48,26 @@ from kalyan_api.services import audit_service
 from kalyan_api.services.audit_service import AuditAction
 
 router = APIRouter(tags=["encounters"])
+
+
+def _department_from_saved_form(enc: ClinicalEncounter) -> int | None:
+    """Department of the specialty form saved with a consultation that has none recorded.
+
+    Consultations finalised before departments were tracked are tamper-protected, so their
+    department is never written back; it is only reported, from the template they used.
+    """
+    session = object_session(enc)
+    if session is None:
+        return None
+    return session.scalar(
+        select(ClinicalTemplate.department_id)
+        .join(ClinicalTemplateVersion, ClinicalTemplateVersion.template_id == ClinicalTemplate.id)
+        .join(
+            ClinicalTemplateResponse,
+            ClinicalTemplateResponse.template_version_id == ClinicalTemplateVersion.id,
+        )
+        .where(ClinicalTemplateResponse.encounter_id == enc.id)
+    )
 
 
 def _to_read_schema(enc: ClinicalEncounter) -> EncounterRead:
@@ -72,7 +95,7 @@ def _to_read_schema(enc: ClinicalEncounter) -> EncounterRead:
         doctor_id=enc.doctor_id,
         doctor_name=enc.doctor.name_en if enc.doctor else "",
         appointment_id=enc.appointment_id,
-        department_id=enc.department_id,
+        department_id=enc.department_id or _department_from_saved_form(enc),
         encounter_date=enc.encounter_date,
         symptoms=enc.symptoms,
         clinical_notes=enc.clinical_notes,
@@ -137,10 +160,20 @@ def create_encounter(
             appt.status_updated_at = clock.utcnow()
             appt.version_id += 1
 
+    # D-19-03: the department (specialty) comes from the appointment. Without an appointment,
+    # fall back to the doctor's department when they belong to exactly one.
+    department_id = payload.department_id
+    if department_id is None and appt is not None:
+        department_id = appt.department_id
+    if department_id is None:
+        doctor = session.get(Doctor, principal.doctor_id)
+        if doctor is not None and len(doctor.departments) == 1:
+            department_id = doctor.departments[0].id
+
     response.status_code = 201
     enc = ClinicalEncounter(
         appointment_id=payload.appointment_id,
-        department_id=payload.department_id,
+        department_id=department_id,
         patient_id=payload.patient_id,
         patient_name=patient.full_name,
         patient_urn=patient.urn,

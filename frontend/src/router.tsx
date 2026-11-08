@@ -114,6 +114,13 @@ export const router = createBrowserRouter([
             },
           },
           {
+            path: '/admin/departments',
+            lazy: async () => {
+              const { DepartmentsPage } = await import('./pages/admin/DepartmentsPage')
+              return { Component: DepartmentsPage }
+            },
+          },
+          {
             path: '/admin/billing',
             lazy: async () => {
               const { BillingAdminPage } = await import('./pages/admin/BillingAdminPage')
@@ -159,13 +166,9 @@ export const router = createBrowserRouter([
             },
           },
           {
+            // Hospital Identity & Logo merged into Hospital Settings; keep old links working.
             path: '/admin/assets',
-            lazy: async () => {
-              const { HospitalAssetsPage } = await import('./pages/admin/HospitalAssetsPage')
-              return {
-                Component: HospitalAssetsPage,
-              }
-            },
+            element: <Navigate to="/admin/settings#hospital-crest" replace />,
           },
           {
             path: '/admin/templates',
@@ -186,22 +189,14 @@ export const router = createBrowserRouter([
             },
           },
           {
+            // Patient Import Centre merged into Backup & Restore module; keep old links working.
             path: '/admin/imports',
-            lazy: async () => {
-              const { PatientImportPage } = await import('./pages/admin/PatientImportPage')
-              return {
-                Component: PatientImportPage,
-              }
-            },
+            element: <Navigate to="/admin/backups?action=import" replace />,
           },
           {
+            // Patient Export Centre merged into Backup & Restore module; keep old links working.
             path: '/admin/exports',
-            lazy: async () => {
-              const { PatientExportPage } = await import('./pages/admin/PatientExportPage')
-              return {
-                Component: PatientExportPage,
-              }
-            },
+            element: <Navigate to="/admin/backups?action=export" replace />,
           },
         ],
       },

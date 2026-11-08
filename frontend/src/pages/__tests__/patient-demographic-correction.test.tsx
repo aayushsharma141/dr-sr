@@ -59,6 +59,18 @@ vi.mock('../../api/queries', () => ({
     },
     isLoading: false,
   }),
+  useMe: () => ({ data: { full_name: 'System Administrator', role: 'ADMIN' }, isLoading: false }),
+  useLogout: () => ({ mutateAsync: vi.fn(), isPending: false }),
+}))
+
+vi.mock('../../api/branding', () => ({
+  useClinicBranding: () => ({
+    trustNameEn: 'Sri Vashishtha Kalyan Trust',
+    trustNameHi: 'श्री वशिष्ठ कल्याण ट्रस्ट',
+    hospitalName: 'Kalyan Hospital',
+    address: 'Hospital Road, Ara, Bhojpur, Bihar - 802301',
+    locationLine: 'Ara, Bhojpur, Bihar',
+  }),
 }))
 
 function renderWithClient(ui: React.ReactElement) {

@@ -247,6 +247,7 @@ export interface DoctorOverview {
   name: string
   role: string
   doctor_id: number
+  department_id: number | null
   doctor_name_en: string
 }
 
@@ -549,6 +550,8 @@ export interface ReceiptCycleConfirmationExtra {
 
 export interface DepartmentOut {
   id: number
+  /** Stable machine code, e.g. PHYSIOTHERAPY; picks the consultation template. */
+  code: string
   name_en: string
   name_hi: string | null
   description: string | null
@@ -724,6 +727,8 @@ export type AppointmentStatus =
 
 export interface Appointment {
   id: number
+  /** Department (specialty) chosen at booking; null for appointments booked before it existed. */
+  department_id?: number | null
   patient_id: number
   patient_urn: string
   patient_name: string
@@ -745,7 +750,7 @@ export interface Appointment {
 
 export interface AppointmentCreate {
   patient_id: number
-  department_id?: number | null
+  department_id: number
   doctor_id: number
   appointment_date: string
   notes?: string | null
@@ -792,6 +797,8 @@ export interface DoctorQueueResponse {
 export interface EncounterCreate {
   patient_id: number
   appointment_id?: number | null
+  /** Omit to let the server take it from the appointment or the doctor's only department. */
+  department_id?: number | null
   symptoms: string
   clinical_notes: string
   diagnosis: string

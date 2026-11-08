@@ -6,6 +6,7 @@ import { ConflictBanner } from '../components/ConflictBanner'
 import { InlineAlert } from '../components/InlineAlert'
 import { Modal } from '../components/Modal'
 import { UnsavedChangesGuard } from '../components/UnsavedChangesGuard'
+import { HospitalAssetManager } from '../components/admin/HospitalAssetManager'
 import type { ClinicSettingsOut, ClinicSettingsUpdate, ReceiptCycleConfirmationExtra } from '../api/types'
 
 type ReceiptCycle = ClinicSettingsOut['receipt_sequence_cycle']
@@ -149,7 +150,7 @@ function readValidationErrors(err: ApiError): { fields: FieldErrors; general: st
 }
 
 const INPUT_CLASS =
-  'w-full px-3 py-2 border rounded min-h-11 text-neutral-900 bg-white focus-visible:outline-2 focus-visible:outline-[#8E1C3D]'
+  'w-full min-h-11 rounded-lg border bg-white px-3 py-2 text-slate-900 focus-visible:outline-2 focus-visible:outline-brand-700'
 
 interface FieldProps {
   id: string
@@ -166,12 +167,12 @@ function Field({ id, label, error, hint, className = '', children }: FieldProps)
   const describedBy = [hintId, errorId].filter(Boolean).join(' ') || undefined
   return (
     <div className={className}>
-      <label htmlFor={id} className="block text-sm font-medium text-neutral-800 mb-1">
+      <label htmlFor={id} className="mb-1 block text-sm font-medium text-slate-800">
         {label}
       </label>
       {children(describedBy, Boolean(error))}
       {hint && (
-        <p id={hintId} className="mt-1 text-sm text-neutral-600">
+        <p id={hintId} className="mt-1 text-sm text-slate-600">
           {hint}
         </p>
       )}
@@ -185,29 +186,45 @@ function Field({ id, label, error, hint, className = '', children }: FieldProps)
 }
 
 function inputBorder(invalid: boolean): string {
-  return invalid ? 'border-red-700' : 'border-neutral-300'
+  return invalid ? 'border-red-700' : 'border-slate-400'
 }
 
 interface SectionProps {
   id: string
   title: string
   description: ReactNode
+  /** Four columns on wide screens instead of two, for full-width sections. */
+  wide?: boolean
   children: ReactNode
 }
 
-function Section({ id, title, description, children }: SectionProps) {
+function Section({ id, title, description, wide = false, children }: SectionProps) {
   return (
-    <section aria-labelledby={id} className="bg-white rounded-lg border border-neutral-200 shadow-xs">
-      <header className="border-b border-neutral-200 px-6 py-4">
-        <h3 id={id} className="text-lg font-semibold text-[#5D0B26]">
+    <section
+      aria-labelledby={id}
+      id={`${id}-region`}
+      className="scroll-mt-4 rounded-xl border border-slate-200 bg-white shadow-xs"
+    >
+      <header className="border-b border-slate-200 px-6 py-4">
+        <h2 id={id} className="text-lg font-semibold text-brand-900">
           {title}
-        </h3>
-        <p className="text-sm text-neutral-600">{description}</p>
+        </h2>
+        <p className="text-sm text-slate-600">{description}</p>
       </header>
-      <div className="grid grid-cols-1 gap-6 px-6 py-5 md:grid-cols-2">{children}</div>
+      <div className={`grid grid-cols-1 gap-6 px-6 py-5 md:grid-cols-2 ${wide ? 'xl:grid-cols-4' : ''}`}>{children}</div>
     </section>
   )
 }
+
+const SECTION_LINKS = [
+  { href: '#settings-section-identity-region', label: 'Identity' },
+  { href: '#settings-section-contact-region', label: 'Contact' },
+  { href: '#settings-section-billing-region', label: 'Receipts' },
+  { href: '#settings-section-consultation-region', label: 'Consultation' },
+  { href: '#settings-section-printing-region', label: 'Printing' },
+  { href: '#hospital-crest', label: 'Crest & logo' },
+  { href: '#asset-library', label: 'Asset library' },
+] as const
 
 interface PendingCycleChange {
   payload: ClinicSettingsUpdate
@@ -328,6 +345,9 @@ export function Settings() {
     const payload: ClinicSettingsUpdate = {
       name_en: form.name_en.trim(),
       name_hi: form.name_hi.trim(),
+      trust_name_en: form.trust_name_en.trim(),
+      trust_name_hi: form.trust_name_hi.trim(),
+      location_line: form.location_line.trim(),
       address_1: form.address_1.trim(),
       address_2: form.address_2.trim() || null,
       phone: form.phone.trim(),
@@ -424,22 +444,237 @@ export function Settings() {
   const extra = pendingCycleChange?.extra
   const requestedCycle = pendingCycleChange?.payload.receipt_sequence_cycle
 
+  const settingsForm = isPending ? (
+    <p className="rounded-xl border border-slate-200 bg-white py-12 text-center text-sm text-slate-600">
+      Loading hospital settings...
+    </p>
+  ) : isError ? (
+    <InlineAlert tone="error">
+      {error instanceof Error ? error.message : 'Failed to load hospital settings.'}
+    </InlineAlert>
+  ) : form ? (
+    <form onSubmit={handleSubmit} noValidate className="min-w-0 space-y-6" aria-label="Hospital settings">
+      <div className="grid items-start gap-6 2xl:grid-cols-2">
+        <Section
+          id="settings-section-identity"
+          title="Hospital identity"
+          description="The hospital and trust names in English and Hindi, used on screens and printed documents."
+        >
+          <Field id="settings-name_en" label="Hospital Name (English)" error={fieldErrors.name_en}>
+            {textInput('name_en', { required: true, maxLength: 120 })}
+          </Field>
+          <Field id="settings-name_hi" label="Hospital Name (Hindi)" error={fieldErrors.name_hi}>
+            {textInput('name_hi', { required: true, maxLength: 120, lang: 'hi' })}
+          </Field>
+          <Field id="settings-trust_name_en" label="Trust Name (English)" error={fieldErrors.trust_name_en}>
+            {textInput('trust_name_en', { required: true, maxLength: 120 })}
+          </Field>
+          <Field id="settings-trust_name_hi" label="Trust Name (Hindi)" error={fieldErrors.trust_name_hi}>
+            {textInput('trust_name_hi', { maxLength: 120, lang: 'hi' })}
+          </Field>
+          <Field
+            id="settings-location_line"
+            label="Location Line"
+            error={fieldErrors.location_line}
+            hint="Shown in the application header, for example Ara, Bhojpur, Bihar."
+            className="md:col-span-2"
+          >
+            {textInput('location_line', { required: true, maxLength: 120 })}
+          </Field>
+        </Section>
+
+        <Section
+          id="settings-section-contact"
+          title="Contact & addresses"
+          description="Phone, email and the addresses printed on receipts, prescriptions and registration cards."
+        >
+          <Field id="settings-phone" label="Phone Number" error={fieldErrors.phone} hint="Digits, spaces and + - / , ( ) only.">
+            {textInput('phone', { required: true, maxLength: 64, type: 'tel', inputMode: 'tel' })}
+          </Field>
+          <Field id="settings-email" label="Email (Optional)" error={fieldErrors.email}>
+            {textInput('email', { maxLength: 120, type: 'email', inputMode: 'email' })}
+          </Field>
+          <Field id="settings-address_1" label="Primary Address" error={fieldErrors.address_1} className="md:col-span-2">
+            {textInput('address_1', { required: true, maxLength: 255 })}
+          </Field>
+          <Field
+            id="settings-address_2"
+            label="Secondary Address (Optional)"
+            error={fieldErrors.address_2}
+            className="md:col-span-2"
+          >
+            {textInput('address_2', { maxLength: 255 })}
+          </Field>
+        </Section>
+
+        <Section
+          id="settings-section-billing"
+          title="Billing — receipt numbering"
+          description="How receipt numbers are grouped into yearly cycles. Each new cycle starts again at 0001."
+        >
+          <Field
+            id="settings-receipt_sequence_cycle"
+            label="Receipt Sequence Cycle"
+            error={fieldErrors.receipt_sequence_cycle}
+            className="md:col-span-2"
+            hint={
+              <>
+                A receipt issued today in this cycle would be numbered like{' '}
+                <span className="font-mono font-semibold text-slate-900">
+                  {exampleReceiptNumber(form.receipt_sequence_cycle)}
+                </span>
+                . The cycle is worked out from the India (IST) date.
+              </>
+            }
+          >
+            {(describedBy, invalid) => (
+              <select
+                id="settings-receipt_sequence_cycle"
+                name="receipt_sequence_cycle"
+                aria-invalid={invalid || undefined}
+                aria-describedby={describedBy}
+                value={form.receipt_sequence_cycle}
+                onChange={(e) => {
+                  if (isReceiptCycle(e.target.value)) setField('receipt_sequence_cycle', e.target.value)
+                }}
+                className={`${INPUT_CLASS} ${inputBorder(invalid)}`}
+              >
+                <option value="FINANCIAL_YEAR">
+                  {CYCLE_LABEL.FINANCIAL_YEAR}, e.g. {exampleReceiptNumber('FINANCIAL_YEAR')}
+                </option>
+                <option value="CALENDAR_YEAR">
+                  {CYCLE_LABEL.CALENDAR_YEAR}, e.g. {exampleReceiptNumber('CALENDAR_YEAR')}
+                </option>
+              </select>
+            )}
+          </Field>
+          {cycleChanging && (
+            <div className="rounded-lg border border-gold-500 bg-gold-100 p-4 text-sm text-slate-900 md:col-span-2">
+              You are changing the receipt numbering cycle. If receipts have already been issued in the
+              current cycle, you will be asked to confirm and give a reason before it is saved.
+            </div>
+          )}
+        </Section>
+
+        <Section
+          id="settings-section-consultation"
+          title="Consultation"
+          description="Rules for consultations and the patient registration card."
+        >
+          <Field
+            id="settings-consultation_validity_days"
+            label="Consultation Validity (Days)"
+            error={fieldErrors.consultation_validity_days}
+            className="md:col-span-2"
+            hint="Printed on the patient registration card as its validity period (1 to 365 days). The server does not use it to expire consultations."
+          >
+            {(describedBy, invalid) => (
+              <input
+                id="settings-consultation_validity_days"
+                name="consultation_validity_days"
+                type="number"
+                inputMode="numeric"
+                min={1}
+                max={365}
+                step={1}
+                aria-required
+                aria-invalid={invalid || undefined}
+                aria-describedby={describedBy}
+                value={form.consultation_validity_days}
+                onChange={(e) => setField('consultation_validity_days', e.target.value)}
+                className={`${INPUT_CLASS} ${inputBorder(invalid)} max-w-48`}
+              />
+            )}
+          </Field>
+        </Section>
+      </div>
+
+      <Section
+        id="settings-section-printing"
+        title="Printing — header & footer"
+        description="Optional text for printed documents, in English and Hindi."
+        wide
+      >
+        <div className="rounded-lg border border-slate-300 bg-slate-50 p-4 text-sm text-slate-800 md:col-span-2 xl:col-span-4">
+          <p className="font-semibold text-slate-900">Where this text is printed today</p>
+          <ul className="mt-1 list-disc space-y-1 pl-5">
+            <li>Print header (English and Hindi): prescriptions, registration cards and receipts, when filled in.</li>
+            <li>
+              Print footer (Hindi): payment receipts and the patient registration card. When it is blank,
+              receipts print their built-in Hindi thank-you line.
+            </li>
+            <li>Print footer (English): the patient registration card only.</li>
+            <li>Prescriptions use the fixed letterhead with the clinic addresses and print neither field.</li>
+          </ul>
+        </div>
+        <Field id="settings-print_header_en" label="Print Header (English)" error={fieldErrors.print_header_en}>
+          {textArea('print_header_en')}
+        </Field>
+        <Field id="settings-print_header_hi" label="Print Header (Hindi)" error={fieldErrors.print_header_hi}>
+          {textArea('print_header_hi', 'hi')}
+        </Field>
+        <Field id="settings-print_footer_en" label="Print Footer (English)" error={fieldErrors.print_footer_en}>
+          {textArea('print_footer_en')}
+        </Field>
+        <Field id="settings-print_footer_hi" label="Print Footer (Hindi)" error={fieldErrors.print_footer_hi}>
+          {textArea('print_footer_hi', 'hi')}
+        </Field>
+      </Section>
+
+      <div className="sticky bottom-0 z-10 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white px-6 py-4 shadow-md">
+        <p className="text-sm text-slate-700" aria-live="polite">
+          {dirty ? 'You have unsaved changes.' : 'No unsaved changes.'}
+        </p>
+        <div className="flex gap-3">
+          <button
+            type="button"
+            onClick={handleCancel}
+            disabled={!dirty || saving}
+            className="min-h-11 min-w-11 cursor-pointer rounded-lg border border-slate-400 bg-white px-4 py-2 text-sm font-medium text-slate-800 hover:bg-slate-100 focus-visible:outline-2 focus-visible:outline-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            Cancel
+          </button>
+          <button
+            type="submit"
+            disabled={!dirty || saving}
+            className="min-h-11 min-w-11 cursor-pointer rounded-lg bg-brand-700 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {saving ? 'Saving...' : 'Save Settings'}
+          </button>
+        </div>
+      </div>
+    </form>
+  ) : null
+
   return (
     <AppShell name={me?.full_name ?? 'Admin'} role={me?.role ?? 'ADMIN'}>
       <UnsavedChangesGuard dirty={dirty} />
-      <div className="space-y-6 max-w-5xl mx-auto">
-        <div>
-          <h2 className="text-2xl font-bold text-neutral-900 tracking-tight">Clinic Settings</h2>
-          <p className="text-sm text-neutral-600">
-            Hospital identity, contact details, receipt numbering, print text and consultation rules.
-          </p>
+      <div className="mx-auto w-full max-w-[1600px] space-y-6">
+        <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight text-slate-900">Hospital Settings</h1>
+            <p className="mt-1 text-sm text-slate-600">
+              Hospital identity, crest and logo, contact details, receipt numbering, print text and consultation rules.
+            </p>
+          </div>
+          <nav aria-label="Hospital settings sections" className="flex flex-wrap gap-2">
+            {SECTION_LINKS.map((link) => (
+              <a
+                key={link.href}
+                href={link.href}
+                className="inline-flex min-h-9 items-center rounded-full border border-slate-300 bg-white px-3 text-sm font-medium text-slate-700 hover:border-brand-700 hover:text-brand-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-700"
+              >
+                {link.label}
+              </a>
+            ))}
+          </nav>
         </div>
 
         {isConflict && <ConflictBanner onReload={handleReload} isReloading={isReloading} />}
 
         {saveSuccess && (
           <InlineAlert tone="success" onDismiss={() => setSaveSuccess(false)}>
-            Clinic settings saved successfully.
+            Hospital settings saved successfully.
           </InlineAlert>
         )}
 
@@ -451,204 +686,19 @@ export function Settings() {
           </InlineAlert>
         )}
 
-        {isPending ? (
-          <p className="text-sm text-neutral-600 py-8 text-center">Loading settings...</p>
-        ) : isError ? (
-          <InlineAlert tone="error">
-            {error instanceof Error ? error.message : 'Failed to load clinic settings.'}
-          </InlineAlert>
-        ) : form ? (
-          <form onSubmit={handleSubmit} noValidate className="space-y-6" aria-label="Clinic settings">
-            <Section
-              id="settings-section-identity"
-              title="Hospital identity"
-              description="The hospital name in English and Hindi, used on screens and printed documents."
-            >
-              <Field id="settings-name_en" label="Clinic Name (English)" error={fieldErrors.name_en}>
-                {textInput('name_en', { required: true, maxLength: 120 })}
-              </Field>
-              <Field id="settings-name_hi" label="Clinic Name (Hindi)" error={fieldErrors.name_hi}>
-                {textInput('name_hi', { required: true, maxLength: 120, lang: 'hi' })}
-              </Field>
-              <Field id="settings-trust_name_en" label="Trust Name (English)" error={fieldErrors.trust_name_en}>
-                {textInput('trust_name_en', { required: true, maxLength: 120 })}
-              </Field>
-              <Field id="settings-trust_name_hi" label="Trust Name (Hindi)" error={fieldErrors.trust_name_hi}>
-                {textInput('trust_name_hi', { maxLength: 120, lang: 'hi' })}
-              </Field>
-              <Field
-                id="settings-location_line"
-                label="Location Line"
-                error={fieldErrors.location_line}
-                hint="Shown in the application header, for example Ara, Bhojpur, Bihar."
-              >
-                {textInput('location_line', { required: true, maxLength: 120 })}
-              </Field>
-            </Section>
-
-            <Section
-              id="settings-section-contact"
-              title="Contact & addresses"
-              description="Phone, email and the clinic addresses printed on receipts, prescriptions and registration cards."
-            >
-              <Field
-                id="settings-phone"
-                label="Phone Number"
-                error={fieldErrors.phone}
-                hint="Digits, spaces and + - / , ( ) only."
-              >
-                {textInput('phone', { required: true, maxLength: 64, type: 'tel', inputMode: 'tel' })}
-              </Field>
-              <Field id="settings-email" label="Email (Optional)" error={fieldErrors.email}>
-                {textInput('email', { maxLength: 120, type: 'email', inputMode: 'email' })}
-              </Field>
-              <Field id="settings-address_1" label="Primary Address" error={fieldErrors.address_1} className="md:col-span-2">
-                {textInput('address_1', { required: true, maxLength: 255 })}
-              </Field>
-              <Field
-                id="settings-address_2"
-                label="Secondary Address (Optional)"
-                error={fieldErrors.address_2}
-                className="md:col-span-2"
-              >
-                {textInput('address_2', { maxLength: 255 })}
-              </Field>
-            </Section>
-
-            <Section
-              id="settings-section-billing"
-              title="Billing — receipt numbering"
-              description="How receipt numbers are grouped into yearly cycles. Each new cycle starts again at 0001."
-            >
-              <Field
-                id="settings-receipt_sequence_cycle"
-                label="Receipt Sequence Cycle"
-                error={fieldErrors.receipt_sequence_cycle}
-                hint={
-                  <>
-                    A receipt issued today in this cycle would be numbered like{' '}
-                    <span className="font-mono font-semibold text-neutral-900">
-                      {exampleReceiptNumber(form.receipt_sequence_cycle)}
-                    </span>
-                    . The cycle is worked out from the India (IST) date.
-                  </>
-                }
-              >
-                {(describedBy, invalid) => (
-                  <select
-                    id="settings-receipt_sequence_cycle"
-                    name="receipt_sequence_cycle"
-                    aria-invalid={invalid || undefined}
-                    aria-describedby={describedBy}
-                    value={form.receipt_sequence_cycle}
-                    onChange={(e) => {
-                      if (isReceiptCycle(e.target.value)) setField('receipt_sequence_cycle', e.target.value)
-                    }}
-                    className={`${INPUT_CLASS} ${inputBorder(invalid)}`}
-                  >
-                    <option value="FINANCIAL_YEAR">
-                      {CYCLE_LABEL.FINANCIAL_YEAR}, e.g. {exampleReceiptNumber('FINANCIAL_YEAR')}
-                    </option>
-                    <option value="CALENDAR_YEAR">
-                      {CYCLE_LABEL.CALENDAR_YEAR}, e.g. {exampleReceiptNumber('CALENDAR_YEAR')}
-                    </option>
-                  </select>
-                )}
-              </Field>
-              {cycleChanging && (
-                <div className="self-start rounded-lg border border-[#C39A35] bg-[#FFF8E7] p-4 text-sm text-neutral-900">
-                  You are changing the receipt numbering cycle. If receipts have already been issued in the
-                  current cycle, you will be asked to confirm and give a reason before it is saved.
-                </div>
-              )}
-            </Section>
-
-            <Section
-              id="settings-section-printing"
-              title="Printing — header & footer"
-              description="Optional text for printed documents, in English and Hindi."
-            >
-              <div className="md:col-span-2 rounded-lg border border-neutral-300 bg-neutral-50 p-4 text-sm text-neutral-800">
-                <p className="font-semibold text-neutral-900">Where this text is printed today</p>
-                <ul className="mt-1 list-disc space-y-1 pl-5">
-                  <li>Print header (English and Hindi): prescriptions, registration cards and receipts, when filled in.</li>
-                  <li>
-                    Print footer (Hindi): payment receipts and the patient registration card. When it is blank,
-                    receipts print their built-in Hindi thank-you line.
-                  </li>
-                  <li>Print footer (English): the patient registration card only.</li>
-                  <li>Prescriptions use the fixed letterhead with the clinic addresses and print neither field.</li>
-                </ul>
+        <HospitalAssetManager
+          layout={({ logo, library }) => (
+            <div className="space-y-6">
+              <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_22rem]">
+                {settingsForm}
+                <aside aria-label="Hospital crest and logo" className="space-y-6 xl:sticky xl:top-0">
+                  {logo}
+                </aside>
               </div>
-              <Field id="settings-print_header_en" label="Print Header (English)" error={fieldErrors.print_header_en}>
-                {textArea('print_header_en')}
-              </Field>
-              <Field id="settings-print_header_hi" label="Print Header (Hindi)" error={fieldErrors.print_header_hi}>
-                {textArea('print_header_hi', 'hi')}
-              </Field>
-              <Field id="settings-print_footer_en" label="Print Footer (English)" error={fieldErrors.print_footer_en}>
-                {textArea('print_footer_en')}
-              </Field>
-              <Field id="settings-print_footer_hi" label="Print Footer (Hindi)" error={fieldErrors.print_footer_hi}>
-                {textArea('print_footer_hi', 'hi')}
-              </Field>
-            </Section>
-
-            <Section
-              id="settings-section-consultation"
-              title="Consultation"
-              description="Rules for consultations and the patient registration card."
-            >
-              <Field
-                id="settings-consultation_validity_days"
-                label="Consultation Validity (Days)"
-                error={fieldErrors.consultation_validity_days}
-                hint="Printed on the patient registration card as its validity period (1 to 365 days). The server does not use it to expire consultations."
-              >
-                {(describedBy, invalid) => (
-                  <input
-                    id="settings-consultation_validity_days"
-                    name="consultation_validity_days"
-                    type="number"
-                    inputMode="numeric"
-                    min={1}
-                    max={365}
-                    step={1}
-                    aria-required
-                    aria-invalid={invalid || undefined}
-                    aria-describedby={describedBy}
-                    value={form.consultation_validity_days}
-                    onChange={(e) => setField('consultation_validity_days', e.target.value)}
-                    className={`${INPUT_CLASS} ${inputBorder(invalid)}`}
-                  />
-                )}
-              </Field>
-            </Section>
-
-            <div className="sticky bottom-0 z-10 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-neutral-200 bg-white px-6 py-4 shadow-md">
-              <p className="text-sm text-neutral-700" aria-live="polite">
-                {dirty ? 'You have unsaved changes.' : 'No unsaved changes.'}
-              </p>
-              <div className="flex gap-3">
-                <button
-                  type="button"
-                  onClick={handleCancel}
-                  disabled={!dirty || saving}
-                  className="px-4 py-2 text-sm font-medium text-neutral-800 bg-white border border-neutral-300 hover:bg-neutral-100 rounded min-h-11 min-w-11 focus-visible:outline-2 focus-visible:outline-[#8E1C3D] disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={!dirty || saving}
-                  className="px-4 py-2 text-sm font-semibold text-white bg-[#8E1C3D] hover:bg-[#5D0B26] rounded min-h-11 min-w-11 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#8E1C3D] disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed"
-                >
-                  {saving ? 'Saving...' : 'Save Settings'}
-                </button>
-              </div>
+              {library}
             </div>
-          </form>
-        ) : null}
+          )}
+        />
       </div>
 
       <Modal
@@ -661,7 +711,7 @@ export function Settings() {
         className="max-w-lg"
       >
         {extra && requestedCycle && (
-          <div className="space-y-4 text-sm text-neutral-800">
+          <div className="space-y-4 text-sm text-slate-800">
             <p>
               <span className="font-semibold">{extra.receipts_issued}</span>{' '}
               {extra.receipts_issued === 1 ? 'receipt has' : 'receipts have'} already been issued in the current cycle ({cycleLabel(extra.current_cycle)}, cycle key{' '}
@@ -678,7 +728,7 @@ export function Settings() {
             <p>The change and your reason are recorded in the audit log.</p>
 
             <div>
-              <label htmlFor="settings-cycle-change-reason" className="block text-sm font-medium text-neutral-800 mb-1">
+              <label htmlFor="settings-cycle-change-reason" className="mb-1 block text-sm font-medium text-slate-800">
                 Reason for the change (required)
               </label>
               <textarea
@@ -690,21 +740,21 @@ export function Settings() {
                 aria-describedby="settings-cycle-change-reason-count"
                 value={changeReason}
                 onChange={(e) => setChangeReason(e.target.value)}
-                className={`${INPUT_CLASS} border-neutral-300`}
+                className={`${INPUT_CLASS} border-slate-400`}
               />
-              <p id="settings-cycle-change-reason-count" className="mt-1 text-sm text-neutral-600">
+              <p id="settings-cycle-change-reason-count" className="mt-1 text-sm text-slate-600">
                 {changeReason.length}/{CHANGE_REASON_MAX_LENGTH} characters
               </p>
             </div>
 
             {cycleModalError && <InlineAlert tone="error">{cycleModalError}</InlineAlert>}
 
-            <div className="flex justify-end gap-3 border-t border-neutral-200 pt-4">
+            <div className="flex justify-end gap-3 border-t border-slate-200 pt-4">
               <button
                 type="button"
                 onClick={closeCycleModal}
                 disabled={saving}
-                className="px-4 py-2 text-sm font-medium text-neutral-800 bg-white border border-neutral-300 hover:bg-neutral-100 rounded min-h-11 min-w-11 focus-visible:outline-2 focus-visible:outline-[#8E1C3D] disabled:opacity-50 cursor-pointer"
+                className="px-4 py-2 text-sm font-medium text-slate-800 bg-white border border-slate-400 hover:bg-slate-100 rounded min-h-11 min-w-11 focus-visible:outline-2 focus-visible:outline-brand-700 disabled:opacity-50 cursor-pointer"
               >
                 Keep current cycle
               </button>

@@ -36,7 +36,22 @@ const sampleBackups = {
   backup_dir: '/var/backups',
 }
 
+vi.mock('../../api/branding', () => ({
+  useClinicBranding: () => ({
+    trustNameEn: 'Sri Vashishtha Kalyan Trust',
+    trustNameHi: 'श्री वशिष्ठ कल्याण ट्रस्ट',
+    hospitalName: 'Kalyan Hospital',
+    address: 'Hospital Road, Ara, Bhojpur, Bihar - 802301',
+    locationLine: 'Ara, Bhojpur, Bihar',
+    crestUrl: '/kalyan-hospital-crest.webp',
+  }),
+}))
+
 vi.mock('../../api/queries', () => ({
+  useMe: () => ({
+    data: { full_name: 'System Administrator', role: 'ADMIN' },
+    isLoading: false,
+  }),
   useBackups: () => ({
     data: sampleBackups,
     isPending: false,
@@ -60,9 +75,9 @@ vi.mock('../../api/queries', () => ({
 }))
 
 describe('BackupManagerPage', () => {
-  const renderPage = () => render(
-    <QueryClientProvider client={new QueryClient()}>
-      <MemoryRouter>
+  const renderPage = (initialEntries: string[] = ['/admin/backups']) => render(
+    <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+      <MemoryRouter initialEntries={initialEntries}>
         <BackupManagerPage />
       </MemoryRouter>
     </QueryClientProvider>,
@@ -71,7 +86,7 @@ describe('BackupManagerPage', () => {
   it('renders archive overview and removes developer-facing text and per-row destructive buttons', () => {
     renderPage()
 
-    expect(screen.getByRole('heading', { name: 'Backup & Recovery' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Backup & Restore' })).toBeInTheDocument()
     expect(screen.getByText('kalyan_backup_20261102_100000.tar.gz')).toBeInTheDocument()
     expect(screen.getAllByText('Integrity passed').length).toBeGreaterThanOrEqual(1)
     expect(screen.getByText('1.00 MB')).toBeInTheDocument()
@@ -115,6 +130,45 @@ describe('BackupManagerPage', () => {
       target: { value: 'RESTORE-DATABASE-OVERWRITE' },
     })
     expect(screen.getByRole('button', { name: 'Confirm database restoration' })).toBeEnabled()
+  })
+
+  it('renders data portability buttons and migration overview', () => {
+    renderPage()
+
+    expect(screen.getByRole('button', { name: 'Import Spreadsheet' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Export Dataset' })).toBeInTheDocument()
+    expect(screen.getByText('Patient Spreadsheet Ingestion')).toBeInTheDocument()
+    expect(screen.getByText('Patient Dataset Export')).toBeInTheDocument()
+  })
+
+  it('opens import wizard modal when clicking Import Spreadsheet', async () => {
+    const user = userEvent.setup()
+    renderPage()
+
+    await user.click(screen.getByRole('button', { name: 'Import Spreadsheet' }))
+    expect(screen.getByRole('heading', { name: 'Patient Import Centre' })).toBeInTheDocument()
+    expect(screen.getByText(/Step 1: Upload Patient Spreadsheet/i)).toBeInTheDocument()
+  })
+
+  it('opens export dialog when clicking Export Dataset', async () => {
+    const user = userEvent.setup()
+    renderPage()
+
+    await user.click(screen.getByRole('button', { name: 'Export Dataset' }))
+    expect(screen.getByRole('heading', { name: 'Export Patient Dataset' })).toBeInTheDocument()
+  })
+
+  it('automatically opens import modal when navigated with ?action=import', () => {
+    renderPage(['/admin/backups?action=import'])
+
+    expect(screen.getByRole('heading', { name: 'Patient Import Centre' })).toBeInTheDocument()
+    expect(screen.getByText(/Step 1: Upload Patient Spreadsheet/i)).toBeInTheDocument()
+  })
+
+  it('automatically opens export dialog when navigated with ?action=export', () => {
+    renderPage(['/admin/backups?action=export'])
+
+    expect(screen.getByRole('heading', { name: 'Export Patient Dataset' })).toBeInTheDocument()
   })
 })
 

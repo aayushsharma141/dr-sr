@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, Query, Request
 from sqlalchemy import select
 
 from kalyan_api.core.errors import ApiError, require_version
-from kalyan_api.core.permissions import Permission
+from kalyan_api.core.permissions import Permission, Role
 from kalyan_api.core.policy import require
 from kalyan_api.core.principal import Principal, build_audit_context, current_principal
 from kalyan_api.db.session import SessionDep
@@ -39,10 +39,12 @@ _FEE_AUDIT_FIELDS: tuple[str, ...] = ("name", "fee_paise", "is_active", "version
 def list_doctors(
     session: SessionDep,
     include_inactive: bool = Query(default=False),
+    principal: Principal = Depends(current_principal),
 ) -> list[DoctorOut]:
     """List doctor profiles. Non-admin roles see only active doctors."""
     query = select(Doctor).order_by(Doctor.name_en)
-    if not include_inactive:
+    # Only Admin may see retired doctors; otherwise any DOCTOR_READ user could list them.
+    if not include_inactive or principal.role != Role.ADMIN:
         query = query.where(Doctor.is_active.is_(True))
     docs = session.scalars(query).all()
     return [DoctorOut.model_validate(d) for d in docs]

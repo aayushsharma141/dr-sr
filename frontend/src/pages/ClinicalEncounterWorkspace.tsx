@@ -11,6 +11,7 @@ import { FollowUpSection } from '../components/FollowUpSection'
 import { AppointmentBookingModal } from '../components/AppointmentBookingModal'
 import { ConsultationSummaryPrint } from '../components/ConsultationSummaryPrint'
 import { QuickPhraseBar } from '../components/QuickPhraseBar'
+import { asSpecialty, useAppointmentDepartmentId, useMyDepartments } from '../api/specialty'
 import {
   IconStethoscope,
   IconHeartRateMonitor,
@@ -92,7 +93,16 @@ export function ClinicalEncounterWorkspace() {
 
   // 3. Vitals & Specialty Template queries
   const { data: serverVitals } = useEncounterVitals(encounterId)
-  const departmentId = existingEncounter?.department_id || (me?.doctor_id ? 1 : 1)
+  // D-19-03: the specialty comes from the consultation's own department, then the booked
+  // appointment's, then the doctor's department when they have exactly one. Never assume one.
+  const myDepartments = useMyDepartments()
+  const appointmentDepartmentId = useAppointmentDepartmentId(
+    existingEncounter?.appointment_id ?? paramApptId,
+  )
+  const departmentId: number | null =
+    existingEncounter?.department_id ??
+    appointmentDepartmentId ??
+    (myDepartments.length === 1 ? myDepartments[0].id : null)
   const { data: deptTemplate } = useDepartmentTemplate(departmentId)
   const { data: serverTemplateResponse } = useEncounterTemplateResponse(encounterId)
 
@@ -417,6 +427,7 @@ export function ClinicalEncounterWorkspace() {
         const created = await createMutation.mutateAsync({
           patient_id: effectivePatientId,
           appointment_id: paramApptId,
+          department_id: departmentId,
           symptoms,
           clinical_notes: clinicalNotes,
           diagnosis,
@@ -456,9 +467,9 @@ export function ClinicalEncounterWorkspace() {
     }
   }
 
-  const isPhysiotherapy =
-    deptTemplate?.code === 'PHYSIOTHERAPY' ||
-    (existingEncounter?.department_id === 1 && deptTemplate?.code !== 'OPHTHALMOLOGY')
+  const specialty = asSpecialty(deptTemplate?.code)
+  const isPhysiotherapy = specialty === 'PHYSIOTHERAPY'
+  const isOphthalmology = specialty === 'OPHTHALMOLOGY'
 
   const scrollToAnchor = (anchorId: string) => {
     setActiveAnchor(anchorId)
@@ -490,7 +501,10 @@ export function ClinicalEncounterWorkspace() {
 
   const patientName = patient?.full_name || existingEncounter?.patient_name || 'Consultation Patient'
   const patientUrn = patient?.urn || existingEncounter?.patient_urn || 'KH-2026-XXXX'
-  const departmentName = deptTemplate?.name_en || (isPhysiotherapy ? 'Physiotherapy' : 'Ophthalmology')
+  const departmentName =
+    deptTemplate?.name_en ||
+    myDepartments.find((d) => d.id === departmentId)?.name_en ||
+    'General consultation'
 
   return (
     <AppShell name={me?.full_name || 'Doctor'} role="DOCTOR">
@@ -1005,7 +1019,11 @@ export function ClinicalEncounterWorkspace() {
                 <div className="bg-[#0D121D] border border-slate-700/80 rounded-xl p-4">
                   <div className="flex items-center justify-between">
                     <span className="text-sm font-semibold text-white">
-                      {isPhysiotherapy ? 'Physiotherapy Clinical Examination' : 'Ophthalmology Clinical Examination'}
+                      {isPhysiotherapy
+                        ? 'Physiotherapy Clinical Examination'
+                        : isOphthalmology
+                          ? 'Ophthalmology Clinical Examination'
+                          : 'Specialty Examination'}
                     </span>
                     <button
                       type="button"
@@ -1027,7 +1045,7 @@ export function ClinicalEncounterWorkspace() {
                         onBlur={handleSectionBlur}
                         readOnly={isFinalised}
                       />
-                    ) : (
+                    ) : isOphthalmology ? (
                       <SpecialtyOphthalmologyForm
                         data={specialtyData as OphthalmologyFormData}
                         onChange={(newData) => {
@@ -1037,6 +1055,13 @@ export function ClinicalEncounterWorkspace() {
                         onBlur={handleSectionBlur}
                         readOnly={isFinalised}
                       />
+                    ) : (
+                      <p data-testid="specialty-unknown" className="text-sm text-slate-200">
+                        No specialty form for this consultation, because it has no department. The
+                        appointment was booked without one, or your department is not set. Ask the
+                        administrator to assign your department under Doctors &amp; Fees, then
+                        Departments.
+                      </p>
                     )}
                   </div>
                 </div>

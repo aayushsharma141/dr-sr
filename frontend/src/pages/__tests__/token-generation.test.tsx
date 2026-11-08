@@ -44,7 +44,7 @@ const mockPatient: PatientOut = {
 const mockDepartments: DepartmentOut[] = [
   {
     id: 1,
-    name_en: 'Physiotherapy',
+    code: 'PHYSIOTHERAPY', name_en: 'Physiotherapy',
     name_hi: 'फिजियोथेरेपी',
     description: null,
     is_active: true,

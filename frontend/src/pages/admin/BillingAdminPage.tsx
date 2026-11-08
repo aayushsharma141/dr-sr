@@ -56,7 +56,7 @@ function ConfigurationSection() {
         Billing rules in force
       </h2>
       <p className="mt-1 text-sm text-slate-700">
-        Read-only. The numbering cycle is set in Clinic Settings; the other rules are fixed until the client decides.
+        Read-only. The numbering cycle is set in Hospital Settings; the other rules are fixed until the client decides.
       </p>
       {isPending && <p role="status" className="mt-3 text-sm text-slate-700">Loading billing rules...</p>}
       {isError && (

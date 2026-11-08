@@ -324,7 +324,7 @@ export function ImportWizard() {
   return (
     <div className="space-y-6">
       {/* 8-Stage Stepper Header */}
-      <nav aria-label="Import Progress" className="overflow-x-auto rounded-xl border border-slate-200 bg-white p-4 shadow-xs dark:border-slate-700 dark:bg-slate-800">
+      <nav aria-label="Import Progress" className="overflow-x-auto rounded-xl border border-slate-200 bg-white p-4 shadow-xs">
         <ol className="flex min-w-[680px] items-center justify-between">
           {STAGES.map((s, idx) => {
             const isCompleted = idx < stageIndex
@@ -337,7 +337,7 @@ export function ImportWizard() {
                       ? 'bg-emerald-700 text-white'
                       : isActive
                         ? 'bg-[#8E1C3D] text-white shadow-xs'
-                        : 'border border-slate-300 text-slate-500 dark:border-slate-600 dark:text-slate-400'
+                        : 'border border-slate-300 text-slate-500'
                     }`}
                 >
                   {isCompleted ? (
@@ -350,16 +350,16 @@ export function ImportWizard() {
                 </div>
                 <span
                   className={`text-xs font-semibold ${isActive
-                      ? 'text-slate-900 font-bold dark:text-slate-100'
+                      ? 'text-slate-900 font-bold'
                       : isCompleted
-                        ? 'text-emerald-800 dark:text-emerald-400'
-                        : 'text-slate-500 dark:text-slate-400'
+                        ? 'text-emerald-800'
+                        : 'text-slate-500'
                     }`}
                 >
                   {s.label}
                 </span>
                 {idx < STAGES.length - 1 && (
-                  <div className={`mx-2 h-0.5 w-6 sm:w-10 ${idx < stageIndex ? 'bg-emerald-600' : 'bg-slate-200 dark:bg-slate-700'}`} />
+                  <div className={`mx-2 h-0.5 w-6 sm:w-10 ${idx < stageIndex ? 'bg-emerald-600' : 'bg-slate-200'}`} />
                 )}
               </li>
             )
@@ -377,8 +377,8 @@ export function ImportWizard() {
 
       {/* Global Loading Spinner Banner */}
       {(isLoading || isCommitting) && (
-        <div className="flex items-center gap-3 rounded-xl border border-indigo-200 bg-indigo-50 p-4 text-indigo-900 dark:border-indigo-900/60 dark:bg-indigo-950/40 dark:text-indigo-200">
-          <svg className="h-5 w-5 animate-spin text-indigo-600 dark:text-indigo-400" viewBox="0 0 24 24" fill="none">
+        <div className="flex items-center gap-3 rounded-xl border border-slate-200 bg-slate-50 p-4 text-slate-900">
+          <svg className="h-5 w-5 animate-spin text-brand-700" viewBox="0 0 24 24" fill="none">
             <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
             <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
           </svg>
@@ -388,23 +388,23 @@ export function ImportWizard() {
 
       {/* --- STAGE 1: UPLOAD --- */}
       {currentStage === 'upload' && (
-        <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-xs dark:border-slate-700 dark:bg-slate-800">
-          <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100">Step 1: Upload Patient Spreadsheet</h2>
-          <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
+        <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-xs">
+          <h2 className="text-lg font-bold text-slate-900">Step 1: Upload Patient Spreadsheet</h2>
+          <p className="mt-1 text-sm text-slate-600">
             Select a CSV or Microsoft Excel (.xlsx) file containing patient demographics. Files up to 10 MB are supported.
           </p>
 
           <div
             onClick={() => fileInputRef.current?.click()}
-            className="mt-6 flex flex-col items-center justify-center rounded-xl border-2 border-dashed border-slate-300 bg-slate-50 p-8 text-center cursor-pointer transition-colors hover:border-slate-400 hover:bg-slate-100 dark:border-slate-600 dark:bg-slate-900/40 dark:hover:border-slate-500"
+            className="mt-6 flex flex-col items-center justify-center rounded-xl border-2 border-dashed border-slate-300 bg-slate-50 p-8 text-center cursor-pointer transition-colors hover:border-slate-400 hover:bg-slate-100"
           >
-            <svg className="h-12 w-12 text-slate-500 dark:text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <svg className="h-12 w-12 text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
             </svg>
-            <p className="mt-3 text-sm font-semibold text-slate-800 dark:text-slate-200">
+            <p className="mt-3 text-sm font-semibold text-slate-800">
               {selectedFile ? selectedFile.name : 'Drag and drop spreadsheet here, or click to browse'}
             </p>
-            <p className="mt-1 text-xs text-slate-600 dark:text-slate-300">
+            <p className="mt-1 text-xs text-slate-600">
               Supports .csv (UTF-8, UTF-8-BOM, Windows-1252) and .xlsx
             </p>
             <input
@@ -418,12 +418,12 @@ export function ImportWizard() {
           </div>
 
           {selectedFile && (
-            <div className="mt-4 flex items-center justify-between rounded-lg bg-slate-100 p-3 text-xs text-slate-700 dark:bg-slate-700 dark:text-slate-200">
+            <div className="mt-4 flex items-center justify-between rounded-lg bg-slate-100 p-3 text-xs text-slate-700">
               <span>Selected: <strong className="font-semibold">{selectedFile.name}</strong> ({(selectedFile.size / 1024).toFixed(1)} KB)</span>
               <button
                 type="button"
                 onClick={() => setSelectedFile(null)}
-                className="cursor-pointer text-red-600 hover:underline dark:text-red-400"
+                className="cursor-pointer text-red-600 hover:underline"
               >
                 Clear
               </button>
@@ -435,7 +435,7 @@ export function ImportWizard() {
               type="button"
               disabled={!selectedFile || isLoading}
               onClick={handleUploadAndInspect}
-              className="min-h-[44px] cursor-pointer rounded-lg bg-[#8E1C3D] px-6 py-2.5 text-sm font-semibold text-white shadow-xs hover:bg-[#721630] disabled:opacity-50"
+              className="min-h-[44px] rounded-lg bg-[#8E1C3D] px-6 py-2.5 text-sm font-semibold text-white shadow-2xs hover:bg-[#721630] disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-500 disabled:opacity-100"
             >
               Upload Import File
             </button>
@@ -445,22 +445,22 @@ export function ImportWizard() {
 
       {/* --- STAGE 2: INSPECT --- */}
       {currentStage === 'inspect' && inspectData && (
-        <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-xs dark:border-slate-700 dark:bg-slate-800">
-          <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-200 pb-4 dark:border-slate-700">
+        <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-xs">
+          <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-200 pb-4">
             <div>
-              <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100">Step 2: File Structure Inspection</h2>
-              <p className="text-xs text-slate-600 dark:text-slate-300">
+              <h2 className="text-lg font-bold text-slate-900">Step 2: File Structure Inspection</h2>
+              <p className="text-xs text-slate-600">
                 Spreadsheet encoding and headers were analyzed automatically.
               </p>
             </div>
             <div className="flex gap-2">
-              <span className="rounded-md bg-blue-100 px-2.5 py-1 text-xs font-semibold text-blue-900 dark:bg-blue-950 dark:text-blue-300">
+              <span className="rounded-md bg-blue-100 px-2.5 py-1 text-xs font-semibold text-blue-900">
                 Format: {inspectData.file_type.toUpperCase()}
               </span>
-              <span className="rounded-md bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-800 dark:bg-slate-700 dark:text-slate-200">
+              <span className="rounded-md bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-800">
                 Encoding: {inspectData.encoding || 'N/A'}
               </span>
-              <span className="rounded-md bg-emerald-100 px-2.5 py-1 text-xs font-semibold text-emerald-900 dark:bg-emerald-950 dark:text-emerald-300">
+              <span className="rounded-md bg-emerald-100 px-2.5 py-1 text-xs font-semibold text-emerald-900">
                 Total Rows: {inspectData.total_rows}
               </span>
             </div>
@@ -468,12 +468,12 @@ export function ImportWizard() {
 
           {/* Sample rows table */}
           <div className="mt-6">
-            <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+            <h3 className="text-sm font-semibold text-slate-900">
               Sample Data Preview (First 5 Rows)
             </h3>
-            <div className="mt-3 overflow-x-auto rounded-lg border border-slate-200 dark:border-slate-700">
-              <table className="min-w-full divide-y divide-slate-200 text-left text-xs dark:divide-slate-700">
-                <thead className="bg-slate-50 font-bold text-slate-800 dark:bg-slate-900/50 dark:text-slate-200">
+            <div className="mt-3 overflow-x-auto rounded-lg border border-slate-200">
+              <table className="min-w-full divide-y divide-slate-200 text-left text-xs">
+                <thead className="bg-slate-50 font-bold text-slate-800">
                   <tr>
                     {inspectData.headers.map((h, i) => (
                       <th key={i} className="px-3 py-2.5 whitespace-nowrap">
@@ -482,11 +482,11 @@ export function ImportWizard() {
                     ))}
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100 bg-white dark:divide-slate-800 dark:bg-slate-800">
+                <tbody className="divide-y divide-slate-100 bg-white">
                   {inspectData.sample_rows.map((row, rIdx) => (
-                    <tr key={rIdx} className="hover:bg-slate-50/50 dark:hover:bg-slate-700/50">
+                    <tr key={rIdx} className="hover:bg-slate-50/50">
                       {inspectData.headers.map((h, cIdx) => (
-                        <td key={cIdx} className="px-3 py-2 text-slate-700 dark:text-slate-300 whitespace-nowrap">
+                        <td key={cIdx} className="px-3 py-2 text-slate-700 whitespace-nowrap">
                           {row[h] !== undefined && row[h] !== '' ? String(row[h]) : '—'}
                         </td>
                       ))}
@@ -501,7 +501,7 @@ export function ImportWizard() {
             <button
               type="button"
               onClick={() => setCurrentStage('upload')}
-              className="min-h-[44px] cursor-pointer rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-700"
+              className="min-h-[44px] cursor-pointer rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
             >
               Back to Upload
             </button>
@@ -518,32 +518,32 @@ export function ImportWizard() {
 
       {/* --- STAGE 3: MAP --- */}
       {currentStage === 'map' && inspectData && (
-        <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-xs dark:border-slate-700 dark:bg-slate-800">
-          <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100">Step 3: Column Mapping</h2>
-          <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
+        <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-xs">
+          <h2 className="text-lg font-bold text-slate-900">Step 3: Column Mapping</h2>
+          <p className="mt-1 text-sm text-slate-600">
             Map spreadsheet columns to canonical hospital demographic fields. Columns marked with (*) are required for registration.
           </p>
 
-          <div className="mt-6 overflow-x-auto rounded-lg border border-slate-200 dark:border-slate-700">
-            <table className="min-w-full divide-y divide-slate-200 text-left text-sm dark:divide-slate-700">
-              <thead className="bg-slate-50 font-bold text-slate-800 dark:bg-slate-900/50 dark:text-slate-200">
+          <div className="mt-6 overflow-x-auto rounded-lg border border-slate-200">
+            <table className="min-w-full divide-y divide-slate-200 text-left text-sm">
+              <thead className="bg-slate-50 font-bold text-slate-800">
                 <tr>
                   <th className="px-4 py-3">Spreadsheet Column Header</th>
                   <th className="px-4 py-3">Sample Value</th>
                   <th className="px-4 py-3">Target Patient Field</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100 bg-white dark:divide-slate-800 dark:bg-slate-800">
+              <tbody className="divide-y divide-slate-100 bg-white">
                 {inspectData.headers.map((header) => {
                   const sampleVal = inspectData.sample_rows[0]?.[header] || '—'
                   const mappedField = columnMapping[header] || ''
 
                   return (
                     <tr key={header}>
-                      <td className="px-4 py-3 font-medium text-slate-900 dark:text-slate-100">
+                      <td className="px-4 py-3 font-medium text-slate-900">
                         {header}
                       </td>
-                      <td className="px-4 py-3 text-xs text-slate-600 dark:text-slate-300">
+                      <td className="px-4 py-3 text-xs text-slate-600">
                         {String(sampleVal)}
                       </td>
                       <td className="px-4 py-3">
@@ -553,7 +553,7 @@ export function ImportWizard() {
                           onChange={(e) =>
                             setColumnMapping((prev) => ({ ...prev, [header]: e.target.value }))
                           }
-                          className="min-h-[44px] w-full max-w-xs rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs text-slate-800 shadow-xs focus:border-indigo-500 focus:outline-none dark:border-slate-600 dark:bg-slate-700 dark:text-slate-100"
+                          className="min-h-[44px] w-full max-w-xs rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs text-slate-800 shadow-xs focus:border-brand-700 focus:outline-none"
                         >
                           <option value="">(Ignore Column)</option>
                           {Object.entries(CANONICAL_FIELD_LABELS).map(([key, label]) => (
@@ -574,7 +574,7 @@ export function ImportWizard() {
             <button
               type="button"
               onClick={() => setCurrentStage('inspect')}
-              className="min-h-[44px] cursor-pointer rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-700"
+              className="min-h-[44px] cursor-pointer rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
             >
               Back to Inspect
             </button>
@@ -582,7 +582,7 @@ export function ImportWizard() {
               type="button"
               disabled={isLoading}
               onClick={handleConfirmMappingAndStage}
-              className="min-h-[44px] cursor-pointer rounded-lg bg-[#8E1C3D] px-6 py-2 text-sm font-semibold text-white shadow-xs hover:bg-[#721630] disabled:opacity-50"
+              className="min-h-[44px] rounded-lg bg-[#8E1C3D] px-6 py-2 text-sm font-semibold text-white shadow-2xs hover:bg-[#721630] disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-500 disabled:opacity-100"
             >
               Confirm Column Mapping
             </button>
@@ -592,11 +592,11 @@ export function ImportWizard() {
 
       {/* --- STAGE 4: VALIDATE --- */}
       {currentStage === 'validate' && batchSummary && (
-        <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-xs dark:border-slate-700 dark:bg-slate-800">
-          <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-200 pb-4 dark:border-slate-700">
+        <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-xs">
+          <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-200 pb-4">
             <div>
-              <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100">Step 4: Batch Validation Results</h2>
-              <p className="text-xs text-slate-600 dark:text-slate-300">
+              <h2 className="text-lg font-bold text-slate-900">Step 4: Batch Validation Results</h2>
+              <p className="text-xs text-slate-600">
                 Staged records verified against required hospital invariants (D-20-10).
               </p>
             </div>
@@ -604,7 +604,7 @@ export function ImportWizard() {
               type="button"
               onClick={() => handleRunValidation()}
               disabled={isLoading}
-              className="min-h-[44px] cursor-pointer rounded-lg border border-slate-300 bg-white px-4 py-2 text-xs font-semibold text-slate-700 shadow-xs hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-700 dark:text-slate-200"
+              className="min-h-[44px] cursor-pointer rounded-lg border border-slate-300 bg-white px-4 py-2 text-xs font-semibold text-slate-700 shadow-xs hover:bg-slate-50"
             >
               Run Batch Validation
             </button>
@@ -612,28 +612,28 @@ export function ImportWizard() {
 
           {/* Validation Metrics Grid */}
           <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-4">
-            <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-700 dark:bg-slate-900/40">
-              <span className="text-xs font-semibold text-slate-600 dark:text-slate-300">Total Rows</span>
-              <p className="mt-2 text-2xl font-bold text-slate-900 dark:text-slate-100">{batchSummary.total_rows}</p>
+            <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+              <span className="text-xs font-semibold text-slate-600">Total Rows</span>
+              <p className="mt-2 text-2xl font-bold text-slate-900">{batchSummary.total_rows}</p>
             </div>
-            <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 dark:border-emerald-900/60 dark:bg-emerald-950/30">
-              <span className="text-xs font-semibold text-emerald-800 dark:text-emerald-300">Valid Rows</span>
-              <p className="mt-2 text-2xl font-bold text-emerald-900 dark:text-emerald-200">{batchSummary.valid_rows}</p>
+            <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4">
+              <span className="text-xs font-semibold text-emerald-800">Valid Rows</span>
+              <p className="mt-2 text-2xl font-bold text-emerald-900">{batchSummary.valid_rows}</p>
             </div>
-            <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 dark:border-amber-900/60 dark:bg-amber-950/30">
-              <span className="text-xs font-semibold text-amber-800 dark:text-amber-300">Duplicate Candidates</span>
-              <p className="mt-2 text-2xl font-bold text-amber-900 dark:text-amber-200">{batchSummary.duplicate_rows}</p>
+            <div className="rounded-xl border border-amber-200 bg-amber-50 p-4">
+              <span className="text-xs font-semibold text-amber-800">Duplicate Candidates</span>
+              <p className="mt-2 text-2xl font-bold text-amber-900">{batchSummary.duplicate_rows}</p>
             </div>
-            <div className="rounded-xl border border-red-200 bg-red-50 p-4 dark:border-red-900/60 dark:bg-red-950/30">
-              <span className="text-xs font-semibold text-red-800 dark:text-red-300">Invalid Rows</span>
-              <p className="mt-2 text-2xl font-bold text-red-900 dark:text-red-200">{batchSummary.invalid_rows}</p>
+            <div className="rounded-xl border border-red-200 bg-red-50 p-4">
+              <span className="text-xs font-semibold text-red-800">Invalid Rows</span>
+              <p className="mt-2 text-2xl font-bold text-red-900">{batchSummary.invalid_rows}</p>
             </div>
           </div>
 
           {batchSummary.invalid_rows === 0 ? (
-            <div className="mt-6 rounded-xl border border-emerald-200 bg-emerald-50/50 p-6 text-center dark:border-emerald-900 dark:bg-emerald-950/20">
-              <h3 className="text-base font-semibold text-emerald-900 dark:text-emerald-200">Zero Validation Errors</h3>
-              <p className="mt-1 text-sm text-emerald-700 dark:text-emerald-300">
+            <div className="mt-6 rounded-xl border border-emerald-200 bg-emerald-50/50 p-6 text-center">
+              <h3 className="text-base font-semibold text-emerald-900">Zero Validation Errors</h3>
+              <p className="mt-1 text-sm text-emerald-700">
                 All staged records satisfy required demographic formats. Click 'Review Import Preview' to verify batch counts.
               </p>
             </div>
@@ -654,7 +654,7 @@ export function ImportWizard() {
             <button
               type="button"
               onClick={() => setCurrentStage('map')}
-              className="min-h-[44px] cursor-pointer rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-700"
+              className="min-h-[44px] cursor-pointer rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
             >
               Back to Mapping
             </button>
@@ -677,10 +677,10 @@ export function ImportWizard() {
 
       {/* --- STAGE 5: RESOLVE --- */}
       {currentStage === 'resolve' && (
-        <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-xs dark:border-slate-700 dark:bg-slate-800">
-          <div className="border-b border-slate-200 pb-4 dark:border-slate-700">
-            <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100">Step 5: Duplicate Resolution</h2>
-            <p className="text-xs text-slate-600 dark:text-slate-300">
+        <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-xs">
+          <div className="border-b border-slate-200 pb-4">
+            <h2 className="text-lg font-bold text-slate-900">Step 5: Duplicate Resolution</h2>
+            <p className="text-xs text-slate-600">
               Flagged candidates matched against existing hospital patients by mobile, address, or old URN (D-20-13).
             </p>
           </div>
@@ -699,7 +699,7 @@ export function ImportWizard() {
             <button
               type="button"
               onClick={() => setCurrentStage('validate')}
-              className="min-h-[44px] cursor-pointer rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-700"
+              className="min-h-[44px] cursor-pointer rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
             >
               Back to Validation
             </button>
@@ -716,32 +716,32 @@ export function ImportWizard() {
 
       {/* --- STAGE 6: PREVIEW --- */}
       {currentStage === 'preview' && batchSummary && (
-        <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-xs dark:border-slate-700 dark:bg-slate-800">
-          <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100">Step 6: Import Preview & Confirmation</h2>
-          <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
+        <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-xs">
+          <h2 className="text-lg font-bold text-slate-900">Step 6: Import Preview & Confirmation</h2>
+          <p className="mt-1 text-sm text-slate-600">
             Review the final batch composition before initiating commit.
           </p>
 
-          <div className="mt-6 rounded-xl border border-slate-200 bg-slate-50 p-6 dark:border-slate-700 dark:bg-slate-900/40">
-            <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wide dark:text-slate-100">
+          <div className="mt-6 rounded-xl border border-slate-200 bg-slate-50 p-6">
+            <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wide">
               Batch Summary: {batchSummary.filename}
             </h3>
             <dl className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4 text-xs">
-              <div className="rounded-lg bg-white p-3 shadow-xs dark:bg-slate-800">
-                <dt className="text-slate-600 dark:text-slate-300">Total Rows in File</dt>
-                <dd className="mt-1 text-xl font-bold text-slate-900 dark:text-slate-100">{batchSummary.total_rows}</dd>
+              <div className="rounded-lg bg-white p-3 shadow-xs">
+                <dt className="text-slate-600">Total Rows in File</dt>
+                <dd className="mt-1 text-xl font-bold text-slate-900">{batchSummary.total_rows}</dd>
               </div>
-              <div className="rounded-lg bg-emerald-50 p-3 shadow-xs dark:bg-emerald-950/40">
-                <dt className="text-emerald-800 dark:text-emerald-300">Valid Records to Commit</dt>
-                <dd className="mt-1 text-xl font-bold text-emerald-900 dark:text-emerald-200">{totalToCommit}</dd>
+              <div className="rounded-lg bg-emerald-50 p-3 shadow-xs">
+                <dt className="text-emerald-800">Valid Records to Commit</dt>
+                <dd className="mt-1 text-xl font-bold text-emerald-900">{totalToCommit}</dd>
               </div>
-              <div className="rounded-lg bg-amber-50 p-3 shadow-xs dark:bg-amber-950/40">
-                <dt className="text-amber-800 dark:text-amber-300">Duplicates Skipped</dt>
-                <dd className="mt-1 text-xl font-bold text-amber-900 dark:text-amber-200">{skippedCount}</dd>
+              <div className="rounded-lg bg-amber-50 p-3 shadow-xs">
+                <dt className="text-amber-800">Duplicates Skipped</dt>
+                <dd className="mt-1 text-xl font-bold text-amber-900">{skippedCount}</dd>
               </div>
-              <div className="rounded-lg bg-red-50 p-3 shadow-xs dark:bg-red-950/40">
-                <dt className="text-red-800 dark:text-red-300">Invalid Rows Held Back</dt>
-                <dd className="mt-1 text-xl font-bold text-red-900 dark:text-red-200">{batchSummary.invalid_rows}</dd>
+              <div className="rounded-lg bg-red-50 p-3 shadow-xs">
+                <dt className="text-red-800">Invalid Rows Held Back</dt>
+                <dd className="mt-1 text-xl font-bold text-red-900">{batchSummary.invalid_rows}</dd>
               </div>
             </dl>
           </div>
@@ -759,7 +759,7 @@ export function ImportWizard() {
             <button
               type="button"
               onClick={() => setCurrentStage(duplicates.length > 0 ? 'resolve' : 'validate')}
-              className="min-h-[44px] cursor-pointer rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-700"
+              className="min-h-[44px] cursor-pointer rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
             >
               Back
             </button>
@@ -767,7 +767,7 @@ export function ImportWizard() {
               type="button"
               disabled={totalToCommit === 0}
               onClick={() => setIsCommitModalOpen(true)}
-              className="min-h-[44px] cursor-pointer rounded-lg bg-[#8E1C3D] px-6 py-2 text-sm font-semibold text-white shadow-xs hover:bg-[#721630] disabled:opacity-50"
+              className="min-h-[44px] rounded-lg bg-[#8E1C3D] px-6 py-2 text-sm font-semibold text-white shadow-2xs hover:bg-[#721630] disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-500 disabled:opacity-100"
             >
               Commit Import Batch
             </button>
@@ -777,45 +777,45 @@ export function ImportWizard() {
 
       {/* --- STAGE 8: RECONCILE --- */}
       {currentStage === 'reconcile' && commitResult && (
-        <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-xs dark:border-slate-700 dark:bg-slate-800">
-          <div className="flex items-center gap-3 border-b border-slate-200 pb-4 dark:border-slate-700">
-            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-400">
+        <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-xs">
+          <div className="flex items-center gap-3 border-b border-slate-200 pb-4">
+            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-100 text-emerald-700">
               <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
               </svg>
             </div>
             <div>
-              <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100">Step 8: Batch Reconciliation</h2>
-              <p className="text-xs text-slate-600 dark:text-slate-300">
+              <h2 className="text-lg font-bold text-slate-900">Step 8: Batch Reconciliation</h2>
+              <p className="text-xs text-slate-600">
                 Patient records committed successfully to hospital database with gap-free URN sequence (D-20-09).
               </p>
             </div>
           </div>
 
           <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
-            <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 dark:border-emerald-900/60 dark:bg-emerald-950/30">
-              <span className="text-xs font-semibold text-emerald-800 dark:text-emerald-300">Allocated URN Range</span>
-              <p className="mt-2 font-mono text-base font-bold text-emerald-900 dark:text-emerald-200">
+            <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4">
+              <span className="text-xs font-semibold text-emerald-800">Allocated URN Range</span>
+              <p className="mt-2 font-mono text-base font-bold text-emerald-900">
                 {commitResult.urn_range_start && commitResult.urn_range_end
                   ? `${commitResult.urn_range_start} → ${commitResult.urn_range_end}`
                   : 'N/A'}
               </p>
             </div>
-            <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-700 dark:bg-slate-900/40">
-              <span className="text-xs font-semibold text-slate-600 dark:text-slate-300">Total Patients Committed</span>
-              <p className="mt-2 text-2xl font-bold text-slate-900 dark:text-slate-100">{commitResult.committed_rows}</p>
+            <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+              <span className="text-xs font-semibold text-slate-600">Total Patients Committed</span>
+              <p className="mt-2 text-2xl font-bold text-slate-900">{commitResult.committed_rows}</p>
             </div>
-            <div className="rounded-xl border border-blue-200 bg-blue-50 p-4 dark:border-blue-900/60 dark:bg-blue-950/30">
-              <span className="text-xs font-semibold text-blue-800 dark:text-blue-300">Safety Backup Archive</span>
-              <p className="mt-2 text-xs font-mono font-medium text-blue-900 truncate dark:text-blue-200">
+            <div className="rounded-xl border border-blue-200 bg-blue-50 p-4">
+              <span className="text-xs font-semibold text-blue-800">Safety Backup Archive</span>
+              <p className="mt-2 text-xs font-mono font-medium text-blue-900 truncate">
                 {commitResult.safety_backup_file || 'Automated bundle'}
               </p>
             </div>
           </div>
 
-          <div className="mt-8 flex flex-wrap items-center justify-between gap-4 border-t border-slate-100 pt-6 dark:border-slate-700">
+          <div className="mt-8 flex flex-wrap items-center justify-between gap-4 border-t border-slate-100 pt-6">
             <div>
-              <p className="text-xs text-slate-600 dark:text-slate-300">
+              <p className="text-xs text-slate-600">
                 Download a CSV file containing invalid or skipped rows along with exact failure reasons for offline correction.
               </p>
             </div>
@@ -823,7 +823,7 @@ export function ImportWizard() {
               <button
                 type="button"
                 onClick={handleDownloadErrors}
-                className="min-h-[44px] cursor-pointer rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-xs hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-700 dark:text-slate-200"
+                className="min-h-[44px] cursor-pointer rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-xs hover:bg-slate-50"
               >
                 Download Error Records
               </button>
@@ -847,14 +847,14 @@ export function ImportWizard() {
         title="Commit Import Batch"
       >
         <div className="space-y-4">
-          <p className="text-sm text-slate-700 dark:text-slate-300">
+          <p className="text-sm text-slate-700">
             Are you sure you want to commit {totalToCommit} valid patient records to the hospital database? This will automatically generate a safety backup and assign gap-free URNs. Imported records cannot be bulk-deleted. Click 'Confirm Batch Commit' to execute or 'Cancel Batch Commit' to review staging rows.
           </p>
-          <div className="flex justify-end gap-3 pt-4 border-t border-slate-200 dark:border-slate-700">
+          <div className="flex justify-end gap-3 pt-4 border-t border-slate-200">
             <button
               type="button"
               onClick={() => setIsCommitModalOpen(false)}
-              className="min-h-[44px] cursor-pointer rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-700"
+              className="min-h-[44px] cursor-pointer rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
             >
               Cancel Batch Commit
             </button>

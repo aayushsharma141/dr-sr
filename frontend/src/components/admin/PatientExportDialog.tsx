@@ -227,12 +227,12 @@ export function PatientExportDialog({ open, onClose, onExportSuccess }: PatientE
       className="max-w-3xl"
       busy={isExporting}
     >
-      <form onSubmit={handleExport} className="space-y-6 text-sm text-slate-800 dark:text-slate-200">
+      <form onSubmit={handleExport} className="space-y-6 text-sm text-slate-800">
         {/* Error notification banner */}
         {errorMessage && (
           <div
             role="alert"
-            className="rounded-lg border border-red-300 bg-red-50 p-4 text-red-900 dark:border-red-700 dark:bg-red-950/40 dark:text-red-200"
+            className="rounded-lg border border-red-300 bg-red-50 p-4 text-red-900"
           >
             <p className="font-semibold">Export Failed</p>
             <p className="mt-1">{errorMessage}</p>
@@ -243,7 +243,7 @@ export function PatientExportDialog({ open, onClose, onExportSuccess }: PatientE
         {statusMessage && (
           <div
             role="status"
-            className="rounded-lg border border-blue-300 bg-blue-50 p-4 text-blue-900 dark:border-blue-700 dark:bg-blue-950/40 dark:text-blue-200"
+            className="rounded-lg border border-blue-300 bg-blue-50 p-4 text-blue-900"
           >
             <p className="font-semibold">Generating Dataset Stream</p>
             <p className="mt-1">{statusMessage}</p>
@@ -251,15 +251,15 @@ export function PatientExportDialog({ open, onClose, onExportSuccess }: PatientE
         )}
 
         {/* 1. Scope Configuration Card */}
-        <div className="rounded-xl border border-slate-200 bg-slate-50/60 p-4 dark:border-slate-750 dark:bg-slate-850">
-          <h2 className="text-sm font-semibold tracking-wide text-slate-900 dark:text-slate-100">
+        <div className="rounded-xl border border-slate-200 bg-slate-50/60 p-4">
+          <h2 className="text-sm font-semibold tracking-wide text-slate-900">
             1. Scope & Filter Parameters
           </h2>
           <div className="mt-3 grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>
               <label
                 htmlFor="export-start-date"
-                className="block text-xs font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-300"
+                className="block text-xs font-semibold uppercase tracking-wider text-slate-600"
               >
                 Start Date
               </label>
@@ -268,14 +268,14 @@ export function PatientExportDialog({ open, onClose, onExportSuccess }: PatientE
                 type="date"
                 value={startDate}
                 onChange={(e) => setStartDate(e.target.value)}
-                className="mt-1 block h-11 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-xs focus:border-[#8E1C3D] focus:ring-1 focus:ring-[#8E1C3D] dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
+                className="mt-1 block h-11 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-xs focus:border-[#8E1C3D] focus:ring-1 focus:ring-[#8E1C3D]"
               />
             </div>
 
             <div>
               <label
                 htmlFor="export-end-date"
-                className="block text-xs font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-300"
+                className="block text-xs font-semibold uppercase tracking-wider text-slate-600"
               >
                 End Date
               </label>
@@ -284,14 +284,14 @@ export function PatientExportDialog({ open, onClose, onExportSuccess }: PatientE
                 type="date"
                 value={endDate}
                 onChange={(e) => setEndDate(e.target.value)}
-                className="mt-1 block h-11 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-xs focus:border-[#8E1C3D] focus:ring-1 focus:ring-[#8E1C3D] dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
+                className="mt-1 block h-11 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-xs focus:border-[#8E1C3D] focus:ring-1 focus:ring-[#8E1C3D]"
               />
             </div>
 
             <div>
               <label
                 htmlFor="export-department"
-                className="block text-xs font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-300"
+                className="block text-xs font-semibold uppercase tracking-wider text-slate-600"
               >
                 Department
               </label>
@@ -299,7 +299,7 @@ export function PatientExportDialog({ open, onClose, onExportSuccess }: PatientE
                 id="export-department"
                 value={departmentId}
                 onChange={(e) => setDepartmentId(e.target.value)}
-                className="mt-1 block h-11 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-xs focus:border-[#8E1C3D] focus:ring-1 focus:ring-[#8E1C3D] dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
+                className="mt-1 block h-11 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-xs focus:border-[#8E1C3D] focus:ring-1 focus:ring-[#8E1C3D]"
               >
                 <option value="">All Departments</option>
                 <option value="1">Physiotherapy</option>
@@ -310,7 +310,7 @@ export function PatientExportDialog({ open, onClose, onExportSuccess }: PatientE
             <div>
               <label
                 htmlFor="export-search-query"
-                className="block text-xs font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-300"
+                className="block text-xs font-semibold uppercase tracking-wider text-slate-600"
               >
                 Patient Search Query (Optional)
               </label>
@@ -320,31 +320,31 @@ export function PatientExportDialog({ open, onClose, onExportSuccess }: PatientE
                 value={searchQuery}
                 placeholder="Name, URN, Mobile..."
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="mt-1 block h-11 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-xs focus:border-[#8E1C3D] focus:ring-1 focus:ring-[#8E1C3D] dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
+                className="mt-1 block h-11 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-xs focus:border-[#8E1C3D] focus:ring-1 focus:ring-[#8E1C3D]"
               />
             </div>
           </div>
         </div>
 
         {/* 2. Field Selection Matrix */}
-        <div className="rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-750 dark:bg-slate-900">
+        <div className="rounded-xl border border-slate-200 bg-white p-4">
           <div className="flex items-center justify-between">
-            <h2 className="text-sm font-semibold tracking-wide text-slate-900 dark:text-slate-100">
+            <h2 className="text-sm font-semibold tracking-wide text-slate-900">
               2. Field Selection Matrix ({selectedFields.length} selected)
             </h2>
             <div className="flex gap-2">
               <button
                 type="button"
                 onClick={() => setSelectedFields(DEFAULT_SELECTED_FIELDS)}
-                className="cursor-pointer text-xs font-medium text-[#8E1C3D] hover:underline dark:text-rose-400"
+                className="cursor-pointer text-xs font-medium text-[#8E1C3D] hover:underline"
               >
                 Reset Default
               </button>
-              <span aria-hidden="true" className="text-slate-500 dark:text-slate-400">|</span>
+              <span aria-hidden="true" className="text-slate-500">|</span>
               <button
                 type="button"
                 onClick={() => setSelectedFields([])}
-                className="cursor-pointer text-xs font-medium text-slate-600 hover:underline dark:text-slate-300"
+                className="cursor-pointer text-xs font-medium text-slate-600 hover:underline"
               >
                 Clear All
               </button>
@@ -360,16 +360,16 @@ export function PatientExportDialog({ open, onClose, onExportSuccess }: PatientE
               return (
                 <div
                   key={group.id}
-                  className="rounded-lg border border-slate-200 p-3.5 dark:border-slate-700/80"
+                  className="rounded-lg border border-slate-200 p-3.5"
                 >
-                  <div className="flex items-center justify-between border-b border-slate-100 pb-2.5 dark:border-slate-800">
-                    <span className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300">
+                  <div className="flex items-center justify-between border-b border-slate-100 pb-2.5">
+                    <span className="text-xs font-bold uppercase tracking-wider text-slate-700">
                       {group.title}
                     </span>
                     <button
                       type="button"
                       onClick={() => toggleGroup(group)}
-                      className="cursor-pointer text-xs font-medium text-indigo-600 hover:underline dark:text-indigo-400"
+                      className="cursor-pointer text-xs font-medium text-brand-700 hover:underline"
                     >
                       {allSelected ? 'Deselect Group' : someSelected ? 'Select Remaining' : 'Select Group'}
                     </button>
@@ -380,15 +380,15 @@ export function PatientExportDialog({ open, onClose, onExportSuccess }: PatientE
                       return (
                         <label
                           key={f.key}
-                          className="flex min-h-11 cursor-pointer items-center gap-2.5 rounded-md px-2 py-1.5 hover:bg-slate-50 dark:hover:bg-slate-800/60"
+                          className="flex min-h-11 cursor-pointer items-center gap-2.5 rounded-md px-2 py-1.5 hover:bg-slate-50"
                         >
                           <input
                             type="checkbox"
                             checked={isChecked}
                             onChange={() => toggleField(f.key)}
-                            className="h-4 w-4 rounded-sm border-slate-300 text-[#8E1C3D] focus:ring-[#8E1C3D] dark:border-slate-600 dark:bg-slate-700"
+                            className="h-4 w-4 rounded-sm border-slate-300 text-[#8E1C3D] focus:ring-[#8E1C3D]"
                           />
-                          <span className="text-xs font-medium text-slate-800 dark:text-slate-200">
+                          <span className="text-xs font-medium text-slate-800">
                             {f.label}
                           </span>
                         </label>
@@ -406,11 +406,11 @@ export function PatientExportDialog({ open, onClose, onExportSuccess }: PatientE
           <div
             role="status"
             aria-live="polite"
-            className="rounded-lg border border-amber-300 bg-amber-50 p-4 text-amber-900 dark:border-amber-700 dark:bg-amber-950/40 dark:text-amber-200"
+            className="rounded-lg border border-amber-300 bg-amber-50 p-4 text-amber-900"
           >
             <div className="flex items-start gap-3">
               <svg
-                className="mt-0.5 h-5 w-5 shrink-0 text-amber-800 dark:text-amber-400"
+                className="mt-0.5 h-5 w-5 shrink-0 text-amber-800"
                 fill="none"
                 viewBox="0 0 24 24"
                 strokeWidth="2"
@@ -434,8 +434,8 @@ export function PatientExportDialog({ open, onClose, onExportSuccess }: PatientE
         )}
 
         {/* 3. Export Format & Formula Injection Security */}
-        <div className="rounded-xl border border-slate-200 bg-slate-50/60 p-4 dark:border-slate-750 dark:bg-slate-850">
-          <h2 className="text-sm font-semibold tracking-wide text-slate-900 dark:text-slate-100">
+        <div className="rounded-xl border border-slate-200 bg-slate-50/60 p-4">
+          <h2 className="text-sm font-semibold tracking-wide text-slate-900">
             3. Export Format & Security Neutralization
           </h2>
           <div className="mt-3 flex flex-wrap gap-6">
@@ -448,7 +448,7 @@ export function PatientExportDialog({ open, onClose, onExportSuccess }: PatientE
                 onChange={() => setFormat('csv')}
                 className="h-4 w-4 border-slate-300 text-[#8E1C3D] focus:ring-[#8E1C3D]"
               />
-              <span className="font-medium text-slate-800 dark:text-slate-200">
+              <span className="font-medium text-slate-800">
                 CSV (UTF-8, Universal)
               </span>
             </label>
@@ -461,13 +461,13 @@ export function PatientExportDialog({ open, onClose, onExportSuccess }: PatientE
                 onChange={() => setFormat('xlsx')}
                 className="h-4 w-4 border-slate-300 text-[#8E1C3D] focus:ring-[#8E1C3D]"
               />
-              <span className="font-medium text-slate-800 dark:text-slate-200">
+              <span className="font-medium text-slate-800">
                 Microsoft Excel (.xlsx)
               </span>
             </label>
           </div>
 
-          <p className="mt-2 text-xs text-slate-600 dark:text-slate-300">
+          <p className="mt-2 text-xs text-slate-600">
             Formula Injection Security: Values beginning with &apos;=&apos;, &apos;+&apos;, &apos;-&apos;, or &apos;@&apos; will be prepended with a single quote to prevent automated formula execution.
           </p>
         </div>
@@ -476,10 +476,10 @@ export function PatientExportDialog({ open, onClose, onExportSuccess }: PatientE
         <div>
           <label
             htmlFor="export-reason"
-            className="block text-xs font-semibold uppercase tracking-wider text-slate-700 dark:text-slate-300"
+            className="block text-xs font-semibold uppercase tracking-wider text-slate-700"
           >
             Documented Purpose / Justification for Export (Audited){' '}
-            <span className="text-rose-600 dark:text-rose-400">*</span>
+            <span className="text-rose-600">*</span>
           </label>
           <textarea
             id="export-reason"
@@ -491,29 +491,29 @@ export function PatientExportDialog({ open, onClose, onExportSuccess }: PatientE
             }}
             onBlur={() => setReasonTouched(true)}
             placeholder="Enter reason of at least 5 characters (e.g., Annual statutory accounting and clinical audit)..."
-            className="mt-1 block w-full rounded-lg border border-slate-300 bg-white p-3 text-sm text-slate-900 shadow-xs focus:border-[#8E1C3D] focus:ring-1 focus:ring-[#8E1C3D] dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
+            className="mt-1 block w-full rounded-lg border border-slate-300 bg-white p-3 text-sm text-slate-900 shadow-xs focus:border-[#8E1C3D] focus:ring-1 focus:ring-[#8E1C3D]"
           />
           {reasonTouched && !isReasonValid && (
-            <p className="mt-1 text-xs text-rose-600 dark:text-rose-400">
+            <p className="mt-1 text-xs text-rose-600">
               Export justification must be at least 5 characters in length.
             </p>
           )}
         </div>
 
         {/* Action Controls */}
-        <div className="flex flex-col-reverse justify-end gap-3 pt-4 sm:flex-row border-t border-slate-200 dark:border-slate-700">
+        <div className="flex flex-col-reverse justify-end gap-3 pt-4 sm:flex-row border-t border-slate-200">
           <button
             type="button"
             onClick={onClose}
             disabled={isExporting}
-            className="inline-flex min-h-11 cursor-pointer items-center justify-center rounded-lg border border-slate-300 bg-white px-5 py-2.5 font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
+            className="inline-flex min-h-11 cursor-pointer items-center justify-center rounded-lg border border-slate-300 bg-white px-5 py-2.5 font-medium text-slate-700 hover:bg-slate-50"
           >
             Cancel
           </button>
           <button
             type="submit"
             disabled={!canExport}
-            className="inline-flex min-h-11 cursor-pointer items-center justify-center rounded-lg bg-[#8E1C3D] px-6 py-2.5 font-medium text-white shadow-xs hover:bg-[#721631] focus-visible:outline-2 focus-visible:outline-[#8E1C3D] disabled:cursor-not-allowed disabled:opacity-50"
+            className="inline-flex min-h-11 items-center justify-center rounded-lg bg-[#8E1C3D] px-6 py-2.5 font-medium text-white shadow-xs hover:bg-[#721631] focus-visible:outline-2 focus-visible:outline-[#8E1C3D] disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-500 disabled:opacity-100"
           >
             {isExporting ? 'Streaming Export...' : 'Export Patient Dataset'}
           </button>

@@ -1,9 +1,11 @@
-import { useMemo, useState, type FormEvent } from 'react'
-import { Link } from 'react-router'
+import { useEffect, useMemo, useState, type FormEvent } from 'react'
+import { Link, useSearchParams } from 'react-router'
 import { AppShell } from '../../components/AppShell'
 import { Modal } from '../../components/Modal'
-import { useBackups, useCreateBackup, useRestoreBackup } from '../../api/queries'
+import { useBackups, useCreateBackup, useRestoreBackup, useMe } from '../../api/queries'
 import type { BackupArchiveInfo } from '../../api/types'
+import { PatientExportDialog } from '../../components/admin/PatientExportDialog'
+import { ImportWizard } from '../../components/admin/ImportWizard'
 
 type ArchiveKind = 'manual' | 'scheduled' | 'safety' | 'test'
 type ArchiveFilter = 'all' | ArchiveKind
@@ -41,6 +43,25 @@ function kindLabel(kind: ArchiveKind): string {
 }
 
 export function BackupManagerPage() {
+  const { data: me } = useMe()
+  const [searchParams, setSearchParams] = useSearchParams()
+  const [showImportModal, setShowImportModal] = useState(() => searchParams.get('action') === 'import')
+  const [showExportDialog, setShowExportDialog] = useState(() => searchParams.get('action') === 'export')
+
+  const clearActionParam = () => {
+    if (searchParams.has('action')) {
+      const next = new URLSearchParams(searchParams)
+      next.delete('action')
+      setSearchParams(next, { replace: true })
+    }
+  }
+
+  useEffect(() => {
+    const action = searchParams.get('action')
+    if (action === 'import') setShowImportModal(true)
+    if (action === 'export') setShowExportDialog(true)
+  }, [searchParams])
+
   const [activeTab, setActiveTab] = useState<ViewTab>('archives')
   const [showCreateForm, setShowCreateForm] = useState(false)
   const [label, setLabel] = useState('')
@@ -137,21 +158,41 @@ export function BackupManagerPage() {
   }
 
   return (
-    <AppShell name="Admin" role="ADMIN">
+    <AppShell name={me?.full_name ?? 'Admin'} role={me?.role ?? 'ADMIN'}>
       <div className="space-y-5">
-        <header className="flex flex-col justify-between gap-4 rounded-xl border border-slate-200 bg-white p-5 shadow-sm sm:flex-row sm:items-center">
+        <header className="flex flex-col justify-between gap-4 rounded-xl border border-slate-200 bg-white p-5 shadow-xs sm:flex-row sm:items-center">
           <div className="min-w-0">
             <div className="mb-2 flex items-center gap-2 text-xs text-slate-500">
               <Link to="/admin" className="hover:text-[#5D0B26] hover:underline">Administration</Link>
               <span aria-hidden="true">/</span>
               <span>Backup & Recovery</span>
             </div>
-            <h1 className="text-2xl font-bold tracking-tight text-slate-900">Backup & Recovery</h1>
+            <h1 className="text-2xl font-bold tracking-tight text-slate-900">Backup & Restore</h1>
             <p className="mt-1 max-w-3xl text-sm text-slate-600">
-              Review backup copies, check archive integrity and manage safe recovery of hospital records.
+              Review backup copies, check archive integrity, and manage data portability (patient spreadsheet import & dataset export).
             </p>
           </div>
           <div className="flex shrink-0 flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => setShowImportModal(true)}
+              className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-700 shadow-2xs hover:border-[#8E1C3D] hover:bg-slate-50 hover:text-[#5D0B26]"
+            >
+              <svg className="h-4 w-4 text-slate-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+              </svg>
+              Import Spreadsheet
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowExportDialog(true)}
+              className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-700 shadow-2xs hover:border-[#8E1C3D] hover:bg-slate-50 hover:text-[#5D0B26]"
+            >
+              <svg className="h-4 w-4 text-slate-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+              </svg>
+              Export Dataset
+            </button>
             <button
               type="button"
               onClick={() => refetch()}
@@ -163,7 +204,7 @@ export function BackupManagerPage() {
             <button
               type="button"
               onClick={() => { setActiveTab('archives'); setShowCreateForm((shown) => !shown) }}
-              className="min-h-11 rounded-lg bg-[#5D0B26] px-4 text-sm font-semibold text-white hover:bg-[#4A081E]"
+              className="min-h-11 rounded-lg bg-[#5D0B26] px-4 text-sm font-semibold text-white hover:bg-[#4A081E] shadow-2xs"
             >
               {showCreateForm ? 'Close backup form' : 'Create backup'}
             </button>
@@ -201,6 +242,65 @@ export function BackupManagerPage() {
             <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Automation status</p>
             <p className="mt-2 text-lg font-bold text-slate-900">Not reported</p>
             <p className="mt-1 text-xs text-slate-500">Schedule details are not available from the current server API</p>
+          </div>
+        </section>
+
+        {/* Data Portability Cards (Import & Export) */}
+        <section aria-label="Data portability and migration" className="grid grid-cols-1 gap-4 md:grid-cols-2">
+          <div className="flex flex-col justify-between rounded-xl border border-slate-200 bg-white p-5 shadow-xs">
+            <div>
+              <div className="flex items-center gap-3">
+                <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-rose-50 text-[#8E1C3D]">
+                  <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                  </svg>
+                </span>
+                <div>
+                  <h2 className="text-base font-bold text-slate-900">Patient Spreadsheet Ingestion</h2>
+                  <p className="text-xs text-slate-600 font-medium">8-Stage CSV/XLSX Bulk Import Pipeline</p>
+                </div>
+              </div>
+              <p className="mt-3 text-xs leading-relaxed text-slate-600">
+                Bulk register patients from legacy spreadsheets with automatic pre-commit safety snapshot, column header matching, and interactive duplicate candidate resolution.
+              </p>
+            </div>
+            <div className="mt-4 pt-3 border-t border-slate-100 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setShowImportModal(true)}
+                className="inline-flex min-h-10 items-center gap-2 rounded-lg bg-[#8E1C3D] px-4 text-xs font-bold text-white shadow-2xs hover:bg-[#741732] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#8E1C3D]"
+              >
+                Launch Import Wizard →
+              </button>
+            </div>
+          </div>
+
+          <div className="flex flex-col justify-between rounded-xl border border-slate-200 bg-white p-5 shadow-xs">
+            <div>
+              <div className="flex items-center gap-3">
+                <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-amber-50 text-amber-800">
+                  <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                  </svg>
+                </span>
+                <div>
+                  <h2 className="text-base font-bold text-slate-900">Patient Dataset Export</h2>
+                  <p className="text-xs text-slate-600 font-medium">Permission-Checked CSV & Excel Stream</p>
+                </div>
+              </div>
+              <p className="mt-3 text-xs leading-relaxed text-slate-600">
+                Export field-selective demographic and clinical records with date range filtering, formula neutralization, and direct streaming without persistent server temp files.
+              </p>
+            </div>
+            <div className="mt-4 pt-3 border-t border-slate-100 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setShowExportDialog(true)}
+                className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 text-xs font-bold text-slate-800 shadow-2xs hover:border-[#8E1C3D] hover:bg-slate-50 hover:text-[#5D0B26] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#8E1C3D]"
+              >
+                Configure & Export Dataset →
+              </button>
+            </div>
           </div>
         </section>
 
@@ -372,6 +472,39 @@ export function BackupManagerPage() {
             </>
           )}
         </section>
+
+        {/* Export Configuration Dialog */}
+        <PatientExportDialog
+          open={showExportDialog}
+          onClose={() => {
+            setShowExportDialog(false)
+            clearActionParam()
+          }}
+          onExportSuccess={(filename) => {
+            setFeedback({
+              tone: 'success',
+              message: `Dataset export completed. File ${filename || 'export.csv'} streamed directly to your browser.`,
+            })
+          }}
+        />
+
+        {/* Import Wizard Modal Dialog */}
+        <Modal
+          open={showImportModal}
+          onClose={() => {
+            setShowImportModal(false)
+            clearActionParam()
+          }}
+          title="Patient Import Centre"
+          description="Staged 8-stage spreadsheet ingestion pipeline for bulk patient registration with automated pre-commit safety backup."
+          variant="info"
+          dismiss="closerequest"
+          className="max-w-5xl w-full"
+        >
+          <div className="max-h-[75vh] overflow-y-auto px-1 py-2">
+            <ImportWizard />
+          </div>
+        </Modal>
 
         {restoreArchive && (
           <Modal

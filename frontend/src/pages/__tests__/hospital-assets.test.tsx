@@ -2,7 +2,7 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { MemoryRouter } from 'react-router'
-import { HospitalAssetsPage } from '../admin/HospitalAssetsPage'
+import { HospitalAssetManager } from '../../components/admin/HospitalAssetManager'
 import type { HospitalAssetOut } from '../../api/types'
 
 const mockAssets: HospitalAssetOut[] = [
@@ -76,13 +76,13 @@ function renderPage() {
   return render(
     <QueryClientProvider client={queryClient}>
       <MemoryRouter>
-        <HospitalAssetsPage />
+        <HospitalAssetManager />
       </MemoryRouter>
     </QueryClientProvider>,
   )
 }
 
-describe('HospitalAssetsPage & HospitalAssetManager', () => {
+describe('HospitalAssetManager', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     currentAssets = [...mockAssets]
@@ -91,8 +91,7 @@ describe('HospitalAssetsPage & HospitalAssetManager', () => {
   it('renders active logo hero card, upload action button, and version table', () => {
     renderPage()
 
-    // Page title & Hero Card
-    expect(screen.getByRole('heading', { level: 1, name: 'Hospital Identity & Logo' })).toBeDefined()
+    // Hero card
     expect(screen.getByText('Active Hospital Crest & Logo')).toBeDefined()
     expect(screen.getByTestId('active-logo-badge')).toBeDefined()
     expect(screen.getByText('v2')).toBeDefined()

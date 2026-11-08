@@ -1,7 +1,33 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { MemoryRouter } from 'react-router'
 import { PatientImportPage } from '../admin/PatientImportPage'
 import { apiFetch, ApiError } from '../../api/client'
+
+vi.mock('../../api/queries', () => ({
+  useMe: () => ({ data: { full_name: 'System Administrator', role: 'ADMIN' }, isLoading: false }),
+  useLogout: () => ({ mutateAsync: vi.fn(), isPending: false }),
+}))
+
+vi.mock('../../api/branding', () => ({
+  useClinicBranding: () => ({
+    trustNameEn: 'Sri Vashishtha Kalyan Trust',
+    trustNameHi: 'श्री वशिष्ठ कल्याण ट्रस्ट',
+    hospitalName: 'Kalyan Hospital',
+    address: 'Hospital Road, Ara, Bhojpur, Bihar - 802301',
+    locationLine: 'Ara, Bhojpur, Bihar',
+  }),
+}))
+
+function renderWithProviders(ui: React.ReactElement) {
+  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+  return render(
+    <QueryClientProvider client={queryClient}>
+      <MemoryRouter>{ui}</MemoryRouter>
+    </QueryClientProvider>
+  )
+}
 
 vi.mock('../../api/client', () => ({
   apiFetch: vi.fn(),
@@ -24,7 +50,7 @@ describe('PatientImportPage and 8-Stage Import Wizard', () => {
   })
 
   it('renders 8-stage stepper and initial upload stage', () => {
-    render(<PatientImportPage />)
+    renderWithProviders(<PatientImportPage />)
 
     expect(screen.getByRole('heading', { name: 'Patient Import Centre' })).toBeInTheDocument()
     expect(screen.getByLabelText('Import Progress')).toBeInTheDocument()
@@ -69,7 +95,7 @@ describe('PatientImportPage and 8-Stage Import Wizard', () => {
 
     vi.mocked(apiFetch).mockResolvedValueOnce(mockInspectResponse)
 
-    render(<PatientImportPage />)
+    renderWithProviders(<PatientImportPage />)
 
     const file = new File(['Name,Guardian\nArun,Vinod'], 'patients.csv', { type: 'text/csv' })
     const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement
@@ -175,7 +201,7 @@ describe('PatientImportPage and 8-Stage Import Wizard', () => {
       .mockResolvedValueOnce(mockValidateSummary) // validate
       .mockResolvedValueOnce(mockDuplicates) // duplicates fetch
 
-    render(<PatientImportPage />)
+    renderWithProviders(<PatientImportPage />)
 
     // Stage 1 -> Stage 2
     const file = new File(['content'], 'patients.csv', { type: 'text/csv' })
@@ -280,7 +306,7 @@ describe('PatientImportPage and 8-Stage Import Wizard', () => {
       .mockResolvedValueOnce(mockValidateSummary)
       .mockResolvedValueOnce(mockCommitResult)
 
-    render(<PatientImportPage />)
+    renderWithProviders(<PatientImportPage />)
 
     const file = new File(['content'], 'patients.csv', { type: 'text/csv' })
     const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement
@@ -366,7 +392,7 @@ describe('PatientImportPage and 8-Stage Import Wizard', () => {
         new ApiError(500, 'precommit_backup_failed', 'Import commit aborted because pre-import safety backup failed: disk error')
       )
 
-    render(<PatientImportPage />)
+    renderWithProviders(<PatientImportPage />)
 
     const file = new File(['content'], 'patients.csv', { type: 'text/csv' })
     const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement

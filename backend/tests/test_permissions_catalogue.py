@@ -28,6 +28,15 @@ def test_permissions_noun_verb_format() -> None:
         assert pattern.match(perm.value), f"Permission {perm.value} does not match noun:verb"
 
 
+def test_payment_create_restricted_exclusively_to_reception() -> None:
+    """Reception is the only role permitted to collect and post payments."""
+    for role, perms in ROLE_PERMISSIONS.items():
+        if role == Role.RECEPTION:
+            assert Permission.PAYMENT_CREATE in perms
+        else:
+            assert Permission.PAYMENT_CREATE not in perms, f"{role} must NOT have payment:create"
+
+
 def test_payment_reverse_restricted_exclusively_to_admin() -> None:
     """D-06 Decision: Payment reversals are restricted exclusively to ADMIN."""
     for role, perms in ROLE_PERMISSIONS.items():
@@ -95,7 +104,6 @@ def test_golden_role_permissions_snapshot() -> None:
                 Permission.PATIENT_READ,
                 Permission.APPOINTMENT_READ,
                 Permission.PAYMENT_READ,
-                Permission.PAYMENT_CREATE,
                 Permission.RECEIPT_REPRINT,
                 Permission.PAYMENT_REVERSE,
                 Permission.TIMELINE_READ,

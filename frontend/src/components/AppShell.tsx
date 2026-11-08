@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { useClinicBranding } from '../api/branding'
+import { useMyDepartments, type SpecialtyCode } from '../api/specialty'
 import { Link, useLocation, useNavigate } from 'react-router'
 import { useLogout } from '../api/queries'
 import type { Role } from '../api/types'
@@ -37,6 +38,8 @@ interface NavigationItem {
   key: string
   label: string
   description: string
+  /** Shown to a doctor only when they belong to this department; shown to all while unknown. */
+  specialty?: SpecialtyCode
   path: string
   icon: NavigationIcon
   roles: Role[]
@@ -92,6 +95,7 @@ const NAVIGATION: NavigationItem[] = [
     path: '/doctor/treatment-plans',
     icon: 'activity',
     roles: DOCTOR_ONLY,
+    specialty: 'PHYSIOTHERAPY',
   },
   {
     key: 'appointments',
@@ -110,6 +114,7 @@ const NAVIGATION: NavigationItem[] = [
     roles: DOCTOR_ONLY,
   },
   {
+
     key: 'billing',
     label: 'Billing & Payments',
     description: 'Patient checkout, collections, receipts and dues',
@@ -136,7 +141,7 @@ const NAVIGATION: NavigationItem[] = [
     path: '/admin/doctors',
     icon: 'database',
     roles: ADMIN_ONLY,
-    activePaths: ['/admin/doctors'],
+    activePaths: ['/admin/doctors', '/admin/departments'],
   },
   {
     key: 'billing-financial',
@@ -487,6 +492,8 @@ export function AppShell({ name, role, children }: AppShellProps) {
   const location = useLocation()
   const logout = useLogout()
   const branding = useClinicBranding()
+  const myDepartments = useMyDepartments()
+  const myDepartmentLabel = myDepartments.map((d) => d.name_en).join(' · ')
   const [mobileOpen, setMobileOpen] = useState(false)
   const [now, setNow] = useState(() => new Date())
 
@@ -508,10 +515,15 @@ export function AppShell({ name, role, children }: AppShellProps) {
 
   const clock = useMemo(() => formatClock(now), [now])
 
-  const visibleItems = useMemo(
-    () => NAVIGATION.filter((item) => item.roles.includes(role)),
-    [role],
-  )
+  const visibleItems = useMemo(() => {
+    const codes = new Set(myDepartments.map((d) => d.code))
+    return NAVIGATION.filter(
+      (item) =>
+        item.roles.includes(role) &&
+        // Until the doctor's departments are known, keep every item rather than hide work.
+        (!item.specialty || role !== 'DOCTOR' || codes.size === 0 || codes.has(item.specialty)),
+    )
+  }, [role, myDepartments])
 
   const handleSignOut = async () => {
     try {
@@ -710,7 +722,7 @@ export function AppShell({ name, role, children }: AppShellProps) {
               <p className="truncate text-xs text-amber-200 font-medium">
                 {role === 'RECEPTION'
                   ? 'Reception & Registration'
-                  : 'Clinical Consultation'}
+                  : myDepartmentLabel || 'Clinical Consultation'}
               </p>
             </div>
           </div>

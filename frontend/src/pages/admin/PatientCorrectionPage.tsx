@@ -2,13 +2,16 @@ import React, { useState, useEffect } from 'react'
 import {
   useAdminSearchPatients,
   useCorrectPatientDemographics,
+  useMe,
 } from '../../api/queries'
 import { apiFetch, ApiError } from '../../api/client'
 import type { PatientOut, AdminPatientDemographicCorrection } from '../../api/types'
 import { ConflictBanner } from '../../components/ConflictBanner'
 import { DemographicCorrectionModal } from '../../components/admin/DemographicCorrectionModal'
+import { AppShell } from '../../components/AppShell'
 
 export function PatientCorrectionPage() {
+  const { data: me } = useMe()
   const [searchQuery, setSearchQuery] = useState('')
   const [activeQuery, setActiveQuery] = useState('')
   const [selectedPatient, setSelectedPatient] = useState<PatientOut | null>(null)
@@ -132,16 +135,17 @@ export function PatientCorrectionPage() {
   }
 
   return (
-    <div className="space-y-6">
-      {/* Page Header */}
-      <div className="border-b border-slate-200 pb-4">
-        <h1 className="text-xl font-bold text-slate-900">
-          Patient Demographic Correction
-        </h1>
-        <p className="mt-1 text-sm text-slate-600">
-          Audited administrative workspace for correcting patient identity and contact records. Historical printouts retain their original issued snapshot.
-        </p>
-      </div>
+    <AppShell name={me?.full_name ?? 'Admin'} role={me?.role ?? 'ADMIN'}>
+      <div className="space-y-6">
+        {/* Page Header */}
+        <div className="border-b border-slate-200 pb-4">
+          <h1 className="text-2xl font-bold tracking-tight text-slate-900">
+            Patient Demographic Correction
+          </h1>
+          <p className="mt-1 text-sm text-slate-600">
+            Audited administrative workspace for correcting patient identity and contact records. Historical printouts retain their original issued snapshot.
+          </p>
+        </div>
 
       {/* Patient Search Section */}
       <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-xs">
@@ -164,12 +168,35 @@ export function PatientCorrectionPage() {
             <button
               type="submit"
               disabled={isSearching || !searchQuery.trim()}
-              className="min-h-11 cursor-pointer rounded-md bg-[#8E1C3D] px-6 py-2 text-sm font-semibold text-white shadow-xs hover:bg-[#731631] focus-visible:outline-2 focus-visible:outline-[#8E1C3D] disabled:opacity-50"
+              className="min-h-11 rounded-lg px-6 py-2 text-sm font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-[#8E1C3D] bg-[#8E1C3D] text-white hover:bg-[#731631] disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-500 disabled:opacity-100 shadow-2xs"
             >
               {isSearching ? 'Searching...' : 'Search Patients'}
             </button>
           </div>
         </form>
+
+        {/* Guidance card when no search has been initiated */}
+        {!activeQuery && !selectedPatient && (
+          <div className="mt-6 rounded-xl border border-slate-200 bg-slate-50/70 p-6">
+            <h2 className="text-sm font-bold text-slate-800">
+              Audited Patient Demographic Correction Guidelines
+            </h2>
+            <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-4 text-xs text-slate-600">
+              <div className="rounded-lg border border-slate-200/80 bg-white p-4 shadow-2xs">
+                <span className="font-bold text-slate-900 block mb-1">1. Lookup & Select</span>
+                Search for the patient by permanent URN, mobile number, or full name to load their authoritative record.
+              </div>
+              <div className="rounded-lg border border-slate-200/80 bg-white p-4 shadow-2xs">
+                <span className="font-bold text-slate-900 block mb-1">2. Mandatory Audit Reason</span>
+                Every change requires a documented justification permanently recorded in the administrative audit log.
+              </div>
+              <div className="rounded-lg border border-slate-200/80 bg-white p-4 shadow-2xs">
+                <span className="font-bold text-slate-900 block mb-1">3. Immutable Printouts</span>
+                Historical consultation summaries, prescriptions, and receipts retain their original issued demographic snapshots.
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Search Results Display */}
         {activeQuery && (
@@ -598,6 +625,7 @@ export function PatientCorrectionPage() {
           />
         </div>
       )}
-    </div>
+      </div>
+    </AppShell>
   )
 }

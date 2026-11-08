@@ -1,7 +1,5 @@
 import type {
   ActiveSessionOut,
-  DepartmentDoctorOut,
-  DepartmentOut,
   AuditLogListResponse,
   BackupArchiveInfo,
   BackupArchiveListResponse,
@@ -71,6 +69,11 @@ import type {
   ClinicSettingsUpdate,
   DoctorCreate,
   DoctorOut,
+  DepartmentOut,
+  DepartmentCreate,
+  DepartmentUpdate,
+  DepartmentDoctorOut,
+  DoctorDepartmentAssignment,
   DoctorUpdate,
   FeeCreate,
   FeeOut,
@@ -547,11 +550,49 @@ export function useDepartments() {
   })
 }
 
+export function useCreateDepartment() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (body: DepartmentCreate) =>
+      apiFetch<DepartmentOut>('/departments', { method: 'POST', body }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['departments'] }),
+  })
+}
+
+export function useUpdateDepartment() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, body }: { id: number; body: DepartmentUpdate }) =>
+      apiFetch<DepartmentOut>(`/departments/${id}`, { method: 'PATCH', body }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['departments'] }),
+  })
+}
+
 export function useDepartmentDoctors(departmentId: number | null) {
   return useQuery({
     queryKey: ['departments', departmentId, 'doctors'],
     queryFn: () => apiFetch<DepartmentDoctorOut[]>(`/departments/${departmentId}/doctors`),
     enabled: departmentId !== null,
+  })
+}
+
+export function useDoctorDepartments(doctorId: number | null) {
+  return useQuery({
+    queryKey: ['doctors', doctorId, 'departments'],
+    queryFn: () => apiFetch<DepartmentOut[]>(`/doctors/${doctorId}/departments`),
+    enabled: doctorId !== null,
+  })
+}
+
+export function useAssignDoctorDepartments() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ doctorId, body }: { doctorId: number; body: DoctorDepartmentAssignment }) =>
+      apiFetch<DepartmentOut[]>(`/doctors/${doctorId}/departments`, { method: 'PUT', body }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['departments'] })
+      qc.invalidateQueries({ queryKey: ['doctors'] })
+    },
   })
 }
 

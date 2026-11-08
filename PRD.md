@@ -32,12 +32,17 @@ Fixed role catalogue for v1; no shared accounts or custom per-user permission bu
 - SET-03 Consultation fee catalogue with effective dates and audit.
 
 ### Reception and registry
+- REC-01 Reception supports patient intake and OPD routing across all configured hospital departments and specialties; specialty-specific clinical workflows remain separately scoped.
+- REC-02 Reception selects department/specialty, then an active doctor belonging to that department before booking or walk-in check-in.
+- REC-03 Each doctor has an independent daily queue and token sequence; tokens are unique per (doctor_id, appointment_date).
+- REC-04 Reception owns payment collection. Only RECEPTION may post payment transactions; ADMIN may read/reconcile and reverse with reason, but cannot collect/post payments. DOCTOR cannot create, edit or reverse payments.
+- REC-05 Walk-ins and booked appointments enter the selected doctor's queue through an explicit check-in event; prevent duplicate active queue entries for one visit.
 - PAT-01 Canonical 12 fields; unique KH-YYYY-XXXX URN under concurrent registration. Define gap semantics for rolled-back/cancelled records.
 - PAT-02 Search URN/name/mobile; Devanagari supported.
 - PAT-03 Demographic edits audited with before/after values.
 - PAT-04 Duplicate warning for same name + mobile.
 - PAT-05 Patient photos stored server-side and served only to authorized users.
-- APT-01 Daily appointments per doctor with token and doctor assignment.
+- APT-01 Daily appointments per doctor with token and doctor assignment, including department/specialty selection.
 - APT-02 Statuses: Booked, Arrived, In consultation, Done, Cancelled, No-show; doctor sees daily queue.
 - PRN-01 A4 registration card with Patient/Attendant and Authorized signatures; verify on actual hospital printer.
 
@@ -53,7 +58,7 @@ Canonical 12 fields: Serial/URN; patient name; age; sex; address (town/village, 
 - CLN-03 One chronological timeline of encounters, sessions and payments.
 
 ### Billing
-- BIL-01 Consultation fees/installments: cash, UPI, card.
+- BIL-01 Consultation fees/installments: cash, UPI, card; payment creation restricted to RECEPTION.
 - BIL-02 Integer paise; reject negative and overpayment, including concurrent two-PC attempts.
 - BIL-03 Balances computed from ledger; never editable.
 - BIL-04 Sequential receipt numbers; print; reprints marked DUPLICATE.

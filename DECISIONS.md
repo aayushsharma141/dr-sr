@@ -33,6 +33,18 @@
 ### ADR-22 — Legacy desktop is reference, not v3 runtime
 **Status:** Proposed. Preserve PySide6/SQLite code; reuse only reviewed business rules, assets, print layouts and tests. Migration only if real data exists and client approves.
 
+### ADR-23 — Reception coverage, doctor queues and payment ownership
+**Status:** User-confirmed product decision (2026-11-04). Reception handles intake and OPD routing for all configured hospital departments and specialties. Each doctor maintains an independent daily appointment/queue/token sequence. Reception is the sole payment-collection role: RECEPTION may create/post payments; ADMIN may read and perform authorized reversals but must not post collections; DOCTOR has no payment-write permission. This does not include full IPD, pharmacy, laboratory or specialty-specific clinical modules. Department/specialty membership must be represented explicitly in clinic configuration and enforced when assigning a doctor.
+
+### ADR-24 — Department deactivation preserves doctor memberships
+**Status:** Confirmed by project owner on 2026-11-06. Deactivating a department retains existing doctor-to-department memberships. Inactive departments cannot receive new doctor assignments or new appointments. Removing an existing membership is an explicit Admin action. Historical appointment department associations remain unchanged.
+
+### ADR-25 — Inactive doctor visibility is Admin-only
+**Status:** Confirmed by project owner on 2026-11-06. Only Admin may retrieve inactive/retired doctors by requesting `include_inactive=true`. Reception and Doctor users receive active doctors only, even when they request inactive records.
+
+### ADR-26 — Queue token monotonicity and permanent consumption
+**Status:** Confirmed operating policy (2026-11-06). Daily tokens are generated as strictly monotonically increasing integers scoped per `(doctor_id, appointment_date)`. Once assigned to an appointment, a token number is permanently consumed. When an appointment is marked `CANCELLED` or `NO_SHOW`, its token number is never backfilled, recycled, or reissued to another patient. Gaps in the active waiting queue are expected, audited, and preserved in appointment history.
+
 ## Open decisions — do not silently assume
 
 | ID | Decision | Recommendation | Status |
@@ -42,7 +54,7 @@
 | OD-03 | Financial reversal authority | Admin only, mandatory reason | Pending |
 | OD-04 | Receipt sequence reset | Calendar or financial year; client chooses | Pending |
 | OD-05 | Genuine v2 data exists? | Inspect before migration; demo data is not production data | Pending |
-| OD-06 | Printer | Confirm actual A4 model/driver; thermal separate | Pending |
+| OD-06 | Printer | Standard Epson A4 desktop printer on plain A4 sheet; thermal not used | Resolved |
 | OD-07 | HTTPS | Prefer HTTPS; HTTP only by explicit approval on isolated LAN | Pending |
 | OD-08 | Idle timeout and lockout thresholds | Agree during security acceptance | Pending |
 | OD-09 | Backup schedule, retention and owner | Daily scheduled plus manual pre-upgrade/restore; confirm policy | Pending |

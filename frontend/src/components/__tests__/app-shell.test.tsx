@@ -81,16 +81,15 @@ describe('AppShell clinical navigation hierarchy', () => {
 
     // Section 1: Hospital Configuration
     expect(within(primaryNav).getByText('Hospital Configuration')).toBeInTheDocument()
-    expect(within(primaryNav).getByRole('link', { name: 'Clinic Settings' })).toHaveAttribute('href', '/admin/settings')
-    expect(within(primaryNav).getByRole('link', { name: 'Hospital Identity & Logo' })).toHaveAttribute('href', '/admin/assets')
+    expect(within(primaryNav).getByRole('link', { name: 'Hospital Settings' })).toHaveAttribute('href', '/admin/settings')
+    expect(within(primaryNav).queryByRole('link', { name: /Clinic Settings|Hospital Identity & Logo/ })).toBeNull()
     expect(within(primaryNav).getByRole('link', { name: 'Print Templates' })).toHaveAttribute('href', '/admin/templates')
     expect(within(primaryNav).getByRole('link', { name: 'Doctors & Fees' })).toHaveAttribute('href', '/admin/doctors')
 
     // Section 2: Patient & Data Management
     expect(within(primaryNav).getByText('Patient & Data Management')).toBeInTheDocument()
     expect(within(primaryNav).getByRole('link', { name: 'Patient Demographic Correction' })).toHaveAttribute('href', '/admin/patients/correct')
-    expect(within(primaryNav).getByRole('link', { name: 'Import Centre' })).toHaveAttribute('href', '/admin/imports')
-    expect(within(primaryNav).getByRole('link', { name: 'Export Centre' })).toHaveAttribute('href', '/admin/exports')
+    expect(within(primaryNav).queryByRole('link', { name: /Import Centre|Export Centre/ })).toBeNull()
 
     // Section 3: Billing & Finance
     expect(within(primaryNav).getByText('Billing & Finance')).toBeInTheDocument()
@@ -122,7 +121,7 @@ describe('AppShell clinical navigation hierarchy', () => {
 
     // No duplicate destinations across the screen
     expect(within(primaryNav).getAllByRole('link', { name: /Backup & Restore/ })).toHaveLength(1)
-    expect(within(primaryNav).getAllByRole('link', { name: /Clinic Settings/ })).toHaveLength(1)
+    expect(within(primaryNav).getAllByRole('link', { name: /Hospital Settings/ })).toHaveLength(1)
 
     // Doctor/Reception specific items not exposed
     expect(within(primaryNav).queryByRole('link', { name: 'Patient Registration' })).not.toBeInTheDocument()
@@ -136,5 +135,50 @@ describe('AppShell clinical navigation hierarchy', () => {
 
     expect(screen.getAllByRole('button', { name: 'Close navigation menu' }).length).toBeGreaterThanOrEqual(1)
     expect(screen.getAllByRole('navigation', { name: 'Primary navigation' }).length).toBeGreaterThan(0)
+  })
+})
+
+describe('AppShell doctor specialty (D-19-03)', () => {
+  afterEach(() => cleanup())
+
+  function renderDoctor(departments: { id: number; code: string; name_en: string }[] | null) {
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    queryClient.setQueryData(['me'], { id: 3, role: 'DOCTOR', doctor_id: 7, full_name: 'Dr. Eye' })
+    if (departments) {
+      queryClient.setQueryData(
+        ['doctors', 7, 'departments'],
+        departments.map((d) => ({ ...d, name_hi: null, description: null, is_active: true, version_id: 1 })),
+      )
+    }
+    return render(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter initialEntries={['/doctor']}>
+          <AppShell name="Dr. Eye" role="DOCTOR">
+            <div>Workspace content</div>
+          </AppShell>
+        </MemoryRouter>
+      </QueryClientProvider>,
+    )
+  }
+
+  it('hides physiotherapy treatment from an ophthalmology doctor and names their department', () => {
+    renderDoctor([{ id: 2, code: 'OPHTHALMOLOGY', name_en: 'Ophthalmology' }])
+    const primaryNav = screen.getByRole('navigation', { name: 'Primary navigation' })
+    expect(within(primaryNav).queryByRole('link', { name: 'Physiotherapy Treatment' })).not.toBeInTheDocument()
+    expect(within(primaryNav).getByRole('link', { name: 'Follow-up & Visits' })).toBeInTheDocument()
+    expect(screen.getAllByText('Ophthalmology').length).toBeGreaterThan(0)
+  })
+
+  it('keeps physiotherapy treatment for a physiotherapy doctor', () => {
+    renderDoctor([{ id: 1, code: 'PHYSIOTHERAPY', name_en: 'Physiotherapy' }])
+    const primaryNav = screen.getByRole('navigation', { name: 'Primary navigation' })
+    expect(within(primaryNav).getByRole('link', { name: 'Physiotherapy Treatment' })).toBeInTheDocument()
+  })
+
+  it('keeps every item while the doctor has no department assigned', () => {
+    renderDoctor(null)
+    const primaryNav = screen.getByRole('navigation', { name: 'Primary navigation' })
+    expect(within(primaryNav).getByRole('link', { name: 'Physiotherapy Treatment' })).toBeInTheDocument()
+    expect(screen.getAllByText('Clinical Consultation').length).toBeGreaterThan(0)
   })
 })

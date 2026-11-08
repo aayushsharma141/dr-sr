@@ -17,7 +17,7 @@ from kalyan_api.core.setup_code import issue_setup_code
 from kalyan_api.db.migrate import upgrade_head
 from kalyan_api.db.session import build_engine, get_session
 from kalyan_api.main import create_app
-from kalyan_api.models import Doctor, User
+from kalyan_api.models import Department, Doctor, User
 
 
 @pytest.fixture(scope="session")
@@ -35,6 +35,9 @@ def test_settings() -> Settings:
     settings = Settings(
         env="test",
         db_name=test_db,
+        extra_allowed_origins=os.environ.get(
+            "KALYAN_EXTRA_ALLOWED_ORIGINS", "http://localhost:5173"
+        ),
         argon2_time_cost=1,
         argon2_memory_cost=8,
         argon2_parallelism=1,
@@ -47,6 +50,7 @@ def configure_test_environment(test_settings: Settings) -> None:
     """Ensure environment points to the test database and clear cached settings."""
     os.environ["KALYAN_DB_NAME"] = test_settings.db_name
     os.environ["KALYAN_ENV"] = "test"
+    os.environ.setdefault("KALYAN_EXTRA_ALLOWED_ORIGINS", "http://localhost:5173")
     from kalyan_api.config import get_settings
 
     get_settings.cache_clear()
@@ -219,6 +223,12 @@ def make_user(
     if role == "DOCTOR":
         d_name = doctor_name or f"Dr. {username.capitalize()}"
         doc = Doctor(name_en=d_name, is_active=True)
+        dept = session.query(Department).filter_by(name_en="Physiotherapy / General OPD").first()
+        if not dept:
+            dept = Department(name_en="Physiotherapy / General OPD", is_active=True)
+            session.add(dept)
+            session.flush()
+        doc.departments.append(dept)
         session.add(doc)
         session.flush()
         doc_id = doc.id

@@ -327,17 +327,17 @@ export function ReceptionDashboard({ overview: initialOverview }: ReceptionDashb
             setOnlyDelayed(false)
           }}
           className={`text-left p-4 rounded-xl border transition-all shadow-2xs hover:shadow-xs group cursor-pointer ${statusFilter === 'IN_CONSULTATION'
-              ? 'bg-indigo-50/80 border-indigo-300 ring-2 ring-indigo-400/20'
-              : 'bg-white border-neutral-200 hover:border-indigo-300'
+              ? 'bg-consult-50/80 border-consult-300 ring-2 ring-consult-400/20'
+              : 'bg-white border-neutral-200 hover:border-consult-300'
             }`}
         >
           <div className="flex items-center justify-between">
             <span className="text-xs font-semibold text-neutral-500 uppercase tracking-wider">In Cabin</span>
-            <span className="p-1.5 rounded-lg bg-indigo-100 text-indigo-800 group-hover:scale-105 transition-transform">
+            <span className="p-1.5 rounded-lg bg-consult-100 text-consult-800 group-hover:scale-105 transition-transform">
               <IconStethoscope size={16} />
             </span>
           </div>
-          <div className="mt-2 text-2xl font-bold text-indigo-900">
+          <div className="mt-2 text-2xl font-bold text-consult-900">
             {inConsultationAppts.length}
           </div>
           <p className="text-xs text-neutral-500 mt-1">With doctors right now</p>
@@ -680,7 +680,7 @@ export function ReceptionDashboard({ overview: initialOverview }: ReceptionDashb
                               </p>
                             </div>
                           ) : appt.status === 'IN_CONSULTATION' ? (
-                            <span className="text-indigo-800 font-medium text-xs">In consultation</span>
+                            <span className="text-consult-800 font-medium text-xs">In consultation</span>
                           ) : appt.status === 'DONE' ? (
                             <span className="text-emerald-800 font-medium text-xs">Consulted</span>
                           ) : (
@@ -696,8 +696,8 @@ export function ReceptionDashboard({ overview: initialOverview }: ReceptionDashb
                               Waiting
                             </span>
                           ) : appt.status === 'IN_CONSULTATION' ? (
-                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-indigo-100 text-indigo-900 border border-indigo-200">
-                              <span className="w-1.5 h-1.5 rounded-full bg-indigo-600 animate-pulse" />
+                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-consult-100 text-consult-900 border border-consult-200">
+                              <span className="w-1.5 h-1.5 rounded-full bg-consult-600 animate-pulse" />
                               In Cabin
                             </span>
                           ) : appt.status === 'DONE' ? (
@@ -832,9 +832,9 @@ export function ReceptionDashboard({ overview: initialOverview }: ReceptionDashb
                       <span className="text-xs text-amber-700">Waiting</span>
                     </div>
 
-                    <div className="bg-indigo-50/60 p-1.5 rounded">
-                      <span className="block text-xs font-bold text-indigo-900">{doc.in_consultation}</span>
-                      <span className="text-xs text-indigo-700">In Cabin</span>
+                    <div className="bg-consult-50/60 p-1.5 rounded">
+                      <span className="block text-xs font-bold text-consult-900">{doc.in_consultation}</span>
+                      <span className="text-xs text-consult-700">In Cabin</span>
                     </div>
 
                     <div className="bg-emerald-50/60 p-1.5 rounded">
@@ -869,7 +869,7 @@ export function ReceptionDashboard({ overview: initialOverview }: ReceptionDashb
                     />
                     <div
                       style={{ width: `${(inConsultationAppts.length / allAppointments.length) * 100}%` }}
-                      className="bg-indigo-600 transition-all duration-300"
+                      className="bg-consult-600 transition-all duration-300"
                       title={`In Consultation: ${inConsultationAppts.length}`}
                     />
                     <div
@@ -895,7 +895,7 @@ export function ReceptionDashboard({ overview: initialOverview }: ReceptionDashb
                   <span>Waiting: <strong>{waitingAppts.length}</strong></span>
                 </div>
                 <div className="flex items-center gap-1.5">
-                  <span className="w-2.5 h-2.5 rounded-full bg-indigo-600 shrink-0" />
+                  <span className="w-2.5 h-2.5 rounded-full bg-consult-600 shrink-0" />
                   <span>In Cabin: <strong>{inConsultationAppts.length}</strong></span>
                 </div>
                 <div className="flex items-center gap-1.5">

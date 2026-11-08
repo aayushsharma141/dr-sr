@@ -628,6 +628,45 @@ describe('Clinical Encounter Workspace Test Suite', () => {
       expect(screen.getByLabelText(/IOP OS \(mmHg\)/i)).toBeInTheDocument()
     })
 
+    it('offers eye quick phrases, not physiotherapy ones, in an ophthalmology consultation', async () => {
+      const mockFetch = setupDefaultFetchMocks({
+        deptTemplate: mockOphthalTemplate,
+        encounter: { ...mockEncounterPhysio, department_id: 2 },
+      })
+      vi.stubGlobal('fetch', mockFetch)
+
+      renderWorkspace(10)
+
+      expect(await screen.findByText(/Ophthalmology Specialty Assessment/i)).toBeInTheDocument()
+      expect(screen.getByText(/Blurry vision for distance & near/i)).toBeInTheDocument()
+      expect(screen.queryByText(/Low back pain radiating to leg/i)).not.toBeInTheDocument()
+      expect(screen.queryByText(/Physiotherapy Specialty Assessment/i)).not.toBeInTheDocument()
+    })
+
+    it('never assumes physiotherapy when the consultation has no department', async () => {
+      const base = setupDefaultFetchMocks({ encounter: { ...mockEncounterPhysio, department_id: null, appointment_id: null } })
+      const mockFetch = vi.fn().mockImplementation((url: string, init?: RequestInit) => {
+        // The doctor has no department assigned yet.
+        if (/\/api\/doctors\/\d+\/departments/.test(String(url))) {
+          return Promise.resolve({
+            ok: true,
+            status: 200,
+            headers: new Headers({ 'content-type': 'application/json' }),
+            text: () => Promise.resolve('[]'),
+          })
+        }
+        return base(url, init)
+      })
+      vi.stubGlobal('fetch', mockFetch)
+
+      renderWorkspace(10)
+
+      expect(await screen.findByTestId('specialty-unknown')).toBeInTheDocument()
+      expect(screen.queryByText(/Physiotherapy Specialty Assessment/i)).not.toBeInTheDocument()
+      expect(screen.queryByText(/Low back pain radiating to leg/i)).not.toBeInTheDocument()
+      expect(mockFetch.mock.calls.some(([u]) => String(u).includes('/api/templates/by-department'))).toBe(false)
+    })
+
     it('authorises prescription, locks inputs, and enables print button', async () => {
       let createdRx: PrescriptionOut | null = null
       const mockFetch = vi.fn().mockImplementation((url: string, init?: RequestInit) => {

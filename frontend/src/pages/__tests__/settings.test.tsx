@@ -40,7 +40,7 @@ const mockSettings: ClinicSettingsOut = {
   updated_at: '2026-01-01T00:00:00Z',
 }
 
-describe('Clinic Settings Page', () => {
+describe('Hospital Settings Page', () => {
   let queryClient: QueryClient
 
   beforeEach(() => {
@@ -68,6 +68,14 @@ describe('Clinic Settings Page', () => {
           text: () => Promise.resolve(JSON.stringify(mockMe)),
         })
       }
+      if (url.includes('/api/admin/assets')) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          headers: new Headers({ 'content-type': 'application/json' }),
+          text: () => Promise.resolve('[]'),
+        })
+      }
       if (url.includes('/api/settings')) {
         return Promise.resolve({
           ok: true,
@@ -89,10 +97,10 @@ describe('Clinic Settings Page', () => {
     )
 
     await waitFor(() => {
-      expect(screen.getByLabelText(/Clinic Name \(English\)/i)).toHaveValue('Kalyan Hospital')
+      expect(screen.getByLabelText(/Hospital Name \(English\)/i)).toHaveValue('Kalyan Hospital')
     })
 
-    expect(screen.getByLabelText(/Clinic Name \(Hindi\)/i)).toHaveValue('कल्याण अस्पताल')
+    expect(screen.getByLabelText(/Hospital Name \(Hindi\)/i)).toHaveValue('कल्याण अस्पताल')
     expect(screen.getByLabelText(/Primary Address/i)).toHaveValue('Station Road, Ara, Bhojpur')
     expect(screen.getByLabelText(/phone/i)).toHaveValue('06182234567')
     expect(screen.getByLabelText(/Consultation Validity/i)).toHaveValue(15)
@@ -108,6 +116,14 @@ describe('Clinic Settings Page', () => {
           status: 200,
           headers: new Headers({ 'content-type': 'application/json' }),
           text: () => Promise.resolve(JSON.stringify(mockMe)),
+        })
+      }
+      if (url.includes('/api/admin/assets')) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          headers: new Headers({ 'content-type': 'application/json' }),
+          text: () => Promise.resolve('[]'),
         })
       }
       if (url.includes('/api/settings')) {
@@ -148,7 +164,7 @@ describe('Clinic Settings Page', () => {
     )
 
     await waitFor(() => {
-      expect(screen.getByLabelText(/Clinic Name \(English\)/i)).toHaveValue('Kalyan Hospital')
+      expect(screen.getByLabelText(/Hospital Name \(English\)/i)).toHaveValue('Kalyan Hospital')
     })
 
     const phoneInput = screen.getByLabelText(/phone/i)
@@ -162,6 +178,10 @@ describe('Clinic Settings Page', () => {
       expect(screen.getByText(/Settings saved successfully/i)).toBeInTheDocument()
     })
     expect((patchedData as any)?.phone).toBe('06182999999')
+    // Trust names and the header location line are editable, so they must be saved too.
+    expect((patchedData as any)?.trust_name_en).toBe('Sri Vashishtha Kalyan Trust')
+    expect((patchedData as any)?.trust_name_hi).toBe('')
+    expect((patchedData as any)?.location_line).toBe('Ara, Bhojpur, Bihar')
   })
 
   it('handles 409 version_conflict and reloads latest data', async () => {
@@ -174,6 +194,14 @@ describe('Clinic Settings Page', () => {
           status: 200,
           headers: new Headers({ 'content-type': 'application/json' }),
           text: () => Promise.resolve(JSON.stringify(mockMe)),
+        })
+      }
+      if (url.includes('/api/admin/assets')) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          headers: new Headers({ 'content-type': 'application/json' }),
+          text: () => Promise.resolve('[]'),
         })
       }
       if (url.includes('/api/settings')) {
@@ -222,13 +250,13 @@ describe('Clinic Settings Page', () => {
     )
 
     await waitFor(() => {
-      expect(screen.getByLabelText(/Clinic Name \(English\)/i)).toHaveValue('Kalyan Hospital')
+      expect(screen.getByLabelText(/Hospital Name \(English\)/i)).toHaveValue('Kalyan Hospital')
     })
 
     // Save is only enabled once something has changed.
     const saveButton = screen.getByRole('button', { name: /save settings/i })
     expect(saveButton).toBeDisabled()
-    await user.type(screen.getByLabelText(/Clinic Name \(English\)/i), ' Trust')
+    await user.type(screen.getByLabelText(/Hospital Name \(English\)/i), ' Trust')
     await user.click(saveButton)
 
     // ConflictBanner should appear
@@ -242,7 +270,7 @@ describe('Clinic Settings Page', () => {
     // ConflictBanner should clear and new value should appear
     await waitFor(() => {
       expect(screen.queryByText('Record was modified by another user')).not.toBeInTheDocument()
-      expect(screen.getByLabelText(/Clinic Name \(English\)/i)).toHaveValue('Kalyan Hospital & Research')
+      expect(screen.getByLabelText(/Hospital Name \(English\)/i)).toHaveValue('Kalyan Hospital & Research')
     })
   })
 
@@ -263,6 +291,14 @@ describe('Clinic Settings Page', () => {
   function stubFetch(onPatch: Responder, settings: ClinicSettingsOut = mockSettings) {
     const fetchMock = vi.fn().mockImplementation((url: string, init?: RequestInit) => {
       if (url.includes('/api/auth/me')) return jsonResponse(200, mockMe)
+      if (url.includes('/api/admin/assets')) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          headers: new Headers({ 'content-type': 'application/json' }),
+          text: () => Promise.resolve('[]'),
+        })
+      }
       if (url.includes('/api/settings')) {
         if (init?.method === 'PATCH') {
           const r = onPatch(init)
@@ -288,7 +324,7 @@ describe('Clinic Settings Page', () => {
 
   async function waitForLoaded() {
     await waitFor(() => {
-      expect(screen.getByLabelText(/Clinic Name \(English\)/i)).toHaveValue('Kalyan Hospital')
+      expect(screen.getByLabelText(/Hospital Name \(English\)/i)).toHaveValue('Kalyan Hospital')
     })
   }
 
@@ -304,12 +340,12 @@ describe('Clinic Settings Page', () => {
       'Printing — header & footer',
       'Consultation',
     ]) {
-      expect(screen.getByRole('heading', { level: 3, name: title })).toBeInTheDocument()
+      expect(screen.getByRole('heading', { level: 2, name: title })).toBeInTheDocument()
     }
     expect(screen.getByRole('region', { name: 'Hospital identity' })).toContainElement(
-      screen.getByLabelText(/Clinic Name \(Hindi\)/i),
+      screen.getByLabelText(/Hospital Name \(Hindi\)/i),
     )
-    expect(screen.getByLabelText(/Clinic Name \(Hindi\)/i)).toHaveAttribute('lang', 'hi')
+    expect(screen.getByLabelText(/Hospital Name \(Hindi\)/i)).toHaveAttribute('lang', 'hi')
     expect(screen.getByLabelText(/Print Footer \(Hindi\)/i)).toHaveAttribute('lang', 'hi')
     expect(screen.getByText(/Print header \(English and Hindi\): prescriptions, registration cards and receipts/i)).toBeInTheDocument()
   })
@@ -427,7 +463,7 @@ describe('Clinic Settings Page', () => {
     await user.click(confirm)
 
     await waitFor(() => {
-      expect(screen.getByText(/Clinic settings saved successfully/i)).toBeInTheDocument()
+      expect(screen.getByText(/Hospital settings saved successfully/i)).toBeInTheDocument()
     })
     expect(patchBodies).toHaveLength(2)
     expect(patchBodies[0].confirm_receipt_cycle_change).toBeUndefined()

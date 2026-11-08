@@ -1,5 +1,7 @@
 @import "tailwindcss";
 
+@custom-variant dark (&:where(.dark, .dark *));
+
 @theme {
   --color-brand-900: #5D0B26;
   --color-brand-800: #741732;
@@ -12,6 +14,18 @@
   --color-gold-400: #D4AF37;
   --color-gold-100: #F9F4E8;
   --color-danger-600: #C81E1E;
+
+  /* Appointment status "In consultation / In Cabin". A status colour, not a brand colour:
+     kept apart from brand maroon, danger red and the other queue statuses (sky, teal, emerald, amber). */
+  --color-consult-50: #EEF2FF;
+  --color-consult-100: #E0E7FF;
+  --color-consult-200: #C7D2FE;
+  --color-consult-300: #A5B4FC;
+  --color-consult-400: #818CF8;
+  --color-consult-600: #4F46E5;
+  --color-consult-700: #4338CA;
+  --color-consult-800: #3730A3;
+  --color-consult-900: #312E81;
 }
 
 :root {
@@ -64,7 +78,7 @@ body,
   background: transparent;
 }
 
-/* UI-matched sleek scrollbar for dark sidebars (#131b2e and #5D0B26) */
+/* UI-matched sleek scrollbar for the dark maroon sidebar (#5D0B26) */
 .custom-scrollbar-dark {
   scrollbar-width: thin;
   scrollbar-color: rgba(255, 255, 255, 0.22) transparent;

@@ -1,7 +1,33 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { MemoryRouter } from 'react-router'
 import { PatientExportPage } from '../admin/PatientExportPage'
 import { PatientExportDialog } from '../../components/admin/PatientExportDialog'
+
+vi.mock('../../api/queries', () => ({
+  useMe: () => ({ data: { full_name: 'System Administrator', role: 'ADMIN' }, isLoading: false }),
+  useLogout: () => ({ mutateAsync: vi.fn(), isPending: false }),
+}))
+
+vi.mock('../../api/branding', () => ({
+  useClinicBranding: () => ({
+    trustNameEn: 'Sri Vashishtha Kalyan Trust',
+    trustNameHi: 'श्री वशिष्ठ कल्याण ट्रस्ट',
+    hospitalName: 'Kalyan Hospital',
+    address: 'Hospital Road, Ara, Bhojpur, Bihar - 802301',
+    locationLine: 'Ara, Bhojpur, Bihar',
+  }),
+}))
+
+function renderWithProviders(ui: React.ReactElement) {
+  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+  return render(
+    <QueryClientProvider client={queryClient}>
+      <MemoryRouter>{ui}</MemoryRouter>
+    </QueryClientProvider>
+  )
+}
 
 describe('PatientExportPage and PatientExportDialog', () => {
   let originalFetch: typeof global.fetch
@@ -25,7 +51,7 @@ describe('PatientExportPage and PatientExportDialog', () => {
   })
 
   it('renders PatientExportPage and opens export dialog on button click', async () => {
-    render(<PatientExportPage />)
+    renderWithProviders(<PatientExportPage />)
 
     expect(screen.getByRole('heading', { name: /patient export centre/i })).toBeInTheDocument()
     const openBtn = screen.getByRole('button', { name: /export patient dataset/i })

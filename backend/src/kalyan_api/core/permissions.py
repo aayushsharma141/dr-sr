@@ -107,7 +107,6 @@ ROLE_PERMISSIONS: dict[Role, frozenset[Permission]] = {
             Permission.PATIENT_READ,
             Permission.APPOINTMENT_READ,
             Permission.PAYMENT_READ,
-            Permission.PAYMENT_CREATE,
             Permission.RECEIPT_REPRINT,
             Permission.PAYMENT_REVERSE,
             Permission.TIMELINE_READ,
