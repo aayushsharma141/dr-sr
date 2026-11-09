@@ -294,3 +294,86 @@ describe('TokenGenerationPage Cockpit', () => {
     })
   })
 })
+
+describe('TokenGenerationPage check-in failure (BR-008)', () => {
+  it('does not show a walk-in token as checked in when the arrival update fails', async () => {
+    const jsonResponse = (status: number, body: unknown) => ({
+      ok: status >= 200 && status < 300,
+      status,
+      headers: new Headers({ 'content-type': 'application/json' }),
+      text: () => Promise.resolve(JSON.stringify(body)),
+    })
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+    })
+    vi.restoreAllMocks()
+
+    const mockFetch = vi.fn().mockImplementation((url: string, init?: RequestInit) => {
+      if (url.includes('/api/auth/me')) return Promise.resolve(jsonResponse(200, mockMe))
+      if (url.includes('/api/departments') && !url.includes('/doctors'))
+        return Promise.resolve(jsonResponse(200, mockDepartments))
+      if (url.includes('/api/departments/1/doctors'))
+        return Promise.resolve(jsonResponse(200, mockDoctors))
+      if (url.includes('/api/patients') && !url.includes('check-duplicate') && init?.method !== 'POST')
+        return Promise.resolve(jsonResponse(200, [mockPatient]))
+      if (url.includes('/api/appointments') && init?.method === 'POST')
+        return Promise.resolve(
+          jsonResponse(201, {
+            id: 501,
+            patient_id: 101,
+            patient_name: 'Ramesh Kumar',
+            patient_urn: 'KH-2026-0001',
+            doctor_id: 10,
+            doctor_name: 'Dr. Anil Kumar',
+            appointment_date: '2026-11-06',
+            token_number: 14,
+            status: 'BOOKED',
+            notes: null,
+            created_by: 2,
+            created_at: '2026-11-06T10:00:00Z',
+            version_id: 1,
+          }),
+        )
+      if (url.includes('/api/appointments/501/status') && init?.method === 'PATCH')
+        return Promise.resolve(jsonResponse(500, { message: 'database unavailable' }))
+      if (url.includes('/api/appointments')) return Promise.resolve(jsonResponse(200, mockAppointments))
+      if (url.includes('/api/fees')) return Promise.resolve(jsonResponse(200, []))
+      return Promise.reject(new Error(`Unhandled URL: ${url}`))
+    })
+    vi.stubGlobal('fetch', mockFetch)
+    const user = userEvent.setup()
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter>
+          <TokenGenerationPage />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    )
+
+    await user.type(screen.getByPlaceholderText(/Search by Name, Mobile or Patient ID/i), 'Ramesh')
+    await waitFor(() => {
+      expect(screen.getByText('KH-2026-0001')).toBeInTheDocument()
+    })
+    await user.click(screen.getByRole('button', { name: /Ramesh Kumar KH-2026-0001 9876543210/i }))
+    await waitFor(() => {
+      expect(screen.getByText('Existing')).toBeInTheDocument()
+    })
+    await waitFor(() => {
+      expect(screen.getByRole('option', { name: 'Physiotherapy' })).toBeInTheDocument()
+    })
+    await user.selectOptions(screen.getByLabelText(/Department \*/i), '1')
+    await waitFor(() => {
+      expect(screen.getByRole('option', { name: /Dr\. Anil Kumar/i })).toBeInTheDocument()
+    })
+    await user.selectOptions(screen.getByLabelText(/Doctor \*/i), '10')
+    await user.click(screen.getByRole('button', { name: /Generate Token & Register Visit/i }))
+
+    await waitFor(() => {
+      expect(screen.getByText(/Token Allocated Successfully!/i)).toBeInTheDocument()
+    })
+    const warning = screen.getByRole('alert')
+    expect(warning).toHaveTextContent('Token #14 is booked but the patient was not checked in')
+    expect(screen.queryByText('Checked In (Arrived)')).not.toBeInTheDocument()
+  })
+})

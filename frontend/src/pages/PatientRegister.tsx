@@ -81,6 +81,11 @@ export function PatientRegister() {
   const [allocatedToken, setAllocatedToken] = useState<number | null>(null)
   const [quickSuccessNotice, setQuickSuccessNotice] = useState<string | null>(null)
   const [formError, setFormError] = useState<string | null>(null)
+  // Steps after the patient record was saved that did not complete (photo, visit, check-in).
+  const [registrationWarnings, setRegistrationWarnings] = useState<string[]>([])
+  const [checkedIn, setCheckedIn] = useState(false)
+  // Blocks a second submit while one is in flight (double-click, Enter key repeat).
+  const submittingRef = useRef(false)
 
   // Queries for departments & doctors
   const { data: departments } = useDepartments()
@@ -160,6 +165,8 @@ export function PatientRegister() {
 
   // Reset entire form
   const handleClear = () => {
+    setRegistrationWarnings([])
+    setCheckedIn(false)
     setFullName('')
     setGuardianName('')
     setGender('M')
@@ -188,8 +195,12 @@ export function PatientRegister() {
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault()
+    // A registered patient stays on screen until "Register Another" is used; never create a second one.
+    if (submittingRef.current || createdPatient) return
     setFormError(null)
     setQuickSuccessNotice(null)
+    setRegistrationWarnings([])
+    setCheckedIn(false)
 
     if (ageYears === '' || ageYears < 0) {
       setFormError('Please enter a valid age in years.')
@@ -219,27 +230,37 @@ export function PatientRegister() {
       notes: notes.trim() || (reasonForVisit.trim() ? `Complaint: ${reasonForVisit.trim()}` : null),
     }
 
+    const errorText = (err: unknown) =>
+      err instanceof Error && err.message ? err.message : 'unknown error'
+
+    submittingRef.current = true
     try {
-      // 1. Register Patient Demographics
+      // 1. Register Patient Demographics. A failure here means nothing was saved.
       const patient = await registerMutation.mutateAsync(payload)
 
-      // 2. Upload Photo if provided
+      const warnings: string[] = []
+
+      // 2. Upload Photo if provided. The patient is already saved, so report and continue.
       if (photoFile) {
         try {
           await uploadPhotoMutation.mutateAsync({
             id: patient.id,
             file: photoFile,
           })
-        } catch {
-          console.warn('Photo upload failed non-fatally.')
+        } catch (photoErr) {
+          warnings.push(
+            `Photo was not saved (${errorText(photoErr)}). Add it from the patient file.`,
+          )
         }
       }
 
       // 3. Allocate Visit & Token if Department and Doctor selected
       let generatedToken: number | null = null
+      let arrived = false
       if (selectedDepartmentId && selectedDoctorId) {
+        let appt: Awaited<ReturnType<typeof bookAppointmentMutation.mutateAsync>> | null = null
         try {
-          const appt = await bookAppointmentMutation.mutateAsync({
+          appt = await bookAppointmentMutation.mutateAsync({
             patient_id: patient.id,
             department_id: Number(selectedDepartmentId),
             doctor_id: Number(selectedDoctorId),
@@ -247,9 +268,15 @@ export function PatientRegister() {
             notes: reasonForVisit.trim() || null,
           })
           generatedToken = appt.token_number
+        } catch (visitErr) {
+          warnings.push(
+            `Visit and queue token were not booked (${errorText(visitErr)}). Book them from Appointments.`,
+          )
+        }
 
-          // If Walk-in, mark Arrived immediately
-          if (visitType === 'walk-in') {
+        // If Walk-in, mark Arrived immediately. Only a confirmed check-in is shown as checked in.
+        if (appt && visitType === 'walk-in') {
+          try {
             await updateStatusMutation.mutateAsync({
               id: appt.id,
               body: {
@@ -257,13 +284,17 @@ export function PatientRegister() {
                 version_id: appt.version_id,
               },
             })
+            arrived = true
+          } catch (arriveErr) {
+            warnings.push(
+              `Token #${appt.token_number} is booked but was not marked arrived (${errorText(arriveErr)}). Mark arrived from Appointments.`,
+            )
           }
-        } catch (visitErr) {
-          console.warn('Auto-booking visit failed:', visitErr)
         }
       }
 
       setAllocatedToken(generatedToken)
+      setCheckedIn(arrived)
 
       if (saveAndAddAnother) {
         const tokenMsg = generatedToken != null ? ` · Queue Token #${generatedToken}` : ''
@@ -271,7 +302,9 @@ export function PatientRegister() {
           `Registered ${patient.full_name} (${patient.urn})${tokenMsg}. Form reset for next patient.`,
         )
         handleClear()
+        setRegistrationWarnings(warnings)
       } else {
+        setRegistrationWarnings(warnings)
         setCreatedPatient(patient)
       }
     } catch (err: unknown) {
@@ -282,6 +315,8 @@ export function PatientRegister() {
       } else {
         setFormError('Registration failed. Please check local LAN connection.')
       }
+    } finally {
+      submittingRef.current = false
     }
   }
 
@@ -322,6 +357,21 @@ export function PatientRegister() {
             </Link>
           </div>
         </div>
+
+        {/* Steps that did not complete after the patient was saved */}
+        {registrationWarnings.length > 0 && (
+          <div
+            role="alert"
+            className="space-y-1 rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-950 shadow-xs"
+          >
+            <p className="font-bold">Patient saved, but some steps did not complete:</p>
+            <ul className="list-disc pl-5">
+              {registrationWarnings.map((warning, index) => (
+                <li key={index}>{warning}</li>
+              ))}
+            </ul>
+          </div>
+        )}
 
         {/* Quick Success Toast when 'Save and add another' is active */}
         {quickSuccessNotice && (
@@ -375,7 +425,7 @@ export function PatientRegister() {
                     #{allocatedToken}
                   </div>
                   <span className="mt-1 block rounded bg-emerald-100 px-2 py-0.5 text-xs font-bold text-emerald-800">
-                    {visitType === 'walk-in' ? 'Checked In (Arrived)' : 'Booked'}
+                    {checkedIn ? 'Checked In (Arrived)' : 'Booked'}
                   </span>
                 </div>
               )}
@@ -952,7 +1002,11 @@ export function PatientRegister() {
               <button
                 type="submit"
                 aria-label="Register Patient"
-                disabled={registerMutation.isPending || (isDuplicateDetected && !confirmDifferentPatient)}
+                disabled={
+                  registerMutation.isPending ||
+                  !!createdPatient ||
+                  (isDuplicateDetected && !confirmDifferentPatient)
+                }
                 className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-[#124832] px-6 text-sm font-bold text-white shadow-xs hover:bg-[#0D3822] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-800 disabled:opacity-50 cursor-pointer"
               >
                 <IconDeviceFloppy className="h-4 w-4" />

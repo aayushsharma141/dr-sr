@@ -52,6 +52,8 @@ export function TokenGenerationPage() {
     date: string
   } | null>(null)
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
+  // Set when the token was booked but the walk-in check-in did not go through.
+  const [checkInError, setCheckInError] = useState<string | null>(null)
 
   // API Queries
   const { data: searchResults, isPending: isSearching } = usePatients(searchQuery, 8, 0)
@@ -108,6 +110,7 @@ export function TokenGenerationPage() {
     setVisitType('walk-in')
     setRemarks('')
     setErrorMsg(null)
+    setCheckInError(null)
     setGeneratedTicket(null)
   }
 
@@ -135,6 +138,7 @@ export function TokenGenerationPage() {
         notes: remarks.trim() || null,
       })
 
+      setCheckInError(null)
       if (visitType === 'walk-in') {
         try {
           await updateStatusMutation.mutateAsync({
@@ -145,7 +149,10 @@ export function TokenGenerationPage() {
             },
           })
         } catch (statusErr) {
-          console.warn('Auto-check-in failed:', statusErr)
+          const reason = statusErr instanceof Error && statusErr.message ? statusErr.message : 'unknown error'
+          setCheckInError(
+            `Token #${res.token_number} is booked but the patient was not checked in (${reason}). Check them in from Appointments.`,
+          )
         }
       }
 
@@ -234,6 +241,12 @@ export function TokenGenerationPage() {
                 </div>
               </div>
             </div>
+
+            {checkInError && (
+              <div role="alert" className="rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm font-semibold text-amber-950">
+                {checkInError}
+              </div>
+            )}
 
             <div className="flex flex-wrap items-center gap-3 pt-2 border-t border-emerald-200">
               <Link

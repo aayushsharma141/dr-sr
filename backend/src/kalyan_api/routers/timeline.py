@@ -33,6 +33,8 @@ from kalyan_api.models import (
     TreatmentSession,
 )
 from kalyan_api.schemas.timeline import TimelineItemOut
+from kalyan_api.services import audit_service
+from kalyan_api.services.audit_service import AuditAction
 
 router = APIRouter(tags=["timeline"])
 
@@ -173,6 +175,29 @@ def get_patient_timeline(
                         "diagnosis": rx.diagnosis,
                     },
                 )
+            )
+
+    # BR-010 / DWS-04: a doctor reading other doctors' clinical rows through the timeline
+    # must leave an audit trail, as a direct read does (core/scope.get_scoped_or_404).
+    # One summary row per timeline read, listing the other doctors' record IDs.
+    if can_see_clinical:
+        other_encounter_ids = [e.id for e in encounters if e.doctor_id != principal.doctor_id]
+        other_prescription_ids = [r.id for r in prescriptions if r.doctor_id != principal.doctor_id]
+        if other_encounter_ids or other_prescription_ids:
+            audit_service.record_audit_event(
+                session,
+                actor_user_id=principal.user_id,
+                action=AuditAction.CROSS_DOCTOR_CLINICAL_READ,
+                entity_type="Patient",
+                entity_id=patient_id,
+                details={
+                    "source": "patient_timeline",
+                    "actor_doctor_id": principal.doctor_id,
+                    "encounter_ids": other_encounter_ids,
+                    "prescription_ids": other_prescription_ids,
+                },
+                actor_username=principal.username,
+                actor_role=Role.DOCTOR.value,
             )
 
     # 4. Treatment Plans

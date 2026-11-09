@@ -209,3 +209,105 @@ describe('Patient Registration Screen', () => {
     expect(submitButton).toBeEnabled()
   })
 })
+
+describe('Registration desk: no second submit and no silent step failures (BR-007, BR-008)', () => {
+  let queryClient: QueryClient
+
+  beforeEach(() => {
+    queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+    })
+    vi.restoreAllMocks()
+  })
+
+  afterEach(() => {
+    cleanup()
+    vi.restoreAllMocks()
+  })
+
+  const jsonResponse = (status: number, body: unknown) => ({
+    ok: status >= 200 && status < 300,
+    status,
+    headers: new Headers({ 'content-type': 'application/json' }),
+    text: () => Promise.resolve(JSON.stringify(body)),
+  })
+
+  function stubRegistrationApi(options: { photoFails: boolean }) {
+    const postedPatients: unknown[] = []
+    const mockFetch = vi.fn().mockImplementation((url: string, init?: RequestInit) => {
+      if (url.includes('/api/auth/me')) return Promise.resolve(jsonResponse(200, mockMe))
+      if (url.includes('/api/patients/check-duplicate')) {
+        const noDup: DuplicateCheckResponse = { has_duplicate: false, matching_patient: null }
+        return Promise.resolve(jsonResponse(200, noDup))
+      }
+      if (url.includes('/photo') && init?.method === 'POST') {
+        if (options.photoFails) return Promise.resolve(jsonResponse(500, { message: 'disk full' }))
+        return Promise.resolve(jsonResponse(200, { photo_path: 'p.jpg' }))
+      }
+      if (url.includes('/api/patients') && init?.method === 'POST') {
+        postedPatients.push(JSON.parse(init.body as string))
+        return Promise.resolve(jsonResponse(201, mockRegisteredPatient))
+      }
+      return Promise.reject(new Error(`Unhandled: ${url}`))
+    })
+    vi.stubGlobal('fetch', mockFetch)
+    return { postedPatients }
+  }
+
+  async function fillRequiredFields(user: ReturnType<typeof userEvent.setup>) {
+    await user.type(screen.getByLabelText(/Full Name \*/i), 'Aarav Kumar')
+    await user.type(screen.getByLabelText(/Mobile Number \*/i), '9876543210')
+    await user.type(screen.getByLabelText(/Age \(Years\)/i), '30')
+    await user.type(screen.getByLabelText(/Address \(Village/i), 'Main Bazaar, Ara')
+  }
+
+  function renderPage() {
+    return render(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter>
+          <PatientRegister />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    )
+  }
+
+  it('does not allow a second registration while the saved patient card is shown', async () => {
+    const { postedPatients } = stubRegistrationApi({ photoFails: false })
+    const user = userEvent.setup()
+    renderPage()
+    await fillRequiredFields(user)
+
+    await user.click(screen.getByRole('button', { name: /register patient/i }))
+    await waitFor(() => {
+      expect(screen.getByText('Registration Successful!')).toBeInTheDocument()
+    })
+
+    const submitAgain = screen.getByRole('button', { name: /register patient/i })
+    expect(submitAgain).toBeDisabled()
+    // Pressing Enter in a field must not submit either.
+    const nameField = screen.getByLabelText(/Full Name \*/i)
+    nameField.focus()
+    await user.keyboard('{Enter}')
+
+    expect(postedPatients).toHaveLength(1)
+  })
+
+  it('reports a failed photo upload instead of showing a clean success', async () => {
+    stubRegistrationApi({ photoFails: true })
+    const user = userEvent.setup()
+    renderPage()
+    await fillRequiredFields(user)
+
+    const photo = new File(['jpeg-bytes'], 'face.jpg', { type: 'image/jpeg' })
+    await user.upload(screen.getByLabelText('Patient Photograph'), photo)
+
+    await user.click(screen.getByRole('button', { name: /register patient/i }))
+    await waitFor(() => {
+      expect(screen.getByText('Registration Successful!')).toBeInTheDocument()
+    })
+
+    const warning = screen.getByRole('alert')
+    expect(warning).toHaveTextContent('Patient saved, but some steps did not complete')
+    expect(warning).toHaveTextContent('Photo was not saved')
+  })
+})

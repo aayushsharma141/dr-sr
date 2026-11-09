@@ -17,6 +17,7 @@ from sqlalchemy.orm import Session
 from kalyan_api.models import (
     Appointment,
     AppointmentStatus,
+    AuditLog,
     ClinicalEncounter,
     Patient,
     Prescription,
@@ -267,3 +268,45 @@ def test_doctor_timeline_keeps_clinical_content(
     assert "ENCOUNTER" in types
     sessions = [e for e in events if e["event_type"] == "TREATMENT_SESSION"]
     assert any("VAS: 7/10" in e["summary"] for e in sessions)
+
+
+# ---------------------------------------------------------------- BR-010
+
+
+def _cross_doctor_audits(db_session: Session, patient_id: int) -> list[AuditLog]:
+    db_session.expire_all()
+    return list(
+        db_session.scalars(
+            select(AuditLog).where(
+                AuditLog.action == "CROSS_DOCTOR_CLINICAL_READ",
+                AuditLog.entity_id == str(patient_id),
+            )
+        ).all()
+    )
+
+
+def test_cross_doctor_timeline_read_is_audited(
+    login_client, doctor_a_user, doctor_b_user, admin_user, db_session
+):
+    """Doctor B reading Doctor A's records via the timeline leaves an audit row (BR-010, DWS-04)."""
+    patient = _patient(db_session, "U1")
+    _seed_clinical_history(db_session, patient, doctor_a_user.doctor_id, admin_user)
+
+    _timeline(login_client(doctor_b_user), patient.id)
+
+    rows = _cross_doctor_audits(db_session, patient.id)
+    assert len(rows) == 1, rows
+    assert rows[0].actor_user_id == doctor_b_user.id
+    assert rows[0].actor_role == "DOCTOR"
+
+
+def test_own_doctor_timeline_read_is_not_audited(
+    login_client, doctor_a_user, admin_user, db_session
+):
+    """Doctor A reading their own encounters writes no cross-doctor audit row (BR-010)."""
+    patient = _patient(db_session, "U2")
+    _seed_clinical_history(db_session, patient, doctor_a_user.doctor_id, admin_user)
+
+    _timeline(login_client(doctor_a_user), patient.id)
+
+    assert _cross_doctor_audits(db_session, patient.id) == []
