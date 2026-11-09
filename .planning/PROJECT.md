@@ -76,10 +76,10 @@ Defined in `.planning/REQUIREMENTS.md` for v3.0.
 
 - **Budget:** ₹22,000 maximum fixed ceiling.
 - **Timeline:** 4–6 weeks total delivery window.
-- **Stack:** React + TypeScript (single app), Python + FastAPI, PostgreSQL, local file storage.
+- **Stack:** Node.js LTS + Express 5 + SQLite (better-sqlite3, WAL), with a plain ES-module browser app served by the same process, in `hms/` (ADR-27, 2026-11-09). Until cutover, the previous React + TypeScript / FastAPI / PostgreSQL stack is reference only.
 - **Security:** Individual accounts; backend-enforced permissions on every endpoint; audit events for sensitive actions.
 - **Deployment:** Installed once on the central server PC; other PCs use a browser over LAN; no internet dependency.
-- **Build tooling:** Node.js is required only on the build machine to produce static frontend assets; the server PC serves the built assets and does not need Node. (Node is not currently installed on the dev machine.)
+- **Runtime:** The server PC needs Node.js LTS, which can be installed offline with the portable bundle. There is no frontend build step.
 
 ## Key Decisions
 
@@ -102,6 +102,7 @@ Defined in `.planning/REQUIREMENTS.md` for v3.0.
 | 30-min idle timeout and 5-failure lockout (D-07) | 15-min lockout cooldown or Admin unlock balances workflow with security | ✓ Approved by user 2026-10-30 (see 11-ENTRY-GATE.md EG-10) |
 | Optimistic concurrency via version_id with 409 and 1-click reload (D-08) | Prevents silent record overwrites during simultaneous edits | ✓ Approved by user 2026-10-30 (see 11-ENTRY-GATE.md EG-11) |
 | Backend package layout and sync ORM (EG-14, EG-20) | `backend/src/kalyan_api` avoids legacy `legacy/app/` (formerly root `app/`) collision; sync ORM guarantees atomic audit commits | ✓ Approved by user 2026-10-30 (see 11-ENTRY-GATE.md EG-14, EG-20) |
+| Replace v3 FastAPI/React/PostgreSQL with the Node.js + SQLite app in `hms/` (ADR-27) | Owner preferred the from-scratch app's interface, workflow and simplicity; Kalyan rules are re-implemented there | ✓ Decided by user 2026-11-09 (see DECISIONS.md ADR-27, docs/plans/UI-ADOPTION-PLAN-2026-11-09.md) |
 
 ## Evolution
 
@@ -123,4 +124,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-10-30 after starting milestone v3.0 (Centralized LAN Web Platform) - Phase 11 Entry Gate*
+*Last updated: 2026-11-09: stack replaced by ADR-27 (Node.js + SQLite app in `hms/`). Previously updated 2026-10-30 when milestone v3.0 (Centralized LAN Web Platform) started, at the Phase 11 Entry Gate.*
