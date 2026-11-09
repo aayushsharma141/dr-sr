@@ -1,6 +1,6 @@
 # Plan: switch Kalyan Hospital to the "workspace-dr-sr" app
 
-**Status:** Phase 0 done 2026-11-09 (SW-00 to SW-03, progress log in section 7). Phases 1–5 not started.
+**Status:** Phase 0 committed (`b770c9fc`). Phase 1 (SW-10 to SW-14) implemented and tested 2026-11-09, not yet committed. Phases 2–5 not started. Progress log in section 7.
 **Decision taken:** on 2026-11-09 the user chose to **switch to the downloaded app** (Path A) instead of reshaping the current React/FastAPI app (Path B).
 **New base:** `C:\Users\147ha\Downloads\workspace-dr-sr`: Node 20+, Express 5, SQLite (better-sqlite3 12.9.0) and plain JavaScript with no build step. About 12,000 lines and 54 integration tests.
 **Retired to reference:** `backend/` (FastAPI + PostgreSQL) and `frontend/` (React). From now on they are the specification of Kalyan's rules, like `legacy/app/` was for v3. Nothing is deleted.
@@ -154,5 +154,28 @@ Phase 5 runs alongside each task, then SW-52 ─► SW-43
 | SW-02 | Branch `switch/node-lan` created from the checkpoint. Source copied to `hms/` without `data/` (live DB, keys, backup) or `node_modules/`; screenshots in `hms/docs/shots/`. No child processes, eval or outbound URLs in the source; all 100 lockfile packages come from registry.npmjs.org. Node 26.13.0 was already installed. better-sqlite3 12.9.0 failed to install (no Node 26 prebuild, no C++ toolchain), so it was moved to **13.0.3** (prebuilt; tested in a scratch folder first) and `engines.node` raised to `>=22.0.0`. | `npm test` → 54/54 pass |
 | SW-03 | Default settings now use the v3 address (Hospital Road, Ara, Bhojpur, Bihar - 802301) and the tagline "Physiotherapy Department · Sri Vashishtha Kalyan Trust"; phone, e-mail and registration number are blank, and the OPD fee default is 0. The built-in price list (lab, imaging, in-patient) is removed, so fresh installs start empty. The demo seed now uses synthetic Bhojpur patients, two physiotherapists and one eye doctor, physio/eye clinical text and a demo-only price list, with no nurse account, and visits follow their doctor's department. Patient form defaults to Bihar. Test fixtures and hms docs updated. New test: a fresh install has an empty catalogue. | `npm test` → 55/55 pass; seed run into a temp folder: 42 patients all in Bihar, 0 visits in the wrong department, roles admin 1 / doctor 3 / reception 1 |
 
-**Not done in Phase 0 (by design):** the Nurse role still exists in code (removed in SW-11). MRN, receipt and invoice formats are unchanged (SW-20, SW-27). Nothing in `hms/` is committed yet.
+**Not done in Phase 0 (by design):** the Nurse role still existed in code (removed in SW-11). MRN, receipt and invoice formats are unchanged (SW-20, SW-27). Committed as `b770c9fc` after the owner's go-ahead.
 **Remaining risks:** the server PC must run Node 22 or newer (26 recommended, to match). The `.archify/*` and `.coverage` modifications from another tool are still uncommitted in the working tree.
+
+### Phase 1 (2026-11-09)
+
+Owner confirmed **D1 = no real patient data** (SW-40 resolved, SW-41 dropped, OD-05 resolved).
+
+| ID | Result | Evidence |
+|---|---|---|
+| SW-10 | Migration runner in `hms/src/db.js`: `schema.sql` is the frozen v1 baseline; numbered files in `hms/src/migrations` run in order, each in its own transaction. A database that holds staff accounts gets an encrypted `pre_upgrade` backup first (recorded on the Backups screen as "Before upgrade"), and the upgrade is audited as `system.upgrade`. A failed step leaves the database at its last good version; a newer database is refused. First migration: `002-phase1-foundations.sql`. | `test/06-upgrades.test.js` 6/6 |
+| SW-11 | Roles ported from the v3 matrix: Admin, Reception, Doctor (Nurse refused by trigger; old nurse accounts switched off). Billing split into `invoice.write` and `payment.collect` (Reception only), `payment.reverse` and `billing.catalogue` (Admin). Admin has no clinical, document or patient-write access; Doctors have no billing access. Doctors write only to open visits assigned to them; Admin is never a valid doctor. Visit, chart, timeline, vitals and prescription responses leave out clinical content for Admin and Reception. D-07: 30-minute idle (the admin setting is now actually enforced), lockout after 5 wrong passwords for 15 minutes. | `test/02`, `03`, `04`, `05`, `07` |
+| SW-12 | No clinical or financial row can be deleted (DB triggers on notes, diagnoses, prescriptions, vitals, invoices, lines, payments). DELETE routes answer 405. Diagnoses and prescription lines are cancelled with a reason by the visit's doctor; unsigned notes by their author. Cancelled entries stay visible, struck through, and are left off printed prescriptions. Signed notes are locked by trigger. | `test/06`, `07` |
+| SW-13 | `version` on patients, visits, appointments, notes, staff accounts and services, bumped by triggers on user-editable columns; one settings version. Every PATCH must send it; stale edits get `409 version_conflict`. The browser shows one "changed by someone else" dialog with Reload. | `test/07`; checked in the browser |
+| SW-14 | Settings: Hindi hospital name, trust (EN/HI), location line, main and second clinic addresses (EN/HI, from PROJECT.md), print header/footer (EN/HI), receipt cycle (financial year default, D-05), consultation validity (7 days, v3 default). Per-field validation. Logo upload (PNG/JPEG/WebP, max 512 KB, stored in the database so backups include it) is served publicly for the sign-in page; it appears on the sign-in page and in the sidebar. | `test/07`; checked in the browser |
+
+**Test run:** `npm test` in `hms/` → 7 suites, 78 tests, 0 failures. The 54 original tests were rewritten to use the role that does each job, since Admin no longer registers patients, writes notes or takes money.
+
+**Browser check** (built-in browser, synthetic seed on port 3100):
+- Doctor: no Billing menu; can cancel a diagnosis on their own visit through the reason dialog, and the entry shows struck through with name, time and reason; another doctor's open visit is read-only with an explanation.
+- Reception: no clinical tabs or vitals; Bill, Edit and Add allergy available; a stale patient edit shows the conflict dialog, and Reload shows the other workstation's change; on invoices, Receive payment but no Void.
+- Admin: no register, bill, edit or visit actions; Void but no Receive payment; new settings sections render the Hindi defaults; logo upload updates the sidebar; an invalid setting is flagged, a valid one saves.
+- No browser console errors apart from the deliberate 409 and 400.
+- Also fixed the doctor greeting ("Dr Verma" instead of "Dr").
+
+**Not covered yet:** printed documents do not use the new header/footer/Hindi settings or the logo (SW-20, SW-25, SW-27 build the prints). Attachments access for Reception awaits D6 (SW-28). Doctor read scope awaits D2. The settings and chart screens were checked in one browser at one size, not on the clinic PCs.

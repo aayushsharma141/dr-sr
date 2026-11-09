@@ -15,8 +15,9 @@ export default async function invoiceView(root, { params, navigate }) {
   const id = Number(params[0]);
   const data = await api.get(`/api/invoices/${id}`);
   const inv = data.invoice;
-  const canWrite = session.can('billing.write');
-  const canVoid = session.can('billing.void');
+  // ADR-23 / D-06: reception collects payments; only the administrator reverses them.
+  const canWrite = session.can('payment.collect');
+  const canVoid = session.can('payment.reverse');
 
   root.innerHTML = `
     <div class="breadcrumb">

@@ -34,9 +34,11 @@ const PERMISSIONS = [
   'visit.write',
   'appointment.read',
   'appointment.write',
-  'billing.read',
-  'billing.write',
-  'billing.void',
+  'billing.read',       // invoices, payments, dues, day report
+  'invoice.write',      // raise invoices (charges)
+  'payment.collect',    // take money at the desk (invariant 6)
+  'payment.reverse',    // void a payment or invoice with a reason (D-06)
+  'billing.catalogue',  // services and fees (OD-10)
   'report.read',
   'export.data',
   'user.manage',
@@ -45,29 +47,37 @@ const PERMISSIONS = [
   'settings.manage',
 ];
 
+// Ported from the approved v3 matrix (backend/src/kalyan_api/core/permissions.py,
+// tag v3-fastapi-final):
+//  - ADR-17: three roles only.
+//  - D-04 / EG-16: Admin and Reception see no clinical content.
+//  - ADR-23: Reception is the only role that collects payments; Admin reverses
+//    them with a reason (D-06); Doctors have no billing access.
+//  - Doctors read clinical records and write only their own (enforced per
+//    record in the routes; D2 read scope still awaits sign-off).
 const ROLE_PERMISSIONS = {
-  admin: PERMISSIONS.slice(),
-  doctor: [
-    'patient.read', 'patient.write',
-    'clinical.read', 'clinical.write', 'vitals.write',
-    'attachment.read', 'attachment.write',
-    'visit.read', 'visit.write',
-    'appointment.read', 'appointment.write',
-    'billing.read', 'report.read',
-  ],
-  nurse: [
+  admin: [
     'patient.read',
-    'clinical.read', 'clinical.write', 'vitals.write',
-    'attachment.read', 'attachment.write',
-    'visit.read', 'visit.write',
+    'visit.read',
     'appointment.read',
+    'billing.read', 'payment.reverse', 'billing.catalogue',
+    'report.read', 'export.data',
+    'user.manage', 'audit.read', 'backup.manage', 'settings.manage',
   ],
   reception: [
     'patient.read', 'patient.write',
     'attachment.read', 'attachment.write',
     'visit.read', 'visit.write',
     'appointment.read', 'appointment.write',
-    'billing.read', 'billing.write', 'report.read',
+    'billing.read', 'invoice.write', 'payment.collect',
+    'report.read',
+  ],
+  doctor: [
+    'patient.read',
+    'clinical.read', 'clinical.write', 'vitals.write',
+    'attachment.read', 'attachment.write',
+    'visit.read', 'visit.write',
+    'appointment.read', 'appointment.write',
   ],
 };
 
@@ -76,9 +86,21 @@ const ROLES = Object.keys(ROLE_PERMISSIONS);
 const ROLE_LABELS = {
   admin: 'Administrator',
   doctor: 'Doctor',
-  nurse: 'Nurse',
   reception: 'Reception',
 };
+
+/**
+ * Idle timeout in minutes: the administrator's setting when it is valid,
+ * otherwise the configured default (30, decision D-07).
+ */
+function idleMinutes(db) {
+  try {
+    const row = db.prepare("SELECT value FROM settings WHERE key = 'session_idle_minutes'").get();
+    const n = Number(row && row.value);
+    if (Number.isInteger(n) && n >= 5 && n <= 240) return n;
+  } catch { /* settings table not created yet */ }
+  return config.session.idleMinutes;
+}
 
 function permissionsFor(role) {
   return ROLE_PERMISSIONS[role] || [];
@@ -173,7 +195,7 @@ function createSession(db, userId, req) {
   const token = randomToken(32);
   const csrf = randomToken(18);
   const now = new Date();
-  const idleMs = config.session.idleMinutes * 60 * 1000;
+  const idleMs = idleMinutes(db) * 60 * 1000;
   const maxMs = config.session.maxHours * 60 * 60 * 1000;
   const expiresAt = new Date(Math.min(now.getTime() + idleMs, now.getTime() + maxMs)).toISOString();
   db.prepare(
@@ -249,7 +271,7 @@ function resolveSession(db, req) {
     return null;
   }
   // Sliding idle window, capped by the absolute lifetime.
-  const idleMs = config.session.idleMinutes * 60 * 1000;
+  const idleMs = idleMinutes(db) * 60 * 1000;
   const maxMs = config.session.maxHours * 60 * 60 * 1000;
   const absoluteEnd = new Date(row.created_at).getTime() + maxMs;
   const nextExpiry = new Date(Math.min(now + idleMs, absoluteEnd)).toISOString();

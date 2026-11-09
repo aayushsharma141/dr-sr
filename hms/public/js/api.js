@@ -93,6 +93,14 @@ export function setUnauthenticatedHandler(fn) {
   onUnauthenticated = fn;
 }
 
+// Someone else saved the same record first (HTTP 409 version_conflict). The
+// shell shows one clear "reload" dialog; the thrown error carries no message
+// so screens do not show a second, duplicate toast.
+let onConflict = () => {};
+export function setConflictHandler(fn) {
+  onConflict = fn;
+}
+
 async function request(method, path, { body, headers = {}, raw, signal } = {}) {
   const init = {
     method,
@@ -132,6 +140,10 @@ async function request(method, path, { body, headers = {}, raw, signal } = {}) {
       onUnauthenticated();
     }
     const error = payload && payload.error ? payload.error : {};
+    if (res.status === 409 && error.code === 'version_conflict') {
+      onConflict(error.message);
+      throw new ApiError('', { status: 409, code: 'version_conflict', details: null });
+    }
     throw new ApiError(error.message || `Request failed (${res.status}).`, {
       status: res.status,
       code: error.code || 'error',

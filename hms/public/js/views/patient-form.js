@@ -126,12 +126,13 @@ export function openPatientForm({ patient = null, onSaved } = {}) {
     ui.setBusy(saveButton, true, 'Saving…');
     try {
       const res = editing
-        ? await api.patch(`/api/patients/${p.id}`, values)
+        ? await api.patch(`/api/patients/${p.id}`, { ...values, version: p.version })
         : await api.post('/api/patients', values);
       ui.toastOk(editing ? 'Patient record updated.' : `Patient registered as ${res.patient.mrn}.`);
       handle.close();
       if (onSaved) onSaved(res.patient);
     } catch (err) {
+      if (err.code === 'version_conflict') return; // the conflict dialog explains and offers a reload
       if (err.details) {
         ui.applyFieldErrors(form, err.details);
       } else {

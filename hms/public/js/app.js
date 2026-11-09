@@ -2,7 +2,7 @@
  * Application bootstrap: authentication screens, shell, hash router,
  * global patient search and session housekeeping.
  */
-import { api, session, setUnauthenticatedHandler, ApiError } from './api.js';
+import { api, session, setUnauthenticatedHandler, setConflictHandler, ApiError } from './api.js';
 import * as ui from './ui.js';
 
 import dashboardView from './views/dashboard.js';
@@ -129,6 +129,14 @@ function setupGlobalSearch() {
 // ---------------------------------------------------------------------------
 // Shell
 // ---------------------------------------------------------------------------
+/** The hospital crest when one is uploaded (SW-14), otherwise the plain mark. */
+function brandMark(logoUrl, large = false) {
+  const cls = `brand-mark${large ? ' brand-mark--lg' : ''}`;
+  return logoUrl
+    ? `<div class="${cls} brand-mark--logo"><img src="${ui.esc(logoUrl)}" alt=""></div>`
+    : `<div class="${cls}">+</div>`;
+}
+
 function applyBranding() {
   const settings = session.settings || {};
   const name = settings.hospitalName || 'Kalyan Hospital';
@@ -137,6 +145,19 @@ function applyBranding() {
   if (brand) brand.textContent = name;
   const tagline = document.getElementById('brand-tagline');
   if (tagline) tagline.textContent = settings.hospitalTagline || 'Clinic workspace';
+  const mark = document.querySelector('.sidebar .brand-mark');
+  if (mark) {
+    mark.classList.toggle('brand-mark--logo', Boolean(settings.logoUrl));
+    mark.replaceChildren();
+    if (settings.logoUrl) {
+      const img = document.createElement('img');
+      img.src = settings.logoUrl;
+      img.alt = '';
+      mark.append(img);
+    } else {
+      mark.textContent = '+';
+    }
+  }
 }
 
 function applyUser() {
@@ -297,7 +318,8 @@ async function render() {
 // ---------------------------------------------------------------------------
 // Auth screens
 // ---------------------------------------------------------------------------
-function renderLogin(hospitalName) {
+function renderLogin(brand = {}) {
+  const hospitalName = brand.hospitalName;
   dom.boot().classList.add('hidden');
   dom.shell().classList.add('hidden');
   const auth = dom.auth();
@@ -306,10 +328,10 @@ function renderLogin(hospitalName) {
     <aside class="auth-aside">
       <div>
         <div class="row" style="gap:12px">
-          <div class="brand-mark brand-mark--lg">+</div>
+          ${brandMark(brand.logoUrl, true)}
           <div>
-            <div style="font-size:16px;font-weight:600;color:#fff">${ui.esc(hospitalName || 'Kalyan Hospital')}</div>
-            <div class="xs" style="color:rgba(234,250,247,.7)">Clinic workspace · local network</div>
+            <div style="font-size:16px;font-weight:600;color:#fff">${ui.esc(hospitalName || 'Kalyan Hospital')}${brand.hospitalNameHi ? ` <span lang="hi" style="font-weight:500">· ${ui.esc(brand.hospitalNameHi)}</span>` : ''}</div>
+            <div class="xs" style="color:rgba(234,250,247,.7)">${ui.esc(brand.hospitalTagline || 'Clinic workspace')} · local network</div>
           </div>
         </div>
         <h1 class="mt-3">Everything the clinic needs,<br>on your own network.</h1>
@@ -517,10 +539,12 @@ setUnauthenticatedHandler(() => {
   dom.shell().classList.add('hidden');
   dom.auth().classList.remove('hidden');
   if (!document.getElementById('login-form')) {
-    renderLogin(session.settings?.hospitalName);
+    renderLogin(session.settings || {});
     ui.toastError('Your session has ended. Please sign in again.');
   }
 });
+
+window.addEventListener('kh:settings-changed', () => applyBranding());
 
 window.addEventListener('hashchange', () => {
   if (session.isAuthenticated) render();
@@ -528,8 +552,9 @@ window.addEventListener('hashchange', () => {
 
 async function boot() {
   ui.hydrateIcons();
+  let status = {};
   try {
-    const status = await api.bootstrapStatus();
+    status = await api.bootstrapStatus();
     if (status.setupRequired) {
       session.setVersion(status.version);
       renderSetup(status);
@@ -543,6 +568,7 @@ async function boot() {
     return;
   }
 
+  const loginBrand = { hospitalName: status.hospitalName, hospitalNameHi: status.hospitalNameHi, hospitalTagline: status.hospitalTagline, logoUrl: status.logoUrl };
   const restored = session.restore();
   if (restored) {
     try {
@@ -558,8 +584,31 @@ async function boot() {
       session.clear();
     }
   }
-  renderLogin();
+  renderLogin(loginBrand);
   wireShell();
 }
+
+// Edit conflict (D-08): explain once, and let the user reload the screen to
+// see the other person's change before trying again.
+let conflictOpen = false;
+setConflictHandler((message) => {
+  if (conflictOpen) return;
+  conflictOpen = true;
+  const handle = ui.modal({
+    title: 'This record was changed by someone else',
+    width: 'narrow',
+    body: `<p class="sm">${ui.esc(message || 'Someone else saved this record first.')}</p>
+           <p class="sm muted mt-1">Reloading shows their change. Anything you typed on this screen will need to be entered again.</p>`,
+    footer: `<button class="btn" type="button" data-close>Keep this screen</button>
+             <button class="btn btn--primary" type="button" data-reload>Reload</button>`,
+    onClose: () => { conflictOpen = false; },
+  });
+  handle.dialog.querySelector('[data-reload]').addEventListener('click', () => {
+    handle.close();
+    for (const node of document.querySelectorAll('.modal-backdrop')) node.remove();
+    document.body.style.overflow = '';
+    render();
+  });
+});
 
 boot();

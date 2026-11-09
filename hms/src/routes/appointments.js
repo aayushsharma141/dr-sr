@@ -3,7 +3,7 @@
 const express = require('express');
 
 const { Validator, ApiError } = require('../lib/http');
-const { audit, idParam } = require('../lib/request');
+const { audit, idParam, expectedVersion, updateVersioned, assertActiveDoctor } = require('../lib/request');
 const { requirePerm } = require('../auth');
 const { todayLocal } = require('../lib/domain');
 
@@ -48,6 +48,7 @@ module.exports = function appointmentRoutes(ctx) {
         status: a.status,
         visitId: a.visit_id,
         notes: a.notes,
+        version: a.version,
       })),
     });
   });
@@ -65,6 +66,7 @@ module.exports = function appointmentRoutes(ctx) {
     const patient = db.prepare('SELECT id, is_active FROM patients WHERE id = ?').get(patientId);
     if (!patient) throw new ApiError(404, 'Patient not found.');
     if (!patient.is_active) throw new ApiError(409, 'This patient record is archived.');
+    assertActiveDoctor(db, doctorId);
 
     const now = new Date().toISOString();
     const info = db
@@ -88,6 +90,7 @@ module.exports = function appointmentRoutes(ctx) {
     if (!appt) throw new ApiError(404, 'Appointment not found.');
 
     const v = new Validator(req.body);
+    const version = expectedVersion(v);
     const status = v.enumOf('status', STATUSES);
     const scheduledAt = v.isoDateTime('scheduledAt');
     const doctorId = v.int('doctorId', { min: 1 });
@@ -99,19 +102,21 @@ module.exports = function appointmentRoutes(ctx) {
     const patch = { updated_at: new Date().toISOString() };
     if (status) patch.status = status;
     if (scheduledAt) patch.scheduled_at = scheduledAt;
-    if (doctorId) patch.doctor_id = doctorId;
+    if (doctorId) {
+      assertActiveDoctor(db, doctorId);
+      patch.doctor_id = doctorId;
+    }
     if (durationMin) patch.duration_min = durationMin;
     if (reason !== undefined && reason !== null) patch.reason = reason;
     if (notes !== undefined && notes !== null) patch.notes = notes;
 
-    db.prepare(`UPDATE appointments SET ${Object.keys(patch).map((k) => `${k} = @${k}`).join(', ')} WHERE id = @id`)
-      .run({ ...patch, id });
+    updateVersioned(db, 'appointments', id, version, patch);
 
     audit(ctx, req, {
       action: 'appointment.update', entityType: 'appointment', entityId: id, patientId: appt.patient_id,
       detail: { status, scheduledAt },
     });
-    res.json({ ok: true });
+    res.json({ ok: true, version: db.prepare('SELECT version FROM appointments WHERE id = ?').get(id).version });
   });
 
   // Check a patient in: creates the open visit and links it to the appointment.

@@ -164,4 +164,31 @@ async function createPatient(client, overrides = {}) {
   return res.body.patient;
 }
 
-module.exports = { boot, setupAdmin, makeStaff, createPatient, Client, config };
+/** Current version of a staff account, as the admin screen would see it. */
+async function userVersion(adminClient, userId) {
+  const res = await adminClient.get('/api/admin/users');
+  const user = res.body.users.find((u) => u.id === userId);
+  if (!user) throw new Error(`user ${userId} not found`);
+  return user.version;
+}
+
+/**
+ * The three Kalyan roles as logged-in clients: reception registers and bills,
+ * the doctor writes clinical records, the admin administers (ADR-17).
+ */
+async function makeTeam(env, adminClient, suffix = '') {
+  const reception = await makeStaff(env, adminClient, { username: `desk${suffix}`, role: 'reception', fullName: 'Kiran Kumari' });
+  const doctor = await makeStaff(env, adminClient, { username: `doc${suffix}`, role: 'doctor', fullName: 'Dr Anil Verma' });
+  return { reception: reception.client, doctor: doctor.client, doctorUser: doctor.user, receptionUser: reception.user };
+}
+
+/** Reception opens a visit for the patient, assigned to the doctor. */
+async function openVisit(receptionClient, patientId, doctorId, extra = {}) {
+  const res = await receptionClient.post('/api/visits', { patientId, doctorId, visitType: 'opd', ...extra });
+  if (res.status !== 201) throw new Error(`open visit failed: ${JSON.stringify(res.body)}`);
+  return res.body.visit;
+}
+
+module.exports = {
+  boot, setupAdmin, makeStaff, createPatient, userVersion, makeTeam, openVisit, Client, config,
+};

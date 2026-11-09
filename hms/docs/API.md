@@ -60,6 +60,10 @@ Every response carries `X-Request-Id`; quote it when reporting a problem.
 
 ### Conventions
 
+* **Edit conflicts.** Every `PATCH` on a patient, visit, appointment, note, staff account, service
+  or the settings must include `version` (the value from the last `GET`). If someone else saved
+  first, the answer is `409` with `code: "version_conflict"` and `details.currentVersion`.
+
 * Money is **integer paise** (`25000` = ₹250.00) on the wire.
 * Timestamps are ISO-8601 UTC. Plain dates are `YYYY-MM-DD` in clinic time.
 * List endpoints use `?limit=` (default 25–50, max 100–200) and `?offset=`; some accept `?q=`,
@@ -143,11 +147,12 @@ Create body (minimum):
 | `POST /api/visits/:id/notes` | `clinical.write` | `{noteType, subject?, body}` |
 | `PATCH /api/notes/:id` | `clinical.write` | Edit an **unsigned** note |
 | `POST /api/notes/:id/sign` | `clinical.write` | Sign → immutable (`409` afterwards) |
-| `DELETE /api/notes/:id` | `clinical.write` | Delete an unsigned note |
+| `POST /api/notes/:id/cancel` | `clinical.write` | Author withdraws an unsigned note `{reason}` (≥5 chars); it stays on the record |
 | `POST /api/visits/:id/diagnoses` | `clinical.write` | `{code?, description, kind}` |
-| `DELETE /api/visits/:id/diagnoses/:diagnosisId` | `clinical.write` | Remove a diagnosis |
+| `POST /api/visits/:id/diagnoses/:diagnosisId/cancel` | `clinical.write` | Cancel a diagnosis `{reason}` (own open visit) |
 | `POST /api/visits/:id/prescriptions` | `clinical.write` | `{drugName, strength?, form?, dose?, route?, frequency?, durationDays?, instructions?}` |
-| `DELETE /api/visits/:id/prescriptions/:rxId` | `clinical.write` | Remove a drug line |
+| `POST /api/visits/:id/prescriptions/:rxId/cancel` | `clinical.write` | Cancel a drug line `{reason}` (own open visit) |
+| `DELETE` on any of the three above | — | `405`: clinical records are never deleted |
 | `GET /api/patients/:id/prescriptions` | `clinical.read` | All prescriptions for the printable sheet |
 
 ---
@@ -192,14 +197,14 @@ be on the allow-list and free of markup) → otherwise `415`.
 
 | Method & path | Perm | Purpose |
 |---|---|---|
-| `GET /api/services` | `billing.read`\|`billing.write` | Service catalogue |
-| `POST /api/services` · `PATCH /api/services/:id` | `billing.write` | Add / edit a catalogue entry |
+| `GET /api/services` | `billing.read`\|`billing.catalogue`\|`invoice.write` | Service catalogue (empty on a fresh install) |
+| `POST /api/services` · `PATCH /api/services/:id` | `billing.catalogue` | Add / edit a catalogue entry (`PATCH` needs `version`) |
 | `GET /api/invoices?q=&status=&from=&to=&limit=&offset=` | `billing.read` | Invoice list with patient, totals, balance |
-| `POST /api/invoices` | `billing.write` | Create an invoice (below) |
+| `POST /api/invoices` | `invoice.write` | Create an invoice (below) |
 | `GET /api/invoices/:id` | `billing.read` | Invoice with items and payments |
-| `POST /api/invoices/:id/payments` | `billing.write` | Record a receipt `{amountPaise, method, reference?, note?}` |
-| `POST /api/invoices/:id/void` | `billing.void` | Void with `{reason}` (≥5 chars) |
-| `POST /api/payments/:id/void` | `billing.void` | Void a single receipt with `{reason}` |
+| `POST /api/invoices/:id/payments` | `payment.collect` | Record a receipt `{amountPaise, method, reference?, note?}` (Reception only) |
+| `POST /api/invoices/:id/void` | `payment.reverse` | Void with `{reason}` (≥5 chars) |
+| `POST /api/payments/:id/void` | `payment.reverse` | Void a single receipt with `{reason}` |
 | `GET /api/billing/report?from=&to=&groupBy=method\|day\|doctor` | `billing.read` | Collection report |
 | `GET /api/billing/outstanding` | `billing.read` | Unpaid / partly paid invoices |
 
@@ -241,7 +246,9 @@ Payment response includes the receipt: `{payment: {receiptNo, amountPaise, metho
 | `POST /api/admin/backups` | `backup.manage` | Write a backup now (`{note?}`) |
 | `POST /api/admin/backups/:id/export` | `backup.manage` | Re-encrypt with `{passphrase}` and download |
 | `GET /api/admin/system` | `backup.manage`\|`audit.read` | Version, Node, uptime, counts, DB size, backup settings, synthetic-data flag |
-| `GET /api/admin/settings` · `PATCH /api/admin/settings` | `settings.manage` | Clinic details, session idle minutes, backup hour/retention, disclaimer |
+| `GET /api/admin/settings` · `PATCH /api/admin/settings` | `settings.manage` | Bilingual identity, clinic addresses, print header/footer, receipt cycle, consultation validity, idle minutes, backup retention, disclaimer. `GET` returns `version`; `PATCH` must send it and is validated per field |
+| `POST /api/admin/settings/logo` · `DELETE /api/admin/settings/logo` | `settings.manage` | Upload (raw PNG/JPEG/WebP, ≤512 KB) or remove the hospital logo |
+| `GET /api/branding/logo` | none | The logo, for the sign-in page and prints (`404` when none) |
 
 ---
 

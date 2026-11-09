@@ -36,10 +36,26 @@ function clearSessionCookie(res) {
   res.clearCookie(config.session.cookieName, { path: '/' });
 }
 
+const { logoUrl } = require('./branding');
+
 function publicSettings(store) {
   const s = store.getSettings();
   return {
     hospitalName: s.hospital_name || 'Kalyan Hospital',
+    hospitalNameHi: s.hospital_name_hi || '',
+    trustName: s.trust_name || '',
+    trustNameHi: s.trust_name_hi || '',
+    locationLine: s.location_line || '',
+    hospitalAddressHi: s.hospital_address_hi || '',
+    clinic2Address: s.clinic2_address || '',
+    clinic2AddressHi: s.clinic2_address_hi || '',
+    printHeaderEn: s.print_header_en || '',
+    printHeaderHi: s.print_header_hi || '',
+    printFooterEn: s.print_footer_en || '',
+    printFooterHi: s.print_footer_hi || '',
+    receiptCycle: s.receipt_cycle || 'financial_year',
+    consultationValidityDays: Number(s.consultation_validity_days || 7),
+    logoUrl: logoUrl(store),
     hospitalTagline: s.hospital_tagline || '',
     hospitalAddress: s.hospital_address || '',
     hospitalPhone: s.hospital_phone || '',

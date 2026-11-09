@@ -219,7 +219,6 @@ shared "reception" login, because the audit trail identifies who did what:
 |---|---|
 | Administrator | 1–2 people only (you and a deputy) |
 | Doctor | Each consulting doctor |
-| Nurse | Nursing / triage staff |
 | Reception | Front desk staff |
 
 Passwords are set by the administrator at creation and must be changed at first sign-in.

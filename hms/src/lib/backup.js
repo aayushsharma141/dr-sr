@@ -113,6 +113,20 @@ function createBackup(ctx, { kind = 'manual', note = null, actorId = null } = {}
   };
 }
 
+/**
+ * Writes an encrypted backup file without adding a row to the backups table.
+ * Used before a schema upgrade, when the table itself may be about to change;
+ * the caller records the row once the upgrade has finished.
+ */
+function writeUnrecordedBackup(ctx, { kind = 'pre_upgrade', note = null } = {}) {
+  const { archive, manifest } = buildArchive(ctx, { kind, note });
+  const encrypted = encryptBuffer(archive, ctx.keys.backup);
+  const filename = `kalyan-${stamp()}-${crypto.randomBytes(3).toString('hex')}.khb`;
+  fs.mkdirSync(ctx.config.paths.backups, { recursive: true });
+  fs.writeFileSync(path.join(ctx.config.paths.backups, filename), encrypted, { mode: 0o600 });
+  return { filename, sizeBytes: encrypted.length, sha256: sha256hex(encrypted), note, manifest };
+}
+
 function pruneBackups(ctx) {
   const keep = Number(ctx.store.getSetting('backup_retention', '30')) || 30;
   const rows = ctx.db.prepare("SELECT * FROM backups WHERE status = 'ok' ORDER BY created_at DESC").all();
@@ -167,4 +181,6 @@ function extractBackupFile(fileBuffer, passphrase, targetDir) {
   return { manifest, fileCount: entries.length };
 }
 
-module.exports = { createBackup, pruneBackups, exportBackup, extractBackupFile, buildArchive };
+module.exports = {
+  createBackup, pruneBackups, exportBackup, extractBackupFile, buildArchive, writeUnrecordedBackup,
+};

@@ -2,12 +2,13 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { boot, setupAdmin, makeStaff } = require('../test-support/helpers');
+const { boot, setupAdmin, makeStaff, userVersion } = require('../test-support/helpers');
 
 test('authentication and sessions', async (t) => {
   const env = await boot();
   t.after(() => env.close());
-  const { client: admin } = await setupAdmin(env);
+  const { client: admin, user: adminUser } = await setupAdmin(env);
+  await makeStaff(env, admin, { username: 'desk0', role: 'reception', password: 'Sunrise-Desk-2026!' });
 
   await t.test('wrong password does not reveal whether the account exists', async () => {
     const c = env.client();
@@ -32,7 +33,7 @@ test('authentication and sessions', async (t) => {
 
   await t.test('a cookie-authenticated write without a CSRF token is rejected', async () => {
     const c = env.client();
-    await c.login('admin', 'Sunrise-Clinic-2026!');
+    await c.login('desk0', 'Sunrise-Desk-2026!');
     const blocked = await c.request('POST', '/api/patients', {
       body: { firstName: 'Csrf', lastName: 'Probe', dob: '1990-01-01', phone: '9000000001' },
       cookieAuth: true,
@@ -58,7 +59,7 @@ test('authentication and sessions', async (t) => {
     const { client: reception } = await makeStaff(env, admin, { username: 'reception1', role: 'reception' });
 
     const patient = await reception.post('/api/patients', {
-      firstName: 'Ravi', lastName: 'Patil', dob: '1985-03-02', sex: 'male', phone: '9812345678',
+      firstName: 'Ravi', lastName: 'Kumar', dob: '1985-03-02', sex: 'male', phone: '9812345678',
     });
     assert.equal(patient.status, 201, 'reception can register patients');
 
@@ -77,29 +78,40 @@ test('authentication and sessions', async (t) => {
     assert.equal(note.status, 403, 'reception cannot write clinical notes');
   });
 
+  await t.test('the nurse role no longer exists (ADR-17)', async () => {
+    const res = await admin.post('/api/admin/users', {
+      username: 'nurse9', fullName: 'Synthetic Nurse', role: 'nurse', password: 'Sunrise-Staff-2026!',
+    });
+    assert.equal(res.status, 400);
+    const roles = (await admin.get('/api/admin/users')).body.roles.map((r) => r.role).sort();
+    assert.deepEqual(roles, ['admin', 'doctor', 'reception']);
+  });
+
   await t.test('changing a password revokes other sessions', async () => {
-    const { client: nurse } = await makeStaff(env, admin, {
-      username: 'nurse1', role: 'nurse', password: 'Sunrise-Nurse-2026!',
+    const { client: desk } = await makeStaff(env, admin, {
+      username: 'desk2', role: 'reception', password: 'Sunrise-Front2-2026!',
     });
     const otherTab = env.client();
-    await otherTab.login('nurse1', 'Sunrise-Nurse-2026!');
+    await otherTab.login('desk2', 'Sunrise-Front2-2026!');
 
-    const change = await nurse.post('/api/auth/change-password', {
-      currentPassword: 'Sunrise-Nurse-2026!',
-      newPassword: 'Sunrise-Nurse-2027!',
+    const change = await desk.post('/api/auth/change-password', {
+      currentPassword: 'Sunrise-Front2-2026!',
+      newPassword: 'Sunrise-Front2-2027!',
     });
     assert.equal(change.status, 200);
 
     const stale = await otherTab.get('/api/auth/me');
     assert.equal(stale.status, 401, 'the other session is no longer valid');
-    const current = await nurse.get('/api/auth/me');
+    const current = await desk.get('/api/auth/me');
     assert.equal(current.status, 200, 'the session that changed the password survives');
   });
 
   await t.test('deactivating a user kills their sessions immediately', async () => {
     const { client: doctor, user } = await makeStaff(env, admin, { username: 'doctor1', role: 'doctor' });
     assert.equal((await doctor.get('/api/auth/me')).status, 200);
-    const deactivate = await admin.patch(`/api/admin/users/${user.id}`, { isActive: false });
+    const deactivate = await admin.patch(`/api/admin/users/${user.id}`, {
+      isActive: false, version: await userVersion(admin, user.id),
+    });
     assert.equal(deactivate.status, 200);
     assert.equal((await doctor.get('/api/auth/me')).status, 401);
     const login = await env.client().post('/api/auth/login', { username: 'doctor1', password: 'Sunrise-Staff-2026!' });
@@ -107,11 +119,23 @@ test('authentication and sessions', async (t) => {
   });
 
   await t.test('an admin cannot deactivate themselves or drop the last admin', async () => {
-    const me = await admin.get('/api/auth/me');
-    const self = await admin.patch(`/api/admin/users/${me.body.user.id}`, { isActive: false });
+    const version = await userVersion(admin, adminUser.id);
+    const self = await admin.patch(`/api/admin/users/${adminUser.id}`, { isActive: false, version });
     assert.equal(self.status, 409);
-    const demote = await admin.patch(`/api/admin/users/${me.body.user.id}`, { role: 'reception' });
+    const demote = await admin.patch(`/api/admin/users/${adminUser.id}`, { role: 'reception', version });
     assert.equal(demote.status, 409);
+  });
+
+  await t.test('an account locks after five wrong passwords (D-07)', async () => {
+    await makeStaff(env, admin, { username: 'desk3', role: 'reception', password: 'Sunrise-Front3-2026!' });
+    const c = env.client();
+    const statuses = [];
+    for (let i = 0; i < 5; i += 1) {
+      statuses.push((await c.post('/api/auth/login', { username: 'desk3', password: `wrong-${i}-xyz` })).status);
+    }
+    assert.deepEqual(statuses, [401, 401, 401, 401, 423]);
+    const right = await c.post('/api/auth/login', { username: 'desk3', password: 'Sunrise-Front3-2026!' });
+    assert.equal(right.status, 423, 'even the right password is refused while locked');
   });
 
   await t.test('logout invalidates the token', async () => {

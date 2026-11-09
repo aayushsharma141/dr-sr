@@ -3,7 +3,7 @@
 const express = require('express');
 
 const { Validator, ApiError, pagination, likePattern } = require('../lib/http');
-const { audit, idParam } = require('../lib/request');
+const { audit, idParam, expectedVersion, updateVersioned } = require('../lib/request');
 const { mapPatient } = require('../lib/domain');
 const { requirePerm } = require('../auth');
 
@@ -78,7 +78,8 @@ module.exports = function patientRoutes(ctx) {
       ...mapPatient(row),
       visitCount: row.visit_count,
       lastVisitAt: row.last_visit_at,
-      balancePaise: row.balance_paise,
+      // Doctors have no billing access (ADR-23).
+      balancePaise: req.user.permissions.includes('billing.read') ? row.balance_paise : null,
     }));
 
     if (q) {
@@ -193,7 +194,8 @@ module.exports = function patientRoutes(ctx) {
         recordedByName: a.recorded_by_name, createdAt: a.created_at,
       }));
 
-    const conditions = db
+    const can = (perm) => req.user.permissions.includes(perm);
+    const conditions = !can('clinical.read') ? [] : db
       .prepare(
         `SELECT c.*, u.full_name AS recorded_by_name FROM patient_conditions c
          LEFT JOIN users u ON u.id = c.recorded_by
@@ -205,19 +207,21 @@ module.exports = function patientRoutes(ctx) {
         notes: c.notes, recordedByName: c.recorded_by_name, createdAt: c.created_at,
       }));
 
-    const latestVitals = db
+    // Vitals and the problem list are clinical content (D-04 / EG-16).
+    const latestVitals = !can('clinical.read') ? null : db
       .prepare('SELECT * FROM vitals WHERE patient_id = ? ORDER BY recorded_at DESC LIMIT 1')
       .get(id);
 
     const stats = {
       visitCount: db.prepare('SELECT COUNT(*) AS n FROM visits WHERE patient_id = ?').get(id).n,
       openVisit: db
-        .prepare("SELECT id, visit_no FROM visits WHERE patient_id = ? AND status = 'open' ORDER BY id DESC LIMIT 1")
+        .prepare("SELECT id, visit_no, doctor_id FROM visits WHERE patient_id = ? AND status = 'open' ORDER BY id DESC LIMIT 1")
         .get(id) || null,
-      balancePaise: db
+      // Doctors have no billing access (ADR-23); Admin has no document access.
+      balancePaise: !can('billing.read') ? null : db
         .prepare("SELECT COALESCE(SUM(balance_paise),0) AS n FROM invoices WHERE patient_id = ? AND status <> 'void'")
         .get(id).n,
-      documentCount: db
+      documentCount: !can('attachment.read') ? null : db
         .prepare('SELECT COUNT(*) AS n FROM attachments WHERE patient_id = ? AND is_deleted = 0')
         .get(id).n,
     };
@@ -249,6 +253,7 @@ module.exports = function patientRoutes(ctx) {
     if (!row) throw new ApiError(404, 'Patient not found.');
 
     const v = new Validator(req.body);
+    const version = expectedVersion(v);
     const f = buildPatientFields(v, { partial: true });
     v.throwIfInvalid();
 
@@ -277,8 +282,7 @@ module.exports = function patientRoutes(ctx) {
     patch.updated_by = req.user.id;
     patch.updated_at = new Date().toISOString();
 
-    const setSql = Object.keys(patch).map((c) => `${c} = @${c}`).join(', ');
-    db.prepare(`UPDATE patients SET ${setSql} WHERE id = @id`).run({ ...patch, id });
+    updateVersioned(db, 'patients', id, version, patch);
 
     const changed = Object.keys(patch).filter((k) => !['updated_at', 'updated_by', 'full_name'].includes(k));
     audit(ctx, req, {
@@ -295,9 +299,6 @@ module.exports = function patientRoutes(ctx) {
     const id = idParam(req);
     const row = db.prepare('SELECT * FROM patients WHERE id = ?').get(id);
     if (!row) throw new ApiError(404, 'Patient not found.');
-    if (req.user.role !== 'admin' && req.user.role !== 'doctor' && req.user.role !== 'reception') {
-      throw new ApiError(403, 'You cannot archive patient records.');
-    }
     const openVisit = db.prepare("SELECT id FROM visits WHERE patient_id = ? AND status = 'open'").get(id);
     if (openVisit) throw new ApiError(409, 'Close the open visit before archiving this patient.');
 
@@ -427,7 +428,7 @@ module.exports = function patientRoutes(ctx) {
           subtitle: [n.author_name, (n.body || '').slice(0, 90)].filter(Boolean).join(' · '),
           noteId: n.id,
           visitId: n.visit_id,
-          status: n.signed_at ? 'signed' : 'draft',
+          status: n.cancelled_at ? 'cancelled' : n.signed_at ? 'signed' : 'draft',
         });
       }
       for (const d of db
@@ -437,13 +438,15 @@ module.exports = function patientRoutes(ctx) {
           type: 'diagnosis',
           at: d.created_at,
           title: d.description,
-          subtitle: [d.code, d.kind].filter(Boolean).join(' · '),
+          subtitle: [d.code, d.kind, d.cancelled_at ? 'cancelled' : null].filter(Boolean).join(' · '),
           visitId: d.visit_id,
+          status: d.cancelled_at ? 'cancelled' : undefined,
         });
       }
     }
 
-    for (const a of db
+    const canSee = (perm) => req.user.permissions.includes(perm);
+    for (const a of !canSee('attachment.read') ? [] : db
       .prepare('SELECT * FROM attachments WHERE patient_id = ? AND is_deleted = 0 ORDER BY created_at DESC LIMIT 50')
       .all(id)) {
       events.push({
@@ -455,7 +458,7 @@ module.exports = function patientRoutes(ctx) {
       });
     }
 
-    for (const i of db
+    for (const i of !canSee('billing.read') ? [] : db
       .prepare('SELECT * FROM invoices WHERE patient_id = ? ORDER BY created_at DESC LIMIT 50')
       .all(id)) {
       events.push({

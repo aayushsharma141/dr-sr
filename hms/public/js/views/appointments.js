@@ -87,9 +87,9 @@ export default async function appointmentsView(root, { query, navigate }) {
                   ${!a.visitId && canVisit && ['scheduled', 'no_show'].includes(a.status)
                     ? `<button class="btn btn--sm btn--primary" data-checkin="${a.id}">Check in</button>` : ''}
                   ${canWrite && a.status === 'scheduled' && !a.visitId
-                    ? `<button class="btn btn--sm" data-status="no_show" data-id="${a.id}">No show</button>` : ''}
+                    ? `<button class="btn btn--sm" data-status="no_show" data-id="${a.id}" data-version="${a.version}">No show</button>` : ''}
                   ${canWrite && ['scheduled', 'arrived'].includes(a.status)
-                    ? `<button class="icon-btn" data-status="cancelled" data-id="${a.id}" title="Cancel appointment">${ui.icon('ban', 15)}</button>` : ''}
+                    ? `<button class="icon-btn" data-status="cancelled" data-id="${a.id}" data-version="${a.version}" title="Cancel appointment">${ui.icon('ban', 15)}</button>` : ''}
                 </div>
               </td>
             </tr>`).join('')}
@@ -137,7 +137,7 @@ export default async function appointmentsView(root, { query, navigate }) {
     button.addEventListener('click', async () => {
       const status = button.dataset.status;
       try {
-        await api.patch(`/api/appointments/${button.dataset.id}`, { status });
+        await api.patch(`/api/appointments/${button.dataset.id}`, { status, version: Number(button.dataset.version) });
         ui.toastOk(status === 'cancelled' ? 'Appointment cancelled.' : 'Appointment updated.');
         go({});
       } catch (err) { ui.toastError(err.message); }

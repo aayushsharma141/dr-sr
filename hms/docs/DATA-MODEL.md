@@ -56,7 +56,8 @@ settings, app_meta                         (key/value state)
 ## 3. Tables
 
 ### `users`
-Staff accounts. `role` ∈ `admin | doctor | nurse | reception`. `password_hash` is
+Staff accounts. `role` ∈ `admin | doctor | reception` (ADR-17; schema v2 triggers refuse `nurse`, and
+any nurse account from an old demo database is switched off, not deleted). `password_hash` is
 `scrypt$N$r$p$salt$hash`; there is no plaintext or reversible form anywhere.
 `must_change_password` forces the change-password dialog at first sign-in.
 `failed_login_count` / `locked_until` implement account lockout. Deactivated users
@@ -65,7 +66,8 @@ Staff accounts. `role` ∈ `admin | doctor | nurse | reception`. `password_hash`
 ### `sessions`
 One row per signed-in browser. `token_hash` = SHA-256 of the bearer token (the token itself is
 never stored). `csrf_token` must accompany cookie-authenticated writes. `expires_at` is the
-absolute limit; `last_seen_at` drives the 20-minute idle timeout. Rows are purged on expiry and
+absolute limit; `last_seen_at` drives the idle timeout (30 minutes by default, decision D-07;
+the administrator can change it in Settings). Rows are purged on expiry and
 whenever the user's password changes or the account is disabled.
 
 ### `patients`
@@ -91,15 +93,19 @@ impossible values (e.g. SpO₂ > 100, temperature outside 25–45 °C). Rows are
 a mistake is corrected by recording a new set, preserving what the machine actually measured.
 
 ### `clinical_notes`
-Free-text notes typed as `consultation | progress | nursing | procedure | discharge | other`.
-`signed_at`/`signed_by` make a note **immutable**: the API refuses further edits after signing
-(`409`). This is the medico-legal record of what the clinician attested to.
+Free-text notes typed as `consultation | progress | procedure | discharge | other` (`nursing`
+only in old demo data). `signed_at`/`signed_by` make a note **immutable**: the API refuses further
+edits after signing (`409`) and a database trigger refuses any change to a signed note. This is the
+medico-legal record of what the clinician attested to. An unsigned draft can be withdrawn by its
+author: `cancelled_at`, `cancelled_by` and `cancel_reason` are set and the note stays on the record.
 
 ### `diagnoses` / `prescriptions`
 Structured entries belonging to a visit. Diagnoses carry an optional ICD-10 `code` and a
 `kind` (primary / secondary / provisional). Prescriptions are one row per drug with strength,
 form, dose, route, frequency, duration and instructions — the prescription sheet is generated
-from these rows, not from free text.
+from these rows, not from free text. A wrong entry is **cancelled with a reason** (`cancelled_at`,
+`cancelled_by`, `cancel_reason`) while the visit is open; it stays visible, struck through, and is
+left off printed prescriptions.
 
 ### `attachments`
 Documents (lab reports, scans, consents). The file itself is **not** in the database: `stored_name`
@@ -138,13 +144,29 @@ hash = sha256(prev_hash ‖ at ‖ actor_id ‖ action ‖ entity_type ‖ entit
 every later hash. `npm run audit:verify` and `GET /api/admin/audit/verify` recompute the chain.
 
 ### `backups`
-Metadata for each archive: `filename`, `kind` ∈ `manual | scheduled | pre_restore`, size,
-SHA-256 of the encrypted file, and who triggered it.
+Metadata for each archive: `filename`, `kind` ∈ `manual | scheduled | pre_restore | pre_upgrade`,
+size, SHA-256 of the encrypted file, and who triggered it. `pre_upgrade` archives are written
+automatically before a schema upgrade of a database that holds data.
 
 ### `settings` / `app_meta`
-`settings` holds non-secret clinic configuration (name, address, phone, disclaimer, session
-timeout, backup hour/retention, `synthetic_data` flag). `app_meta` holds internal state:
-`setup_completed`, number sequences, the hashed bootstrap code and its expiry.
+`settings` holds non-secret clinic configuration: English and Hindi hospital and trust names,
+location line, both clinic addresses (English and Hindi), print header and footer lines,
+`receipt_cycle` (`financial_year` by default, D-05), `consultation_validity_days`, phone,
+disclaimer, session timeout, backup retention and the `synthetic_data` flag. All settings share
+one version counter (`app_meta.settings_version`). `app_meta` holds internal state:
+`schema_version`, `setup_completed`, number sequences, the hashed bootstrap code and its expiry,
+and the uploaded logo (`branding_logo`, base64, so it is inside every backup).
+
+### Versions and edit conflicts
+`patients`, `visits`, `appointments`, `clinical_notes`, `users` and `services` carry a `version`.
+Triggers increase it whenever a user-editable column changes; every edit (`PATCH`) must send the
+version it last saw, and a stale edit is refused with `409 version_conflict` (decision D-08).
+
+### Schema versions
+`src/schema.sql` is the frozen v1 baseline. Each later change is a numbered file in
+`src/migrations` (`002-phase1-foundations.sql`, …), applied in order at start-up, each in its own
+transaction. A database that already holds staff accounts is first backed up (`pre_upgrade`).
+A database newer than the application is refused.
 
 ---
 
@@ -152,43 +174,55 @@ timeout, backup hour/retention, `synthetic_data` flag). `app_meta` holds interna
 
 Roles are fixed; permissions are checked server-side on every request (`requirePerm`).
 
-| Permission | Admin | Doctor | Nurse | Reception |
-|---|:--:|:--:|:--:|:--:|
-| `patient.read` | ✅ | ✅ | ✅ | ✅ |
-| `patient.write` | ✅ | ✅ | — | ✅ |
-| `clinical.read` | ✅ | ✅ | ✅ | — |
-| `clinical.write` | ✅ | ✅ | ✅ | — |
-| `vitals.write` | ✅ | ✅ | ✅ | ✅ ¹ |
-| `visit.read` | ✅ | ✅ | ✅ | ✅ |
-| `visit.write` | ✅ | ✅ | ✅ | ✅ |
-| `attachment.read` / `attachment.write` | ✅ | ✅ | ✅ | ✅ |
-| `appointment.read` | ✅ | ✅ | ✅ | ✅ |
-| `appointment.write` | ✅ | ✅ | — | ✅ |
-| `billing.read` | ✅ | ✅ | — | ✅ |
-| `billing.write` | ✅ | — | — | ✅ |
-| `billing.void` | ✅ | — | — | — |
-| `report.read` | ✅ | ✅ | — | ✅ |
-| `export.data` | ✅ | — | — | — |
-| `user.manage` | ✅ | — | — | — |
-| `audit.read` | ✅ | — | — | — |
-| `backup.manage` | ✅ | — | — | — |
-| `settings.manage` | ✅ | — | — | — |
+Ported from the approved v3 matrix (tag `v3-fastapi-final`, `core/permissions.py`): ADR-17
+(three roles), D-04 / EG-16 (Admin and Reception see no clinical content), ADR-23 (Reception is
+the only role that takes money; Doctors have no billing access) and D-06 (Admin-only reversals).
 
-¹ Reception may record vitals at check-in (weight/BP in the queue); the route permits
-`vitals.write` or `clinical.write`.
+| Permission | Admin | Doctor | Reception |
+|---|:--:|:--:|:--:|
+| `patient.read` | ✅ | ✅ | ✅ |
+| `patient.write` (register, edit demographics, archive) | — | — | ✅ |
+| `clinical.read` | — | ✅ | — |
+| `clinical.write` (own visits only, see below) | — | ✅ | — |
+| `vitals.write` (own visits only) | — | ✅ | — |
+| `visit.read` | ✅ | ✅ | ✅ |
+| `visit.write` (open visits, assign doctor) | — | ✅ | ✅ |
+| `attachment.read` / `attachment.write` ¹ | — | ✅ | ✅ |
+| `appointment.read` | ✅ | ✅ | ✅ |
+| `appointment.write` | — | ✅ | ✅ |
+| `billing.read` | ✅ | — | ✅ |
+| `invoice.write` | — | — | ✅ |
+| `payment.collect` | — | — | ✅ |
+| `payment.reverse` | ✅ | — | — |
+| `billing.catalogue` (services and fees) | ✅ | — | — |
+| `report.read` | ✅ | — | ✅ |
+| `export.data` | ✅ | — | — |
+| `user.manage` · `audit.read` · `backup.manage` · `settings.manage` | ✅ | — | — |
+
+¹ Who may open lab and imaging documents is open decision D6 (plan task SW-28).
+
+**Edit-own.** A doctor reads every chart (read scope D2 still awaits sign-off) but writes vitals,
+notes, diagnoses and prescriptions, cancels entries and closes a visit only when the visit is
+assigned to them and still open. A visit with no doctor assigned cannot be written to.
 
 The UI mirrors this table through `session.can(...)` — a hidden button is a convenience, the API
-check is the real control. A reception user opening a chart sees demographics, visits, documents
-and billing, but no clinical tabs, and direct calls to clinical endpoints return `403`.
+check is the real control. Reception and Admin opening a chart see demographics, visits, documents
+(Reception only) and billing, but no vitals, problem list or clinical tabs; direct calls to clinical
+endpoints return `403` and visit responses leave the clinical fields out.
 
 ---
 
 ## 5. Data integrity rules enforced in code
 
 * A visit must belong to the patient in the URL; mismatches are rejected.
-* Notes, diagnoses and prescriptions cannot be added to a **closed** visit.
-* A signed note is read-only; unsigned notes can be edited only by their author (admins may
-  delete).
+* Notes, diagnoses, prescriptions and vitals cannot be added to a **closed** visit.
+* A signed note is read-only; unsigned notes can be edited, signed or cancelled only by their
+  author.
+* Clinical rows (notes, diagnoses, prescriptions, vitals) and financial rows (invoices, lines,
+  payments) are never deleted: database triggers refuse `DELETE`, and wrong entries are cancelled
+  or voided with a reason.
+* Doctors write only to visits assigned to them; an admin account is never a valid doctor.
+* Every edit carries the version it last saw; a stale edit gets `409 version_conflict`.
 * `payments.amount_paise` must be > 0 and ≤ the invoice balance; overpayment returns `422`.
 * An invoice with any payment cannot be voided until those payments are voided first.
 * Voiding requires a reason of at least 5 characters and is audited.

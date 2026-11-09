@@ -100,6 +100,14 @@ svg { display: block; }
   box-shadow: inset 0 -2px 0 rgba(0,0,0,.12);
 }
 .brand-mark--lg { width: 46px; height: 46px; font-size: 26px; border-radius: 12px; }
+.brand-mark--logo { background: #fff; padding: 3px; box-shadow: none; }
+.brand-mark--logo img { width: 100%; height: 100%; object-fit: contain; border-radius: 6px; }
+.sidebar .brand-mark.brand-mark--logo { background: #fff; }
+
+/* Cancelled clinical entries stay on the record, visibly struck through (SW-12). */
+.is-cancelled { opacity: .62; }
+.is-cancelled .strike { text-decoration: line-through; }
+.cancel-note { color: var(--danger); }
 
 /* ------------------------------------------------------------ auth screen - */
 .auth-shell {

@@ -13,6 +13,7 @@
  * through HTTP.
  */
 const express = require('express');
+const { logoUrl } = require('./branding');
 
 const { ApiError, Validator } = require('../lib/http');
 const { audit } = require('../lib/request');
@@ -53,6 +54,9 @@ module.exports = function bootstrapRoutes(ctx) {
     res.json({
       setupRequired: required,
       hospitalName: ctx.store.getSetting('hospital_name', 'Kalyan Hospital'),
+      hospitalNameHi: ctx.store.getSetting('hospital_name_hi', ''),
+      hospitalTagline: ctx.store.getSetting('hospital_tagline', ''),
+      logoUrl: logoUrl(ctx.store),
       version: ctx.config.version,
     });
   });

@@ -2,7 +2,7 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { boot, setupAdmin, makeStaff, createPatient } = require('../test-support/helpers');
+const { boot, setupAdmin, makeStaff, createPatient, makeTeam } = require('../test-support/helpers');
 
 const rupees = (p) => Math.round(p * 100);
 
@@ -10,6 +10,8 @@ test('billing and payments', async (t) => {
   const env = await boot();
   t.after(() => env.close());
   const { client: admin } = await setupAdmin(env);
+  // ADR-23: reception raises invoices and collects; admin manages fees and reverses.
+  const { reception: desk, doctor } = await makeTeam(env, admin);
 
   let patient;
   let invoice;
@@ -20,7 +22,7 @@ test('billing and payments', async (t) => {
   });
 
   await t.test('an invoice is built from catalogue items', async () => {
-    patient = await createPatient(admin, { firstName: 'Meera', lastName: 'Joshi', phone: '9877000111' });
+    patient = await createPatient(desk, { firstName: 'Meera', lastName: 'Joshi', phone: '9877000111' });
     for (const service of [
       { code: 'CONS-PHYSIO', name: 'Physiotherapy consultation', category: 'Consultation', pricePaise: rupees(300) },
       { code: 'PT-SESSION', name: 'Physiotherapy session', category: 'Physiotherapy', pricePaise: rupees(200) },
@@ -32,7 +34,7 @@ test('billing and payments', async (t) => {
     const consult = services.body.services.find((s) => s.code === 'CONS-PHYSIO');
     const session = services.body.services.find((s) => s.code === 'PT-SESSION');
 
-    const res = await admin.post('/api/invoices', {
+    const res = await desk.post('/api/invoices', {
       patientId: patient.id,
       items: [
         { serviceId: consult.id, qty: 1 },
@@ -53,17 +55,17 @@ test('billing and payments', async (t) => {
   });
 
   await t.test('invalid invoices are refused', async () => {
-    const noItems = await admin.post('/api/invoices', { patientId: patient.id, items: [] });
+    const noItems = await desk.post('/api/invoices', { patientId: patient.id, items: [] });
     assert.equal(noItems.status, 400);
 
-    const overDiscount = await admin.post('/api/invoices', {
+    const overDiscount = await desk.post('/api/invoices', {
       patientId: patient.id,
       items: [{ description: 'X', qty: 1, unitPricePaise: 1000 }],
       discountPaise: 5000,
     });
     assert.equal(overDiscount.status, 400);
 
-    const badService = await admin.post('/api/invoices', {
+    const badService = await desk.post('/api/invoices', {
       patientId: patient.id,
       items: [{ serviceId: 99999, qty: 1 }],
     });
@@ -71,7 +73,7 @@ test('billing and payments', async (t) => {
   });
 
   await t.test('partial payments move the invoice to partially paid', async () => {
-    const res = await admin.post(`/api/invoices/${invoice.id}/payments`, {
+    const res = await desk.post(`/api/invoices/${invoice.id}/payments`, {
       amountPaise: rupees(300), method: 'cash',
     });
     assert.equal(res.status, 201, JSON.stringify(res.body));
@@ -81,26 +83,26 @@ test('billing and payments', async (t) => {
   });
 
   await t.test('overpayment and unreferenced card payments are refused', async () => {
-    const over = await admin.post(`/api/invoices/${invoice.id}/payments`, {
+    const over = await desk.post(`/api/invoices/${invoice.id}/payments`, {
       amountPaise: invoice.totalPaise, method: 'cash',
     });
     assert.equal(over.status, 400);
     assert.match(over.body.error.details[0].message, /outstanding balance/);
 
-    const noRef = await admin.post(`/api/invoices/${invoice.id}/payments`, {
+    const noRef = await desk.post(`/api/invoices/${invoice.id}/payments`, {
       amountPaise: rupees(10), method: 'upi',
     });
     assert.equal(noRef.status, 400);
     assert.equal(noRef.body.error.details[0].field, 'reference');
 
-    const zero = await admin.post(`/api/invoices/${invoice.id}/payments`, { amountPaise: 0, method: 'cash' });
+    const zero = await desk.post(`/api/invoices/${invoice.id}/payments`, { amountPaise: 0, method: 'cash' });
     assert.equal(zero.status, 400);
   });
 
   await t.test('paying the balance closes the invoice', async () => {
     const detail = await admin.get(`/api/invoices/${invoice.id}`);
     const balance = detail.body.invoice.balancePaise;
-    const res = await admin.post(`/api/invoices/${invoice.id}/payments`, {
+    const res = await desk.post(`/api/invoices/${invoice.id}/payments`, {
       amountPaise: balance, method: 'upi', reference: 'UPI-778812',
     });
     assert.equal(res.status, 201);
@@ -109,12 +111,12 @@ test('billing and payments', async (t) => {
   });
 
   await t.test('voiding is ordered and audited', async () => {
-    const res = await admin.post('/api/invoices', {
+    const res = await desk.post('/api/invoices', {
       patientId: patient.id,
       items: [{ description: 'Consultation', qty: 1, unitPricePaise: rupees(500) }],
     });
     const second = res.body.invoice;
-    const pay = await admin.post(`/api/invoices/${second.id}/payments`, { amountPaise: rupees(200), method: 'cash' });
+    const pay = await desk.post(`/api/invoices/${second.id}/payments`, { amountPaise: rupees(200), method: 'cash' });
 
     const voidInvoice = await admin.post(`/api/invoices/${second.id}/void`, { reason: 'Raised in error' });
     assert.equal(voidInvoice.status, 409, 'cannot void an invoice that still has payments');
@@ -133,7 +135,7 @@ test('billing and payments', async (t) => {
     const ok = await admin.post(`/api/invoices/${second.id}/void`, { reason: 'Raised in error' });
     assert.equal(ok.status, 200);
 
-    const payOnVoid = await admin.post(`/api/invoices/${second.id}/payments`, { amountPaise: 100, method: 'cash' });
+    const payOnVoid = await desk.post(`/api/invoices/${second.id}/payments`, { amountPaise: 100, method: 'cash' });
     assert.equal(payOnVoid.status, 409);
   });
 
@@ -150,7 +152,7 @@ test('billing and payments', async (t) => {
   });
 
   await t.test('patient balance and outstanding list agree', async () => {
-    const unpaid = await admin.post('/api/invoices', {
+    const unpaid = await desk.post('/api/invoices', {
       patientId: patient.id,
       items: [{ description: 'Pending lab work', qty: 1, unitPricePaise: rupees(500) }],
     });
@@ -180,8 +182,40 @@ test('billing and payments', async (t) => {
     assert.equal(voidAttempt.status, 403, 'voiding requires billing.void');
   });
 
+  await t.test('only reception collects money; doctors have no billing access (ADR-23)', async () => {
+    const res = await desk.post('/api/invoices', {
+      patientId: patient.id,
+      items: [{ description: 'Physiotherapy session', qty: 1, unitPricePaise: rupees(200) }],
+    });
+    assert.equal(res.status, 201);
+    const byAdmin = await admin.post(`/api/invoices/${res.body.invoice.id}/payments`, { amountPaise: rupees(200), method: 'cash' });
+    assert.equal(byAdmin.status, 403, 'admin reverses payments but never takes them');
+    const adminInvoice = await admin.post('/api/invoices', {
+      patientId: patient.id, items: [{ description: 'X', qty: 1, unitPricePaise: 100 }],
+    });
+    assert.equal(adminInvoice.status, 403);
+    const fee = await desk.post('/api/services', { name: 'Desk-made fee', pricePaise: 100 });
+    assert.equal(fee.status, 403, 'fees are set by the administrator');
+
+    for (const url of ['/api/invoices', `/api/invoices/${res.body.invoice.id}`, '/api/billing/outstanding', '/api/services']) {
+      assert.equal((await doctor.get(url)).status, 403, url);
+    }
+    const byDoctor = await doctor.post(`/api/invoices/${res.body.invoice.id}/payments`, { amountPaise: rupees(200), method: 'cash' });
+    assert.equal(byDoctor.status, 403);
+  });
+
+  await t.test('a fee change needs the version the administrator last saw', async () => {
+    const list = (await admin.get('/api/services')).body.services;
+    const svc = list.find((x) => x.code === 'PT-SESSION');
+    const first = await admin.patch(`/api/services/${svc.id}`, { pricePaise: rupees(220), version: svc.version });
+    assert.equal(first.status, 200);
+    const stale = await admin.patch(`/api/services/${svc.id}`, { pricePaise: rupees(240), version: svc.version });
+    assert.equal(stale.status, 409);
+    assert.equal(stale.body.error.code, 'version_conflict');
+  });
+
   await t.test('a zero-value invoice is recorded as paid', async () => {
-    const res = await admin.post('/api/invoices', {
+    const res = await desk.post('/api/invoices', {
       patientId: patient.id,
       items: [{ description: 'Free follow-up', qty: 1, unitPricePaise: 0, serviceId: null }],
     });

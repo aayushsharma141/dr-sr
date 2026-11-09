@@ -74,7 +74,7 @@ export default async function patientView(root, { params, query, navigate }) {
                   : `<button class="btn btn--primary" data-action="new-visit">${ui.icon('stethoscope')}<span>New visit</span></button>`)
               : ''}
             ${session.can('appointment.write') ? `<button class="btn" data-action="book">${ui.icon('calendar')}<span>Book</span></button>` : ''}
-            ${session.can('billing.write') ? `<button class="btn" data-action="invoice">${ui.icon('receipt')}<span>Bill</span></button>` : ''}
+            ${session.can('invoice.write') ? `<button class="btn" data-action="invoice">${ui.icon('receipt')}<span>Bill</span></button>` : ''}
             ${session.can('patient.write') ? `<button class="btn" data-action="edit">${ui.icon('edit')}<span>Edit</span></button>` : ''}
           </div>
         </div>
@@ -147,6 +147,8 @@ export default async function patientView(root, { params, query, navigate }) {
   async function renderOverview() {
     const c = state.chart;
     const v = c.latestVitals;
+    const canRecordAllergy = session.can('clinical.write') || session.can('patient.write');
+    const myOpenVisit = c.stats.openVisit && c.stats.openVisit.doctor_id === session.user?.id ? c.stats.openVisit : null;
     body.innerHTML = `
       <div class="grid grid--sidebar">
         <div class="col">
@@ -172,11 +174,11 @@ export default async function patientView(root, { params, query, navigate }) {
             </div>
           </section>
 
-          ${session.can('clinical.read') ? `
+          ${session.can('clinical.read') || session.can('patient.write') ? `
           <section class="card">
             <div class="card-head">
-              <div class="grow"><h2>Allergies &amp; conditions</h2></div>
-              ${session.can('clinical.write') ? '<button class="btn btn--sm" data-action="add-allergy">Add allergy</button>' : ''}
+              <div class="grow"><h2>${session.can('clinical.read') ? 'Allergies &amp; conditions' : 'Allergies'}</h2></div>
+              ${canRecordAllergy ? '<button class="btn btn--sm" data-action="add-allergy">Add allergy</button>' : ''}
             </div>
             <div class="card-body">
               ${c.allergies.length || c.conditions.length ? `
@@ -188,7 +190,7 @@ export default async function patientView(root, { params, query, navigate }) {
                         <span class="strong sm">${ui.esc(a.substance)}</span>
                         ${ui.severityPill(a.severity)}
                         ${a.reaction ? `<span class="muted xs">${ui.esc(a.reaction)}</span>` : ''}
-                        ${session.can('clinical.write') ? `<button class="icon-btn" style="margin-left:auto;width:24px;height:24px" data-remove-allergy="${a.id}" title="Remove">${ui.icon('close', 13)}</button>` : ''}
+                        ${canRecordAllergy ? `<button class="icon-btn" style="margin-left:auto;width:24px;height:24px" data-remove-allergy="${a.id}" title="Remove">${ui.icon('close', 13)}</button>` : ''}
                       </div>`).join('')}
                   </div>` : ''}
                 ${c.conditions.length ? `
@@ -207,10 +209,11 @@ export default async function patientView(root, { params, query, navigate }) {
         </div>
 
         <div class="col">
+          ${session.can('clinical.read') ? `
           <section class="card">
             <div class="card-head">
               <div class="grow"><h2>Latest vitals</h2></div>
-              ${session.can('vitals.write') && c.stats.openVisit ? '<button class="btn btn--sm" data-action="add-vitals">Record</button>' : ''}
+              ${session.can('vitals.write') && myOpenVisit ? '<button class="btn btn--sm" data-action="add-vitals">Record</button>' : ''}
             </div>
             <div class="card-body">
               ${v ? `
@@ -223,9 +226,9 @@ export default async function patientView(root, { params, query, navigate }) {
                   ${vitalTile('Respiratory', v.respRate ? `${v.respRate}/min` : '—', v.respRate > 22)}
                 </div>
                 <div class="muted xs mt-2">Recorded ${ui.esc(ui.fmtDateTime(v.recordedAt))}</div>
-              ` : ui.emptyState({ iconName: 'activity', title: 'No vitals recorded', message: 'Vitals appear here once nursing or the doctor records them.' })}
+              ` : ui.emptyState({ iconName: 'activity', title: 'No vitals recorded', message: 'Vitals appear here once the doctor records them.' })}
             </div>
-          </section>
+          </section>` : ''}
 
           ${session.can('billing.read') ? `
           <section class="card">
@@ -235,10 +238,10 @@ export default async function patientView(root, { params, query, navigate }) {
                 <span class="muted sm">Outstanding balance</span>
                 <span class="money ${c.stats.balancePaise > 0 ? 'money--due' : 'money--ok'}">${ui.inr(c.stats.balancePaise)}</span>
               </div>
-              <div class="row row--between mt-1">
+              ${c.stats.documentCount !== null ? `<div class="row row--between mt-1">
                 <span class="muted sm">Documents on file</span>
                 <span class="sm">${c.stats.documentCount}</span>
-              </div>
+              </div>` : ''}
             </div>
           </section>` : ''}
         </div>
@@ -246,7 +249,7 @@ export default async function patientView(root, { params, query, navigate }) {
     `;
 
     for (const button of body.querySelectorAll('[data-action="add-vitals"]')) {
-      button.addEventListener('click', () => openVitalsForm(c.stats.openVisit.id, reloadChart));
+      button.addEventListener('click', () => openVitalsForm(myOpenVisit.id, reloadChart));
     }
     for (const button of body.querySelectorAll('[data-action="add-allergy"]')) {
       button.addEventListener('click', () => openAllergyForm(patientId, () => { refreshThen(reloadChart); }));
@@ -351,7 +354,14 @@ export default async function patientView(root, { params, query, navigate }) {
     }
     const v = detail.visit;
     const isOpen = v.status === 'open';
-    const canClinical = session.can('clinical.write');
+    const me = session.user?.id;
+    // Doctors write only to visits assigned to them, and only while open (SW-11).
+    const isMine = v.doctorId === me;
+    const canClinical = session.can('clinical.write') && isMine && isOpen;
+    const live = (rows) => (rows || []).filter((r) => !r.cancelledAt);
+    const cancelledLine = (r) => r.cancelledAt
+      ? `<div class="xs cancel-note">Cancelled${r.cancelledByName ? ` by ${ui.esc(r.cancelledByName)}` : ''} · ${ui.esc(ui.fmtDateTime(r.cancelledAt))} — ${ui.esc(r.cancelReason || '')}</div>`
+      : '';
 
     host.innerHTML = `
       <div class="col">
@@ -368,6 +378,12 @@ export default async function patientView(root, { params, query, navigate }) {
               <span class="label">Chief complaint</span>
               <div class="sm">${ui.esc(v.chiefComplaint || 'Not recorded')}</div>
             </div>
+            ${v.outcome || v.dischargeSummary ? `
+              <div class="field mb-2">
+                <span class="label">Outcome</span>
+                <div class="sm">${ui.esc(v.outcome || '—')}${v.followUpDate ? ` · follow-up ${ui.esc(ui.fmtDate(v.followUpDate))}` : ''}</div>
+                ${v.dischargeSummary ? `<div class="sm" style="white-space:pre-wrap">${ui.esc(v.dischargeSummary)}</div>` : ''}
+              </div>` : ''}
             ${(detail.vitals || []).length ? `
               <div class="section-title mb-1">Vitals (${(detail.vitals || []).length})</div>
               <div class="table-wrap mb-2"><table class="table table--compact">
@@ -382,16 +398,18 @@ export default async function patientView(root, { params, query, navigate }) {
                     <td class="muted xs">${ui.esc(vt.recordedByName || '—')}</td>
                   </tr>`).join('')}</tbody>
               </table></div>` : ''}
-            ${session.can('vitals.write') && isOpen
+            ${session.can('vitals.write') && canClinical
               ? `<button class="btn btn--sm" data-action="add-vitals">${ui.icon('plus', 14)}<span>Record vitals</span></button>`
               : ''}
+            ${session.can('clinical.write') && isOpen && !isMine
+              ? `<div class="muted xs mt-1">${v.doctorId ? `Only ${ui.esc(v.doctorName || 'the assigned doctor')} can change this visit's clinical record.` : 'No doctor is assigned to this visit yet.'}</div>`
+              : ''}
           </div>
-          ${isOpen ? `<div class="card-foot row row--wrap" style="gap:8px">
-            ${canClinical ? `
+          ${canClinical ? `<div class="card-foot row row--wrap" style="gap:8px">
               <button class="btn btn--sm" data-action="add-note">${ui.icon('clipboard', 14)}<span>Add note</span></button>
               <button class="btn btn--sm" data-action="add-diagnosis">${ui.icon('stethoscope', 14)}<span>Diagnosis</span></button>
-              <button class="btn btn--sm" data-action="add-rx">${ui.icon('pill', 14)}<span>Prescribe</span></button>` : ''}
-            ${session.can('visit.write') ? `<button class="btn btn--sm" style="margin-left:auto" data-action="close-visit">Close visit</button>` : ''}
+              <button class="btn btn--sm" data-action="add-rx">${ui.icon('pill', 14)}<span>Prescribe</span></button>
+              <button class="btn btn--sm" style="margin-left:auto" data-action="close-visit">Close visit</button>
           </div>` : ''}
         </section>
 
@@ -401,11 +419,14 @@ export default async function patientView(root, { params, query, navigate }) {
             <div class="card-body">
               ${detail.diagnoses?.length ? `<div class="stack-sm">
                 ${detail.diagnoses.map((d) => `
-                  <div class="row" style="gap:8px">
-                    ${d.code ? `<span class="pill pill--muted mono">${ui.esc(d.code)}</span>` : ''}
-                    <span class="sm strong">${ui.esc(d.description)}</span>
-                    <span class="muted xs">${ui.esc(ui.titleCase(d.kind))}</span>
-                    ${canClinical && isOpen ? `<button class="icon-btn" style="margin-left:auto;width:24px;height:24px" data-del-diagnosis="${d.id}">${ui.icon('close', 13)}</button>` : ''}
+                  <div class="${d.cancelledAt ? 'is-cancelled' : ''}">
+                    <div class="row" style="gap:8px">
+                      ${d.code ? `<span class="pill pill--muted mono">${ui.esc(d.code)}</span>` : ''}
+                      <span class="sm strong strike">${ui.esc(d.description)}</span>
+                      <span class="muted xs">${ui.esc(ui.titleCase(d.kind))}</span>
+                      ${canClinical && !d.cancelledAt ? `<button class="btn btn--sm btn--ghost" style="margin-left:auto" data-cancel-diagnosis="${d.id}">Cancel</button>` : ''}
+                    </div>
+                    ${cancelledLine(d)}
                   </div>`).join('')}
               </div>` : '<div class="muted sm">No diagnosis recorded for this visit.</div>'}
             </div>
@@ -414,20 +435,23 @@ export default async function patientView(root, { params, query, navigate }) {
           <section class="card">
             <div class="card-head">
               <div class="grow"><h2>Prescriptions</h2></div>
-              ${detail.prescriptions?.length ? '<button class="btn btn--sm" data-action="print-rx">Print</button>' : ''}
+              ${live(detail.prescriptions).length ? '<button class="btn btn--sm" data-action="print-rx">Print</button>' : ''}
             </div>
             <div class="card-body">
               ${detail.prescriptions?.length ? `<div class="stack-sm">
                 ${detail.prescriptions.map((rx) => `
-                  <div class="row" style="gap:8px;align-items:flex-start">
-                    <span class="grow">
-                      <span class="sm strong">${ui.esc(rx.drugName)} ${ui.esc(rx.strength || '')}</span>
-                      <div class="muted xs">
-                        ${[rx.dose, rx.frequency, rx.route, rx.durationDays ? `${rx.durationDays} days` : null].filter(Boolean).map(ui.esc).join(' · ') || '—'}
-                        ${rx.instructions ? ` · ${ui.esc(rx.instructions)}` : ''}
-                      </div>
-                    </span>
-                    ${canClinical && isOpen ? `<button class="icon-btn" style="width:24px;height:24px" data-del-rx="${rx.id}">${ui.icon('close', 13)}</button>` : ''}
+                  <div class="${rx.cancelledAt ? 'is-cancelled' : ''}">
+                    <div class="row" style="gap:8px;align-items:flex-start">
+                      <span class="grow">
+                        <span class="sm strong strike">${ui.esc(rx.drugName)} ${ui.esc(rx.strength || '')}</span>
+                        <div class="muted xs">
+                          ${[rx.dose, rx.frequency, rx.route, rx.durationDays ? `${rx.durationDays} days` : null].filter(Boolean).map(ui.esc).join(' · ') || '—'}
+                          ${rx.instructions ? ` · ${ui.esc(rx.instructions)}` : ''}
+                        </div>
+                      </span>
+                      ${canClinical && !rx.cancelledAt ? `<button class="btn btn--sm btn--ghost" data-cancel-rx="${rx.id}">Cancel</button>` : ''}
+                    </div>
+                    ${cancelledLine(rx)}
                   </div>`).join('')}
               </div>` : '<div class="muted sm">No medicines prescribed yet.</div>'}
             </div>
@@ -438,19 +462,24 @@ export default async function patientView(root, { params, query, navigate }) {
             <div class="card-body">
               ${detail.notes?.length ? `<div class="col" style="gap:14px">
                 ${detail.notes.map((n) => `
-                  <article style="border-left:2px solid var(--line); padding-left:12px">
+                  <article class="${n.cancelledAt ? 'is-cancelled' : ''}" style="border-left:2px solid var(--line); padding-left:12px">
                     <div class="row" style="gap:8px">
                       <span class="pill pill--muted">${ui.esc(ui.titleCase(n.noteType))}</span>
-                      ${n.signedAt ? `<span class="pill pill--ok">Signed</span>` : '<span class="pill pill--warn">Draft</span>'}
+                      ${n.cancelledAt ? '<span class="pill pill--danger">Cancelled</span>' : n.signedAt ? '<span class="pill pill--ok">Signed</span>' : '<span class="pill pill--warn">Draft</span>'}
                       <span class="muted xs">${ui.esc(n.authorName || '—')} · ${ui.esc(ui.fmtDateTime(n.createdAt))}</span>
-                      ${canClinical && !n.signedAt ? `<button class="btn btn--sm" style="margin-left:auto" data-sign-note="${n.id}">Sign</button>` : ''}
+                      ${session.can('clinical.write') && n.authorId === me && !n.signedAt && !n.cancelledAt ? `
+                        <span class="row" style="gap:6px;margin-left:auto">
+                          <button class="btn btn--sm btn--ghost" data-cancel-note="${n.id}">Cancel draft</button>
+                          <button class="btn btn--sm" data-sign-note="${n.id}">Sign</button>
+                        </span>` : ''}
                     </div>
-                    ${n.subject ? `<div class="sm strong mt-1">${ui.esc(n.subject)}</div>` : ''}
-                    <div class="sm" style="white-space:pre-wrap;margin-top:4px">${ui.esc(n.body)}</div>
+                    ${n.subject ? `<div class="sm strong mt-1 strike">${ui.esc(n.subject)}</div>` : ''}
+                    <div class="sm strike" style="white-space:pre-wrap;margin-top:4px">${ui.esc(n.body)}</div>
+                    ${cancelledLine(n)}
                   </article>`).join('')}
               </div>` : '<div class="muted sm">No notes written for this visit.</div>'}
             </div>
-          </section>` : `<div class="card"><div class="card-body muted sm">Clinical content (notes, diagnoses, prescriptions) is not visible to your role.</div></div>`}
+          </section>` : `<div class="card"><div class="card-body muted sm">Clinical content (vitals, notes, diagnoses, prescriptions) is not visible to your role.</div></div>`}
       </div>
     `;
 
@@ -466,7 +495,7 @@ export default async function patientView(root, { params, query, navigate }) {
       button.addEventListener('click', async () => {
         const ok = await ui.confirmDialog({
           title: 'Sign this note?',
-          message: 'Signed notes become read-only and cannot be edited or deleted.',
+          message: 'Signed notes become read-only and can never be changed or withdrawn.',
           confirmLabel: 'Sign note',
         });
         if (!ok) return;
@@ -477,21 +506,36 @@ export default async function patientView(root, { params, query, navigate }) {
         } catch (err) { ui.toastError(err.message); }
       });
     }
-    for (const button of host.querySelectorAll('[data-del-diagnosis]')) {
-      button.addEventListener('click', async () => {
-        try {
-          await api.del(`/api/visits/${visitId}/diagnoses/${button.dataset.delDiagnosis}`);
-          renderVisitDetail(visitId);
-        } catch (err) { ui.toastError(err.message); }
+
+    // Nothing clinical is deleted: an entry is cancelled with a reason and stays
+    // visible, struck through, on the record (SW-12).
+    const cancelWithReason = async (title, url, done) => {
+      const reason = await ui.confirmDialog({
+        title,
+        message: 'The entry stays on the record, struck through, with your reason. This cannot be undone.',
+        confirmLabel: 'Cancel entry',
+        cancelLabel: 'Keep it',
+        danger: true,
+        requireReason: 'Reason',
       });
+      if (!reason) return;
+      try {
+        await api.post(url, { reason });
+        ui.toastOk(done);
+        renderVisitDetail(visitId);
+      } catch (err) { ui.toastError(err.message); }
+    };
+    for (const button of host.querySelectorAll('[data-cancel-diagnosis]')) {
+      button.addEventListener('click', () => cancelWithReason('Cancel this diagnosis?',
+        `/api/visits/${visitId}/diagnoses/${button.dataset.cancelDiagnosis}/cancel`, 'Diagnosis cancelled.'));
     }
-    for (const button of host.querySelectorAll('[data-del-rx]')) {
-      button.addEventListener('click', async () => {
-        try {
-          await api.del(`/api/visits/${visitId}/prescriptions/${button.dataset.delRx}`);
-          renderVisitDetail(visitId);
-        } catch (err) { ui.toastError(err.message); }
-      });
+    for (const button of host.querySelectorAll('[data-cancel-rx]')) {
+      button.addEventListener('click', () => cancelWithReason('Cancel this medicine?',
+        `/api/visits/${visitId}/prescriptions/${button.dataset.cancelRx}/cancel`, 'Medicine cancelled.'));
+    }
+    for (const button of host.querySelectorAll('[data-cancel-note]')) {
+      button.addEventListener('click', () => cancelWithReason('Cancel this draft note?',
+        `/api/notes/${button.dataset.cancelNote}/cancel`, 'Draft note cancelled.'));
     }
   }
 
@@ -566,7 +610,7 @@ export default async function patientView(root, { params, query, navigate }) {
             <article style="border-left:2px solid var(--line);padding-left:12px">
               <div class="row row--wrap" style="gap:8px">
                 <span class="pill pill--muted">${ui.esc(ui.titleCase(n.noteType))}</span>
-                ${n.signedAt ? '<span class="pill pill--ok">Signed</span>' : '<span class="pill pill--warn">Draft</span>'}
+                ${n.cancelledAt ? '<span class="pill pill--danger">Cancelled</span>' : n.signedAt ? '<span class="pill pill--ok">Signed</span>' : '<span class="pill pill--warn">Draft</span>'}
                 <a class="xs" href="#/patients/${patientId}?tab=visits&visit=${n.visitId}">${ui.esc(n.visitNo)}</a>
                 <span class="muted xs">${ui.esc(n.authorName || '—')} · ${ui.esc(ui.fmtDateTime(n.createdAt))}</span>
               </div>
@@ -584,7 +628,7 @@ export default async function patientView(root, { params, query, navigate }) {
       <section class="card">
         <div class="card-head">
           <div class="grow"><h2>Vitals history</h2><div class="muted xs">${rows.length} record${rows.length === 1 ? '' : 's'}</div></div>
-          ${session.can('vitals.write') && state.chart.stats.openVisit ? `<button class="btn btn--sm btn--primary" data-action="add-vitals">Record vitals</button>` : ''}
+          ${session.can('vitals.write') && state.chart.stats.openVisit && state.chart.stats.openVisit.doctor_id === session.user?.id ? `<button class="btn btn--sm btn--primary" data-action="add-vitals">Record vitals</button>` : ''}
         </div>
         ${rows.length ? `<div class="table-wrap"><table class="table">
           <thead><tr><th>Recorded</th><th>Temp °C</th><th>Pulse</th><th>Resp</th><th>BP</th><th>SpO₂</th><th>Weight</th><th>Pain</th><th>By</th></tr></thead>
@@ -614,8 +658,8 @@ export default async function patientView(root, { params, query, navigate }) {
         ${rows.length ? `<div class="table-wrap"><table class="table">
           <thead><tr><th>Medicine</th><th>Dose / frequency</th><th>Duration</th><th>Prescribed</th><th>Visit</th><th>By</th></tr></thead>
           <tbody>${rows.map((r) => `
-            <tr>
-              <td class="cell-main">${ui.esc(r.drugName)} <span class="muted">${ui.esc(r.strength || '')}</span></td>
+            <tr class="${r.cancelledAt ? 'is-cancelled' : ''}" title="${r.cancelledAt ? ui.esc(`Cancelled: ${r.cancelReason || ''}`) : ''}">
+              <td class="cell-main"><span class="strike">${ui.esc(r.drugName)} <span class="muted">${ui.esc(r.strength || '')}</span></span>${r.cancelledAt ? ' <span class="pill pill--danger">Cancelled</span>' : ''}</td>
               <td>${[r.dose, r.frequency, r.route].filter(Boolean).map(ui.esc).join(' · ') || '—'}</td>
               <td>${r.durationDays ? `${r.durationDays} days` : '—'}</td>
               <td class="nowrap">${ui.esc(ui.fmtDate(r.createdAt, { short: true }))}</td>
@@ -750,7 +794,7 @@ export default async function patientView(root, { params, query, navigate }) {
       <section class="card">
         <div class="card-head">
           <div class="grow"><h2>Invoices</h2><div class="muted xs">${data.total} invoice${data.total === 1 ? '' : 's'} · ${ui.inr(data.summary.billedPaise)} billed</div></div>
-          ${session.can('billing.write') ? `<button class="btn btn--sm btn--primary" data-action="invoice">New invoice</button>` : ''}
+          ${session.can('invoice.write') ? `<button class="btn btn--sm btn--primary" data-action="invoice">New invoice</button>` : ''}
         </div>
         ${data.invoices.length ? `<div class="table-wrap"><table class="table">
           <thead><tr><th>Invoice</th><th>Date</th><th class="right">Total</th><th class="right">Paid</th><th class="right">Balance</th><th class="right">Status</th></tr></thead>
@@ -1088,7 +1132,7 @@ export default async function patientView(root, { params, query, navigate }) {
   function printPrescription(detail) {
     const settings = session.settings || {};
     const v = detail.visit;
-    const rows = (detail.prescriptions || []).map((rx, i) => `
+    const rows = (detail.prescriptions || []).filter((rx) => !rx.cancelledAt).map((rx, i) => `
       <div class="rx-line">
         <span>${i + 1}.</span>
         <span><strong>${ui.esc(rx.drugName)} ${ui.esc(rx.strength || '')}</strong>${rx.form ? ` <span class="muted">(${ui.esc(rx.form)})</span>` : ''}</span>
@@ -1114,7 +1158,7 @@ export default async function patientView(root, { params, query, navigate }) {
               <div>${ui.esc(ui.fmtDate(v.createdAt, { withTime: true }))}</div>
             </div>
           </div>
-          <div class="mt-2 xs"><strong>Diagnosis:</strong> ${(detail.diagnoses || []).map((d) => ui.esc(d.description)).join('; ') || '—'}</div>
+          <div class="mt-2 xs"><strong>Diagnosis:</strong> ${(detail.diagnoses || []).filter((d) => !d.cancelledAt).map((d) => ui.esc(d.description)).join('; ') || '—'}</div>
           <div class="rx-head mt-2"><span>#</span><span>Medicine</span><span>Dose / frequency</span><span>Duration</span></div>
           ${rows || '<div class="muted sm mt-2">No medicines prescribed.</div>'}
           <div class="receipt-foot">

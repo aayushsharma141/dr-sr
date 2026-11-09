@@ -26,10 +26,9 @@ export async function usersView(root, { navigate }) {
         ${data.roles.map((r) => `
           <div class="sm"><strong>${ui.esc(r.label)}</strong>
             <div class="muted xs">${ui.esc({
-              admin: 'Full access, including accounts, audit and backups',
-              doctor: 'Charts, clinical notes, prescriptions; read-only billing',
-              nurse: 'Vitals and nursing notes',
-              reception: 'Registration, appointments and billing; no clinical notes',
+              admin: 'Accounts, settings, fees, audit and backups; reverses payments; no clinical records',
+              doctor: 'Clinical records of their own patients; reads every chart; no billing',
+              reception: 'Registration, appointments, invoices and payments; no clinical records',
             }[r.role] || '')}</div>
           </div>`).join('')}
       </div>
@@ -94,7 +93,7 @@ export async function usersView(root, { navigate }) {
       });
       if (!ok) return;
       try {
-        await api.patch(`/api/admin/users/${user.id}`, { isActive: !user.isActive });
+        await api.patch(`/api/admin/users/${user.id}`, { isActive: !user.isActive, version: user.version });
         ui.toastOk(disabling ? 'Account disabled.' : 'Account enabled.');
         navigate('/admin/users');
       } catch (err) { ui.toastError(err.message); }
@@ -174,7 +173,7 @@ function openUserForm({ user = null, roles, onSaved }) {
     errorBox.classList.add('hidden');
     ui.setBusy(save, true, 'Saving…');
     try {
-      if (editing) await api.patch(`/api/admin/users/${u.id}`, ui.formValues(form));
+      if (editing) await api.patch(`/api/admin/users/${u.id}`, { ...ui.formValues(form), version: u.version });
       else await api.post('/api/admin/users', ui.formValues(form));
       ui.toastOk(editing ? 'Account updated.' : 'Staff account created.');
       handle.close();
@@ -400,7 +399,7 @@ export async function backupsView(root, { navigate }) {
             ${data.backups.map((b) => `
               <tr>
                 <td class="mono xs">${ui.esc(b.filename)}</td>
-                <td>${ui.esc(ui.titleCase(b.kind))}</td>
+                <td>${ui.esc({ pre_upgrade: 'Before upgrade', pre_restore: 'Before restore' }[b.kind] || ui.titleCase(b.kind))}</td>
                 <td class="nowrap">${ui.esc(ui.bytes(b.sizeBytes))}</td>
                 <td class="nowrap">${ui.esc(ui.fmtDateTime(b.createdAt))}</td>
                 <td class="muted">${ui.esc(b.createdByName || 'automatic')}</td>
@@ -523,10 +522,16 @@ export async function settingsView(root, { navigate }) {
   const data = await api.get('/api/admin/settings');
   const s = data.settings;
 
-  const field = (name, label, value, { hint = '', type = 'text', span = '' } = {}) => `
+  const field = (name, label, value, { hint = '', type = 'text', span = '', lang = '' } = {}) => `
     <div class="field ${span ? `span-${span}` : ''}">
       <label for="set-${name}">${ui.esc(label)}</label>
-      <input class="input" id="set-${name}" name="${name}" type="${type}" value="${ui.esc(value || '')}">
+      <input class="input" id="set-${name}" name="${name}" type="${type}" value="${ui.esc(value || '')}"${lang ? ` lang="${lang}"` : ''}>
+      ${hint ? `<div class="hint">${ui.esc(hint)}</div>` : ''}
+    </div>`;
+  const area = (name, label, value, { hint = '', lang = '' } = {}) => `
+    <div class="field span-2">
+      <label for="set-${name}">${ui.esc(label)}</label>
+      <textarea class="textarea" id="set-${name}" name="${name}" rows="2"${lang ? ` lang="${lang}"` : ''}>${ui.esc(value || '')}</textarea>
       ${hint ? `<div class="hint">${ui.esc(hint)}</div>` : ''}
     </div>`;
 
@@ -534,21 +539,77 @@ export async function settingsView(root, { navigate }) {
     <div class="page-head">
       <div>
         <h1>Clinic settings</h1>
-        <div class="sub">These details appear on prescriptions, receipts and reports</div>
+        <div class="sub">These details appear on the sign-in page, prescriptions, receipts and reports</div>
       </div>
     </div>
 
-    <form id="settings-form" class="grid grid--2">
+    <form id="settings-form" class="grid grid--2" novalidate>
       <section class="card">
         <div class="card-head"><h2>Hospital identity</h2></div>
         <div class="card-body form-grid">
-          ${field('hospital_name', 'Hospital name', s.hospital_name, { span: '2' })}
+          ${field('hospital_name', 'Hospital name (English)', s.hospital_name)}
+          ${field('hospital_name_hi', 'Hospital name (Hindi)', s.hospital_name_hi, { lang: 'hi' })}
+          ${field('trust_name', 'Trust (English)', s.trust_name)}
+          ${field('trust_name_hi', 'Trust (Hindi)', s.trust_name_hi, { lang: 'hi' })}
           ${field('hospital_tagline', 'Tagline', s.hospital_tagline, { span: '2' })}
-          ${field('hospital_address', 'Address', s.hospital_address, { span: '2' })}
+          ${field('location_line', 'Location line', s.location_line, { span: '2', hint: 'Short place line for headers, e.g. Ara, Bhojpur, Bihar' })}
           ${field('hospital_phone', 'Phone', s.hospital_phone)}
           ${field('hospital_email', 'Email', s.hospital_email)}
           ${field('hospital_registration', 'Registration number', s.hospital_registration, { span: '2' })}
+        </div>
+      </section>
+
+      <section class="card">
+        <div class="card-head"><h2>Clinic addresses</h2></div>
+        <div class="card-body form-grid">
+          ${area('hospital_address', 'Main clinic (English)', s.hospital_address)}
+          ${area('hospital_address_hi', 'Main clinic (Hindi)', s.hospital_address_hi, { lang: 'hi' })}
+          ${area('clinic2_address', 'Second clinic (English)', s.clinic2_address, { hint: 'Leave blank if prints should show the main clinic only.' })}
+          ${area('clinic2_address_hi', 'Second clinic (Hindi)', s.clinic2_address_hi, { lang: 'hi' })}
+        </div>
+      </section>
+
+      <section class="card">
+        <div class="card-head"><h2>Hospital logo</h2></div>
+        <div class="card-body">
+          <div class="row" style="gap:16px;align-items:center">
+            <div class="brand-mark brand-mark--lg ${data.logo ? 'brand-mark--logo' : ''}" id="logo-preview" style="width:72px;height:72px">${data.logo ? '' : '+'}</div>
+            <div class="col" style="gap:8px">
+              <div class="xs muted">PNG, JPEG or WebP, up to 512 KB. Shown on the sign-in page, the sidebar and printouts. It is stored in the database, so every backup includes it.</div>
+              <div class="row" style="gap:8px">
+                <label class="btn btn--sm">${ui.icon('upload', 14)}<span>${data.logo ? 'Replace logo' : 'Upload logo'}</span>
+                  <input type="file" id="logo-file" accept="image/png,image/jpeg,image/webp" hidden>
+                </label>
+                ${data.logo ? '<button class="btn btn--sm btn--ghost" type="button" data-action="remove-logo">Remove</button>' : ''}
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="card">
+        <div class="card-head"><h2>Printed documents</h2></div>
+        <div class="card-body form-grid">
+          ${area('print_header_en', 'Header line (English)', s.print_header_en)}
+          ${area('print_header_hi', 'Header line (Hindi)', s.print_header_hi, { lang: 'hi' })}
+          ${area('print_footer_en', 'Footer line (English)', s.print_footer_en)}
+          ${area('print_footer_hi', 'Footer line (Hindi)', s.print_footer_hi, { lang: 'hi' })}
           ${field('disclaimer', 'Footer note on printed documents', s.disclaimer, { span: '2' })}
+        </div>
+      </section>
+
+      <section class="card">
+        <div class="card-head"><h2>Receipts &amp; consultations</h2></div>
+        <div class="card-body form-grid">
+          <div class="field">
+            <label for="set-receipt_cycle">Receipt numbers restart every</label>
+            <select class="select" id="set-receipt_cycle" name="receipt_cycle">
+              <option value="financial_year" ${s.receipt_cycle !== 'calendar_year' ? 'selected' : ''}>Financial year (1 April)</option>
+              <option value="calendar_year" ${s.receipt_cycle === 'calendar_year' ? 'selected' : ''}>Calendar year (1 January)</option>
+            </select>
+            <div class="hint">Decision D-05: the trust's accounts follow the Indian financial year.</div>
+          </div>
+          ${field('consultation_validity_days', 'Consultation valid for (days)', s.consultation_validity_days, { type: 'number', hint: 'A repeat visit within this many days counts as a follow-up.' })}
         </div>
       </section>
 
@@ -559,7 +620,7 @@ export async function settingsView(root, { navigate }) {
           ${field('visit_prefix', 'Visit prefix', s.visit_prefix, { hint: 'e.g. V → V-000123' })}
           ${field('invoice_prefix', 'Invoice prefix', s.invoice_prefix)}
           ${field('receipt_prefix', 'Receipt prefix', s.receipt_prefix)}
-          ${field('session_idle_minutes', 'Auto sign-out after (minutes)', s.session_idle_minutes, { type: 'number', hint: 'Default 20. Reception PCs should stay short.' })}
+          ${field('session_idle_minutes', 'Auto sign-out after (minutes)', s.session_idle_minutes, { type: 'number', hint: 'Default 30 (decision D-07). Applies from the next sign-in.' })}
           ${field('backup_retention', 'Backups to keep', s.backup_retention, { type: 'number', hint: 'Older backups are deleted automatically.' })}
           <div class="field span-2">
             <label>Dataset</label>
@@ -575,12 +636,52 @@ export async function settingsView(root, { navigate }) {
             <div class="hint">Untick this once the demonstration records have been cleared and real patients are being registered. The dashboard banner disappears when it is off.</div>
           </div>
         </div>
-        <div class="card-foot row" style="justify-content:flex-end">
-          <button class="btn btn--primary" type="submit">${ui.icon('save')}<span>Save settings</span></button>
-        </div>
       </section>
+
+      <div class="row" style="justify-content:flex-end;grid-column:1 / -1">
+        <button class="btn btn--primary" type="submit">${ui.icon('save')}<span>Save settings</span></button>
+      </div>
     </form>
   `;
+
+  // Logo preview uses DOM calls (no HTML strings) for the image itself.
+  const preview = root.querySelector('#logo-preview');
+  if (data.logo) {
+    const img = document.createElement('img');
+    img.src = data.logo.url;
+    img.alt = 'Current logo';
+    preview.append(img);
+  }
+
+  const brandingChanged = async () => {
+    await api.me();
+    window.dispatchEvent(new CustomEvent('kh:settings-changed'));
+  };
+
+  root.querySelector('#logo-file').addEventListener('change', async (e) => {
+    const file = e.target.files && e.target.files[0];
+    if (!file) return;
+    if (file.size > 512 * 1024) {
+      ui.toastError('The logo must be 512 KB or smaller.');
+      return;
+    }
+    try {
+      await api.post('/api/admin/settings/logo', undefined, { raw: file, headers: { 'content-type': file.type || 'application/octet-stream' } });
+      await brandingChanged();
+      ui.toastOk('Logo updated.');
+      navigate('/admin/settings');
+    } catch (err) { ui.toastError(err.message); }
+  });
+  root.querySelector('[data-action="remove-logo"]')?.addEventListener('click', async () => {
+    const ok = await ui.confirmDialog({ title: 'Remove the logo?', message: 'The plain mark is shown instead until a new logo is uploaded.', confirmLabel: 'Remove' });
+    if (!ok) return;
+    try {
+      await api.del('/api/admin/settings/logo');
+      await brandingChanged();
+      ui.toastOk('Logo removed.');
+      navigate('/admin/settings');
+    } catch (err) { ui.toastError(err.message); }
+  });
 
   const form = root.querySelector('#settings-form');
   form.addEventListener('submit', async (e) => {
@@ -589,11 +690,12 @@ export async function settingsView(root, { navigate }) {
     ui.setBusy(button, true, 'Saving…');
     try {
       const values = ui.formValues(form);
-      await api.patch('/api/admin/settings', values);
-      await api.me();
+      await api.patch('/api/admin/settings', { ...values, version: data.version });
+      await brandingChanged();
       ui.toastOk('Settings saved.');
       navigate('/admin/settings');
     } catch (err) {
+      if (err.details) ui.applyFieldErrors(form, err.details.map((d) => ({ ...d, field: d.field })));
       ui.toastError(err.message);
     } finally {
       ui.setBusy(button, false);

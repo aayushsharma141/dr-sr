@@ -7,7 +7,7 @@
 const express = require('express');
 
 const { Validator, ApiError, pagination, likePattern } = require('../lib/http');
-const { audit, idParam } = require('../lib/request');
+const { audit, idParam, expectedVersion, updateVersioned } = require('../lib/request');
 const { requirePerm } = require('../auth');
 const { todayLocal } = require('../lib/domain');
 
@@ -64,7 +64,7 @@ module.exports = function billingRoutes(ctx) {
   // ---------------------------------------------------------------------------
   // Service catalogue
   // ---------------------------------------------------------------------------
-  router.get('/services', requirePerm('billing.read', 'billing.write'), (req, res) => {
+  router.get('/services', requirePerm('billing.read', 'billing.catalogue', 'invoice.write'), (req, res) => {
     const includeInactive = String(req.query.includeInactive || '') === 'true';
     const rows = db
       .prepare(`SELECT * FROM services ${includeInactive ? '' : 'WHERE is_active = 1'} ORDER BY category, name`)
@@ -72,12 +72,12 @@ module.exports = function billingRoutes(ctx) {
     res.json({
       services: rows.map((s) => ({
         id: s.id, code: s.code, name: s.name, category: s.category,
-        pricePaise: s.price_paise, isActive: !!s.is_active,
+        pricePaise: s.price_paise, isActive: !!s.is_active, version: s.version,
       })),
     });
   });
 
-  router.post('/services', requirePerm('billing.write'), (req, res) => {
+  router.post('/services', requirePerm('billing.catalogue'), (req, res) => {
     const v = new Validator(req.body);
     const name = v.str('name', { required: true, max: 160, label: 'Service name' });
     const code = v.str('code', { max: 30 });
@@ -91,22 +91,26 @@ module.exports = function billingRoutes(ctx) {
     res.status(201).json({ id: info.lastInsertRowid });
   });
 
-  router.patch('/services/:id', requirePerm('billing.write'), (req, res) => {
+  router.patch('/services/:id', requirePerm('billing.catalogue'), (req, res) => {
     const id = idParam(req);
     const service = db.prepare('SELECT * FROM services WHERE id = ?').get(id);
     if (!service) throw new ApiError(404, 'Service not found.');
     const v = new Validator(req.body);
+    const version = expectedVersion(v);
     const name = v.str('name', { max: 160 });
     const category = v.str('category', { max: 60 });
     const pricePaise = v.int('pricePaise', { min: 0, max: 100000000, label: 'Price' });
     const isActive = v.bool('isActive');
     v.throwIfInvalid();
-    db.prepare(
-      `UPDATE services SET name = COALESCE(?, name), category = COALESCE(?, category),
-        price_paise = COALESCE(?, price_paise), is_active = COALESCE(?, is_active) WHERE id = ?`,
-    ).run(name, category, pricePaise, isActive === null || isActive === undefined ? null : (isActive ? 1 : 0), id);
+    const patch = {};
+    if (name) patch.name = name;
+    if (category !== undefined && category !== null) patch.category = category;
+    if (pricePaise !== undefined && pricePaise !== null) patch.price_paise = pricePaise;
+    if (isActive !== undefined && isActive !== null) patch.is_active = isActive ? 1 : 0;
+    if (!Object.keys(patch).length) return res.json({ ok: true, unchanged: true, version: service.version });
+    updateVersioned(db, 'services', id, version, patch);
     audit(ctx, req, { action: 'service.update', entityType: 'service', entityId: id, detail: { name, pricePaise, isActive } });
-    res.json({ ok: true });
+    res.json({ ok: true, version: db.prepare('SELECT version FROM services WHERE id = ?').get(id).version });
   });
 
   // ---------------------------------------------------------------------------
@@ -172,7 +176,7 @@ module.exports = function billingRoutes(ctx) {
     });
   });
 
-  router.post('/invoices', requirePerm('billing.write'), (req, res) => {
+  router.post('/invoices', requirePerm('invoice.write'), (req, res) => {
     const v = new Validator(req.body);
     const patientId = v.int('patientId', { required: true, min: 1, label: 'Patient' });
     const visitId = v.int('visitId', { min: 1 });
@@ -297,7 +301,7 @@ module.exports = function billingRoutes(ctx) {
     });
   });
 
-  router.post('/invoices/:id/payments', requirePerm('billing.write'), (req, res) => {
+  router.post('/invoices/:id/payments', requirePerm('payment.collect'), (req, res) => {
     const id = idParam(req);
     const invoice = db.prepare('SELECT * FROM invoices WHERE id = ?').get(id);
     if (!invoice) throw new ApiError(404, 'Invoice not found.');
@@ -362,7 +366,7 @@ module.exports = function billingRoutes(ctx) {
     });
   });
 
-  router.post('/invoices/:id/void', requirePerm('billing.void'), (req, res) => {
+  router.post('/invoices/:id/void', requirePerm('payment.reverse'), (req, res) => {
     const id = idParam(req);
     const invoice = db.prepare('SELECT * FROM invoices WHERE id = ?').get(id);
     if (!invoice) throw new ApiError(404, 'Invoice not found.');
@@ -388,7 +392,7 @@ module.exports = function billingRoutes(ctx) {
     res.json({ ok: true });
   });
 
-  router.post('/payments/:id/void', requirePerm('billing.void'), (req, res) => {
+  router.post('/payments/:id/void', requirePerm('payment.reverse'), (req, res) => {
     const id = idParam(req);
     const payment = db.prepare('SELECT * FROM payments WHERE id = ?').get(id);
     if (!payment) throw new ApiError(404, 'Payment not found.');

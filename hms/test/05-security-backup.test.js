@@ -6,7 +6,7 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 
-const { boot, setupAdmin, makeStaff, createPatient } = require('../test-support/helpers');
+const { boot, setupAdmin, makeStaff, createPatient, makeTeam } = require('../test-support/helpers');
 const { createTar, readTar } = require('../src/lib/tar');
 const { createBackup, exportBackup, extractBackupFile } = require('../src/lib/backup');
 
@@ -19,7 +19,8 @@ test('documents, audit trail and backups', async (t) => {
   const env = await boot();
   t.after(() => env.close());
   const { client: admin } = await setupAdmin(env);
-  const patient = await createPatient(admin, { firstName: 'Farhan', lastName: 'Qureshi', phone: '9898989898' });
+  const { reception: desk } = await makeTeam(env, admin);
+  const patient = await createPatient(desk, { firstName: 'Farhan', lastName: 'Qureshi', phone: '9898989898' });
 
   await t.test('tar archives round-trip', () => {
     const entries = [
@@ -38,7 +39,7 @@ test('documents, audit trail and backups', async (t) => {
 
   let attachmentId;
   await t.test('documents are encrypted at rest and download byte-identical', async () => {
-    const upload = await admin.request('POST', `/api/patients/${patient.id}/attachments`, {
+    const upload = await desk.request('POST', `/api/patients/${patient.id}/attachments`, {
       raw: PDF,
       headers: {
         'content-type': 'application/pdf',
@@ -59,7 +60,7 @@ test('documents, audit trail and backups', async (t) => {
     assert.equal(raw.subarray(0, 4).toString('latin1'), 'KHE1');
 
     const download = await fetch(`${env.base}/api/attachments/${attachmentId}`, {
-      headers: { 'x-session-token': admin.token },
+      headers: { 'x-session-token': desk.token },
     });
     assert.equal(download.status, 200);
     const bytes = Buffer.from(await download.arrayBuffer());
@@ -73,14 +74,14 @@ test('documents, audit trail and backups', async (t) => {
 
   await t.test('disallowed file types are refused', async () => {
     const html = Buffer.from('<html><script>alert(1)</script></html>');
-    const res = await admin.request('POST', `/api/patients/${patient.id}/attachments`, {
+    const res = await desk.request('POST', `/api/patients/${patient.id}/attachments`, {
       raw: html,
       headers: { 'content-type': 'text/html', 'x-file-name': 'evil.html' },
     });
     assert.equal(res.status, 415);
 
     // Declared as a PNG but the bytes are not one.
-    const spoof = await admin.request('POST', `/api/patients/${patient.id}/attachments`, {
+    const spoof = await desk.request('POST', `/api/patients/${patient.id}/attachments`, {
       raw: Buffer.from('MZ virtual executable'),
       headers: { 'content-type': 'image/png', 'x-file-type': 'image/png', 'x-file-name': 'x.png' },
     });
@@ -156,12 +157,24 @@ test('documents, audit trail and backups', async (t) => {
     assert.equal(res.status, 403);
   });
 
-  await t.test('login throttling stops password guessing', async () => {
+  await t.test('admin has no access to patient documents (D-04)', async () => {
+    assert.equal((await admin.get(`/api/patients/${patient.id}/attachments`)).status, 403);
+    assert.equal((await admin.get(`/api/attachments/${attachmentId}`)).status, 403);
+  });
+
+  await t.test('password guessing is stopped by lockout and by throttling', async () => {
     const attacker = env.client();
     let last;
     for (let i = 0; i < 12; i += 1) {
       last = await attacker.post('/api/auth/login', { username: 'admin', password: `guess-${i}` });
     }
-    assert.equal(last.status, 429);
+    assert.equal(last.status, 423, 'the account locks after five wrong passwords (D-07)');
+
+    // Spraying many usernames from one computer is throttled per IP.
+    let sprayed;
+    for (let i = 0; i < 10; i += 1) {
+      sprayed = await attacker.post('/api/auth/login', { username: `nobody${i}`, password: 'guess-guess' });
+    }
+    assert.equal(sprayed.status, 429);
   });
 });

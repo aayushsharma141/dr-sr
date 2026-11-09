@@ -56,6 +56,7 @@ function mapPatient(row) {
     allergiesSummary: row.allergies_summary,
     notes: row.notes,
     isActive: !!row.is_active,
+    version: row.version,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };

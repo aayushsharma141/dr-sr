@@ -9,7 +9,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const { Validator, ApiError, pagination, toCsv } = require('../lib/http');
-const { audit, idParam } = require('../lib/request');
+const { audit, idParam, expectedVersion, updateVersioned, versionConflict } = require('../lib/request');
 const { hashPassword, checkPasswordPolicy, sha256hex } = require('../lib/crypto');
 const { requirePerm } = require('../auth');
 const { ROLES, ROLE_LABELS, permissionsFor } = require('../auth');
@@ -19,7 +19,45 @@ const SETTINGS_ALLOWED = new Set([
   'hospital_name', 'hospital_tagline', 'hospital_address', 'hospital_phone', 'hospital_email',
   'hospital_registration', 'mrn_prefix', 'invoice_prefix', 'receipt_prefix', 'visit_prefix',
   'opd_fee_default', 'session_idle_minutes', 'backup_retention', 'disclaimer', 'synthetic_data',
+  // SW-14: bilingual identity, second clinic, print text, receipts, consultations
+  'hospital_name_hi', 'trust_name', 'trust_name_hi', 'location_line', 'hospital_address_hi',
+  'clinic2_address', 'clinic2_address_hi', 'print_header_en', 'print_header_hi', 'print_footer_en',
+  'print_footer_hi', 'receipt_cycle', 'consultation_validity_days',
 ]);
+
+// Settings with a fixed shape. Anything else is free text (max 500 characters).
+const SETTING_RULES = {
+  receipt_cycle: { oneOf: ['financial_year', 'calendar_year'], message: 'Choose financial year or calendar year.' },
+  consultation_validity_days: { min: 0, max: 365, message: 'Enter a number of days from 0 to 365.' },
+  session_idle_minutes: { min: 5, max: 240, message: 'Enter a number of minutes from 5 to 240.' },
+  backup_retention: { min: 3, max: 365, message: 'Keep between 3 and 365 backups.' },
+  opd_fee_default: { min: 0, max: 100000000, message: 'Enter an amount in paise (0 or more).' },
+  synthetic_data: { oneOf: ['true', 'false'], message: 'Must be true or false.' },
+  hospital_name: { required: true, message: 'The hospital name cannot be empty.' },
+};
+
+function checkSetting(key, raw) {
+  const value = raw === null || raw === undefined ? '' : String(raw).trim().slice(0, 500);
+  const rule = SETTING_RULES[key];
+  if (!rule) return { value };
+  if (rule.required && !value) return { error: rule.message };
+  if (rule.oneOf && !rule.oneOf.includes(value)) return { error: rule.message };
+  if (rule.min !== undefined) {
+    const n = Number(value);
+    if (!/^\d+$/.test(value) || n < rule.min || n > rule.max) return { error: rule.message };
+  }
+  return { value };
+}
+
+// Logo: PNG, JPEG or WebP up to 512 KB, kept inside the database (app_meta)
+// so it travels with every backup.
+const LOGO_MAX_BYTES = 512 * 1024;
+function sniffLogo(b) {
+  if (b.length > 8 && b.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))) return 'image/png';
+  if (b.length > 3 && b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff) return 'image/jpeg';
+  if (b.length > 12 && b.subarray(0, 4).toString('latin1') === 'RIFF' && b.subarray(8, 12).toString('latin1') === 'WEBP') return 'image/webp';
+  return null;
+}
 
 function mapUser(row) {
   return {
@@ -33,6 +71,7 @@ function mapUser(row) {
     registrationNo: row.registration_no,
     phone: row.phone,
     isActive: !!row.is_active,
+    version: row.version,
     mustChangePassword: !!row.must_change_password,
     lastLoginAt: row.last_login_at,
     createdAt: row.created_at,
@@ -106,6 +145,7 @@ module.exports = function adminRoutes(ctx) {
     if (!row) throw new ApiError(404, 'User not found.');
 
     const v = new Validator(req.body);
+    const version = expectedVersion(v);
     const fullName = v.str('fullName', { max: 120 });
     const role = v.enumOf('role', ROLES);
     const designation = v.str('designation', { max: 80 });
@@ -131,8 +171,7 @@ module.exports = function adminRoutes(ctx) {
       if (admins <= 1) throw new ApiError(409, 'At least one active administrator is required.');
     }
 
-    const patch = { updated_at: new Date().toISOString(), updated_by: undefined };
-    delete patch.updated_by;
+    const patch = { updated_at: new Date().toISOString() };
     if (fullName) patch.full_name = fullName;
     if (role) patch.role = role;
     if (designation !== undefined && designation !== null) patch.designation = designation;
@@ -141,8 +180,7 @@ module.exports = function adminRoutes(ctx) {
     if (phone !== undefined && phone !== null) patch.phone = phone;
     if (isActive !== null && isActive !== undefined) patch.is_active = isActive ? 1 : 0;
 
-    db.prepare(`UPDATE users SET ${Object.keys(patch).map((k) => `${k} = @${k}`).join(', ')} WHERE id = @id`)
-      .run({ ...patch, id });
+    updateVersioned(db, 'users', id, version, patch);
 
     if (isActive === false) db.prepare('DELETE FROM sessions WHERE user_id = ?').run(id);
 
@@ -351,22 +389,82 @@ module.exports = function adminRoutes(ctx) {
   // ---------------------------------------------------------------------------
   // Settings
   // ---------------------------------------------------------------------------
+  const settingsVersion = () => Number(ctx.store.getMeta('settings_version') || 1);
+  const logoInfo = () => {
+    const data = ctx.store.getMeta('branding_logo');
+    if (!data) return null;
+    return {
+      mime: ctx.store.getMeta('branding_logo_mime'),
+      sizeBytes: Buffer.from(data, 'base64').length,
+      url: `/api/branding/logo?v=${ctx.store.getMeta('branding_logo_version') || 1}`,
+    };
+  };
+
   router.get('/settings', requirePerm('settings.manage'), (_req, res) => {
-    res.json({ settings: ctx.store.getSettings() });
+    res.json({ settings: ctx.store.getSettings(), version: settingsVersion(), logo: logoInfo() });
   });
 
+  // All settings share one version counter (SW-13): the form is saved only if
+  // nobody else saved settings since this administrator loaded them.
   router.patch('/settings', requirePerm('settings.manage'), (req, res) => {
     const body = req.body && typeof req.body === 'object' ? req.body : {};
-    const changed = [];
-    for (const [key, value] of Object.entries(body)) {
+    const v = new Validator(body);
+    const version = expectedVersion(v);
+    v.throwIfInvalid();
+
+    const updates = [];
+    const details = [];
+    for (const [key, raw] of Object.entries(body)) {
       if (!SETTINGS_ALLOWED.has(key)) continue;
-      const str = value === null || value === undefined ? '' : String(value).slice(0, 500);
-      ctx.store.setSetting(key, str);
-      changed.push(key);
+      const { value, error } = checkSetting(key, raw);
+      if (error) details.push({ field: key, message: error });
+      else updates.push([key, value]);
     }
-    if (changed.length === 0) throw new ApiError(400, 'No recognised settings were supplied.');
+    if (details.length) {
+      throw new ApiError(400, 'Please correct the highlighted fields.', { code: 'validation_failed', details });
+    }
+    if (updates.length === 0) throw new ApiError(400, 'No recognised settings were supplied.');
+
+    const before = ctx.store.getSettings();
+    db.transaction(() => {
+      if (settingsVersion() !== version) throw versionConflict(settingsVersion());
+      for (const [key, value] of updates) ctx.store.setSetting(key, value);
+      ctx.store.setMeta('settings_version', settingsVersion() + 1);
+    })();
+    const changed = updates.filter(([key, value]) => before[key] !== value).map(([key]) => key);
     audit(ctx, req, { action: 'settings.update', detail: { keys: changed } });
-    res.json({ ok: true, settings: ctx.store.getSettings() });
+    res.json({ ok: true, settings: ctx.store.getSettings(), version: settingsVersion() });
+  });
+
+  router.post(
+    '/settings/logo',
+    requirePerm('settings.manage'),
+    express.raw({ type: () => true, limit: LOGO_MAX_BYTES + 1024 }),
+    (req, res) => {
+      const body = req.body;
+      if (!Buffer.isBuffer(body) || body.length === 0) throw new ApiError(400, 'No image was received.');
+      if (body.length > LOGO_MAX_BYTES) throw new ApiError(413, 'The logo must be 512 KB or smaller.');
+      const mime = sniffLogo(body);
+      if (!mime) throw new ApiError(415, 'The logo must be a PNG, JPEG or WebP image.');
+      db.transaction(() => {
+        ctx.store.setMeta('branding_logo', body.toString('base64'));
+        ctx.store.setMeta('branding_logo_mime', mime);
+        ctx.store.nextSequence('branding_logo_version');
+      })();
+      audit(ctx, req, { action: 'settings.logo_update', detail: { mime, sizeBytes: body.length, sha256: sha256hex(body) } });
+      res.status(201).json({ ok: true, logo: logoInfo() });
+    },
+  );
+
+  router.delete('/settings/logo', requirePerm('settings.manage'), (req, res) => {
+    if (!ctx.store.getMeta('branding_logo')) return res.json({ ok: true, logo: null });
+    db.transaction(() => {
+      ctx.store.setMeta('branding_logo', null);
+      ctx.store.setMeta('branding_logo_mime', null);
+      ctx.store.nextSequence('branding_logo_version');
+    })();
+    audit(ctx, req, { action: 'settings.logo_remove' });
+    res.json({ ok: true, logo: null });
   });
 
   return router;

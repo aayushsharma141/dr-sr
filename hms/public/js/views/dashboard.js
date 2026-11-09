@@ -10,6 +10,13 @@ function greeting() {
   return 'Good evening';
 }
 
+/** "Dr Anil Kumar Verma" -> "Dr Verma"; "Kiran Kumari" -> "Kiran". */
+function greetingName(fullName = '') {
+  const parts = String(fullName).trim().split(/\s+/);
+  if (/^dr\.?$/i.test(parts[0]) && parts.length > 1) return `Dr ${parts[parts.length - 1]}`;
+  return parts[0] || '';
+}
+
 function statCard({ label, value, meta, iconName, href }) {
   const inner = `
     <div class="stat">
@@ -47,12 +54,12 @@ export default async function dashboardView(root, { navigate }) {
   root.innerHTML = `
     <div class="page-head">
       <div>
-        <h1>${ui.esc(greeting())}, ${ui.esc(user.fullName.split(' ')[0])}</h1>
+        <h1>${ui.esc(greeting())}, ${ui.esc(greetingName(user.fullName))}</h1>
         <div class="sub">${ui.esc(today.toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }))} · ${ui.esc(user.roleLabel)}</div>
       </div>
       <div class="page-head-actions">
         ${session.can('patient.write') ? `<button class="btn btn--primary" data-action="register">${ui.icon('userPlus')}<span>Register patient</span></button>` : ''}
-        ${session.can('billing.write') ? `<a class="btn" href="#/billing">${ui.icon('receipt')}<span>New invoice</span></a>` : ''}
+        ${session.can('invoice.write') ? `<a class="btn" href="#/billing">${ui.icon('receipt')}<span>New invoice</span></a>` : ''}
       </div>
     </div>
 
@@ -159,7 +166,7 @@ export default async function dashboardView(root, { navigate }) {
             ${session.can('patient.write') ? `<button class="btn btn--block" data-action="register">${ui.icon('userPlus')}<span>Register a patient</span></button>` : ''}
             <a class="btn btn--block" href="#/patients">${ui.icon('search')}<span>Find a patient record</span></a>
             ${session.can('appointment.write') ? `<a class="btn btn--block" href="#/appointments">${ui.icon('calendar')}<span>Book an appointment</span></a>` : ''}
-            ${session.can('billing.write') ? `<a class="btn btn--block" href="#/billing">${ui.icon('receipt')}<span>Create an invoice</span></a>` : ''}
+            ${session.can('invoice.write') ? `<a class="btn btn--block" href="#/billing">${ui.icon('receipt')}<span>Create an invoice</span></a>` : ''}
             ${session.can('backup.manage') ? `<a class="btn btn--block" href="#/admin/backups">${ui.icon('database')}<span>Backups &amp; restore</span></a>` : ''}
           </div>
         </section>

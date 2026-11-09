@@ -107,6 +107,16 @@ A backup that has never been restored is a hope, not a backup.
 
 ---
 
+### Upgrading the application
+
+Copy the new application files over the old ones (never over `data/`) and start the server.
+If the new version changes the database, the console shows `Pre-upgrade backup written: …`
+followed by `Database upgraded to schema vN`. That backup appears on the Backups screen as
+*Before upgrade*; the upgrade itself is written to the audit trail as `system.upgrade`. If an
+upgrade step fails, the server does not start, the database stays at its previous version and the
+console names the backup to restore from. A database from a newer version of the application is
+refused rather than opened.
+
 ## 4. Restoring after a failure
 
 ### The server PC still works, data looks wrong

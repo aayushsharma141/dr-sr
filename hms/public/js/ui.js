@@ -307,7 +307,7 @@ export function severityPill(severity) {
 // ---------------------------------------------------------------------------
 export function toast(message, type = 'info', timeout = 4200) {
   const root = document.getElementById('toasts');
-  if (!root) return;
+  if (!root || !message) return; // empty = already explained elsewhere (e.g. edit conflict dialog)
   const icoName = type === 'error' ? 'alert' : type === 'ok' ? 'check-circle' : 'info';
   const node = el(`<div class="toast toast--${type}">${icon(icoName, 16)}<div>${esc(message)}</div></div>`);
   root.appendChild(node);
@@ -445,9 +445,9 @@ export function confirmDialog({
     handle.dialog.querySelector('[data-confirm]').addEventListener('click', () => {
       if (requireReason) {
         const value = reasonInput.value.trim();
-        if (value.length < 3) {
+        if (value.length < 5) {
           const err = handle.dialog.querySelector('[data-reason-error]');
-          err.textContent = 'Please give a short reason (at least 3 characters).';
+          err.textContent = 'Please give a short reason (at least 5 characters).';
           err.classList.remove('hidden');
           reasonInput.setAttribute('aria-invalid', 'true');
           reasonInput.focus();

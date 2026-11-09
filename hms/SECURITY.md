@@ -55,26 +55,29 @@ Recovery when all admins are locked out is a **console** command
 Permissions are checked in the route handlers (`requirePerm(...)`), not only in the UI.
 Hiding a button is a convenience; the API is the boundary.
 
-| Permission | Admin | Doctor | Nurse | Reception |
-|---|:--:|:--:|:--:|:--:|
-| `patient.read` / `patient.write` | ✅ | ✅ | read | ✅ |
-| `clinical.read` (notes, diagnoses, prescriptions) | ✅ | ✅ | ✅ | ❌ |
-| `clinical.write` | ✅ | ✅ | ✅ | ❌ |
-| `vitals.write` | ✅ | ✅ | ✅ | ❌ |
-| `attachment.read` / `attachment.write` | ✅ | ✅ | ✅ | ✅ |
-| `visit.read` / `visit.write` | ✅ | ✅ | ✅ | ✅ |
-| `appointment.read` / `appointment.write` | ✅ | ✅ | read | ✅ |
-| `billing.read` | ✅ | ✅ | ❌ | ✅ |
-| `billing.write` | ✅ | ❌ | ❌ | ✅ |
-| `billing.void` (void invoices / payments) | ✅ | ❌ | ❌ | ❌ |
-| `report.read` / `export.data` | ✅ | ✅ | ❌ | ✅ |
-| `user.manage`, `audit.read`, `backup.manage`, `settings.manage` | ✅ | ❌ | ❌ | ❌ |
+| Permission | Admin | Doctor | Reception |
+|---|:--:|:--:|:--:|
+| `patient.read` / `patient.write` | read | read | ✅ |
+| `clinical.read` (vitals, notes, diagnoses, prescriptions) | ❌ | ✅ | ❌ |
+| `clinical.write` / `vitals.write` (own visits only) | ❌ | ✅ | ❌ |
+| `attachment.read` / `attachment.write` | ❌ | ✅ | ✅ |
+| `visit.read` / `visit.write` | read | ✅ | ✅ |
+| `appointment.read` / `appointment.write` | read | ✅ | ✅ |
+| `billing.read` | ✅ | ❌ | ✅ |
+| `invoice.write` / `payment.collect` | ❌ | ❌ | ✅ |
+| `payment.reverse` (void invoices / payments) | ✅ | ❌ | ❌ |
+| `billing.catalogue` (fees) | ✅ | ❌ | ❌ |
+| `report.read` / `export.data` | ✅ / ✅ | ❌ | ✅ / ❌ |
+| `user.manage`, `audit.read`, `backup.manage`, `settings.manage` | ✅ | ❌ | ❌ |
+
+The matrix is ported from the approved v3 matrix (ADR-17, D-04 / EG-16, ADR-23, D-06). Doctors
+change only visits assigned to them (edit-own); see `docs/DATA-MODEL.md` section 4.
 
 Guard rails against self-inflicted lockout: an administrator cannot deactivate or demote
 themselves, and the last active administrator cannot be disabled or demoted.
 
-Reception staff calling a clinical endpoint receive `403`; the patient chart they can open
-simply contains no clinical sections (verified by an automated test).
+Reception and Admin calling a clinical endpoint receive `403`; the patient chart and visit they
+can open simply contain no clinical sections (verified by automated tests).
 
 ---
 

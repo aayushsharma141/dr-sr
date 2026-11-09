@@ -8,7 +8,7 @@ future change.
 npm test
 ```
 
-Expected output: **5 suites, 55 tests, 0 failures**, in roughly 5 seconds. Exit code is non-zero
+Expected output: **7 suites, 78 tests, 0 failures**, in roughly 5 seconds. Exit code is non-zero
 if anything fails, so it can gate a deployment.
 
 ---
@@ -24,8 +24,8 @@ const { boot, setupAdmin, makeStaff, createPatient } = require('../test-support/
 
 const env = await boot();                        // fresh DB + keys + app on a random port
 const { client: admin } = await setupAdmin(env); // consumes the setup code like a human would
-await createPatient(admin, { firstName: 'Sunita', phone: '9876543210' });
-const { client: nurse } = await makeStaff(env, admin, { username: 'nurse.test', role: 'nurse' });
+const { reception, doctor } = await makeTeam(env, admin); // the three Kalyan roles
+await createPatient(reception, { firstName: 'Sunita', phone: '9876543210' });
 await env.close();                               // stops the server, closes the DB
 ```
 
@@ -117,22 +117,22 @@ backup.
 ```js
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { boot, setupAdmin, makeStaff, createPatient } = require('../test-support/helpers');
+const { boot, setupAdmin, makeTeam, createPatient } = require('../test-support/helpers');
 
-test('a nurse cannot void an invoice', async (t) => {
+test('reception cannot void an invoice', async (t) => {
   const env = await boot();
   t.after(() => env.close());
   const { client: admin } = await setupAdmin(env);
-  const { client: nurse } = await makeStaff(env, admin, { username: 'nurse.void', role: 'nurse' });
+  const { reception } = await makeTeam(env, admin);
 
-  const patient = await createPatient(admin);
-  const invoice = await admin.post('/api/invoices', {
+  const patient = await createPatient(reception);
+  const invoice = await reception.post('/api/invoices', {
     patientId: patient.id,
     items: [{ description: 'Consultation', qty: 1, unitPricePaise: 25000 }],
   });
   assert.equal(invoice.status, 201);
 
-  const res = await nurse.post(`/api/invoices/${invoice.body.invoice.id}/void`, { reason: 'test void' });
+  const res = await reception.post(`/api/invoices/${invoice.body.invoice.id}/void`, { reason: 'test void' });
   assert.equal(res.status, 403);
 });
 ```
@@ -152,5 +152,5 @@ test('a nurse cannot void an invoice', async (t) => {
   EXISTS`) for v1; a real migration path is the first thing to build before schema v2.
 * The suite deliberately does not assert exact counts of seeded demo data (that lives in
   `scripts/seed.js` and changes with the demo).
-* Never weaken a test to make a change pass. Each of the 55 tests corresponds to something
+* Never weaken a test to make a change pass. Each of the 78 tests corresponds to something
   the hospital is relying on.

@@ -23,8 +23,10 @@ internet connection** and sends nothing outside the building.
 | **Administration** | Staff accounts and roles, tamper-evident audit trail with CSV export, encrypted backups (nightly + on demand + off-site export), clinic settings |
 | **Safety** | One-time console setup code for the first admin, role-based access, session timeouts, login throttling, CSRF/origin protection, hash-chained audit log |
 
-Roles: **Administrator**, **Doctor**, **Nurse**, **Reception** — each with a fixed permission
-set enforced on the server, not just hidden in the UI.
+Roles: **Administrator**, **Doctor**, **Reception** (ADR-17) — each with a fixed permission
+set enforced on the server, not just hidden in the UI. Reception registers patients and takes
+payments; doctors write the clinical record of their own visits; the administrator manages the
+system and reverses payments but sees no clinical content.
 
 ---
 
@@ -122,14 +124,15 @@ server.js                 entry point: console banner, timers, graceful shutdown
 src/
   app.js                  Express app assembly (security headers, routes, errors)
   config.js               env-driven configuration with safe defaults
-  db.js  schema.sql       SQLite bootstrap, schema, helpers
+  db.js  schema.sql       SQLite bootstrap, v1 baseline schema, upgrade runner, helpers
+  migrations/             numbered schema upgrades (002-phase1-foundations.sql, ...)
   auth.js                 permissions, sessions, login throttling
   lib/                    crypto, audit chain, http/validation, tar, backups, logging
   routes/                 bootstrap, auth, patients, clinical, attachments,
                           appointments, billing, dashboard, admin
 public/                   the browser app (index.html, css, js/views/*)
 scripts/                  seed, backup, restore, users, audit-verify, make-portable
-test/                     55 integration tests (node:test, no extra dependencies)
+test/                     78 integration tests (node:test, no extra dependencies)
 docs/                     deployment, operations, data model, API, security, testing
 data/                     runtime data (git-ignored): database, uploads, keys, backups
 ```
@@ -158,7 +161,7 @@ in **[SECURITY.md](SECURITY.md)**.
 |---|---|
 | `npm start` | Run the server (prints LAN URLs and, on first run, the setup code) |
 | `npm run dev` | Same, with auto-restart on file changes |
-| `npm test` | Run the integration test suite (55 tests) |
+| `npm test` | Run the integration test suite (78 tests) |
 | `npm run seed` | Load synthetic demo data |
 | `npm run seed:reset` | **Wipe** the database and reload synthetic data |
 | `npm run backup` | Write an encrypted backup now (`-- --list` to list them) |

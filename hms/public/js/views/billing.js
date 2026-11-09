@@ -22,7 +22,7 @@ export default async function billingView(root, { query, navigate }) {
   if (filters.date) params.set('date', filters.date);
 
   const data = await api.get(`/api/invoices?${params}`);
-  const canWrite = session.can('billing.write');
+  const canWrite = session.can('invoice.write'); // reception raises invoices (ADR-23)
 
   root.innerHTML = `
     <div class="page-head">

@@ -107,7 +107,7 @@ The first start prints a **one-time setup code** on the console. Open `http://lo
 on the server PC, enter the code, and create the real first administrator. Then:
 
 1. **Settings** → real hospital name, address, phone, registration, disclaimer.
-2. **Staff accounts** → one account per person (Administrator, Doctor, Nurse, Reception).
+2. **Staff accounts** → one account per person (Administrator, Doctor, Reception).
    Do not recreate `admin`, `dr.verma` or `reception` as shared logins.
 3. **Settings → Dataset** → the tick box is already off (a fresh database has no synthetic
    flag), verify it reads *"This installation contains live clinic data."*

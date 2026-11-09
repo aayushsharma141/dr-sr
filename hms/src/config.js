@@ -50,7 +50,7 @@ const config = {
   },
 
   session: {
-    idleMinutes: num('KH_SESSION_IDLE_MIN', 20),
+    idleMinutes: num('KH_SESSION_IDLE_MIN', 30), // D-07: 30-minute idle timeout
     maxHours: num('KH_SESSION_MAX_HOURS', 12),
     cookieName: 'kh_sid',
   },
@@ -69,8 +69,8 @@ const config = {
     // Login throttling (per client IP + per account).
     loginMaxAttempts: 8,
     loginWindowMinutes: 10,
-    accountLockThreshold: 10,
-    accountLockMinutes: 15,
+    accountLockThreshold: 5, // D-07: lock after 5 wrong passwords ...
+    accountLockMinutes: 15, // ... for 15 minutes (or until an admin resets it)
   },
 
   uploads: {

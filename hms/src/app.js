@@ -21,6 +21,7 @@ const appointmentRoutes = require('./routes/appointments');
 const billingRoutes = require('./routes/billing');
 const dashboardRoutes = require('./routes/dashboard');
 const adminRoutes = require('./routes/admin');
+const brandingRoutes = require('./routes/branding');
 
 function securityHeaders(config) {
   return (req, res, next) => {
@@ -108,6 +109,7 @@ function createApp(ctx) {
   });
 
   app.use('/api/bootstrap', bootstrapRoutes(ctx));
+  app.use('/api/branding', brandingRoutes(ctx));
   app.use('/api/auth', authRoutes(ctx));
   app.use('/api', dashboardRoutes(ctx));
   app.use('/api/patients', patientRoutes(ctx));
