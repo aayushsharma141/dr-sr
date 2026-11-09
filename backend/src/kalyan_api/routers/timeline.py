@@ -91,14 +91,14 @@ def get_patient_timeline(
             )
         )
 
-    # 2. Clinical Encounters (CLINICAL_READ & Reception Policy)
-    # Reception does not view raw clinical encounters; Doctors can view all under CLINICAL_READ (DWS-04)
-    if principal.role in (Role.ADMIN, Role.DOCTOR):
-        enc_scope = (
-            true()
-            if principal.role == Role.ADMIN
-            else row_scope(principal, ScopeFamily.CLINICAL_READ, ClinicalEncounter.doctor_id)
-        )
+    # Clinical content is doctor-only (D-04). ADMIN and RECEPTION get no encounters,
+    # prescriptions, diagnoses or VAS/modality detail (BR-002). Doctors see rows within
+    # their CLINICAL_READ scope (DWS-04).
+    can_see_clinical = principal.role == Role.DOCTOR
+
+    # 2. Clinical Encounters
+    if can_see_clinical:
+        enc_scope = row_scope(principal, ScopeFamily.CLINICAL_READ, ClinicalEncounter.doctor_id)
         enc_stmt = (
             select(ClinicalEncounter)
             .where(ClinicalEncounter.patient_id == patient_id, enc_scope)
@@ -139,13 +139,9 @@ def get_patient_timeline(
                 )
             )
 
-    # 3. Prescriptions (CLINICAL_READ & Reception Policy)
-    if principal.role in (Role.ADMIN, Role.DOCTOR):
-        rx_scope = (
-            true()
-            if principal.role == Role.ADMIN
-            else row_scope(principal, ScopeFamily.CLINICAL_READ, Prescription.doctor_id)
-        )
+    # 3. Prescriptions
+    if can_see_clinical:
+        rx_scope = row_scope(principal, ScopeFamily.CLINICAL_READ, Prescription.doctor_id)
         rx_stmt = (
             select(Prescription)
             .where(Prescription.patient_id == patient_id, rx_scope)
@@ -197,8 +193,12 @@ def get_patient_timeline(
                 title=f"Package: {plan.plan_name}",
                 subtitle=f"{_doctor_title(doc_name)} · ₹{price_rupees:,.2f}",
                 summary=(
-                    f"Diagnosis: {plan.condition_diagnosis or 'N/A'} | "
-                    f"Sessions: {plan.completed_sessions}/{plan.total_sessions}"
+                    (
+                        f"Diagnosis: {plan.condition_diagnosis or 'N/A'} | "
+                        f"Sessions: {plan.completed_sessions}/{plan.total_sessions}"
+                    )
+                    if can_see_clinical
+                    else f"Sessions: {plan.completed_sessions}/{plan.total_sessions}"
                 ),
                 badge=plan.status,
                 badge_variant="default" if plan.status == "ACTIVE" else "outline",
@@ -232,9 +232,14 @@ def get_patient_timeline(
         doc_name = sess.doctor.name_en if sess.doctor else "Doctor"
         plan_name = sess.treatment_plan.plan_name if sess.treatment_plan else "Physiotherapy"
         doctor_label = _doctor_title(doc_name)
-        summary_txt = f"Doctor: {doctor_label} | Modalities: {sess.modalities or 'Standard'}"
-        if sess.vas_score is not None:
-            summary_txt += f" | VAS: {sess.vas_score}/10"
+        # Attendance (date, number, doctor) is administrative; VAS and modalities are clinical.
+        vas_score = sess.vas_score if can_see_clinical else None
+        if can_see_clinical:
+            summary_txt = f"Doctor: {doctor_label} | Modalities: {sess.modalities or 'Standard'}"
+            if vas_score is not None:
+                summary_txt += f" | VAS: {vas_score}/10"
+        else:
+            summary_txt = f"Doctor: {doctor_label}"
 
         items.append(
             TimelineItemOut(
@@ -250,7 +255,7 @@ def get_patient_timeline(
                     "session_id": sess.id,
                     "treatment_plan_id": sess.treatment_plan_id,
                     "session_number": sess.session_number,
-                    "vas_score": sess.vas_score,
+                    "vas_score": vas_score,
                 },
             )
         )

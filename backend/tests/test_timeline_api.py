@@ -165,7 +165,7 @@ def test_timeline_chronological_ordering_admin(
     db_session: Session,
     login_client: type[TestClient],
 ) -> None:
-    """Admin views complete unified chronological timeline with all 6 event types (CLN-03)."""
+    """Admin sees the administrative timeline but no clinical events (CLN-03, D-04, BR-002)."""
     pat = _seed_patient_activity(
         db_session, doctor_a_user.doctor_id, doctor_b_user.doctor_id, admin_user
     )
@@ -179,9 +179,10 @@ def test_timeline_chronological_ordering_admin(
     assert "PAYMENT" in event_types
     assert "TREATMENT_SESSION" in event_types
     assert "TREATMENT_PLAN" in event_types
-    assert "PRESCRIPTION" in event_types
-    assert "ENCOUNTER" in event_types
     assert "APPOINTMENT" in event_types
+    # Clinical events are doctor-only: admin must not receive them.
+    assert "PRESCRIPTION" not in event_types
+    assert "ENCOUNTER" not in event_types
 
     # Ensure items are strictly sorted descending by event_date
     dates = [item["event_date"] for item in timeline]

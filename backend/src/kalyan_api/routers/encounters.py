@@ -143,6 +143,13 @@ def create_encounter(
                 code="appointment_not_found",
                 message="Appointment not found or not assigned to this doctor.",
             )
+        # BR-001: the appointment must belong to the same patient as the note.
+        if appt.patient_id != payload.patient_id:
+            raise ApiError(
+                status_code=404,
+                code="appointment_not_found",
+                message="Appointment not found for this patient.",
+            )
 
         # DWS-01: Idempotency / reopening existing encounter
         existing_enc = session.scalar(

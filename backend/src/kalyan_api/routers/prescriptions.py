@@ -128,6 +128,13 @@ def create_prescription(
             family=ScopeFamily.CLINICAL_WRITE,
             doctor_id_col=ClinicalEncounter.doctor_id,
         )
+        # BR-001: the encounter must belong to the same patient as the prescription.
+        if encounter.patient_id != payload.patient_id:
+            raise ApiError(
+                status_code=404,
+                code="encounter_not_found",
+                message="Encounter not found for this patient.",
+            )
 
         # Enforce partial unique index: at most one active prescription per encounter (D-19-15)
         active_rx = session.execute(

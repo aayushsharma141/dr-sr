@@ -248,7 +248,8 @@ def test_phase15_comprehensive_gate(
     assert "PAYMENT" in types
     assert "TREATMENT_PLAN" in types
     assert "TREATMENT_SESSION" in types
-    assert "ENCOUNTER" in types
+    # Admin has no clinical view (D-04, BR-002): encounters are doctor-only.
+    assert "ENCOUNTER" not in types
 
     # Strict descending chronology
     dates = [it["event_date"] for it in timeline]
