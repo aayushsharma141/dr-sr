@@ -13,10 +13,10 @@ interface DocumentTabOption {
 }
 
 const DOCUMENT_TABS: DocumentTabOption[] = [
-  { type: 'prescription', label: 'Prescription Slip', labelHi: 'पर्चा' },
-  { type: 'receipt', label: 'Payment Receipt', labelHi: 'रसीद' },
-  { type: 'registration_card', label: 'Registration Identity Card', labelHi: 'पहचान पत्र' },
-  { type: 'consultation_summary', label: 'Patient Consultation Summary', labelHi: 'परामर्श सारांश' },
+  { type: 'prescription', label: 'Prescription', labelHi: 'पर्चा' },
+  { type: 'receipt', label: 'Receipt', labelHi: 'रसीद' },
+  { type: 'registration_card', label: 'Registration Card', labelHi: 'पहचान पत्र' },
+  { type: 'consultation_summary', label: 'Consultation Summary', labelHi: 'परामर्श सारांश' },
 ]
 
 export function PrintTemplateEditor() {

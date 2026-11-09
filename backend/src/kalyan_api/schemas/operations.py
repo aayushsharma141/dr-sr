@@ -127,29 +127,56 @@ class RestoreResultOut(BaseModel):
 class IntegrityCheckItemOut(BaseModel):
     """Status of an individual integrity check.
 
-    ``severity`` describes how a non-passing result is classified: ERROR findings make the
-    report unhealthy; WARNING findings are reported but do not.
+    ``code`` is a stable identifier for the check. ``severity`` is the worst severity among
+    its findings: ERROR makes the report unhealthy; WARNING is a review item; CLEANUP is
+    harmless clutter. Each finding in ``discrepancies`` carries its own ``issue`` and
+    ``severity``.
     """
 
+    code: str = ""
     name: str
     passed: bool
-    severity: Literal["ERROR", "WARNING"] = "ERROR"
+    severity: Literal["ERROR", "WARNING", "CLEANUP"] = "ERROR"
     details: str
     discrepancies: list[dict[str, Any]] = Field(default_factory=list)
 
 
 class IntegrityReportOut(BaseModel):
-    """System-wide clinical and financial integrity report."""
+    """System-wide clinical and financial integrity report (one stored run)."""
 
+    id: int | None = None
     generated_at: str
+    run_by_username: str | None = None
+    duration_ms: int = 0
     is_healthy: bool
     total_checks: int
     passed_checks: int
     failed_checks: int
     warning_checks: int = 0
+    cleanup_checks: int = 0
     checks: list[IntegrityCheckItemOut]
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class IntegrityRunSummaryOut(BaseModel):
+    """Counts from one past integrity run, for the history list."""
+
+    id: int
+    generated_at: str
+    run_by_username: str | None = None
+    is_healthy: bool
+    total_checks: int
+    passed_checks: int
+    failed_checks: int
+    warning_checks: int
+    cleanup_checks: int
+
+
+class IntegrityHistoryOut(BaseModel):
+    """Most recent integrity runs, newest first."""
+
+    runs: list[IntegrityRunSummaryOut]
 
 
 class BackupSettingsOut(BaseModel):

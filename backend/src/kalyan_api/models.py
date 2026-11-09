@@ -1537,3 +1537,30 @@ class PatientImportRow(Base):
 
 
 
+
+
+class IntegrityRun(Base):
+    """One run of the data integrity check, with its full result (BAK-03).
+
+    Opening the Data Integrity page reads the latest run; only an explicit run adds a row.
+    Rows are never updated.
+    """
+
+    __tablename__ = "integrity_runs"
+
+    id: Mapped[int] = mapped_column(BigInteger, Identity(always=False), primary_key=True)
+    generated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    run_by_user_id: Mapped[int | None] = mapped_column(
+        BigInteger, ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    run_by_username: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    duration_ms: Mapped[int] = mapped_column(Integer, nullable=False)
+    is_healthy: Mapped[bool] = mapped_column(Boolean, nullable=False)
+    total_checks: Mapped[int] = mapped_column(Integer, nullable=False)
+    passed_checks: Mapped[int] = mapped_column(Integer, nullable=False)
+    failed_checks: Mapped[int] = mapped_column(Integer, nullable=False)
+    warning_checks: Mapped[int] = mapped_column(Integer, nullable=False)
+    cleanup_checks: Mapped[int] = mapped_column(Integer, nullable=False)
+    checks: Mapped[list] = mapped_column(JSONB, nullable=False)
+
+    __table_args__ = (Index("ix_integrity_runs_generated_at", "generated_at"),)

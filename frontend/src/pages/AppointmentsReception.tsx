@@ -47,9 +47,9 @@ function FollowUpVisits() {
   const followUps = data ?? []
 
   const windows: { key: FollowUpWindow; label: string }[] = [
-    { key: 'all', label: 'All dated follow-ups' },
-    { key: 'today', label: 'Due today' },
-    { key: 'week', label: 'Next 7 days' },
+    { key: 'all', label: 'All Follow-ups' },
+    { key: 'today', label: 'Due Today' },
+    { key: 'week', label: 'Next 7 Days' },
     { key: 'overdue', label: 'Overdue' },
   ]
 
@@ -274,6 +274,7 @@ export function AppointmentsReception() {
   return (
     <AppShell name={me?.full_name || 'Staff'} role={me?.role || 'RECEPTION'}>
       <div className="space-y-6">
+        <h1 className="text-2xl font-bold tracking-tight text-slate-900">Appointments</h1>
         <div role="tablist" aria-label="Appointment workspace" className="flex flex-wrap gap-2 border-b border-slate-200 pb-2">
           <button
             type="button"
@@ -284,7 +285,7 @@ export function AppointmentsReception() {
             onClick={() => selectTab('today')}
             className={`min-h-11 rounded-lg border-b-2 px-4 text-sm font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#8E1C3D] ${activeTab === 'today' ? 'border-[#C39A35] bg-white text-[#5D0B26]' : 'border-transparent text-slate-600 hover:bg-white hover:text-[#5D0B26]'}`}
           >
-            Today's Token Queue
+            Today's Queue
           </button>
           {canViewFollowUps && (
             <button
@@ -296,7 +297,7 @@ export function AppointmentsReception() {
               onClick={() => selectTab('followup')}
               className={`min-h-11 rounded-lg border-b-2 px-4 text-sm font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#8E1C3D] ${activeTab === 'followup' ? 'border-[#C39A35] bg-white text-[#5D0B26]' : 'border-transparent text-slate-600 hover:bg-white hover:text-[#5D0B26]'}`}
             >
-              Follow-up Visits
+              Follow-ups
             </button>
           )}
         </div>

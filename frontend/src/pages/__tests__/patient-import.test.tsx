@@ -10,6 +10,11 @@ vi.mock('../../api/queries', () => ({
   useLogout: () => ({ mutateAsync: vi.fn(), isPending: false }),
 }))
 
+// The sidebar's Data Integrity count would otherwise take a queued apiFetch response.
+vi.mock('../../api/integrity', () => ({
+  useLatestIntegrityRun: () => ({ data: undefined }),
+}))
+
 vi.mock('../../api/branding', () => ({
   useClinicBranding: () => ({
     trustNameEn: 'Sri Vashishtha Kalyan Trust',
@@ -52,7 +57,7 @@ describe('PatientImportPage and 8-Stage Import Wizard', () => {
   it('renders 8-stage stepper and initial upload stage', () => {
     renderWithProviders(<PatientImportPage />)
 
-    expect(screen.getByRole('heading', { name: 'Patient Import Centre' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Import Patients' })).toBeInTheDocument()
     expect(screen.getByLabelText('Import Progress')).toBeInTheDocument()
 
     // 8 stages in stepper

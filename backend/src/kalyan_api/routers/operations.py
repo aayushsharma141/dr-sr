@@ -35,7 +35,7 @@ from kalyan_api.core.principal import (
     current_principal,
 )
 from kalyan_api.db.session import SessionDep, SessionLocal
-from kalyan_api.models import BackupRun, BackupSettings, User
+from kalyan_api.models import BackupRun, BackupSettings, IntegrityRun, User
 from kalyan_api.schemas.operations import (
     BackupArchiveInfo,
     BackupArchiveListResponse,
@@ -45,7 +45,9 @@ from kalyan_api.schemas.operations import (
     BackupSettingsUpdate,
     BackupVerifyResponse,
     IntegrityCheckItemOut,
+    IntegrityHistoryOut,
     IntegrityReportOut,
+    IntegrityRunSummaryOut,
     RestoreRequest,
     RestoreResultOut,
 )
@@ -524,52 +526,116 @@ def trigger_restore(
     )
 
 
+def _report_from_run(run: IntegrityRun) -> IntegrityReportOut:
+    return IntegrityReportOut(
+        id=run.id,
+        generated_at=run.generated_at.isoformat(),
+        run_by_username=run.run_by_username,
+        duration_ms=run.duration_ms,
+        is_healthy=run.is_healthy,
+        total_checks=run.total_checks,
+        passed_checks=run.passed_checks,
+        failed_checks=run.failed_checks,
+        warning_checks=run.warning_checks,
+        cleanup_checks=run.cleanup_checks,
+        checks=[IntegrityCheckItemOut.model_validate(item) for item in run.checks],
+    )
+
+
 @router.get(
     "/integrity",
-    response_model=IntegrityReportOut,
-    summary="Run live clinical and financial integrity inspection (BAK-03)",
+    response_model=IntegrityReportOut | None,
+    summary="Latest stored integrity check result, or null if none has run (BAK-03)",
     dependencies=[Depends(require(Permission.INTEGRITY_RUN))],
 )
-def get_integrity_report(
+def get_latest_integrity_report(session: SessionDep) -> IntegrityReportOut | None:
+    """Read the latest stored run. Reading does not run the checks or write an audit entry."""
+    run = session.scalars(
+        select(IntegrityRun).order_by(IntegrityRun.generated_at.desc(), IntegrityRun.id.desc())
+    ).first()
+    return _report_from_run(run) if run is not None else None
+
+
+@router.get(
+    "/integrity/history",
+    response_model=IntegrityHistoryOut,
+    summary="Recent integrity check runs, newest first (BAK-03)",
+    dependencies=[Depends(require(Permission.INTEGRITY_RUN))],
+)
+def get_integrity_history(
+    session: SessionDep,
+    limit: int = Query(default=20, ge=1, le=100),
+) -> IntegrityHistoryOut:
+    runs = session.scalars(
+        select(IntegrityRun)
+        .order_by(IntegrityRun.generated_at.desc(), IntegrityRun.id.desc())
+        .limit(limit)
+    ).all()
+    return IntegrityHistoryOut(
+        runs=[
+            IntegrityRunSummaryOut(
+                id=run.id,
+                generated_at=run.generated_at.isoformat(),
+                run_by_username=run.run_by_username,
+                is_healthy=run.is_healthy,
+                total_checks=run.total_checks,
+                passed_checks=run.passed_checks,
+                failed_checks=run.failed_checks,
+                warning_checks=run.warning_checks,
+                cleanup_checks=run.cleanup_checks,
+            )
+            for run in runs
+        ]
+    )
+
+
+@router.post(
+    "/integrity/run",
+    response_model=IntegrityReportOut,
+    status_code=status.HTTP_201_CREATED,
+    summary="Run every clinical, financial and file integrity check and store the result (BAK-03)",
+    dependencies=[Depends(require(Permission.INTEGRITY_RUN))],
+)
+def run_integrity_report(
     request: Request,
     session: SessionDep,
     principal: Principal = Depends(current_principal),
 ) -> IntegrityReportOut:
-    """Run full diagnostic audit on database constraints, ledger balances, and files."""
+    """Run the read-only checks, store the run and record one audit entry."""
     settings = get_settings()
     report = run_integrity_audit(session=session, settings=settings)
+    payload = report.to_dict()
 
-    # Record audit event
+    run = IntegrityRun(
+        generated_at=datetime.fromisoformat(report.generated_at),
+        run_by_user_id=principal.user_id,
+        run_by_username=principal.username,
+        duration_ms=report.duration_ms,
+        is_healthy=report.is_healthy,
+        total_checks=report.total_checks,
+        passed_checks=report.passed_checks,
+        failed_checks=report.failed_checks,
+        warning_checks=report.warning_checks,
+        cleanup_checks=report.cleanup_checks,
+        checks=payload["checks"],
+    )
+    session.add(run)
+    session.flush()
+
     ctx = build_audit_context(request, principal)
     audit_service.record(
         session,
         ctx,
         action=AuditAction.INTEGRITY_CHECK_RUN,
         entity_type="system",
-        entity_id="integrity_audit",
+        entity_id=f"integrity_run:{run.id}",
         after={
             "is_healthy": report.is_healthy,
             "total_checks": report.total_checks,
             "failed_checks": report.failed_checks,
             "warning_checks": report.warning_checks,
+            "cleanup_checks": report.cleanup_checks,
         },
     )
 
-    return IntegrityReportOut(
-        generated_at=report.generated_at,
-        is_healthy=report.is_healthy,
-        total_checks=report.total_checks,
-        passed_checks=report.passed_checks,
-        failed_checks=report.failed_checks,
-        warning_checks=report.warning_checks,
-        checks=[
-            IntegrityCheckItemOut(
-                name=c.name,
-                passed=c.passed,
-                severity=c.severity,
-                details=c.details,
-                discrepancies=c.discrepancies,
-            )
-            for c in report.checks
-        ],
-    )
+    return _report_from_run(run)

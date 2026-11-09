@@ -120,7 +120,7 @@ export function PatientDetail() {
 
   return (
     <AppShell name={me?.full_name || 'Staff'} role={me?.role || 'RECEPTION'}>
-      <div className="space-y-6 max-w-5xl mx-auto">
+      <div className="mx-auto w-full max-w-[1600px] space-y-6">
         {/* Navigation & Header */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
@@ -128,11 +128,11 @@ export function PatientDetail() {
               to="/reception/patients"
               className="text-sm text-red-900 hover:underline font-medium inline-flex items-center gap-1"
             >
-              &larr; Back to Patient Directory
+              &larr; Back to Patient Records
             </Link>
-            <h2 className="text-2xl font-bold text-neutral-900 tracking-tight mt-1">
-              Patient Profile
-            </h2>
+            <h1 className="text-2xl font-bold text-neutral-900 tracking-tight mt-1">
+              {patient ? patient.full_name : 'Patient Record'}
+            </h1>
           </div>
           {patient && (
             <div className="flex items-center gap-3">
@@ -195,14 +195,14 @@ export function PatientDetail() {
               className="flex flex-wrap gap-1 border-b border-slate-200"
             >
               {([
-                { key: 'profile', label: 'Demographic Profile' },
-                { key: 'visits', label: 'Visits & Appointments' },
+                { key: 'profile', label: 'Profile' },
+                { key: 'visits', label: 'Appointments' },
                 ...(me?.permissions.includes('encounter:read') && me.permissions.includes('prescription:read')
-                  ? [{ key: 'clinical' as const, label: 'Clinical Records' }]
+                  ? [{ key: 'clinical' as const, label: 'Consultations' }]
                   : []),
-                { key: 'therapy', label: 'Physiotherapy' },
-                { key: 'billing', label: 'Financial Ledger' },
-                ...(me?.role === 'ADMIN' && me.permissions.includes('audit:read') ? [{ key: 'audit' as const, label: 'Audit History' }] : []),
+                { key: 'therapy', label: 'Treatment Plans' },
+                { key: 'billing', label: 'Payments' },
+                ...(me?.role === 'ADMIN' && me.permissions.includes('audit:read') ? [{ key: 'audit' as const, label: 'Change History' }] : []),
               ] as const).map((tab) => (
                 <button
                   key={tab.key}

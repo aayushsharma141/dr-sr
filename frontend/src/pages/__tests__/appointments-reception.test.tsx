@@ -339,7 +339,7 @@ describe('AppointmentsReception Component', () => {
       expect(screen.getByText('Aarav Kumar')).toBeInTheDocument()
     })
 
-    expect(screen.getByRole('tab', { name: 'Follow-up Visits' })).toHaveAttribute('aria-selected', 'true')
+    expect(screen.getByRole('tab', { name: 'Follow-ups' })).toHaveAttribute('aria-selected', 'true')
     expect(screen.getByText('Knee rehabilitation')).toBeInTheDocument()
     expect(screen.getByText('Upcoming')).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Open patient' })).toHaveAttribute('href', '/reception/patients/101')

@@ -140,7 +140,7 @@ export function PatientCorrectionPage() {
         {/* Page Header */}
         <div className="border-b border-slate-200 pb-4">
           <h1 className="text-2xl font-bold tracking-tight text-slate-900">
-            Patient Demographic Correction
+            Patient Corrections
           </h1>
           <p className="mt-1 text-sm text-slate-600">
             Audited administrative workspace for correcting patient identity and contact records. Historical printouts retain their original issued snapshot.

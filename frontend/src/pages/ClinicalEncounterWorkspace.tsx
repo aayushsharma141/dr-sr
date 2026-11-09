@@ -11,7 +11,7 @@ import { FollowUpSection } from '../components/FollowUpSection'
 import { AppointmentBookingModal } from '../components/AppointmentBookingModal'
 import { ConsultationSummaryPrint } from '../components/ConsultationSummaryPrint'
 import { QuickPhraseBar } from '../components/QuickPhraseBar'
-import { asSpecialty, useAppointmentDepartmentId, useMyDepartments } from '../api/specialty'
+import { asSpecialty, useBookedAppointment, useMyDepartments } from '../api/specialty'
 import {
   IconStethoscope,
   IconHeartRateMonitor,
@@ -61,7 +61,18 @@ import { withDoctorTitle } from '../format'
 
 type AutoSaveStatus = 'IDLE' | 'SAVING' | 'SAVED' | 'OFFLINE_ERROR'
 
+/**
+ * One fresh workspace per consultation route. Moving from one consultation to another (or to a
+ * new one) inside the app would otherwise keep the previous record's state, such as its
+ * finalised lock and draft text.
+ */
 export function ClinicalEncounterWorkspace() {
+  const { id } = useParams<{ id?: string }>()
+  const [searchParams] = useSearchParams()
+  return <EncounterWorkspace key={`${id ?? 'new'}?${searchParams.toString()}`} />
+}
+
+function EncounterWorkspace() {
   const { id } = useParams<{ id?: string }>()
   const [searchParams] = useSearchParams()
   const navigate = useNavigate()
@@ -96,12 +107,10 @@ export function ClinicalEncounterWorkspace() {
   // D-19-03: the specialty comes from the consultation's own department, then the booked
   // appointment's, then the doctor's department when they have exactly one. Never assume one.
   const myDepartments = useMyDepartments()
-  const appointmentDepartmentId = useAppointmentDepartmentId(
-    existingEncounter?.appointment_id ?? paramApptId,
-  )
+  const bookedAppointment = useBookedAppointment(existingEncounter?.appointment_id ?? paramApptId)
   const departmentId: number | null =
     existingEncounter?.department_id ??
-    appointmentDepartmentId ??
+    bookedAppointment?.department_id ??
     (myDepartments.length === 1 ? myDepartments[0].id : null)
   const { data: deptTemplate } = useDepartmentTemplate(departmentId)
   const { data: serverTemplateResponse } = useEncounterTemplateResponse(encounterId)
@@ -499,8 +508,11 @@ export function ClinicalEncounterWorkspace() {
     )
   }
 
-  const patientName = patient?.full_name || existingEncounter?.patient_name || 'Consultation Patient'
-  const patientUrn = patient?.urn || existingEncounter?.patient_urn || 'KH-2026-XXXX'
+  // Never fill clinical identity with stand-in values: an unknown patient, URN or token is shown
+  // as missing, so nobody mistakes a placeholder for a real record.
+  const patientName = patient?.full_name || existingEncounter?.patient_name || null
+  const patientUrn = patient?.urn || existingEncounter?.patient_urn || null
+  const queueToken = bookedAppointment?.token_number ?? null
   const departmentName =
     deptTemplate?.name_en ||
     myDepartments.find((d) => d.id === departmentId)?.name_en ||
@@ -514,7 +526,7 @@ export function ClinicalEncounterWorkspace() {
           data-testid="sticky-clinical-header"
           className="sticky top-0 z-30 bg-[#0B132B] border-b border-slate-800 px-6 py-3 shadow-md"
         >
-          <div className="max-w-7xl mx-auto space-y-3">
+          <div className="mx-auto w-full max-w-[1600px] space-y-3">
             {/* Top Row: Navigation, Patient ID, Auto-save & Header Actions */}
             <div className="flex flex-wrap items-center justify-between gap-4">
               <div className="flex items-center gap-3">
@@ -531,18 +543,28 @@ export function ClinicalEncounterWorkspace() {
                     <span className="text-xs font-bold tracking-widest uppercase text-slate-500">
                       CURRENT CONSULTATION
                     </span>
-                    <span className="text-slate-600">•</span>
-                    <span className="text-xs font-bold font-mono text-slate-200">
-                      Token #{existingEncounter?.appointment_id ? String(existingEncounter.appointment_id).padStart(3, '0') : '004'}
-                    </span>
+                    {queueToken !== null && (
+                      <>
+                        <span className="text-slate-600" aria-hidden="true">•</span>
+                        <span data-testid="queue-token" className="text-xs font-bold font-mono text-slate-200">
+                          Token #{String(queueToken).padStart(3, '0')}
+                        </span>
+                      </>
+                    )}
                   </div>
                   <div className="flex items-baseline gap-3 mt-0.5">
                     <h1 className="text-xl font-bold text-white leading-tight">
-                      {patientName}
+                      {patientName ?? 'No patient selected'}
                     </h1>
-                    <span className="text-xs text-slate-500 font-mono">
-                      Patient ID: {patientUrn} · OPD Visit
-                    </span>
+                    {patientUrn ? (
+                      <span className="text-xs text-slate-500 font-mono">
+                        Patient ID: {patientUrn} · OPD Visit
+                      </span>
+                    ) : (
+                      <span data-testid="no-patient-hint" className="text-xs text-amber-300">
+                        Open a patient from the consultation queue to start.
+                      </span>
+                    )}
                   </div>
                 </div>
               </div>
@@ -629,7 +651,7 @@ export function ClinicalEncounterWorkspace() {
                 <div>
                   <div className="flex items-center gap-2">
                     <span className="text-sm font-bold text-white">
-                      {patientName}
+                      {patientName ?? 'No patient selected'}
                     </span>
                     <span className="text-xs px-2 py-0.5 rounded font-semibold bg-teal-950 text-teal-200 border border-teal-700 uppercase tracking-wider">
                       {departmentName}
@@ -664,7 +686,7 @@ export function ClinicalEncounterWorkspace() {
 
         {/* Sleek Horizontal Anchor Jump Navigation Strip */}
         <div className="bg-[#0B1220] border-b border-slate-800/80 sticky top-28 z-20 shadow-2xs">
-          <div className="max-w-7xl mx-auto px-6 py-2 flex items-center justify-between gap-3 overflow-x-auto">
+          <div className="mx-auto w-full max-w-[1600px] px-6 py-2 flex items-center justify-between gap-3 overflow-x-auto">
             <nav
               data-testid="jump-navigation-rail"
               aria-label="Consultation Jump Navigation"
@@ -708,7 +730,7 @@ export function ClinicalEncounterWorkspace() {
         </div>
 
         {/* Global Conflict / Notification Banners */}
-        <div className="max-w-7xl mx-auto px-6 pt-4 space-y-3">
+        <div className="mx-auto w-full max-w-[1600px] px-6 pt-4 space-y-3">
           {conflictError && (
             <ConflictBanner
               onReload={() => {
@@ -750,7 +772,7 @@ export function ClinicalEncounterWorkspace() {
         </div>
 
         {/* Option C: Consultation-First Workspace Grid matching Mockup */}
-        <main className="max-w-7xl mx-auto px-6 pt-6 grid grid-cols-1 xl:grid-cols-[1fr_340px] gap-6 items-start">
+        <main className="mx-auto w-full max-w-[1600px] px-6 pt-6 grid grid-cols-1 xl:grid-cols-[1fr_340px] gap-6 items-start">
           {/* Main Clinical Consultation Column */}
           <div className="min-w-0 space-y-6">
             {/* Section: Reason for visit */}
@@ -1458,8 +1480,8 @@ export function ClinicalEncounterWorkspace() {
               existingEncounter || {
                 id: encounterId,
                 patient_id: effectivePatientId,
-                patient_urn: patientUrn,
-                patient_name: patientName,
+                patient_urn: patientUrn ?? '',
+                patient_name: patientName ?? '',
                 doctor_id: me?.doctor_id || 1,
                 doctor_name: me?.full_name || '',
                 appointment_id: paramApptId || 0,

@@ -1513,6 +1513,30 @@ MATRIX: list[MatrixRow] = [
         },
     ),
     MatrixRow(
+        method="GET",
+        path="/api/operations/integrity/history",
+        body_factory=None,
+        expected={
+            "anonymous": 401,
+            "admin": 200,
+            "reception": 403,
+            "doctor_a": 403,
+            "doctor_b": 403,
+        },
+    ),
+    MatrixRow(
+        method="POST",
+        path="/api/operations/integrity/run",
+        body_factory=None,
+        expected={
+            "anonymous": 401,
+            "admin": 201,
+            "reception": 403,
+            "doctor_a": 403,
+            "doctor_b": 403,
+        },
+    ),
+    MatrixRow(
         method="POST",
         path="/api/users/{id}/revoke-sessions",
         body_factory=lambda _=None: {"reason": "Revoking user sessions matrix test"},

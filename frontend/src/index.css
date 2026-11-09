@@ -15,6 +15,12 @@
   --color-gold-100: #F9F4E8;
   --color-danger-600: #C81E1E;
 
+  /* Chart series, after brand maroon and gold: distinct from each other and from status colours. */
+  --color-chart-teal: #0F766E;
+  --color-chart-blue: #1D4E89;
+  --color-chart-plum: #7A4E8C;
+  --color-chart-muted: #94A3B8;
+
   /* Appointment status "In consultation / In Cabin". A status colour, not a brand colour:
      kept apart from brand maroon, danger red and the other queue statuses (sky, teal, emerald, amber). */
   --color-consult-50: #EEF2FF;

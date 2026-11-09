@@ -1,7 +1,7 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { cleanup, render, screen, waitFor, within, fireEvent } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { MemoryRouter, Route, Routes } from 'react-router'
+import { Link, MemoryRouter, Route, Routes } from 'react-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import '../../test/dialog-shim'
 import { ClinicalEncounterWorkspace } from '../ClinicalEncounterWorkspace'
@@ -665,6 +665,68 @@ describe('Clinical Encounter Workspace Test Suite', () => {
       expect(screen.queryByText(/Physiotherapy Specialty Assessment/i)).not.toBeInTheDocument()
       expect(screen.queryByText(/Low back pain radiating to leg/i)).not.toBeInTheDocument()
       expect(mockFetch.mock.calls.some(([u]) => String(u).includes('/api/templates/by-department'))).toBe(false)
+    })
+
+    it('shows the queue token from the booked appointment, not the appointment id', async () => {
+      const base = setupDefaultFetchMocks()
+      const mockFetch = vi.fn().mockImplementation((url: string, init?: RequestInit) => {
+        if (String(url).includes('/api/appointments/5')) {
+          return Promise.resolve({
+            ok: true,
+            status: 200,
+            headers: new Headers({ 'content-type': 'application/json' }),
+            text: () => Promise.resolve(JSON.stringify({ id: 5, token_number: 7, department_id: 1 })),
+          })
+        }
+        return base(url, init)
+      })
+      vi.stubGlobal('fetch', mockFetch)
+
+      renderWorkspace(10)
+
+      expect(await screen.findByTestId('queue-token')).toHaveTextContent('Token #007')
+      expect(screen.queryByText(/Token #005/)).not.toBeInTheDocument()
+    })
+
+    it('shows no token and no stand-in values when nothing is known', async () => {
+      const mockFetch = setupDefaultFetchMocks({
+        encounter: { ...mockEncounterPhysio, appointment_id: null },
+      })
+      vi.stubGlobal('fetch', mockFetch)
+
+      renderWorkspace(10)
+
+      expect(await screen.findByTestId('sticky-clinical-header')).toBeInTheDocument()
+      expect(screen.queryByTestId('queue-token')).not.toBeInTheDocument()
+      expect(screen.queryByText(/Token #004/)).not.toBeInTheDocument()
+      expect(screen.queryByText(/KH-2026-XXXX/)).not.toBeInTheDocument()
+      expect(screen.queryByText('Consultation Patient')).not.toBeInTheDocument()
+    })
+
+    it('starts a new consultation unlocked after viewing a finalised one in the same session', async () => {
+      const mockFetch = setupDefaultFetchMocks({
+        encounter: { ...mockEncounterPhysio, is_finalised: true, finalised_at: '2026-11-06T10:00:00Z' },
+      })
+      vi.stubGlobal('fetch', mockFetch)
+      const user = userEvent.setup()
+
+      render(
+        <QueryClientProvider client={queryClient}>
+          <MemoryRouter initialEntries={['/doctor/encounters/10']}>
+            <Link to="/doctor/encounters/new">Start new</Link>
+            <Routes>
+              <Route path="/doctor/encounters/new" element={<ClinicalEncounterWorkspace />} />
+              <Route path="/doctor/encounters/:id" element={<ClinicalEncounterWorkspace />} />
+            </Routes>
+          </MemoryRouter>
+        </QueryClientProvider>,
+      )
+
+      expect(await screen.findByText(/Finalised & Locked/)).toBeInTheDocument()
+      await user.click(screen.getByRole('link', { name: 'Start new' }))
+
+      expect((await screen.findAllByText('No patient selected')).length).toBeGreaterThan(0)
+      expect(screen.queryByText(/Finalised & Locked/)).not.toBeInTheDocument()
     })
 
     it('authorises prescription, locks inputs, and enables print button', async () => {

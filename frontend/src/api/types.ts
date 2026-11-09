@@ -155,77 +155,43 @@ export interface AdminOverview {
   alerts: OverviewAlertOut[]
 }
 
-export interface ManagementMetricChange {
-  value_paise: number
-  prior_paise: number
-  percent_change: number
+/** A monthly figure next to the previous month's; change_pct is null when last month was 0. */
+export interface MonthOverMonth {
+  current: number
+  previous: number
+  change_pct: number | null
 }
 
-export interface ManagementAttentionItem {
-  key: string
-  label: string
-  count: number
-  badge_variant: string
-  target_path: string
-}
-
-export interface FinancialTrendMonth {
+export interface CollectionTrendMonth {
   month: string
-  revenue_paise: number
-  expenses_paise: number
+  collected_paise: number
 }
 
-export interface DepartmentRevenueItem {
+/** Collected this month against appointments in a department; null id = not linked to one. */
+export interface DepartmentCollection {
+  department_id: number | null
   name: string
+  collected_paise: number
   percentage: number
-  revenue_paise: number
-  color: string
 }
 
-export interface HospitalGrowthSummary {
-  new_patients: number
-  new_patients_change_pct: number
-  returning_patients: number
-  returning_patients_change_pct: number
-}
-
-export interface DoctorUtilizationSummary {
-  utilization_pct: number
-  occupied_minutes: number
-  scheduled_minutes: number
-}
-
-export interface PatientGrowthMonth {
+export interface PatientTrendMonth {
   month: string
-  count: number
+  new_patients: number
 }
 
-export interface SystemHealthSummary {
-  status: string
-  application_version: string
-  database_status: string
-  last_backup_time: string | null
-  storage_used_bytes: number
-  storage_total_bytes: number
-  storage_percentage: number
-}
-
+/** Monthly figures, every one computed from records. The hospital records no expenses. */
 export interface ManagementOverview {
   current_month_label: string
-  comparison_month_label: string
-  monthly_revenue: ManagementMetricChange
-  operating_expenses: ManagementMetricChange
-  net_surplus: ManagementMetricChange
-  outstanding_receivables_paise: number
-  financial_trends: FinancialTrendMonth[]
-  department_revenues: DepartmentRevenueItem[]
-  management_attention: ManagementAttentionItem[]
-  management_attention_total: number
-  hospital_growth: HospitalGrowthSummary
-  doctor_utilization: DoctorUtilizationSummary
-  patient_growth_trends: PatientGrowthMonth[]
-  patient_growth_pct: number
-  system_health: SystemHealthSummary
+  previous_month_label: string
+  collections_paise: MonthOverMonth
+  reversed_this_month: number
+  reversed_this_month_paise: number
+  collection_trend: CollectionTrendMonth[]
+  department_collections: DepartmentCollection[]
+  new_patients: MonthOverMonth
+  returning_patients_this_month: number
+  patient_trend: PatientTrendMonth[]
 }
 
 export interface ReceptionOverview {
@@ -1195,26 +1161,52 @@ export interface RestoreResultOut {
   manifest?: Record<string, unknown> | null
 }
 
-export type IntegritySeverity = 'ERROR' | 'WARNING'
+/** ERROR: a record is wrong or points at something missing. WARNING: review, may be expected.
+ * CLEANUP: harmless clutter, such as a stored file no record uses. */
+export type IntegritySeverity = 'ERROR' | 'WARNING' | 'CLEANUP'
 
 export interface IntegrityCheckItemOut {
+  /** Stable check identifier, e.g. 'asset_files'. */
+  code: string
   name: string
   passed: boolean
-  /** ERROR findings make the report unhealthy; WARNING findings are reported only. */
+  /** Worst severity among the findings. */
   severity: IntegritySeverity
   details: string
+  /** Each finding carries its own `issue` code and `severity`. */
   discrepancies: Record<string, unknown>[]
 }
 
+/** One stored run of the integrity check. */
 export interface IntegrityReportOut {
+  id: number | null
   generated_at: string
+  run_by_username: string | null
+  duration_ms: number
   is_healthy: boolean
   total_checks: number
   passed_checks: number
-  /** Counts ERROR-level failures only. */
+  /** Checks whose worst finding is an ERROR. */
   failed_checks: number
   warning_checks: number
+  cleanup_checks: number
   checks: IntegrityCheckItemOut[]
+}
+
+export interface IntegrityRunSummaryOut {
+  id: number
+  generated_at: string
+  run_by_username: string | null
+  is_healthy: boolean
+  total_checks: number
+  passed_checks: number
+  failed_checks: number
+  warning_checks: number
+  cleanup_checks: number
+}
+
+export interface IntegrityHistoryOut {
+  runs: IntegrityRunSummaryOut[]
 }
 
 // Phase 19: Universal Consultation Workspace Contracts

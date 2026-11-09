@@ -140,7 +140,7 @@ export function SystemHealthPage() {
       <div className="space-y-6">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
-            <h1 className="text-2xl font-bold text-slate-900">System Health & Maintenance</h1>
+            <h1 className="text-2xl font-bold text-slate-900">System Health</h1>
             <p className="mt-1 text-sm text-slate-700">
               Server, database and storage facts as reported by the server.
               {dataUpdatedAt > 0 && ` Fetched ${new Date(dataUpdatedAt).toLocaleTimeString('en-IN')}.`}

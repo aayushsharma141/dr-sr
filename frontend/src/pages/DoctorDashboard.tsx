@@ -21,9 +21,9 @@ export function DoctorDashboard() {
         {/* Welcome & Queue Header */}
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-6 rounded-lg border border-neutral-200 shadow-xs">
           <div>
-            <h2 className="text-xl font-bold text-neutral-900">
-              Doctor Consultation Queue
-            </h2>
+            <h1 className="text-xl font-bold text-neutral-900">
+              Doctor Dashboard
+            </h1>
             <p className="text-xs text-neutral-500 mt-1">
               Live waiting room for {doctorName ? withDoctorTitle(doctorName) : 'the doctor'} ({queue?.queue_date || 'Today'})
             </p>

@@ -17,6 +17,15 @@ vi.mock('../../api/queries', () => ({
     data: {
       name: 'Superintendent Admin',
       role: 'ADMIN',
+      business_date: '2026-11-09',
+      collections_today: {
+        gross_paise: 1250000,
+        reversed_paise: 0,
+        payments_count: 5,
+        reversals_count: 0,
+        by_method: { CASH: 800000, UPI: 450000 },
+      },
+      outstanding_dues_paise: 4260000,
       alerts: [],
       user_counts: {
         ADMIN: { active: 1, inactive: 0 },
@@ -36,54 +45,35 @@ vi.mock('../../api/queries', () => ({
   useManagementOverview: () => ({
     data: {
       current_month_label: 'Nov 2026',
-      comparison_month_label: 'Oct 2026',
-      monthly_revenue: { value_paise: 84200000, prior_paise: 74900000, percent_change: 12.4 },
-      operating_expenses: { value_paise: 31600000, prior_paise: 30100000, percent_change: 5.1 },
-      net_surplus: { value_paise: 52600000, prior_paise: 44800000, percent_change: 17.6 },
-      outstanding_receivables_paise: 4260000,
-      financial_trends: [
-        { month: 'Jun', revenue_paise: 58000000, expenses_paise: 24000000 },
-        { month: 'Jul', revenue_paise: 70000000, expenses_paise: 27000000 },
-        { month: 'Aug', revenue_paise: 68000000, expenses_paise: 26000000 },
-        { month: 'Sep', revenue_paise: 74000000, expenses_paise: 29000000 },
-        { month: 'Oct', revenue_paise: 74900000, expenses_paise: 30100000 },
-        { month: 'Nov', revenue_paise: 84200000, expenses_paise: 31600000 },
+      previous_month_label: 'Oct 2026',
+      collections_paise: { current: 84200000, previous: 74900000, change_pct: 12.4 },
+      reversed_this_month: 0,
+      reversed_this_month_paise: 0,
+      new_patients: { current: 228, previous: 199, change_pct: 14.6 },
+      returning_patients_this_month: 1034,
+      collection_trend: [
+        { month: 'Jun', collected_paise: 58000000 },
+        { month: 'Jul', collected_paise: 70000000 },
+        { month: 'Aug', collected_paise: 68000000 },
+        { month: 'Sep', collected_paise: 74000000 },
+        { month: 'Oct', collected_paise: 74900000 },
+        { month: 'Nov', collected_paise: 84200000 },
       ],
-      department_revenues: [
-        { name: 'Orthopaedics', percentage: 45, revenue_paise: 37890000, color: '#6366f1' },
-        { name: 'Physiotherapy', percentage: 20, revenue_paise: 16840000, color: '#38bdf8' },
-        { name: 'General Consultation', percentage: 15, revenue_paise: 12630000, color: '#10b981' },
-        { name: 'Follow-up & Reviews', percentage: 12, revenue_paise: 10104000, color: '#f59e0b' },
-        { name: 'Other Services', percentage: 8, revenue_paise: 6736000, color: '#94a3b8' },
+      department_collections: [
+        { department_id: 1, name: 'Orthopaedics', percentage: 45, collected_paise: 37890000 },
+        { department_id: 2, name: 'Physiotherapy', percentage: 20, collected_paise: 16840000 },
+        { department_id: 3, name: 'General Consultation', percentage: 15, collected_paise: 12630000 },
+        { department_id: 4, name: 'Follow-up & Reviews', percentage: 12, collected_paise: 10104000 },
+        { department_id: null, name: 'Other Services', percentage: 8, collected_paise: 6736000 },
       ],
-      management_attention: [
-        { key: 'sec', label: 'Unreviewed security events', count: 3, badge_variant: 'danger', target_path: '/admin/security' },
-        { key: 'audit', label: 'Pending audit reviews', count: 6, badge_variant: 'warning', target_path: '/admin/audit' },
-        { key: 'adj', label: 'Unapproved financial adjustments', count: 2, badge_variant: 'warning', target_path: '/admin/billing' },
-        { key: 'users', label: 'Inactive user accounts', count: 4, badge_variant: 'neutral', target_path: '/admin/users' },
-        { key: 'backup', label: 'Backup verification due', count: 1, badge_variant: 'neutral', target_path: '/admin/backups' },
+      patient_trend: [
+        { month: 'Jun', new_patients: 140 },
+        { month: 'Jul', new_patients: 175 },
+        { month: 'Aug', new_patients: 190 },
+        { month: 'Sep', new_patients: 210 },
+        { month: 'Oct', new_patients: 225 },
+        { month: 'Nov', new_patients: 248 },
       ],
-      management_attention_total: 6,
-      hospital_growth: { new_patients: 228, new_patients_change_pct: 14.6, returning_patients: 1034, returning_patients_change_pct: 8.9 },
-      doctor_utilization: { utilization_pct: 76, occupied_minutes: 2280, scheduled_minutes: 3000 },
-      patient_growth_trends: [
-        { month: 'Jun', count: 140 },
-        { month: 'Jul', count: 175 },
-        { month: 'Aug', count: 190 },
-        { month: 'Sep', count: 210 },
-        { month: 'Oct', count: 225 },
-        { month: 'Nov', count: 248 },
-      ],
-      patient_growth_pct: 11.2,
-      system_health: {
-        status: 'Healthy',
-        application_version: 'v1.16.0',
-        database_status: 'Healthy',
-        last_backup_time: 'Nov 5, 02:00',
-        storage_used_bytes: 186000000000,
-        storage_total_bytes: 300000000000,
-        storage_percentage: 62,
-      },
     },
     isPending: false,
     isError: false,
@@ -190,71 +180,49 @@ describe('Administration Dashboard & Single Sidebar Layout', () => {
     expect(screen.queryByRole('complementary', { name: 'Administration modules' })).not.toBeInTheDocument()
   })
 
-  it('renders the executive Management Overview dashboard and all KPI cards', () => {
+  it('renders the executive administration dashboard and all key figures', () => {
     renderAreaHome()
 
-    // Dashboard heading and subtitle
-    expect(screen.getByRole('heading', { name: 'Management Overview' })).toBeInTheDocument()
-    expect(screen.getByText('Hospital performance, governance and system health at a glance.')).toBeInTheDocument()
+    // Dashboard heading
+    expect(screen.getByRole('heading', { name: 'Administration Dashboard' })).toBeInTheDocument()
 
-    // 4 KPI cards
-    expect(screen.getByText('Monthly Revenue')).toBeInTheDocument()
+    // 4 Key Figure cards
+    expect(screen.getByText('Collected this month')).toBeInTheDocument()
     expect(screen.getByText('₹8,42,000')).toBeInTheDocument()
 
-    expect(screen.getByText('Operating Expenses')).toBeInTheDocument()
-    expect(screen.getByText('₹3,16,000')).toBeInTheDocument()
+    expect(screen.getByText('Collected today')).toBeInTheDocument()
+    expect(screen.getByText('₹12,500')).toBeInTheDocument()
 
-    expect(screen.getByText('Net Operating Surplus')).toBeInTheDocument()
-    expect(screen.getByText('₹5,26,000')).toBeInTheDocument()
+    expect(screen.getByText('New patients this month')).toBeInTheDocument()
+    expect(screen.getAllByText('228').length).toBeGreaterThanOrEqual(1)
 
-    expect(screen.getByText('Outstanding Receivables')).toBeInTheDocument()
+    expect(screen.getByText('Pending dues')).toBeInTheDocument()
     expect(screen.getByText('₹42,600')).toBeInTheDocument()
 
-    // Ageing link
-    expect(screen.getByRole('link', { name: /View Ageing/ })).toHaveAttribute('href', '/reception/dues')
+    // Pending dues link
+    expect(screen.getByRole('link', { name: /Open Pending Dues/ })).toHaveAttribute('href', '/reception/dues')
   })
 
-  it('renders executive performance charts, attention items, growth and system health', () => {
+  it('renders executive performance charts, attention items, patient counts and system health', () => {
     renderAreaHome()
 
-    // Middle Strip Panels
-    expect(screen.getByRole('heading', { name: 'Financial Performance Trend' })).toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: 'Revenue by Department' })).toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: 'Management Attention' })).toBeInTheDocument()
+    // Key panels
+    expect(screen.getByRole('heading', { name: 'Collected per month' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Collected by department' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Needs attention' })).toBeInTheDocument()
 
-    // Management Attention Rows
-    expect(screen.getByText('Unreviewed security events')).toBeInTheDocument()
-    expect(screen.getByText('Pending audit reviews')).toBeInTheDocument()
-    expect(screen.getByText('Unapproved financial adjustments')).toBeInTheDocument()
-    expect(screen.getByText('Inactive user accounts')).toBeInTheDocument()
-    expect(screen.getByText('Backup verification due')).toBeInTheDocument()
-
-    // Lower Strip Panels
-    expect(screen.getByText('Hospital Growth')).toBeInTheDocument()
-    expect(screen.getByText('New Patients')).toBeInTheDocument()
-    expect(screen.getByText('Returning Patients')).toBeInTheDocument()
-
-    expect(screen.getByText('Doctor Utilization')).toBeInTheDocument()
-    expect(screen.getByText('76%')).toBeInTheDocument()
-
-    expect(screen.getByText('Patient Growth Trend')).toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: 'System Health' })).toBeInTheDocument()
-    expect(screen.getByText('v1.16.0')).toBeInTheDocument()
+    // Patient & health panels
+    expect(screen.getByRole('heading', { name: 'Patients this month' })).toBeInTheDocument()
+    expect(screen.getByText('Returning')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'New patients per month' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'System health' })).toBeInTheDocument()
   })
 
-  it('renders the Quick Access grid with canonical routes', () => {
+  it('renders doctors today and recent admin actions panels', () => {
     renderAreaHome()
 
-    const quickAccess = screen.getByRole('region', { name: 'Quick Access' })
-    expect(within(quickAccess).getByRole('heading', { name: 'Quick Access' })).toBeInTheDocument()
-
-    // Quick access links
-    expect(within(quickAccess).getByRole('link', { name: /Financial Reports/ })).toHaveAttribute('href', '/admin/billing')
-    expect(within(quickAccess).getByRole('link', { name: /Audit & Compliance/ })).toHaveAttribute('href', '/admin/audit')
-    expect(within(quickAccess).getByRole('link', { name: /Users & Roles/ })).toHaveAttribute('href', '/admin/users')
-    expect(within(quickAccess).getByRole('link', { name: /Backup & Restore/ })).toHaveAttribute('href', '/admin/backups')
-    expect(within(quickAccess).getByRole('link', { name: /Configuration/ })).toHaveAttribute('href', '/admin/settings')
-    expect(within(quickAccess).getByRole('link', { name: /Hospital Profile/ })).toHaveAttribute('href', '/admin/settings')
+    expect(screen.getByRole('heading', { name: 'Doctors today' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Recent admin actions' })).toBeInTheDocument()
   })
 
   it('sidebar renders Management Overview and five canonical sections', () => {

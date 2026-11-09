@@ -38,7 +38,7 @@ export const PendingDuesPage: React.FC = () => {
         <div className="flex flex-col gap-4 border-b border-slate-200 pb-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h1 className="text-2xl font-bold tracking-tight text-slate-900">
-              Pending Dues Ledger
+              Pending Dues
             </h1>
             <p className="mt-1 text-sm text-slate-600">
               Dynamically computed outstanding balances across active treatment packages (BIL-03).

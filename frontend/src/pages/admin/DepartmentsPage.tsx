@@ -56,7 +56,7 @@ export function DepartmentsPage() {
   }
 
   return <AppShell name={me?.full_name ?? 'Admin'} role={me?.role ?? 'ADMIN'}><main className="mx-auto max-w-4xl space-y-6 p-4 sm:p-6">
-    <header><p className="text-xs font-semibold uppercase text-red-900">Administration</p><h1 className="text-2xl font-bold">Departments & Specialties</h1><p className="mt-1 text-sm text-neutral-600">Configure reception departments and doctor memberships.</p></header>
+    <header><p className="text-xs font-semibold uppercase text-red-900">Administration</p><h1 className="text-2xl font-bold">Departments</h1><p className="mt-1 text-sm text-neutral-600">Configure reception departments and doctor memberships.</p></header>
     {notice && <p role="status" className="rounded border border-green-200 bg-green-50 p-3 text-sm text-green-900">{notice}</p>}
     {error && <p role="alert" className="rounded border border-red-200 bg-red-50 p-3 text-sm text-red-900">{error}</p>}
     <section className="space-y-3 rounded-lg border bg-white p-4">

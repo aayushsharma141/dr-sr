@@ -297,7 +297,7 @@ export function PatientRegister() {
             </div>
             <div>
               <h1 className="text-2xl font-bold tracking-tight text-slate-900">
-                New Patient Registration
+                Patient Registration
               </h1>
               <p className="text-xs text-slate-500">
                 Register a new patient, allocate Universal Record Number (URN), and issue doctor queue token.

@@ -47,12 +47,12 @@ export function PatientsDirectory() {
       name={me?.full_name || 'Staff'}
       role={me?.role || 'RECEPTION'}
     >
-      <div className="space-y-6 max-w-7xl mx-auto">
+      <div className="mx-auto w-full max-w-[1600px] space-y-6">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
-            <h2 className="text-2xl font-bold text-neutral-900 tracking-tight">
-              Patient Directory
-            </h2>
+            <h1 className="text-2xl font-bold text-neutral-900 tracking-tight">
+              Patient Records
+            </h1>
             <p className="text-sm text-neutral-500">
               Search and manage registered patients across the hospital LAN
             </p>

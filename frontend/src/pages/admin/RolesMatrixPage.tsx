@@ -40,7 +40,7 @@ export function RolesMatrixPage() {
     <AppShell name={me?.full_name ?? 'Admin'} role={me?.role ?? 'ADMIN'}>
       <div className="flex min-h-0 flex-col gap-6">
         <div>
-          <h1 className="text-2xl font-bold text-neutral-900">Role permissions (fixed catalogue)</h1>
+          <h1 className="text-2xl font-bold text-neutral-900">Roles & Permissions</h1>
           <p className="mt-1 max-w-3xl text-sm text-neutral-700">
             The three roles and what each one may do are fixed by the approved scope. Per-user permissions are not
             available, and this page cannot change anything. The server checks these permissions on every request.

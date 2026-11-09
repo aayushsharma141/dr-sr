@@ -23,6 +23,7 @@ from kalyan_api.models import (
     Appointment,
     AppointmentStatus,
     AuditLog,
+    Department,
     Doctor,
     Patient,
     Payment,
@@ -147,86 +148,59 @@ class OverviewAlertOut(BaseModel):
     message: str
 
 
-class ManagementMetricChange(BaseModel):
+class MonthOverMonth(BaseModel):
+    """A monthly figure next to the previous month's. change_pct is null when last month was 0."""
+
     model_config = ConfigDict(extra="forbid")
-    value_paise: int
-    prior_paise: int
-    percent_change: float
+    current: int
+    previous: int
+    change_pct: float | None
 
 
-class ManagementAttentionItem(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-    key: str
-    label: str
-    count: int
-    badge_variant: str  # 'danger' | 'warning' | 'info' | 'neutral'
-    target_path: str
-
-
-class FinancialTrendMonth(BaseModel):
+class CollectionTrendMonth(BaseModel):
     model_config = ConfigDict(extra="forbid")
     month: str
-    revenue_paise: int
-    expenses_paise: int
+    collected_paise: int
 
 
-class DepartmentRevenueItem(BaseModel):
+class DepartmentCollection(BaseModel):
+    """Money collected this month against appointments booked in a department.
+
+    department_id is null for payments with no appointment or an appointment booked before
+    departments were recorded; they are counted, never spread across departments.
+    """
+
     model_config = ConfigDict(extra="forbid")
+    department_id: int | None
     name: str
-    percentage: int
-    revenue_paise: int
-    color: str
+    collected_paise: int
+    percentage: float
 
 
-class HospitalGrowthSummary(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-    new_patients: int
-    new_patients_change_pct: float
-    returning_patients: int
-    returning_patients_change_pct: float
-
-
-class DoctorUtilizationSummary(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-    utilization_pct: int
-    occupied_minutes: int
-    scheduled_minutes: int
-
-
-class PatientGrowthMonth(BaseModel):
+class PatientTrendMonth(BaseModel):
     model_config = ConfigDict(extra="forbid")
     month: str
-    count: int
-
-
-class SystemHealthSummary(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-    status: str
-    application_version: str
-    database_status: str
-    last_backup_time: str | None
-    storage_used_bytes: int
-    storage_total_bytes: int
-    storage_percentage: int
+    new_patients: int
 
 
 class ManagementOverviewResponse(BaseModel):
+    """Monthly figures for the administration dashboard, every one computed from records.
+
+    The hospital does not record expenses, so the response has no expense, surplus or
+    utilisation figures; nothing in it is estimated or filled with sample values.
+    """
+
     model_config = ConfigDict(extra="forbid")
     current_month_label: str
-    comparison_month_label: str
-    monthly_revenue: ManagementMetricChange
-    operating_expenses: ManagementMetricChange
-    net_surplus: ManagementMetricChange
-    outstanding_receivables_paise: int
-    financial_trends: list[FinancialTrendMonth]
-    department_revenues: list[DepartmentRevenueItem]
-    management_attention: list[ManagementAttentionItem]
-    management_attention_total: int
-    hospital_growth: HospitalGrowthSummary
-    doctor_utilization: DoctorUtilizationSummary
-    patient_growth_trends: list[PatientGrowthMonth]
-    patient_growth_pct: float
-    system_health: SystemHealthSummary
+    previous_month_label: str
+    collections_paise: MonthOverMonth
+    reversed_this_month: int
+    reversed_this_month_paise: int
+    collection_trend: list[CollectionTrendMonth]
+    department_collections: list[DepartmentCollection]
+    new_patients: MonthOverMonth
+    returning_patients_this_month: int
+    patient_trend: list[PatientTrendMonth]
 
 
 class AdminOverviewResponse(BaseModel):
@@ -592,6 +566,18 @@ def get_admin_overview(
     )
 
 
+def _month_start(year: int, month: int) -> date:
+    return date(year + (month - 1) // 12, (month - 1) % 12 + 1, 1)
+
+
+def _ist_midnight(day: date) -> datetime:
+    return datetime.combine(day, time.min, tzinfo=clock.IST)
+
+
+def _change_pct(current: int, previous: int) -> float | None:
+    return round((current - previous) / previous * 100, 1) if previous else None
+
+
 @router.get(
     "/admin/management-overview",
     response_model=ManagementOverviewResponse,
@@ -601,249 +587,116 @@ def get_management_overview(
     session: SessionDep,
     principal: Principal = Depends(current_principal),
 ) -> ManagementOverviewResponse:
-    """Return executive management overview metrics, financial trends, and governance health."""
+    """Monthly collections, departments and patient numbers, computed from records only."""
     today = clock.ist_today()
-    cur_year, cur_month = today.year, today.month
-    cur_start_date = date(cur_year, cur_month, 1)
-    if cur_month == 12:
-        next_month_start_date = date(cur_year + 1, 1, 1)
-    else:
-        next_month_start_date = date(cur_year, cur_month + 1, 1)
-    if cur_month == 1:
-        prior_start_date = date(cur_year - 1, 12, 1)
-    else:
-        prior_start_date = date(cur_year, cur_month - 1, 1)
+    # Six month starts, oldest first, ending with the current month, plus next month's start.
+    starts = [_month_start(today.year, today.month - k) for k in range(5, -1, -1)]
+    next_start = _month_start(today.year, today.month + 1)
+    bounds = [_ist_midnight(d) for d in starts] + [_ist_midnight(next_start)]
 
-    cur_start_dt = datetime.combine(cur_start_date, time.min, tzinfo=clock.IST)
-    next_start_dt = datetime.combine(next_month_start_date, time.min, tzinfo=clock.IST)
-    prior_start_dt = datetime.combine(prior_start_date, time.min, tzinfo=clock.IST)
+    def collected(start: datetime, end: datetime) -> int:
+        return int(
+            session.scalar(
+                select(func.coalesce(func.sum(Payment.amount_paise), 0)).where(
+                    Payment.is_reversed.is_(False),
+                    Payment.created_at >= start,
+                    Payment.created_at < end,
+                )
+            )
+            or 0
+        )
 
-    # 1. Monthly revenue
-    actual_cur_rev = session.scalar(
-        select(func.sum(Payment.amount_paise)).where(
+    def registered(start: datetime, end: datetime) -> int:
+        return int(
+            session.scalar(
+                select(func.count(Patient.id)).where(
+                    Patient.created_at >= start, Patient.created_at < end
+                )
+            )
+            or 0
+        )
+
+    trend_paise = [collected(bounds[i], bounds[i + 1]) for i in range(6)]
+    trend_patients = [registered(bounds[i], bounds[i + 1]) for i in range(6)]
+    cur_start, cur_end = bounds[5], bounds[6]
+
+    reversed_row = session.execute(
+        select(func.count(Payment.id), func.coalesce(func.sum(Payment.amount_paise), 0)).where(
+            Payment.is_reversed.is_(True),
+            Payment.created_at >= cur_start,
+            Payment.created_at < cur_end,
+        )
+    ).one()
+
+    by_department = session.execute(
+        select(
+            Appointment.department_id,
+            Department.name_en,
+            func.sum(Payment.amount_paise),
+        )
+        .select_from(Payment)
+        .outerjoin(Appointment, Appointment.id == Payment.appointment_id)
+        .outerjoin(Department, Department.id == Appointment.department_id)
+        .where(
             Payment.is_reversed.is_(False),
-            Payment.created_at >= cur_start_dt,
-            Payment.created_at < next_start_dt,
+            Payment.created_at >= cur_start,
+            Payment.created_at < cur_end,
         )
+        .group_by(Appointment.department_id, Department.name_en)
+    ).all()
+    month_total = trend_paise[5]
+    department_collections = sorted(
+        (
+            DepartmentCollection(
+                department_id=dept_id,
+                name=name or "Not linked to a department",
+                collected_paise=int(amount or 0),
+                percentage=round(int(amount or 0) / month_total * 100, 1) if month_total else 0.0,
+            )
+            for dept_id, name, amount in by_department
+        ),
+        key=lambda d: (d.department_id is None, -d.collected_paise),
     )
-    actual_prior_rev = session.scalar(
-        select(func.sum(Payment.amount_paise)).where(
-            Payment.is_reversed.is_(False),
-            Payment.created_at >= prior_start_dt,
-            Payment.created_at < cur_start_dt,
+
+    # Patients seen this month (any appointment) who registered before the month began.
+    returning = int(
+        session.scalar(
+            select(func.count(func.distinct(Appointment.patient_id)))
+            .join(Patient, Patient.id == Appointment.patient_id)
+            .where(
+                Appointment.appointment_date >= starts[5],
+                Appointment.appointment_date < next_start,
+                Patient.created_at < cur_start,
+            )
         )
-    )
-
-    cur_rev_paise = actual_cur_rev if (actual_cur_rev and actual_cur_rev > 0) else 842000_00
-    prior_rev_paise = actual_prior_rev if (actual_prior_rev and actual_prior_rev > 0) else 749000_00
-    rev_pct = (
-        round(((cur_rev_paise - prior_rev_paise) / prior_rev_paise) * 100, 1)
-        if prior_rev_paise
-        else 12.4
-    )
-
-    # 2. Operating expenses (benchmark/illustrative baseline)
-    cur_exp_paise = int(cur_rev_paise * 0.375) if cur_rev_paise != 842000_00 else 316000_00
-    prior_exp_paise = int(prior_rev_paise * 0.40) if prior_rev_paise != 749000_00 else 301000_00
-    exp_pct = (
-        round(((cur_exp_paise - prior_exp_paise) / prior_exp_paise) * 100, 1)
-        if prior_exp_paise
-        else 5.1
-    )
-
-    # 3. Net surplus
-    cur_surplus = cur_rev_paise - cur_exp_paise
-    prior_surplus = prior_rev_paise - prior_exp_paise
-    surplus_pct = (
-        round(((cur_surplus - prior_surplus) / prior_surplus) * 100, 1)
-        if prior_surplus
-        else 17.6
-    )
-
-    # 4. Receivables
-    actual_dues = sum(due.balance_paise for due in billing_service.compute_pending_dues(session))
-    receivables_paise = actual_dues if actual_dues > 0 else 42600_00
-
-    # 5. Financial trends (6 months)
-    financial_trends = [
-        FinancialTrendMonth(month="Jun", revenue_paise=580000_00, expenses_paise=240000_00),
-        FinancialTrendMonth(month="Jul", revenue_paise=700000_00, expenses_paise=270000_00),
-        FinancialTrendMonth(month="Aug", revenue_paise=680000_00, expenses_paise=260000_00),
-        FinancialTrendMonth(month="Sep", revenue_paise=740000_00, expenses_paise=290000_00),
-        FinancialTrendMonth(month="Oct", revenue_paise=prior_rev_paise, expenses_paise=prior_exp_paise),
-        FinancialTrendMonth(month="Nov", revenue_paise=cur_rev_paise, expenses_paise=cur_exp_paise),
-    ]
-
-    # 6. Department revenues
-    department_revenues = [
-        DepartmentRevenueItem(
-            name="Orthopaedics",
-            percentage=45,
-            revenue_paise=int(cur_rev_paise * 0.45),
-            color="#6366f1",
-        ),
-        DepartmentRevenueItem(
-            name="Physiotherapy",
-            percentage=20,
-            revenue_paise=int(cur_rev_paise * 0.20),
-            color="#38bdf8",
-        ),
-        DepartmentRevenueItem(
-            name="General Consultation",
-            percentage=15,
-            revenue_paise=int(cur_rev_paise * 0.15),
-            color="#10b981",
-        ),
-        DepartmentRevenueItem(
-            name="Follow-up & Reviews",
-            percentage=12,
-            revenue_paise=int(cur_rev_paise * 0.12),
-            color="#f59e0b",
-        ),
-        DepartmentRevenueItem(
-            name="Other Services",
-            percentage=8,
-            revenue_paise=int(cur_rev_paise * 0.08),
-            color="#94a3b8",
-        ),
-    ]
-
-    # 7. Management Attention items
-    now_utc = clock.utcnow()
-    failed_logins = session.scalar(
-        select(func.count(AuditLog.id)).where(
-            AuditLog.action == AuditAction.AUTH_LOGIN_FAILED.value,
-            AuditLog.occurred_at >= now_utc - timedelta(hours=24),
-        )
-    ) or 0
-    inactive_users_cnt = session.scalar(
-        select(func.count(User.id)).where(User.is_active.is_(False))
-    ) or 0
-    reversals_cnt = session.scalar(
-        select(func.count(Payment.id)).where(Payment.is_reversed.is_(True))
-    ) or 0
-
-    settings: Settings = get_settings()
-    latest_backup = latest_backup_info(settings.backup_dir)
-    backup_due_cnt = 1 if (latest_backup is None or is_overdue(session, now_utc)) else 0
-
-    attention_items = [
-        ManagementAttentionItem(
-            key="security_events",
-            label="Unreviewed security events",
-            count=failed_logins if failed_logins > 0 else 3,
-            badge_variant="danger",
-            target_path="/admin/security",
-        ),
-        ManagementAttentionItem(
-            key="audit_reviews",
-            label="Pending audit reviews",
-            count=6,
-            badge_variant="warning",
-            target_path="/admin/audit",
-        ),
-        ManagementAttentionItem(
-            key="financial_adjustments",
-            label="Unapproved financial adjustments",
-            count=reversals_cnt if reversals_cnt > 0 else 2,
-            badge_variant="warning",
-            target_path="/admin/billing",
-        ),
-        ManagementAttentionItem(
-            key="inactive_users",
-            label="Inactive user accounts",
-            count=inactive_users_cnt if inactive_users_cnt > 0 else 4,
-            badge_variant="neutral",
-            target_path="/admin/users",
-        ),
-        ManagementAttentionItem(
-            key="backup_due",
-            label="Backup verification due",
-            count=backup_due_cnt if backup_due_cnt > 0 else 1,
-            badge_variant="neutral",
-            target_path="/admin/backups",
-        ),
-    ]
-    attention_total = sum(i.count for i in attention_items)
-
-    # 8. Hospital growth
-    new_patients_cnt = session.scalar(
-        select(func.count(Patient.id)).where(
-            Patient.created_at >= cur_start_dt,
-            Patient.created_at < next_start_dt,
-        )
-    ) or 0
-    hospital_growth = HospitalGrowthSummary(
-        new_patients=new_patients_cnt if new_patients_cnt > 0 else 228,
-        new_patients_change_pct=14.6,
-        returning_patients=1034,
-        returning_patients_change_pct=8.9,
-    )
-
-    # 9. Doctor utilization
-    doctor_utilization = DoctorUtilizationSummary(
-        utilization_pct=76,
-        occupied_minutes=2280,
-        scheduled_minutes=3000,
-    )
-
-    # 10. Patient growth trend
-    patient_trends = [
-        PatientGrowthMonth(month="Jun", count=140),
-        PatientGrowthMonth(month="Jul", count=175),
-        PatientGrowthMonth(month="Aug", count=190),
-        PatientGrowthMonth(month="Sep", count=210),
-        PatientGrowthMonth(month="Oct", count=225),
-        PatientGrowthMonth(month="Nov", count=248),
-    ]
-
-    # 11. System Health
-    backup_time_str = "Nov 5, 02:00"
-    if latest_backup is not None:
-        backup_time_str = latest_backup.created_at.strftime("%b %d, %H:%M")
-
-    total_storage = 300 * 1024 * 1024 * 1024  # 300 GB
-    used_storage = 186 * 1024 * 1024 * 1024   # 186 GB
-    storage_pct = 62
-
-    system_health = SystemHealthSummary(
-        status="Healthy",
-        application_version="v1.16.0",
-        database_status="Healthy",
-        last_backup_time=backup_time_str,
-        storage_used_bytes=used_storage,
-        storage_total_bytes=total_storage,
-        storage_percentage=storage_pct,
+        or 0
     )
 
     return ManagementOverviewResponse(
-        current_month_label=today.strftime("%b %Y"),
-        comparison_month_label=prior_start_date.strftime("%b %Y"),
-        monthly_revenue=ManagementMetricChange(
-            value_paise=cur_rev_paise,
-            prior_paise=prior_rev_paise,
-            percent_change=rev_pct,
+        current_month_label=starts[5].strftime("%b %Y"),
+        previous_month_label=starts[4].strftime("%b %Y"),
+        collections_paise=MonthOverMonth(
+            current=trend_paise[5],
+            previous=trend_paise[4],
+            change_pct=_change_pct(trend_paise[5], trend_paise[4]),
         ),
-        operating_expenses=ManagementMetricChange(
-            value_paise=cur_exp_paise,
-            prior_paise=prior_exp_paise,
-            percent_change=exp_pct,
+        reversed_this_month=int(reversed_row[0] or 0),
+        reversed_this_month_paise=int(reversed_row[1] or 0),
+        collection_trend=[
+            CollectionTrendMonth(month=d.strftime("%b"), collected_paise=v)
+            for d, v in zip(starts, trend_paise, strict=True)
+        ],
+        department_collections=department_collections,
+        new_patients=MonthOverMonth(
+            current=trend_patients[5],
+            previous=trend_patients[4],
+            change_pct=_change_pct(trend_patients[5], trend_patients[4]),
         ),
-        net_surplus=ManagementMetricChange(
-            value_paise=cur_surplus,
-            prior_paise=prior_surplus,
-            percent_change=surplus_pct,
-        ),
-        outstanding_receivables_paise=receivables_paise,
-        financial_trends=financial_trends,
-        department_revenues=department_revenues,
-        management_attention=attention_items,
-        management_attention_total=attention_total,
-        hospital_growth=hospital_growth,
-        doctor_utilization=doctor_utilization,
-        patient_growth_trends=patient_trends,
-        patient_growth_pct=11.2,
-        system_health=system_health,
+        returning_patients_this_month=returning,
+        patient_trend=[
+            PatientTrendMonth(month=d.strftime("%b"), new_patients=v)
+            for d, v in zip(starts, trend_patients, strict=True)
+        ],
     )
 
 

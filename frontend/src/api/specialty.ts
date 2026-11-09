@@ -33,12 +33,16 @@ export function useMyDepartments(): DepartmentOut[] {
   return Array.isArray(data) ? data.filter((d) => d.is_active) : []
 }
 
-/** Department chosen when the appointment was booked; it decides the consultation template (D-19-03). */
-export function useAppointmentDepartmentId(appointmentId: number | null): number | null {
+/**
+ * The appointment a consultation was opened from. Its `department_id` decides the consultation
+ * template (D-19-03) and its `token_number` is the queue token the patient holds. Null while
+ * loading or when the consultation has no appointment.
+ */
+export function useBookedAppointment(appointmentId: number | null): Appointment | null {
   const { data } = useQuery({
     queryKey: ['appointment', appointmentId],
     queryFn: () => apiFetch<Appointment>(`/appointments/${appointmentId}`),
     enabled: appointmentId !== null && appointmentId > 0,
   })
-  return data?.department_id ?? null
+  return data ?? null
 }

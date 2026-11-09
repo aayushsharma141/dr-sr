@@ -56,7 +56,7 @@ describe('PendingDuesPage', () => {
       </QueryClientProvider>
     )
 
-    expect(screen.getByText('Pending Dues Ledger')).toBeInTheDocument()
+    expect(screen.getByText('Pending Dues')).toBeInTheDocument()
     expect(screen.getByText('Sunita Devi')).toBeInTheDocument()
     expect(screen.getByText('KLY-0010')).toBeInTheDocument()
     expect(screen.getByText('Knee Osteoarthritis Rehab')).toBeInTheDocument()

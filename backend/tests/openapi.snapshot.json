@@ -2017,6 +2017,25 @@
         "title": "ClinicalTemplateVersionRead",
         "type": "object"
       },
+      "CollectionTrendMonth": {
+        "additionalProperties": false,
+        "properties": {
+          "collected_paise": {
+            "title": "Collected Paise",
+            "type": "integer"
+          },
+          "month": {
+            "title": "Month",
+            "type": "string"
+          }
+        },
+        "required": [
+          "month",
+          "collected_paise"
+        ],
+        "title": "CollectionTrendMonth",
+        "type": "object"
+      },
       "CollectionsTodayOut": {
         "additionalProperties": false,
         "description": "Today's ledger activity, reported without applying any netting rule.\n\n- payments_count / gross_paise / by_method: payments CREATED today (IST), including any\n  that were later reversed.\n- reversals_count / reversed_paise: payments REVERSED today (IST), whatever day they were\n  originally collected.",
@@ -2111,6 +2130,43 @@
           "committed_rows"
         ],
         "title": "CommitBatchResponse",
+        "type": "object"
+      },
+      "DepartmentCollection": {
+        "additionalProperties": false,
+        "description": "Money collected this month against appointments booked in a department.\n\ndepartment_id is null for payments with no appointment or an appointment booked before\ndepartments were recorded; they are counted, never spread across departments.",
+        "properties": {
+          "collected_paise": {
+            "title": "Collected Paise",
+            "type": "integer"
+          },
+          "department_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Department Id"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "percentage": {
+            "title": "Percentage",
+            "type": "number"
+          }
+        },
+        "required": [
+          "department_id",
+          "name",
+          "collected_paise",
+          "percentage"
+        ],
+        "title": "DepartmentCollection",
         "type": "object"
       },
       "DepartmentCreate": {
@@ -2220,35 +2276,6 @@
           "updated_at"
         ],
         "title": "DepartmentOut",
-        "type": "object"
-      },
-      "DepartmentRevenueItem": {
-        "additionalProperties": false,
-        "properties": {
-          "color": {
-            "title": "Color",
-            "type": "string"
-          },
-          "name": {
-            "title": "Name",
-            "type": "string"
-          },
-          "percentage": {
-            "title": "Percentage",
-            "type": "integer"
-          },
-          "revenue_paise": {
-            "title": "Revenue Paise",
-            "type": "integer"
-          }
-        },
-        "required": [
-          "name",
-          "percentage",
-          "revenue_paise",
-          "color"
-        ],
-        "title": "DepartmentRevenueItem",
         "type": "object"
       },
       "DepartmentUpdate": {
@@ -2910,30 +2937,6 @@
           "version_id"
         ],
         "title": "DoctorUpdate",
-        "type": "object"
-      },
-      "DoctorUtilizationSummary": {
-        "additionalProperties": false,
-        "properties": {
-          "occupied_minutes": {
-            "title": "Occupied Minutes",
-            "type": "integer"
-          },
-          "scheduled_minutes": {
-            "title": "Scheduled Minutes",
-            "type": "integer"
-          },
-          "utilization_pct": {
-            "title": "Utilization Pct",
-            "type": "integer"
-          }
-        },
-        "required": [
-          "utilization_pct",
-          "occupied_minutes",
-          "scheduled_minutes"
-        ],
-        "title": "DoctorUtilizationSummary",
         "type": "object"
       },
       "DuplicateCandidatePatient": {
@@ -3664,30 +3667,6 @@
         "title": "FeeUpdate",
         "type": "object"
       },
-      "FinancialTrendMonth": {
-        "additionalProperties": false,
-        "properties": {
-          "expenses_paise": {
-            "title": "Expenses Paise",
-            "type": "integer"
-          },
-          "month": {
-            "title": "Month",
-            "type": "string"
-          },
-          "revenue_paise": {
-            "title": "Revenue Paise",
-            "type": "integer"
-          }
-        },
-        "required": [
-          "month",
-          "revenue_paise",
-          "expenses_paise"
-        ],
-        "title": "FinancialTrendMonth",
-        "type": "object"
-      },
       "FollowUpBookRequest": {
         "additionalProperties": false,
         "description": "Schema for booking an appointment from a follow-up recommendation.",
@@ -3796,35 +3775,6 @@
         "title": "HTTPValidationError",
         "type": "object"
       },
-      "HospitalGrowthSummary": {
-        "additionalProperties": false,
-        "properties": {
-          "new_patients": {
-            "title": "New Patients",
-            "type": "integer"
-          },
-          "new_patients_change_pct": {
-            "title": "New Patients Change Pct",
-            "type": "number"
-          },
-          "returning_patients": {
-            "title": "Returning Patients",
-            "type": "integer"
-          },
-          "returning_patients_change_pct": {
-            "title": "Returning Patients Change Pct",
-            "type": "number"
-          }
-        },
-        "required": [
-          "new_patients",
-          "new_patients_change_pct",
-          "returning_patients",
-          "returning_patients_change_pct"
-        ],
-        "title": "HospitalGrowthSummary",
-        "type": "object"
-      },
       "HourlyCollectionOut": {
         "additionalProperties": false,
         "description": "Hourly bucket of payment collections for today (IST).",
@@ -3931,8 +3881,13 @@
         "type": "object"
       },
       "IntegrityCheckItemOut": {
-        "description": "Status of an individual integrity check.\n\n``severity`` describes how a non-passing result is classified: ERROR findings make the\nreport unhealthy; WARNING findings are reported but do not.",
+        "description": "Status of an individual integrity check.\n\n``code`` is a stable identifier for the check. ``severity`` is the worst severity among\nits findings: ERROR makes the report unhealthy; WARNING is a review item; CLEANUP is\nharmless clutter. Each finding in ``discrepancies`` carries its own ``issue`` and\n``severity``.",
         "properties": {
+          "code": {
+            "default": "",
+            "title": "Code",
+            "type": "string"
+          },
           "details": {
             "title": "Details",
             "type": "string"
@@ -3957,7 +3912,8 @@
             "default": "ERROR",
             "enum": [
               "ERROR",
-              "WARNING"
+              "WARNING",
+              "CLEANUP"
             ],
             "title": "Severity",
             "type": "string"
@@ -3971,8 +3927,25 @@
         "title": "IntegrityCheckItemOut",
         "type": "object"
       },
+      "IntegrityHistoryOut": {
+        "description": "Most recent integrity runs, newest first.",
+        "properties": {
+          "runs": {
+            "items": {
+              "$ref": "#/components/schemas/IntegrityRunSummaryOut"
+            },
+            "title": "Runs",
+            "type": "array"
+          }
+        },
+        "required": [
+          "runs"
+        ],
+        "title": "IntegrityHistoryOut",
+        "type": "object"
+      },
       "IntegrityReportOut": {
-        "description": "System-wide clinical and financial integrity report.",
+        "description": "System-wide clinical and financial integrity report (one stored run).",
         "properties": {
           "checks": {
             "items": {
@@ -3980,6 +3953,16 @@
             },
             "title": "Checks",
             "type": "array"
+          },
+          "cleanup_checks": {
+            "default": 0,
+            "title": "Cleanup Checks",
+            "type": "integer"
+          },
+          "duration_ms": {
+            "default": 0,
+            "title": "Duration Ms",
+            "type": "integer"
           },
           "failed_checks": {
             "title": "Failed Checks",
@@ -3989,6 +3972,17 @@
             "title": "Generated At",
             "type": "string"
           },
+          "id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Id"
+          },
           "is_healthy": {
             "title": "Is Healthy",
             "type": "boolean"
@@ -3996,6 +3990,17 @@
           "passed_checks": {
             "title": "Passed Checks",
             "type": "integer"
+          },
+          "run_by_username": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Run By Username"
           },
           "total_checks": {
             "title": "Total Checks",
@@ -4016,6 +4021,66 @@
           "checks"
         ],
         "title": "IntegrityReportOut",
+        "type": "object"
+      },
+      "IntegrityRunSummaryOut": {
+        "description": "Counts from one past integrity run, for the history list.",
+        "properties": {
+          "cleanup_checks": {
+            "title": "Cleanup Checks",
+            "type": "integer"
+          },
+          "failed_checks": {
+            "title": "Failed Checks",
+            "type": "integer"
+          },
+          "generated_at": {
+            "title": "Generated At",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "is_healthy": {
+            "title": "Is Healthy",
+            "type": "boolean"
+          },
+          "passed_checks": {
+            "title": "Passed Checks",
+            "type": "integer"
+          },
+          "run_by_username": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Run By Username"
+          },
+          "total_checks": {
+            "title": "Total Checks",
+            "type": "integer"
+          },
+          "warning_checks": {
+            "title": "Warning Checks",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "generated_at",
+          "is_healthy",
+          "total_checks",
+          "passed_checks",
+          "failed_checks",
+          "warning_checks",
+          "cleanup_checks"
+        ],
+        "title": "IntegrityRunSummaryOut",
         "type": "object"
       },
       "LastBackupOut": {
@@ -4224,150 +4289,69 @@
         "title": "LoginRequest",
         "type": "object"
       },
-      "ManagementAttentionItem": {
-        "additionalProperties": false,
-        "properties": {
-          "badge_variant": {
-            "title": "Badge Variant",
-            "type": "string"
-          },
-          "count": {
-            "title": "Count",
-            "type": "integer"
-          },
-          "key": {
-            "title": "Key",
-            "type": "string"
-          },
-          "label": {
-            "title": "Label",
-            "type": "string"
-          },
-          "target_path": {
-            "title": "Target Path",
-            "type": "string"
-          }
-        },
-        "required": [
-          "key",
-          "label",
-          "count",
-          "badge_variant",
-          "target_path"
-        ],
-        "title": "ManagementAttentionItem",
-        "type": "object"
-      },
-      "ManagementMetricChange": {
-        "additionalProperties": false,
-        "properties": {
-          "percent_change": {
-            "title": "Percent Change",
-            "type": "number"
-          },
-          "prior_paise": {
-            "title": "Prior Paise",
-            "type": "integer"
-          },
-          "value_paise": {
-            "title": "Value Paise",
-            "type": "integer"
-          }
-        },
-        "required": [
-          "value_paise",
-          "prior_paise",
-          "percent_change"
-        ],
-        "title": "ManagementMetricChange",
-        "type": "object"
-      },
       "ManagementOverviewResponse": {
         "additionalProperties": false,
+        "description": "Monthly figures for the administration dashboard, every one computed from records.\n\nThe hospital does not record expenses, so the response has no expense, surplus or\nutilisation figures; nothing in it is estimated or filled with sample values.",
         "properties": {
-          "comparison_month_label": {
-            "title": "Comparison Month Label",
-            "type": "string"
+          "collection_trend": {
+            "items": {
+              "$ref": "#/components/schemas/CollectionTrendMonth"
+            },
+            "title": "Collection Trend",
+            "type": "array"
+          },
+          "collections_paise": {
+            "$ref": "#/components/schemas/MonthOverMonth"
           },
           "current_month_label": {
             "title": "Current Month Label",
             "type": "string"
           },
-          "department_revenues": {
+          "department_collections": {
             "items": {
-              "$ref": "#/components/schemas/DepartmentRevenueItem"
+              "$ref": "#/components/schemas/DepartmentCollection"
             },
-            "title": "Department Revenues",
+            "title": "Department Collections",
             "type": "array"
           },
-          "doctor_utilization": {
-            "$ref": "#/components/schemas/DoctorUtilizationSummary"
+          "new_patients": {
+            "$ref": "#/components/schemas/MonthOverMonth"
           },
-          "financial_trends": {
+          "patient_trend": {
             "items": {
-              "$ref": "#/components/schemas/FinancialTrendMonth"
+              "$ref": "#/components/schemas/PatientTrendMonth"
             },
-            "title": "Financial Trends",
+            "title": "Patient Trend",
             "type": "array"
           },
-          "hospital_growth": {
-            "$ref": "#/components/schemas/HospitalGrowthSummary"
+          "previous_month_label": {
+            "title": "Previous Month Label",
+            "type": "string"
           },
-          "management_attention": {
-            "items": {
-              "$ref": "#/components/schemas/ManagementAttentionItem"
-            },
-            "title": "Management Attention",
-            "type": "array"
-          },
-          "management_attention_total": {
-            "title": "Management Attention Total",
+          "returning_patients_this_month": {
+            "title": "Returning Patients This Month",
             "type": "integer"
           },
-          "monthly_revenue": {
-            "$ref": "#/components/schemas/ManagementMetricChange"
-          },
-          "net_surplus": {
-            "$ref": "#/components/schemas/ManagementMetricChange"
-          },
-          "operating_expenses": {
-            "$ref": "#/components/schemas/ManagementMetricChange"
-          },
-          "outstanding_receivables_paise": {
-            "title": "Outstanding Receivables Paise",
+          "reversed_this_month": {
+            "title": "Reversed This Month",
             "type": "integer"
           },
-          "patient_growth_pct": {
-            "title": "Patient Growth Pct",
-            "type": "number"
-          },
-          "patient_growth_trends": {
-            "items": {
-              "$ref": "#/components/schemas/PatientGrowthMonth"
-            },
-            "title": "Patient Growth Trends",
-            "type": "array"
-          },
-          "system_health": {
-            "$ref": "#/components/schemas/SystemHealthSummary"
+          "reversed_this_month_paise": {
+            "title": "Reversed This Month Paise",
+            "type": "integer"
           }
         },
         "required": [
           "current_month_label",
-          "comparison_month_label",
-          "monthly_revenue",
-          "operating_expenses",
-          "net_surplus",
-          "outstanding_receivables_paise",
-          "financial_trends",
-          "department_revenues",
-          "management_attention",
-          "management_attention_total",
-          "hospital_growth",
-          "doctor_utilization",
-          "patient_growth_trends",
-          "patient_growth_pct",
-          "system_health"
+          "previous_month_label",
+          "collections_paise",
+          "reversed_this_month",
+          "reversed_this_month_paise",
+          "collection_trend",
+          "department_collections",
+          "new_patients",
+          "returning_patients_this_month",
+          "patient_trend"
         ],
         "title": "ManagementOverviewResponse",
         "type": "object"
@@ -4434,6 +4418,38 @@
           "version_id"
         ],
         "title": "MeResponse",
+        "type": "object"
+      },
+      "MonthOverMonth": {
+        "additionalProperties": false,
+        "description": "A monthly figure next to the previous month's. change_pct is null when last month was 0.",
+        "properties": {
+          "change_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Change Pct"
+          },
+          "current": {
+            "title": "Current",
+            "type": "integer"
+          },
+          "previous": {
+            "title": "Previous",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "current",
+          "previous",
+          "change_pct"
+        ],
+        "title": "MonthOverMonth",
         "type": "object"
       },
       "OverviewAlertOut": {
@@ -4631,25 +4647,6 @@
         "title": "PatientExportRequest",
         "type": "object"
       },
-      "PatientGrowthMonth": {
-        "additionalProperties": false,
-        "properties": {
-          "count": {
-            "title": "Count",
-            "type": "integer"
-          },
-          "month": {
-            "title": "Month",
-            "type": "string"
-          }
-        },
-        "required": [
-          "month",
-          "count"
-        ],
-        "title": "PatientGrowthMonth",
-        "type": "object"
-      },
       "PatientOut": {
         "description": "Full patient demographic entity response.",
         "properties": {
@@ -4790,6 +4787,25 @@
           "updated_at"
         ],
         "title": "PatientOut",
+        "type": "object"
+      },
+      "PatientTrendMonth": {
+        "additionalProperties": false,
+        "properties": {
+          "month": {
+            "title": "Month",
+            "type": "string"
+          },
+          "new_patients": {
+            "title": "New Patients",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "month",
+          "new_patients"
+        ],
+        "title": "PatientTrendMonth",
         "type": "object"
       },
       "PatientUpdate": {
@@ -6910,57 +6926,6 @@
         "title": "StorageVolumeOut",
         "type": "object"
       },
-      "SystemHealthSummary": {
-        "additionalProperties": false,
-        "properties": {
-          "application_version": {
-            "title": "Application Version",
-            "type": "string"
-          },
-          "database_status": {
-            "title": "Database Status",
-            "type": "string"
-          },
-          "last_backup_time": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Last Backup Time"
-          },
-          "status": {
-            "title": "Status",
-            "type": "string"
-          },
-          "storage_percentage": {
-            "title": "Storage Percentage",
-            "type": "integer"
-          },
-          "storage_total_bytes": {
-            "title": "Storage Total Bytes",
-            "type": "integer"
-          },
-          "storage_used_bytes": {
-            "title": "Storage Used Bytes",
-            "type": "integer"
-          }
-        },
-        "required": [
-          "status",
-          "application_version",
-          "database_status",
-          "last_backup_time",
-          "storage_used_bytes",
-          "storage_total_bytes",
-          "storage_percentage"
-        ],
-        "title": "SystemHealthSummary",
-        "type": "object"
-      },
       "SystemStatusOut": {
         "additionalProperties": false,
         "description": "Runtime, schema, database and storage status of the LAN server.",
@@ -9011,7 +8976,7 @@
     },
     "/api/admin/management-overview": {
       "get": {
-        "description": "Return executive management overview metrics, financial trends, and governance health.",
+        "description": "Monthly collections, departments and patient numbers, computed from records only.",
         "operationId": "get_management_overview_api_admin_management_overview_get",
         "responses": {
           "200": {
@@ -11511,10 +11476,85 @@
     },
     "/api/operations/integrity": {
       "get": {
-        "description": "Run full diagnostic audit on database constraints, ledger balances, and files.",
-        "operationId": "get_integrity_report_api_operations_integrity_get",
+        "description": "Read the latest stored run. Reading does not run the checks or write an audit entry.",
+        "operationId": "get_latest_integrity_report_api_operations_integrity_get",
         "responses": {
           "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/IntegrityReportOut"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "title": "Response Get Latest Integrity Report Api Operations Integrity Get"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Latest stored integrity check result, or null if none has run (BAK-03)",
+        "tags": [
+          "operations"
+        ]
+      }
+    },
+    "/api/operations/integrity/history": {
+      "get": {
+        "operationId": "get_integrity_history_api_operations_integrity_history_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 20,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IntegrityHistoryOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Recent integrity check runs, newest first (BAK-03)",
+        "tags": [
+          "operations"
+        ]
+      }
+    },
+    "/api/operations/integrity/run": {
+      "post": {
+        "description": "Run the read-only checks, store the run and record one audit entry.",
+        "operationId": "run_integrity_report_api_operations_integrity_run_post",
+        "responses": {
+          "201": {
             "content": {
               "application/json": {
                 "schema": {
@@ -11525,7 +11565,7 @@
             "description": "Successful Response"
           }
         },
-        "summary": "Run live clinical and financial integrity inspection (BAK-03)",
+        "summary": "Run every clinical, financial and file integrity check and store the result (BAK-03)",
         "tags": [
           "operations"
         ]

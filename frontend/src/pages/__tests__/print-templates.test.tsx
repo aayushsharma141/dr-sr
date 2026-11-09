@@ -96,10 +96,10 @@ describe('PrintTemplatesPage & PrintTemplateEditor', () => {
     renderPage()
 
     // Document tabs
-    expect(screen.getByRole('button', { name: /Prescription Slip/i })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /Payment Receipt/i })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /Registration Identity Card/i })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /Patient Consultation Summary/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Prescription/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Receipt/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Registration Card/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Consultation Summary/i })).toBeInTheDocument()
 
     // Version badge
     expect(screen.getByText('Version 1')).toBeInTheDocument()
@@ -131,8 +131,8 @@ describe('PrintTemplatesPage & PrintTemplateEditor', () => {
   it('switches tabs and updates form and preview', async () => {
     renderPage()
 
-    // Switch to Payment Receipt
-    const receiptTab = screen.getByRole('button', { name: /Payment Receipt/i })
+    // Switch to Receipt
+    const receiptTab = screen.getByRole('button', { name: /Receipt/i })
     fireEvent.click(receiptTab)
 
     // Check version badge updated

@@ -2,7 +2,9 @@ import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { useClinicBranding } from '../api/branding'
 import { useMyDepartments, type SpecialtyCode } from '../api/specialty'
 import { Link, useLocation, useNavigate } from 'react-router'
+import { useLatestIntegrityRun } from '../api/integrity'
 import { useLogout } from '../api/queries'
+import { countBySeverity, groupFindings } from '../admin/integrity'
 import type { Role } from '../api/types'
 import {
   ADMIN_MODULE_GROUPS,
@@ -73,7 +75,7 @@ const NAVIGATION: NavigationItem[] = [
   },
   {
     key: 'token-generation',
-    label: 'Visit & Token Desk',
+    label: 'Token Desk',
     description: 'Register visit and issue queue token',
     path: '/reception/tokens',
     icon: 'ticket',
@@ -398,46 +400,41 @@ function formatClock(date: Date) {
   }).format(date)
 }
 
-function Breadcrumbs({ pathname, role }: { pathname: string; role: Role }) {
-  const homePath = dashboardPath(role)
-  const homeLabel =
-    role === 'ADMIN'
-      ? 'Administration Dashboard'
-      : role === 'DOCTOR'
-        ? 'Doctor Station'
-        : 'Reception Desk'
+type Crumb = { label: string; href?: string }
 
-  const crumbs: { label: string; href?: string }[] = [{ label: homeLabel, href: homePath }]
+/**
+ * The path to the current page, in the same words as the sidebar and the page title.
+ * The last crumb also names the browser tab, so every page is told apart in the tab bar.
+ */
+function breadcrumbsFor(pathname: string, role: Role): Crumb[] {
+  const crumbs: Crumb[] = [{ label: 'Dashboard', href: dashboardPath(role) }]
 
   if (pathname === '/reception/patients/new') {
     crumbs.push({ label: 'Patient Registration' })
   } else if (pathname === '/reception/tokens') {
-    crumbs.push({ label: 'Visit & Token Desk' })
+    crumbs.push({ label: 'Token Desk' })
   } else if (pathname === '/reception/patients') {
     crumbs.push({ label: 'Patient Records' })
   } else if (/^\/reception\/patients\/\d+$/.test(pathname)) {
     crumbs.push({ label: 'Patient Records', href: '/reception/patients' })
-    crumbs.push({ label: 'Patient Profile & File' })
+    crumbs.push({ label: 'Patient Record' })
   } else if (/^\/reception\/patients\/\d+\/print$/.test(pathname)) {
     crumbs.push({ label: 'Patient Records', href: '/reception/patients' })
-    crumbs.push({ label: 'Print Patient Card' })
+    crumbs.push({ label: 'Registration Card' })
   } else if (pathname === '/reception/appointments') {
-    crumbs.push({ label: 'Waiting Queue / OPD' })
+    crumbs.push({ label: 'Appointments' })
   } else if (pathname === '/reception/billing') {
     crumbs.push({ label: 'Billing & Payments' })
   } else if (pathname === '/reception/dues') {
     crumbs.push({ label: 'Billing & Payments', href: '/reception/billing' })
-    crumbs.push({ label: 'Outstanding Package Dues' })
+    crumbs.push({ label: 'Pending Dues' })
   } else if (pathname === '/doctor/treatment-plans') {
-    crumbs.push({ label: 'Physiotherapy Treatment Plans' })
+    crumbs.push({ label: 'Treatment Plans' })
   } else if (pathname === '/doctor/encounters/new') {
-    crumbs.push({ label: 'Consultation Queue', href: '/doctor' })
-    crumbs.push({ label: 'New Clinical Consultation' })
+    crumbs.push({ label: 'New Consultation' })
   } else if (/^\/doctor\/encounters\/\d+$/.test(pathname)) {
-    crumbs.push({ label: 'Consultation Queue', href: '/doctor' })
-    crumbs.push({ label: 'Consultation Record' })
+    crumbs.push({ label: 'Consultation' })
   } else if (pathname === '/doctor/prescriptions/new') {
-    crumbs.push({ label: 'Consultation Queue', href: '/doctor' })
     crumbs.push({ label: 'New Prescription' })
   } else if (pathname.startsWith('/admin/')) {
     const match = findAdminModuleForPath(pathname)
@@ -455,6 +452,11 @@ function Breadcrumbs({ pathname, role }: { pathname: string; role: Role }) {
     }
   }
 
+  return crumbs
+}
+
+function Breadcrumbs({ pathname, role }: { pathname: string; role: Role }) {
+  const crumbs = breadcrumbsFor(pathname, role)
   if (crumbs.length <= 1) return null
 
   return (
@@ -494,6 +496,9 @@ export function AppShell({ name, role, children }: AppShellProps) {
   const branding = useClinicBranding()
   const myDepartments = useMyDepartments()
   const myDepartmentLabel = myDepartments.map((d) => d.name_en).join(' · ')
+  // Problems from the last stored integrity run, shown beside Data Integrity in the sidebar.
+  const latestIntegrity = useLatestIntegrityRun({ enabled: role === 'ADMIN' })
+  const integrityProblems = countBySeverity(groupFindings(latestIntegrity.data)).ERROR
   const [mobileOpen, setMobileOpen] = useState(false)
   const [now, setNow] = useState(() => new Date())
 
@@ -514,6 +519,12 @@ export function AppShell({ name, role, children }: AppShellProps) {
   }, [mobileOpen])
 
   const clock = useMemo(() => formatClock(now), [now])
+
+  useEffect(() => {
+    const crumbs = breadcrumbsFor(location.pathname, role)
+    const page = crumbs[crumbs.length - 1].label
+    document.title = `${page} – Kalyan Hospital`
+  }, [location.pathname, role])
 
   const visibleItems = useMemo(() => {
     const codes = new Set(myDepartments.map((d) => d.code))
@@ -538,15 +549,13 @@ export function AppShell({ name, role, children }: AppShellProps) {
     return (
       <aside
         aria-label="Primary navigation"
-        className={`flex h-full flex-col bg-[#5D0B26] text-white transition-all duration-200 ${
-          isDrawer ? 'w-72 max-w-[85vw] shadow-2xl' : 'w-16 lg:w-64 shrink-0'
-        }`}
+        className={`flex h-full flex-col bg-[#5D0B26] text-white transition-all duration-200 ${isDrawer ? 'w-72 max-w-[85vw] shadow-2xl' : 'w-16 lg:w-64 shrink-0'
+          }`}
       >
         {/* Sidebar Brand Header */}
         <div
-          className={`flex min-h-[64px] shrink-0 items-center border-b border-white/15 ${
-            isDesktopSidebar ? 'justify-center px-2 lg:justify-start lg:gap-3 lg:px-4' : 'justify-between px-4'
-          }`}
+          className={`flex min-h-[64px] shrink-0 items-center border-b border-white/15 ${isDesktopSidebar ? 'justify-center px-2 lg:justify-start lg:gap-3 lg:px-4' : 'justify-between px-4'
+            }`}
         >
           <div className="flex items-center gap-3 min-w-0">
             <img
@@ -585,18 +594,17 @@ export function AppShell({ name, role, children }: AppShellProps) {
           aria-label="Primary navigation"
           className="flex-1 space-y-3 overflow-y-auto px-3 py-4 custom-scrollbar-dark"
         >
-          {/* Management Overview (Home) */}
+          {/* Dashboard (Home) */}
           <Link
             to="/admin"
             onClick={() => isDrawer && setMobileOpen(false)}
             aria-current={location.pathname === '/admin' ? 'page' : undefined}
-            className={`group relative flex min-h-11 items-center gap-3 rounded-lg px-3 py-2 text-xs font-semibold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-white ${
-              isDesktopSidebar ? 'justify-center lg:justify-start' : 'justify-start'
-            } ${
-              location.pathname === '/admin'
+            title="Management Overview"
+            className={`group relative flex min-h-11 items-center gap-3 rounded-lg px-3 py-2 text-xs font-semibold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-white ${isDesktopSidebar ? 'justify-center lg:justify-start' : 'justify-start'
+              } ${location.pathname === '/admin'
                 ? 'bg-white text-[#5D0B26] font-bold shadow-sm'
                 : 'text-rose-100 hover:bg-white/10 hover:text-white'
-            }`}
+              }`}
           >
             <svg className="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
@@ -620,9 +628,8 @@ export function AppShell({ name, role, children }: AppShellProps) {
                 <div
                   role="heading"
                   aria-level={3}
-                  className={`px-3 py-2 text-xs font-bold uppercase tracking-wider text-rose-200 ${
-                    isDesktopSidebar ? 'hidden lg:block' : 'block'
-                  }`}
+                  className={`px-3 py-2 text-xs font-bold uppercase tracking-wider text-rose-200 ${isDesktopSidebar ? 'hidden lg:block' : 'block'
+                    }`}
                 >
                   {group.label}
                 </div>
@@ -632,10 +639,10 @@ export function AppShell({ name, role, children }: AppShellProps) {
                       mod.canonicalPath === '/admin'
                         ? location.pathname === '/admin'
                         : Boolean(
-                            mod.canonicalPath &&
-                              (location.pathname === mod.canonicalPath ||
-                                location.pathname.startsWith(`${mod.canonicalPath}/`)),
-                          )
+                          mod.canonicalPath &&
+                          (location.pathname === mod.canonicalPath ||
+                            location.pathname.startsWith(`${mod.canonicalPath}/`)),
+                        )
                     return (
                       <Link
                         key={mod.id}
@@ -643,23 +650,31 @@ export function AppShell({ name, role, children }: AppShellProps) {
                         onClick={() => isDrawer && setMobileOpen(false)}
                         aria-current={active ? 'page' : undefined}
                         title={mod.title}
-                        className={`group relative flex min-h-11 items-center gap-2.5 rounded-lg px-3 py-2 text-xs font-medium transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-white ${
-                          isDesktopSidebar ? 'justify-center lg:justify-start' : 'justify-start'
-                        } ${
-                          active
+                        className={`group relative flex min-h-11 items-center gap-2.5 rounded-lg px-3 py-2 text-xs font-medium transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-white ${isDesktopSidebar ? 'justify-center lg:justify-start' : 'justify-start'
+                          } ${active
                             ? 'bg-white text-[#5D0B26] font-bold shadow-sm'
                             : 'text-rose-100 hover:bg-white/10 hover:text-white'
-                        }`}
+                          }`}
                       >
                         <span
-                          className={`h-1.5 w-1.5 shrink-0 rounded-full ${
-                            active ? 'bg-[#5D0B26]' : 'bg-rose-200/60'
-                          }`}
+                          className={`h-1.5 w-1.5 shrink-0 rounded-full ${active ? 'bg-[#5D0B26]' : 'bg-rose-200/60'
+                            }`}
                           aria-hidden="true"
                         />
                         <span className={`truncate ${isDesktopSidebar ? 'hidden lg:inline' : 'inline'}`}>
                           {mod.title}
                         </span>
+                        {mod.id === 'data-integrity' && integrityProblems > 0 && (
+                          <span
+                            className={`ml-auto shrink-0 rounded-full bg-red-700 px-1.5 py-0.5 text-xs font-bold tabular-nums text-white ${isDesktopSidebar ? 'hidden lg:inline' : 'inline'
+                              }`}
+                          >
+                            <span aria-hidden="true">{integrityProblems}</span>
+                            <span className="sr-only">
+                              , {integrityProblems} {integrityProblems === 1 ? 'problem' : 'problems'}
+                            </span>
+                          </span>
+                        )}
                         {active && (
                           <span
                             aria-hidden="true"
@@ -677,9 +692,8 @@ export function AppShell({ name, role, children }: AppShellProps) {
 
         {/* Sidebar Footer Context */}
         <div
-          className={`border-t border-white/15 p-3 text-xs text-rose-100/80 shrink-0 ${
-            isDesktopSidebar ? 'hidden lg:block' : 'block'
-          }`}
+          className={`border-t border-white/15 p-3 text-xs text-rose-100/80 shrink-0 ${isDesktopSidebar ? 'hidden lg:block' : 'block'
+            }`}
         >
           <p className="font-semibold text-white">Local clinic network</p>
           <p className="mt-0.5 text-xs text-rose-200">Kalyan Hospital · v3.0 LAN</p>

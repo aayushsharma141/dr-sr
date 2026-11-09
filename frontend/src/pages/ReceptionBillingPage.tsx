@@ -8,6 +8,7 @@ import {
   usePatients,
   usePatient,
   useDoctors,
+  useFees,
   useRecordPayment,
   useLedger,
   usePendingDues,
@@ -45,6 +46,20 @@ function formatIst(value: string): string {
   })
 }
 
+type ServiceType = 'opd_consultation' | 'custom' | `fee:${number}`
+
+function paiseToRupees(paise: number): string {
+  return (paise / 100).toFixed(2)
+}
+
+/** Whole rupees with up to two decimals ("350", "350.5", "350.50"); anything else is rejected. */
+function rupeesToPaise(value: string): number | null {
+  const trimmed = value.trim()
+  if (!/^\d{1,7}(\.\d{1,2})?$/.test(trimmed)) return null
+  const paise = Math.round(Number(trimmed) * 100)
+  return paise > 0 ? paise : null
+}
+
 export function ReceptionBillingPage() {
   const { data: me } = useMe()
   const [searchParams, setSearchParams] = useSearchParams()
@@ -66,9 +81,11 @@ export function ReceptionBillingPage() {
   // --- TAB 1: CHECKOUT / COLLECT PAYMENT STATE ---
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedPatient, setSelectedPatient] = useState<PatientOut | null>(null)
-  const [serviceType, setServiceType] = useState<'opd_consultation' | 'follow_up' | 'physio_session' | 'custom'>('opd_consultation')
+  // 'opd_consultation' charges the chosen doctor's fee, 'fee:<id>' an admin fee schedule entry,
+  // 'custom' whatever reception types. No amount is ever assumed (a guessed fee gets charged).
+  const [serviceType, setServiceType] = useState<ServiceType>('opd_consultation')
   const [selectedDoctorId, setSelectedDoctorId] = useState<string>('')
-  const [amountRupees, setAmountRupees] = useState<string>('400.00')
+  const [amountRupees, setAmountRupees] = useState<string>('')
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('CASH')
   const [notes, setNotes] = useState<string>('')
 
@@ -79,6 +96,7 @@ export function ReceptionBillingPage() {
   const { data: searchResults, isPending: isSearching } = usePatients(searchQuery, 8, 0)
   const { data: preloadedPatient } = usePatient(patientIdParam ? Number(patientIdParam) : 0)
   const { data: doctors } = useDoctors(false)
+  const { data: fees } = useFees(true)
 
   // Auto-select patient if provided via URL
   useEffect(() => {
@@ -88,26 +106,32 @@ export function ReceptionBillingPage() {
   }, [preloadedPatient, selectedPatient])
 
   // Update amount when service type changes
-  const handleServiceChange = (val: 'opd_consultation' | 'follow_up' | 'physio_session' | 'custom') => {
+  const handleServiceChange = (val: ServiceType) => {
     setServiceType(val)
     if (val === 'opd_consultation') {
       const doc = doctors?.find((d) => String(d.id) === selectedDoctorId)
-      setAmountRupees(doc ? (doc.default_fee_paise / 100).toFixed(2) : '400.00')
-    } else if (val === 'follow_up') {
-      setAmountRupees('200.00')
-    } else if (val === 'physio_session') {
-      setAmountRupees('500.00')
+      setAmountRupees(doc ? paiseToRupees(doc.default_fee_paise) : '')
+    } else if (val.startsWith('fee:')) {
+      const fee = fees?.find((f) => `fee:${f.id}` === val)
+      setAmountRupees(fee ? paiseToRupees(fee.fee_paise) : '')
     } else {
       setAmountRupees('')
     }
   }
+
+  const serviceLabel =
+    serviceType === 'opd_consultation'
+      ? 'OPD consultation'
+      : serviceType.startsWith('fee:')
+        ? fees?.find((f) => `fee:${f.id}` === serviceType)?.name ?? 'Service charge'
+        : 'Custom service charge'
 
   const handleDoctorChange = (docId: string) => {
     setSelectedDoctorId(docId)
     if (serviceType === 'opd_consultation' && docId) {
       const doc = doctors?.find((d) => String(d.id) === docId)
       if (doc) {
-        setAmountRupees((doc.default_fee_paise / 100).toFixed(2))
+        setAmountRupees(paiseToRupees(doc.default_fee_paise))
       }
     }
   }
@@ -123,20 +147,22 @@ export function ReceptionBillingPage() {
       return
     }
 
-    const parsed = parseFloat(amountRupees)
-    if (isNaN(parsed) || parsed <= 0) {
-      setFormError('Please enter a valid payment amount in rupees.')
+    const amountPaise = rupeesToPaise(amountRupees)
+    if (amountPaise === null) {
+      setFormError(
+        serviceType === 'opd_consultation' && !selectedDoctorId
+          ? 'Choose the consulting doctor to fill their fee, or enter the amount.'
+          : 'Enter the amount in rupees, for example 350 or 350.50.',
+      )
       return
     }
-
-    const amountPaise = Math.round(parsed * 100)
 
     try {
       const res = await recordPaymentMutation.mutateAsync({
         patient_id: selectedPatient.id,
         amount_paise: amountPaise,
         payment_method: paymentMethod,
-        notes: notes.trim() || `OPD ${serviceType.replace('_', ' ').toUpperCase()}`,
+        notes: notes.trim() || serviceLabel,
       })
 
       setRecordedPayment(res)
@@ -154,7 +180,7 @@ export function ReceptionBillingPage() {
   const handleResetCheckout = () => {
     setSelectedPatient(null)
     setSearchQuery('')
-    setAmountRupees('400.00')
+    setAmountRupees('')
     setServiceType('opd_consultation')
     setPaymentMethod('CASH')
     setNotes('')
@@ -204,7 +230,7 @@ export function ReceptionBillingPage() {
             </div>
             <div>
               <h1 className="text-2xl font-bold tracking-tight text-slate-900">
-                Reception Billing &amp; Payment Desk
+                Billing &amp; Payments
               </h1>
               <p className="text-xs text-slate-500">
                 Collect OPD consultation charges, issue sequential receipts, and manage package ledger balances.
@@ -241,7 +267,7 @@ export function ReceptionBillingPage() {
               }`}
           >
             <IconRupee className="h-4 w-4" />
-            Counter Checkout &amp; Collect
+            Checkout
           </button>
           <button
             type="button"
@@ -252,7 +278,7 @@ export function ReceptionBillingPage() {
               }`}
           >
             <IconReceipt className="h-4 w-4" />
-            Today&apos;s Receipts &amp; Ledger
+            Today&apos;s Receipts
           </button>
           <button
             type="button"
@@ -263,7 +289,7 @@ export function ReceptionBillingPage() {
               }`}
           >
             <IconClock className="h-4 w-4" />
-            Outstanding Package Dues
+            Pending Dues
           </button>
         </div>
 
@@ -457,13 +483,16 @@ export function ReceptionBillingPage() {
                       <select
                         id="billing-service-type"
                         value={serviceType}
-                        onChange={(e) => handleServiceChange(e.target.value as any)}
+                        onChange={(e) => handleServiceChange(e.target.value as ServiceType)}
                         className="w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-xs font-medium text-slate-900 shadow-2xs focus:border-emerald-700 focus:outline-none min-h-[44px]"
                       >
-                        <option value="opd_consultation">OPD Consultation Fee - ₹400.00</option>
-                        <option value="follow_up">Clinical Follow-up Re-visit - ₹200.00</option>
-                        <option value="physio_session">Physiotherapy Treatment Session - ₹500.00</option>
-                        <option value="custom">Other / Custom Service Charge</option>
+                        <option value="opd_consultation">OPD consultation (doctor's fee)</option>
+                        {fees?.map((fee) => (
+                          <option key={fee.id} value={`fee:${fee.id}`}>
+                            {fee.name} - ₹{paiseToRupees(fee.fee_paise)}
+                          </option>
+                        ))}
+                        <option value="custom">Other service (enter amount)</option>
                       </select>
                     </div>
 
@@ -504,10 +533,16 @@ export function ReceptionBillingPage() {
                           required
                           value={amountRupees}
                           onChange={(e) => setAmountRupees(e.target.value)}
-                          placeholder="0.00"
+                          placeholder="Enter amount"
+                          aria-describedby="billing-amount-hint"
                           className="w-full rounded-xl border border-slate-300 bg-white pl-8 pr-3.5 py-2.5 text-base font-black text-slate-900 shadow-2xs focus:border-emerald-700 focus:outline-none min-h-[44px]"
                         />
                       </div>
+                      <p id="billing-amount-hint" className="mt-1 text-xs text-slate-600">
+                        {serviceType === 'opd_consultation' && !selectedDoctorId
+                          ? "Choose the consulting doctor to fill their fee, or enter the amount."
+                          : 'Filled from the fee schedule. Change it only if the fee differs today.'}
+                      </p>
                     </div>
                   </div>
                 </section>
@@ -702,7 +737,7 @@ export function ReceptionBillingPage() {
           <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs sm:p-6 space-y-4">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 pb-4">
               <div>
-                <h2 className="text-base font-bold text-slate-900">Outstanding Package Dues Ledger</h2>
+                <h2 className="text-base font-bold text-slate-900">Pending Dues</h2>
                 <p className="text-xs text-slate-500">
                   Active physiotherapy packages with pending balances computed dynamically.
                 </p>

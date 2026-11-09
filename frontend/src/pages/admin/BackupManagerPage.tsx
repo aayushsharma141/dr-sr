@@ -212,11 +212,10 @@ export function BackupManagerPage() {
         </header>
 
         {!restoreArchive && feedback && (
-          <div role={feedback.tone === 'error' ? 'alert' : 'status'} className={`flex items-start justify-between gap-3 rounded-lg border p-3 text-sm ${
-            feedback.tone === 'success' ? 'border-emerald-200 bg-emerald-50 text-emerald-900'
+          <div role={feedback.tone === 'error' ? 'alert' : 'status'} className={`flex items-start justify-between gap-3 rounded-lg border p-3 text-sm ${feedback.tone === 'success' ? 'border-emerald-200 bg-emerald-50 text-emerald-900'
               : feedback.tone === 'error' ? 'border-red-200 bg-red-50 text-red-900'
                 : 'border-amber-200 bg-amber-50 text-amber-900'
-          }`}>
+            }`}>
             <span>{feedback.message}</span>
             <button type="button" onClick={() => setFeedback(null)} aria-label="Dismiss message" className="font-bold">×</button>
           </div>
@@ -334,7 +333,7 @@ export function BackupManagerPage() {
         <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
           <div className="flex flex-wrap gap-2 border-b border-slate-200 bg-slate-50 p-2" role="tablist" aria-label="Backup management views">
             <button type="button" role="tab" aria-selected={activeTab === 'archives'} onClick={() => setActiveTab('archives')} className={`min-h-10 rounded-lg px-4 text-sm font-semibold ${activeTab === 'archives' ? 'bg-white text-[#5D0B26] shadow-sm ring-1 ring-slate-200' : 'text-slate-600 hover:bg-white/70'}`}>
-              Backup archives <span className="ml-1 text-xs text-slate-500">({archives.length})</span>
+              Backups <span className="ml-1 text-xs text-slate-500">({archives.length})</span>
             </button>
             <button type="button" role="tab" aria-selected={activeTab === 'schedule'} onClick={() => setActiveTab('schedule')} className={`min-h-10 rounded-lg px-4 text-sm font-semibold ${activeTab === 'schedule' ? 'bg-white text-[#5D0B26] shadow-sm ring-1 ring-slate-200' : 'text-slate-600 hover:bg-white/70'}`}>
               Schedule & automation

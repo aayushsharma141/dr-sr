@@ -74,12 +74,27 @@ def test_operations_admin_lifecycle(
     """Admin can list backups, trigger a backup, check integrity, and restore."""
     admin_c = login_client(admin_user)
 
-    # 1. Check integrity
-    integ_res = admin_c.get("/api/operations/integrity")
-    assert integ_res.status_code == 200
-    integ_data = integ_res.json()
-    assert "is_healthy" in integ_data
-    assert integ_data["total_checks"] == 7
+    # 1. Run the integrity check; the stored run is what the page reads afterwards.
+    run_res = admin_c.post("/api/operations/integrity/run")
+    assert run_res.status_code == 201
+    run_data = run_res.json()
+    assert "is_healthy" in run_data
+    assert run_data["total_checks"] == 7
+    assert run_data["run_by_username"] == admin_user.username
+    assert {c["code"] for c in run_data["checks"]} == {
+        "package_payments",
+        "patient_id_unique",
+        "patient_id_gaps",
+        "receipt_unique",
+        "session_counts",
+        "photo_files",
+        "asset_files",
+    }
+    latest = admin_c.get("/api/operations/integrity")
+    assert latest.status_code == 200
+    assert latest.json()["id"] == run_data["id"]
+    history = admin_c.get("/api/operations/integrity/history").json()["runs"]
+    assert history[0]["id"] == run_data["id"]
 
     # 2. Trigger backup
     backup_res = admin_c.post("/api/operations/backups", json={"label": "api_test"})
@@ -143,3 +158,32 @@ def test_operations_admin_lifecycle(
     assert restore_data["status"] == "SUCCESS"
     assert restore_data["database_restored"] is True
     assert calls == ["release", "restore"]
+
+
+def test_reading_the_integrity_page_runs_nothing(
+    login_client: Any, admin_user: User, db_session: Any
+) -> None:
+    """GET only reads the stored run; it never runs the checks or writes an audit entry."""
+    from sqlalchemy import func, select
+
+    from kalyan_api.models import AuditLog, IntegrityRun
+
+    admin_c = login_client(admin_user)
+
+    def counts() -> tuple[int, int]:
+        runs = db_session.scalar(select(func.count(IntegrityRun.id))) or 0
+        audits = (
+            db_session.scalar(
+                select(func.count(AuditLog.id)).where(AuditLog.action == "INTEGRITY_CHECK_RUN")
+            )
+            or 0
+        )
+        return runs, audits
+
+    before = counts()
+    for _ in range(3):
+        assert admin_c.get("/api/operations/integrity").status_code == 200
+    assert counts() == before
+
+    assert admin_c.post("/api/operations/integrity/run").status_code == 201
+    assert counts() == (before[0] + 1, before[1] + 1)

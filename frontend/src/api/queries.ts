@@ -6,7 +6,6 @@ import type {
   BackupCreateRequest,
   BackupVerifyResponse,
   HospitalAssetOut,
-  IntegrityReportOut,
   LoginHistoryEntry,
   PasswordPolicyOut,
   PrintTemplateOut,
@@ -1439,13 +1438,6 @@ export function useRestoreBackup() {
       // 400 backup_corrupted / 500 restore_failed commit a BACKUP_RESTORE_FAILED audit row.
       invalidateAdminSummaries(queryClient)
     },
-  })
-}
-
-export function useIntegrityCheck() {
-  return useQuery({
-    queryKey: ['operations', 'integrity'],
-    queryFn: () => apiFetch<IntegrityReportOut>('/api/operations/integrity'),
   })
 }
 

@@ -193,7 +193,7 @@ describe('BackupManagerPage failures are persistent inline alerts (UX-03)', () =
       status: 'SUCCESS',
       prerestore_snapshot: '/var/backups/prerestore.tar.gz',
     })
-    alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {})
+    alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => { })
   })
 
   afterEach(() => {

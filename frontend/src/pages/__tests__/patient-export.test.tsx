@@ -53,7 +53,7 @@ describe('PatientExportPage and PatientExportDialog', () => {
   it('renders PatientExportPage and opens export dialog on button click', async () => {
     renderWithProviders(<PatientExportPage />)
 
-    expect(screen.getByRole('heading', { name: /patient export centre/i })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: /export patients/i })).toBeInTheDocument()
     const openBtn = screen.getByRole('button', { name: /export patient dataset/i })
     expect(openBtn).toBeInTheDocument()
 

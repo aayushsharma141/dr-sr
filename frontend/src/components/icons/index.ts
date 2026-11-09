@@ -64,4 +64,9 @@ export {
   IconWalk,
   IconWallet,
   IconX,
+  IconChartDonut,
+  IconChartLine,
+  IconServer,
+  IconTrendingDown,
+  IconTrendingUp,
 } from '@tabler/icons-react'

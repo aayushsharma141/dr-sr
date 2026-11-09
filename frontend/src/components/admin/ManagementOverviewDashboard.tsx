@@ -18,7 +18,8 @@ function formatPaiseToLakhs(paise: number): string {
 }
 
 export function ManagementOverviewDashboard({ overview }: ManagementOverviewDashboardProps) {
-  const { data: mgmt } = useManagementOverview()
+  const { data } = useManagementOverview()
+  const mgmt: any = data
   const [selectedMonth, setSelectedMonth] = useState('Nov 2026')
   const [comparisonMonth, setComparisonMonth] = useState('Oct 2026')
   const filterId = useId()
@@ -408,7 +409,7 @@ export function ManagementOverviewDashboard({ overview }: ManagementOverviewDash
 
             {/* Legend breakdown list */}
             <ul className="flex-1 space-y-2 text-xs">
-              {departmentData.map((d) => (
+              {departmentData.map((d: any) => (
                 <li key={d.name} className="flex items-center justify-between gap-2">
                   <div className="flex items-center gap-2 min-w-0">
                     <span
@@ -437,7 +438,7 @@ export function ManagementOverviewDashboard({ overview }: ManagementOverviewDash
           </div>
 
           <ul className="mt-3 divide-y divide-slate-100">
-            {attentionItems.map((item) => (
+            {attentionItems.map((item: any) => (
               <li key={item.key}>
                 <Link
                   to={item.target_path}
@@ -448,13 +449,12 @@ export function ManagementOverviewDashboard({ overview }: ManagementOverviewDash
                   </span>
                   <div className="flex items-center gap-2 shrink-0">
                     <span
-                      className={`inline-flex min-w-5 items-center justify-center rounded px-1.5 py-0.5 text-xs font-bold ${
-                        item.badge_variant === 'danger'
-                          ? 'bg-rose-100 text-rose-700'
-                          : item.badge_variant === 'warning'
-                            ? 'bg-amber-100 text-amber-800'
-                            : 'bg-slate-100 text-slate-600'
-                      }`}
+                      className={`inline-flex min-w-5 items-center justify-center rounded px-1.5 py-0.5 text-xs font-bold ${item.badge_variant === 'danger'
+                        ? 'bg-rose-100 text-rose-700'
+                        : item.badge_variant === 'warning'
+                          ? 'bg-amber-100 text-amber-800'
+                          : 'bg-slate-100 text-slate-600'
+                        }`}
                     >
                       {item.count}
                     </span>
@@ -565,6 +565,17 @@ export function ManagementOverviewDashboard({ overview }: ManagementOverviewDash
           </div>
 
           <ul className="mt-3 space-y-2 text-xs">
+            {overview?.user_counts && (
+              <li className="flex items-center justify-between text-slate-700">
+                <span className="flex items-center gap-1.5">
+                  <span className="text-emerald-700 font-bold">✔</span>
+                  Staff accounts
+                </span>
+                <span className="font-semibold text-slate-900">
+                  {Object.values(overview.user_counts).reduce((s, c) => s + c.active, 0)} active
+                </span>
+              </li>
+            )}
             <li className="flex items-center justify-between text-slate-700">
               <span className="flex items-center gap-1.5">
                 <span className="text-emerald-700 font-bold">✔</span>

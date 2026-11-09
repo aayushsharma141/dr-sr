@@ -402,8 +402,9 @@ export function Doctors() {
 
   return (
     <AppShell name={me?.full_name ?? 'Admin'} role={me?.role ?? 'ADMIN'}>
-      <div className="space-y-8 max-w-6xl mx-auto">
+      <div className="mx-auto w-full max-w-[1600px] space-y-8">
         {/* Doctors Section */}
+        <h1 className="text-2xl font-bold tracking-tight text-slate-900">Doctors &amp; Fees</h1>
         <section aria-labelledby="doctors-heading" className="space-y-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>

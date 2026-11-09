@@ -15,7 +15,7 @@ export function PatientExportPage() {
         <div className="flex flex-col justify-between gap-4 border-b border-slate-200 pb-5 sm:flex-row sm:items-center">
           <div>
             <h1 className="text-2xl font-bold tracking-tight text-slate-900">
-              Patient Export Centre
+              Export Patients
             </h1>
             <p className="mt-1 text-sm text-slate-600">
               Permission-checked, field-selective, formula-sanitized dataset streaming in CSV and Excel formats.

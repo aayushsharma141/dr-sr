@@ -252,7 +252,7 @@ Plans:
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 11 → 12 → 13 → 14 → 15 → 16 → 17 → 18 → 19 → 20 → 21
+Phases execute in numeric order: 11 → 12 → 13 → 14 → 15 → 16 → 17 → 18 → 19 → 20 → 21 → 22
 
 | Phase | Plans Complete | Status | Completed |
 | --- | --- | --- | --- |
@@ -263,10 +263,11 @@ Phases execute in numeric order: 11 → 12 → 13 → 14 → 15 → 16 → 17 �
 | 15. Billing, Receipts & Reversals | 7/7 | Complete | 2026-11-02 |
 | 16. Audit Viewer, Backup/Restore & Integrity | 7/7 | Complete | 2026-11-04 |
 | 17. LAN Deployment, Printer & Acceptance | 5/5 | Complete | 2026-11-05 |
-| 18. UI/UX Review Hardening | 5/8 | In progress (04 closed with printer waiver; 05 closed with criterion 4 unmet; 06-08 pending) | - |
+| 18. UI/UX Review Hardening | 5/8 | Skipped / Superseded by current build | - |
 | 19. Universal Consultation Workspace | 7/7 | Complete | 2026-11-06 |
 | 20. Admin Data Governance & Asset Management | 8/8 | Complete | 2026-11-08 |
-| 21. Advanced Data Operations | 0/0 | Deferred — depends on Phase 20 | - |
+| 21. Build Takeover & System Stabilization | 0/2 | In progress | - |
+| 22. Advanced Data Operations | 0/0 | Deferred — depends on Phase 21 | - |
 
 ---
 *Roadmap created: 2026-10-30*
@@ -302,3 +303,26 @@ Plans:
 - [x] 20-06-PLAN.md — Patient import centre (8-stage pipeline, CSV/XLSX, staging, safety backup before commit, URN sequence) (Wave 6)
 - [x] 20-07-PLAN.md — Patient export centre (stream to browser, field-selective, audited, formula sanitization) (Wave 7)
 - [x] 20-08-PLAN.md — Phase 20 integration gate (all tests pass, typecheck clean, coverage floor maintained) (Wave 8)
+
+---
+
+### Phase 21: Build Takeover & System Stabilization
+
+**Goal**: Take over the active build on branch `refactor/admin-modules-ssot` from the multi-agent session. Reconcile frontend admin navigation tests, ensure 100% green test suites across frontend and backend, stabilize the 5-section Admin SSOT navigation, and complete verification for hospital lifecycles WF-001 through WF-017.
+
+**Depends on**: Current build in tree (Phase 20 foundation)
+
+**Plans:** 2 plans
+
+Plans:
+
+- [ ] 21-01-PLAN.md — Reconcile admin navigation architecture test with real AdminDashboard component shape and types (Wave 1)
+- [ ] 21-02-PLAN.md — Full-stack regression verification gate (Vitest 54/54 suites, pytest 1,064 tests, typecheck) (Wave 2)
+
+---
+
+### Phase 22: Advanced Data Operations
+
+**Goal**: Duplicate patient detection and merge workflow (high-risk FK cascade; dedicated transaction design); bulk archive and bulk delete for eligible records; extended data-edit permission controls; LAN workstation status monitoring.
+
+**Depends on**: Phase 21 stable data foundation

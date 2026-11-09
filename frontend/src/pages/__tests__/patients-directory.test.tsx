@@ -381,30 +381,30 @@ describe('Patients Directory and Profile Screens', () => {
       expect(screen.getByText('KH-2026-0001')).toBeInTheDocument()
     })
 
-    expect(screen.getByText('Aarav Kumar')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { level: 1, name: 'Aarav Kumar' })).toBeInTheDocument()
     expect(screen.getByText('Suresh Kumar')).toBeInTheDocument()
     expect(screen.getByText('Penicillin')).toBeInTheDocument()
     expect(screen.getByText('30 Years')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /edit demographics/i })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: /print card/i })).toBeInTheDocument()
 
-    expect(screen.getByRole('tab', { name: 'Demographic Profile' })).toHaveAttribute('aria-selected', 'true')
-    expect(screen.queryByRole('tab', { name: 'Clinical Records' })).not.toBeInTheDocument()
-    expect(screen.queryByRole('tab', { name: 'Audit History' })).not.toBeInTheDocument()
+    expect(screen.getByRole('tab', { name: 'Profile' })).toHaveAttribute('aria-selected', 'true')
+    expect(screen.queryByRole('tab', { name: 'Consultations' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('tab', { name: 'Change History' })).not.toBeInTheDocument()
 
-    await user.click(screen.getByRole('tab', { name: 'Visits & Appointments' }))
+    await user.click(screen.getByRole('tab', { name: 'Appointments' }))
     await waitFor(() => {
       expect(screen.getByText('Appointment & visit history')).toBeInTheDocument()
       expect(screen.getByText(/Token #1: Appointment/)).toBeInTheDocument()
     })
 
-    await user.click(screen.getByRole('tab', { name: 'Physiotherapy' }))
+    await user.click(screen.getByRole('tab', { name: 'Treatment Plans' }))
     await waitFor(() => {
       expect(screen.getByText('Package: Knee Rehabilitation')).toBeInTheDocument()
     })
     expect(screen.queryByText(/Payment Received/)).not.toBeInTheDocument()
 
-    await user.click(screen.getByRole('tab', { name: 'Financial Ledger' }))
+    await user.click(screen.getByRole('tab', { name: 'Payments' }))
     await waitFor(() => {
       expect(screen.getByText('Payment Received: ₹500.00')).toBeInTheDocument()
     })
@@ -486,10 +486,10 @@ describe('Patients Directory and Profile Screens', () => {
     )
 
     await waitFor(() => {
-      expect(screen.getByRole('tab', { name: 'Clinical Records' })).toBeInTheDocument()
+      expect(screen.getByRole('tab', { name: 'Consultations' })).toBeInTheDocument()
     })
 
-    await user.click(screen.getByRole('tab', { name: 'Clinical Records' }))
+    await user.click(screen.getByRole('tab', { name: 'Consultations' }))
     await waitFor(() => {
       expect(screen.getByText('Clinical Consultation with Dr. Madan Mohan Dwivedi')).toBeInTheDocument()
       expect(screen.getByText('Prescription by Dr. Madan Mohan Dwivedi')).toBeInTheDocument()
@@ -574,11 +574,11 @@ describe('Patients Directory and Profile Screens', () => {
     )
 
     await waitFor(() => {
-      expect(screen.getByRole('tab', { name: 'Audit History' })).toBeInTheDocument()
+      expect(screen.getByRole('tab', { name: 'Change History' })).toBeInTheDocument()
     })
-    expect(screen.queryByRole('tab', { name: 'Clinical Records' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('tab', { name: 'Consultations' })).not.toBeInTheDocument()
 
-    await user.click(screen.getByRole('tab', { name: 'Audit History' }))
+    await user.click(screen.getByRole('tab', { name: 'Change History' }))
     await waitFor(() => {
       expect(screen.getByText('PATIENT_UPDATED')).toBeInTheDocument()
     })

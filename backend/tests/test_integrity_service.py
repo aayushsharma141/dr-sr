@@ -63,3 +63,58 @@ def test_integrity_audit_detects_orphan_and_missing_photos(db_session, tmp_path:
     finally:
         if orphan_file.exists():
             orphan_file.unlink()
+
+
+def test_each_finding_has_its_own_severity(db_session, tmp_path: Path):
+    """A missing linked file is an ERROR; an unlinked file on disk is only CLEANUP."""
+    settings = get_settings().model_copy(update={"photos_dir": tmp_path})
+    (tmp_path / "unlinked_leftover.jpg").write_bytes(b"x" * 12)
+
+    only_orphan = check_photo_storage_integrity(db_session, settings)
+    assert only_orphan.code == "photo_files"
+    assert only_orphan.passed is False
+    assert [d["severity"] for d in only_orphan.discrepancies] == ["CLEANUP"]
+    assert only_orphan.severity == "CLEANUP"
+
+    db_session.add(
+        Patient(
+            urn="KHM-2026-88889",
+            full_name="Missing Photo Patient",
+            guardian_name="Guardian",
+            gender="F",
+            age_years=40,
+            mobile="9876543212",
+            address="Street 2",
+            district="Kangra",
+            state="Himachal Pradesh",
+            photo_path="/api/patients/photos/gone.jpg",
+        )
+    )
+    db_session.flush()
+
+    mixed = check_photo_storage_integrity(db_session, settings)
+    by_issue = {d["issue"]: d["severity"] for d in mixed.discrepancies}
+    assert by_issue == {"orphan_photo_file": "CLEANUP", "missing_photo_file": "ERROR"}
+    assert mixed.severity == "ERROR"
+
+
+def test_cleanup_only_findings_leave_the_report_healthy(db_session, tmp_path: Path):
+    """Clutter is counted separately and does not make the report unhealthy."""
+    photos = tmp_path / "photos"
+    assets = tmp_path / "assets"
+    photos.mkdir()
+    assets.mkdir()
+    (photos / "stray.jpg").write_bytes(b"x")
+    settings = get_settings().model_copy(update={"photos_dir": photos, "assets_dir": assets})
+
+    report = run_integrity_audit(db_session, settings)
+    assert report.cleanup_checks == 1
+    assert report.failed_checks == 0
+    assert report.is_healthy is True
+    assert (
+        report.passed_checks
+        + report.failed_checks
+        + report.warning_checks
+        + (report.cleanup_checks)
+        == report.total_checks
+    )

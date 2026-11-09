@@ -18,11 +18,19 @@ Checks implemented:
 5. Patient Photo Storage Integrity:
    - Every patient with a non-null photo_path must have an existing file on disk.
    - Identifies any orphan files on disk in settings.photos_dir that have no corresponding patient.
+6. Hospital Asset Storage Integrity: the same two checks for uploaded hospital assets.
+
+Every finding carries a stable ``issue`` code and its own ``severity``:
+- ERROR: a record is wrong or points at something missing (makes the report unhealthy).
+- WARNING: worth a review and may be expected (URN gaps, OD-12).
+- CLEANUP: harmless clutter, such as a stored file that no record uses.
+A check takes the worst severity among its findings; a check with no findings passed.
 """
 
 from __future__ import annotations
 
 import re
+import time
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Any, Literal
@@ -40,7 +48,23 @@ from kalyan_api.models import (
     UrnSequence,
 )
 
-Severity = Literal["ERROR", "WARNING"]
+Severity = Literal["ERROR", "WARNING", "CLEANUP"]
+
+SEVERITY_RANK: dict[str, int] = {"ERROR": 0, "WARNING": 1, "CLEANUP": 2}
+
+# Severity of each finding, by its issue code.
+ISSUE_SEVERITY: dict[str, Severity] = {
+    "negative_agreed_price": "ERROR",
+    "overpaid_ledger": "ERROR",
+    "duplicate_urn": "ERROR",
+    "urn_sequence_gap": "WARNING",
+    "duplicate_receipt": "ERROR",
+    "session_count_mismatch": "ERROR",
+    "missing_photo_file": "ERROR",
+    "orphan_photo_file": "CLEANUP",
+    "missing_asset_file": "ERROR",
+    "orphan_asset_file": "CLEANUP",
+}
 
 URN_PATTERN = re.compile(r"^KH-(\d{4})-(\d+)$")
 # Cap on listed missing numbers per year so a pathological gap cannot bloat the response.
@@ -51,8 +75,9 @@ MAX_LISTED_GAPS_PER_YEAR = 200
 class CheckResult:
     """Outcome of an individual integrity check.
 
-    ``severity`` classifies a non-passing result: ERROR findings make the report unhealthy,
-    WARNING findings are surfaced but leave ``is_healthy`` untouched.
+    ``code`` is a stable identifier for the check. ``severity`` is the worst severity among
+    the findings (see the module docstring); for a passed check it is the severity its
+    findings would normally have.
     """
 
     name: str
@@ -60,6 +85,17 @@ class CheckResult:
     details: str
     discrepancies: list[dict[str, Any]] = field(default_factory=list)
     severity: Severity = "ERROR"
+    code: str = ""
+
+    def __post_init__(self) -> None:
+        for item in self.discrepancies:
+            issue = str(item.get("issue", ""))
+            item.setdefault("severity", ISSUE_SEVERITY.get(issue, self.severity))
+        if self.discrepancies:
+            self.severity = min(
+                (item["severity"] for item in self.discrepancies),
+                key=lambda value: SEVERITY_RANK.get(value, 0),
+            )
 
 
 @dataclass
@@ -73,6 +109,8 @@ class IntegrityReport:
     passed_checks: int
     failed_checks: int
     warning_checks: int = 0
+    cleanup_checks: int = 0
+    duration_ms: int = 0
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -82,8 +120,11 @@ class IntegrityReport:
             "passed_checks": self.passed_checks,
             "failed_checks": self.failed_checks,
             "warning_checks": self.warning_checks,
+            "cleanup_checks": self.cleanup_checks,
+            "duration_ms": self.duration_ms,
             "checks": [
                 {
+                    "code": c.code,
                     "name": c.name,
                     "passed": c.passed,
                     "severity": c.severity,
@@ -105,32 +146,37 @@ def check_financial_ledger_integrity(session: Session) -> CheckResult:
         .all()
     )
 
+    active_payments_by_plan = {
+        int(plan_id): int(paid_sum or 0)
+        for plan_id, paid_sum in session.execute(
+            select(Payment.treatment_plan_id, func.sum(Payment.amount_paise))
+            .where(
+                Payment.treatment_plan_id.is_not(None),
+                Payment.is_reversed.is_(False),
+            )
+            .group_by(Payment.treatment_plan_id)
+        ).all()
+    }
+
     for plan in plans:
         agreed = plan.agreed_price_paise or 0
         if agreed < 0:
             discrepancies.append(
                 {
                     "plan_id": plan.id,
+                    "patient_id": plan.patient_id,
                     "issue": "negative_agreed_price",
                     "agreed_price_paise": agreed,
                 }
             )
 
-        # Query active payments
-        paid_sum: int = (
-            session.scalar(
-                select(func.coalesce(func.sum(Payment.amount_paise), 0)).where(
-                    Payment.treatment_plan_id == plan.id,
-                    Payment.is_reversed.is_(False),
-                )
-            )
-            or 0
-        )
+        paid_sum = active_payments_by_plan.get(plan.id, 0)
 
         if paid_sum > agreed:
             discrepancies.append(
                 {
                     "plan_id": plan.id,
+                    "patient_id": plan.patient_id,
                     "issue": "overpaid_ledger",
                     "agreed_price_paise": agreed,
                     "paid_sum_paise": paid_sum,
@@ -140,6 +186,7 @@ def check_financial_ledger_integrity(session: Session) -> CheckResult:
 
     passed = len(discrepancies) == 0
     return CheckResult(
+        code="package_payments",
         name="Financial Ledger & Package Invariants",
         passed=passed,
         details=(
@@ -159,10 +206,13 @@ def check_urn_uniqueness(session: Session) -> CheckResult:
         .having(func.count(Patient.id) > 1)
     )
     duplicates = session.execute(dup_stmt).all()
-    discrepancies = [{"urn": d.urn, "occurrences": d.count} for d in duplicates]
+    discrepancies = [
+        {"issue": "duplicate_urn", "urn": d.urn, "occurrences": d.count} for d in duplicates
+    ]
 
     passed = len(discrepancies) == 0
     return CheckResult(
+        code="patient_id_unique",
         name="Patient URN Uniqueness",
         passed=passed,
         details=(
@@ -232,6 +282,7 @@ def check_urn_sequence_gaps(session: Session) -> CheckResult:
     passed = len(discrepancies) == 0
     total_missing = sum(int(d["missing_count"]) for d in discrepancies)
     return CheckResult(
+        code="patient_id_gaps",
         name="Patient URN Sequence Gaps",
         passed=passed,
         severity="WARNING",
@@ -257,11 +308,13 @@ def check_receipt_uniqueness(session: Session) -> CheckResult:
     )
     duplicates = session.execute(dup_stmt).all()
     discrepancies = [
-        {"receipt_number": d.receipt_number, "occurrences": d.count} for d in duplicates
+        {"issue": "duplicate_receipt", "receipt_number": d.receipt_number, "occurrences": d.count}
+        for d in duplicates
     ]
 
     passed = len(discrepancies) == 0
     return CheckResult(
+        code="receipt_unique",
         name="Sequential Receipt Number Uniqueness",
         passed=passed,
         details=(
@@ -278,21 +331,23 @@ def check_session_progress_synchronization(session: Session) -> CheckResult:
     discrepancies: list[dict[str, Any]] = []
 
     plans = session.execute(select(TreatmentPlan)).scalars().all()
+    finalised_sessions_by_plan = {
+        int(plan_id): int(count)
+        for plan_id, count in session.execute(
+            select(TreatmentSession.treatment_plan_id, func.count(TreatmentSession.id))
+            .where(TreatmentSession.is_finalised.is_(True))
+            .group_by(TreatmentSession.treatment_plan_id)
+        ).all()
+    }
     for plan in plans:
-        actual_finalised_count: int = (
-            session.scalar(
-                select(func.count(TreatmentSession.id)).where(
-                    TreatmentSession.treatment_plan_id == plan.id,
-                    TreatmentSession.is_finalised.is_(True),
-                )
-            )
-            or 0
-        )
+        actual_finalised_count = finalised_sessions_by_plan.get(plan.id, 0)
 
         if plan.completed_sessions != actual_finalised_count:
             discrepancies.append(
                 {
                     "plan_id": plan.id,
+                    "patient_id": plan.patient_id,
+                    "issue": "session_count_mismatch",
                     "recorded_completed_sessions": plan.completed_sessions,
                     "actual_finalised_sessions": actual_finalised_count,
                 }
@@ -300,6 +355,7 @@ def check_session_progress_synchronization(session: Session) -> CheckResult:
 
     passed = len(discrepancies) == 0
     return CheckResult(
+        code="session_counts",
         name="Treatment Session Progress Synchronization",
         passed=passed,
         details=(
@@ -358,6 +414,7 @@ def check_photo_storage_integrity(
 
     passed = len(discrepancies) == 0
     return CheckResult(
+        code="photo_files",
         name="Patient Photo Storage Consistency",
         passed=passed,
         details=(
@@ -390,6 +447,9 @@ def check_asset_storage_integrity(
                     "asset_id": a.id,
                     "filename": fname,
                     "asset_type": a.asset_type,
+                    "is_active": a.is_active,
+                    "original_filename": a.original_filename,
+                    "uploaded_at": a.created_at.isoformat() if a.created_at else None,
                     "issue": "missing_asset_file",
                 }
             )
@@ -411,6 +471,7 @@ def check_asset_storage_integrity(
 
     passed = len(discrepancies) == 0
     return CheckResult(
+        code="asset_files",
         name="Hospital Asset Storage Consistency",
         passed=passed,
         details=(
@@ -425,6 +486,7 @@ def check_asset_storage_integrity(
 def run_integrity_audit(session: Session, settings: Settings | None = None) -> IntegrityReport:
     """Execute complete suite of clinical and financial integrity checks (BAK-03)."""
     cfg = settings or get_settings()
+    started = time.perf_counter()
 
     checks = [
         check_financial_ledger_integrity(session),
@@ -440,6 +502,7 @@ def run_integrity_audit(session: Session, settings: Settings | None = None) -> I
     passed = sum(1 for c in checks if c.passed)
     failed = sum(1 for c in checks if not c.passed and c.severity == "ERROR")
     warnings = sum(1 for c in checks if not c.passed and c.severity == "WARNING")
+    cleanups = sum(1 for c in checks if not c.passed and c.severity == "CLEANUP")
 
     return IntegrityReport(
         generated_at=datetime.now(UTC).isoformat(),
@@ -449,4 +512,6 @@ def run_integrity_audit(session: Session, settings: Settings | None = None) -> I
         passed_checks=passed,
         failed_checks=failed,
         warning_checks=warnings,
+        cleanup_checks=cleanups,
+        duration_ms=round((time.perf_counter() - started) * 1000),
     )

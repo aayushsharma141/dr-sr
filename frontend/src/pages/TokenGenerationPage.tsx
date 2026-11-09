@@ -177,7 +177,7 @@ export function TokenGenerationPage() {
             </div>
             <div>
               <h1 className="text-2xl font-bold tracking-tight text-slate-900">
-                Register Visit &amp; Generate Token
+                Token Desk
               </h1>
               <p className="text-xs text-slate-500">
                 Create a new patient, select department and doctor, and generate a queue token.

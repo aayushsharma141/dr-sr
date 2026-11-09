@@ -11,7 +11,7 @@ export function PatientImportPage() {
         {/* Page Header */}
         <div className="flex flex-col gap-1 border-b border-slate-200 pb-5">
           <h1 className="text-2xl font-bold tracking-tight text-slate-900">
-            Patient Import Centre
+            Import Patients
           </h1>
           <p className="text-sm text-slate-600">
             Staged 8-stage spreadsheet ingestion pipeline for bulk patient registration with automated pre-commit safety backup and duplicate candidate detection.

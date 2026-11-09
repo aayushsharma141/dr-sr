@@ -84,7 +84,7 @@ function renderWithClient(ui: React.ReactElement) {
   )
 }
 
-describe('Patient Demographic Correction & Print Snapshots', () => {
+describe('Patient Corrections & Print Snapshots', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     mockSearchResults = [mockPatient]

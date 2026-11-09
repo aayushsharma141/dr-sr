@@ -238,7 +238,7 @@ describe('TokenGenerationPage Cockpit', () => {
     )
 
     // Verify Title & Cockpit Columns
-    expect(screen.getByRole('heading', { name: /Register Visit & Generate Token/i })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: /Token Desk/i })).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Patient' })).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Visit Details' })).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Token Preview' })).toBeInTheDocument()

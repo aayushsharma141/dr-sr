@@ -212,7 +212,7 @@ export function BillingAdminPage() {
     <AppShell name={me?.full_name ?? 'Admin'} role={me?.role ?? 'ADMIN'}>
       <div className="space-y-6">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Billing & Financial</h1>
+          <h1 className="text-2xl font-bold text-slate-900">Receipts & Reversals</h1>
           <p className="mt-1 text-sm text-slate-700">Receipt rules, payment search and authorised reversals.</p>
         </div>
         <ConfigurationSection />

@@ -412,18 +412,52 @@ def test_admin_management_overview_endpoint(
     assert res.status_code == 200
     data = res.json()
 
-    assert "current_month_label" in data
-    assert "comparison_month_label" in data
-    assert data["monthly_revenue"]["value_paise"] > 0
-    assert data["operating_expenses"]["value_paise"] > 0
-    assert data["net_surplus"]["value_paise"] > 0
-    assert data["outstanding_receivables_paise"] > 0
-    assert len(data["financial_trends"]) == 6
-    assert len(data["department_revenues"]) == 5
-    assert len(data["management_attention"]) == 5
-    assert data["management_attention_total"] >= 5
-    assert data["hospital_growth"]["new_patients"] > 0
-    assert data["doctor_utilization"]["utilization_pct"] == 76
-    assert len(data["patient_growth_trends"]) == 6
-    assert data["system_health"]["status"] == "Healthy"
-    assert data["system_health"]["application_version"] == "v1.16.0"
+    # Every figure comes from records: nothing invented, no expense or utilisation figures.
+    for invented in ("operating_expenses", "net_surplus", "doctor_utilization", "system_health"):
+        assert invented not in data
+    assert data["current_month_label"] and data["previous_month_label"]
+    assert len(data["collection_trend"]) == 6
+    assert len(data["patient_trend"]) == 6
+    assert data["collection_trend"][-1]["collected_paise"] == data["collections_paise"]["current"]
+    assert data["collection_trend"][-2]["collected_paise"] == data["collections_paise"]["previous"]
+    assert data["patient_trend"][-1]["new_patients"] == data["new_patients"]["current"]
+    if data["collections_paise"]["previous"] == 0:
+        assert data["collections_paise"]["change_pct"] is None
+    total = sum(d["collected_paise"] for d in data["department_collections"])
+    assert total == data["collections_paise"]["current"]
+
+
+def test_management_overview_counts_real_collections_and_reversals(
+    login_client: Any,
+    admin_user: User,
+    reception_user: User,
+    db_session: Session,
+    overview_settings: Settings,
+) -> None:
+    """Collections, reversals and new patients move by exactly what was recorded."""
+    path = "/api/admin/management-overview"
+    admin_c = login_client(admin_user)
+    before = admin_c.get(path).json()
+
+    patient = _patient(db_session, "mo")
+    rec_c = login_client(reception_user)
+    paid = []
+    for amount in (35000, 15000):
+        res = rec_c.post(
+            "/api/payments",
+            json={"patient_id": patient.id, "amount_paise": amount, "payment_method": "CASH"},
+        )
+        assert res.status_code == 201, res.text
+        paid.append(res.json()["id"])
+    rev = admin_c.post(
+        f"/api/payments/{paid[1]}/reverse", json={"reversal_reason": "Entered twice"}
+    )
+    assert rev.status_code == 200, rev.text
+
+    after = admin_c.get(path).json()
+    assert after["collections_paise"]["current"] - before["collections_paise"]["current"] == 35000
+    assert after["reversed_this_month"] - before["reversed_this_month"] == 1
+    assert after["reversed_this_month_paise"] - before["reversed_this_month_paise"] == 15000
+    assert after["new_patients"]["current"] - before["new_patients"]["current"] == 1
+    unlinked = {d["name"]: d["collected_paise"] for d in after["department_collections"]}
+    assert unlinked.get("Not linked to a department", 0) >= 35000

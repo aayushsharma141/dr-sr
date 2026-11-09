@@ -121,6 +121,19 @@ describe('ReceptionBillingPage Desk', () => {
           text: () => Promise.resolve(JSON.stringify(mockMe)),
         })
       }
+      if (url.includes('/api/fees')) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          headers: new Headers({ 'content-type': 'application/json' }),
+          text: () =>
+            Promise.resolve(
+              JSON.stringify([
+                { id: 5, name: 'Follow-up visit', fee_paise: 20000, is_active: true, version_id: 1, created_at: '2026-01-01T00:00:00Z', updated_at: '2026-01-01T00:00:00Z' },
+              ]),
+            ),
+        })
+      }
       if (url.includes('/api/doctors')) {
         return Promise.resolve({
           ok: true,
@@ -177,10 +190,10 @@ describe('ReceptionBillingPage Desk', () => {
     )
 
     // Check Header & Tabs
-    expect(screen.getByRole('heading', { name: /Reception Billing & Payment Desk/i })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /Counter Checkout & Collect/i })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /Today's Receipts & Ledger/i })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /Outstanding Package Dues/i })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: /Billing & Payments/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Checkout/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Today's Receipts/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Pending Dues/i })).toBeInTheDocument()
 
     // Search and select patient
     const searchInput = screen.getByPlaceholderText(/Search patient by Name, Mobile or Patient ID/i)
@@ -197,6 +210,24 @@ describe('ReceptionBillingPage Desk', () => {
     await waitFor(() => {
       expect(screen.getByText('Change')).toBeInTheDocument()
     })
+
+    // No fee is assumed: nothing to collect until the doctor (or an amount) is chosen.
+    expect(screen.getByRole('button', { name: /Collect ₹0.00 & Issue Receipt/i })).toBeInTheDocument()
+    expect(screen.getAllByText(/Choose the consulting doctor to fill their fee/i).length).toBeGreaterThan(0)
+
+    // A fee schedule entry fills the amount the administrator set for it.
+    await waitFor(() => {
+      expect(screen.getByRole('option', { name: 'Follow-up visit - ₹200.00' })).toBeInTheDocument()
+    })
+    await user.selectOptions(screen.getByLabelText(/Service Type/i), 'fee:5')
+    expect(screen.getByRole('button', { name: /Collect ₹200.00 & Issue Receipt/i })).toBeInTheDocument()
+    await user.selectOptions(screen.getByLabelText(/Service Type/i), 'opd_consultation')
+
+    // Choosing the doctor fills their own fee (₹400.00 in this fixture).
+    await waitFor(() => {
+      expect(screen.getByLabelText(/Consulting Doctor/i).querySelectorAll('option').length).toBeGreaterThan(1)
+    })
+    await user.selectOptions(screen.getByLabelText(/Consulting Doctor/i), String(mockDoctors[0].id))
 
     // Submit payment collection
     const collectBtn = screen.getByRole('button', { name: /Collect ₹400.00 & Issue Receipt/i })
@@ -216,8 +247,8 @@ describe('ReceptionBillingPage Desk', () => {
       notes: expect.stringContaining('OPD'),
     })
 
-    // Switch to Outstanding Package Dues tab
-    const duesTab = screen.getByRole('button', { name: /Outstanding Package Dues/i })
+    // Switch to Pending Dues tab
+    const duesTab = screen.getByRole('button', { name: /Pending Dues/i })
     await user.click(duesTab)
 
     await waitFor(() => {
