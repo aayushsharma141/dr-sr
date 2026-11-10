@@ -122,6 +122,84 @@ describe('Patients Directory and Profile Screens', () => {
     expect(screen.getByPlaceholderText(/search by urn/i)).toBeInTheDocument()
   })
 
+  it('pages through the patient list 20 rows at a time and resets to page 1 on a new search', async () => {
+    const allPatients: PatientOut[] = Array.from({ length: 25 }, (_, i) => ({
+      ...mockPatients[1],
+      id: 1000 + i,
+      urn: `KH-2026-${String(i + 1).padStart(4, '0')}`,
+      full_name: `Synthetic Patient ${i + 1}`,
+    }))
+    const requestedUrls: string[] = []
+
+    const mockFetch = vi.fn().mockImplementation((url: string) => {
+      if (url.includes('/api/auth/me')) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          headers: new Headers({ 'content-type': 'application/json' }),
+          text: () => Promise.resolve(JSON.stringify(mockMe)),
+        })
+      }
+      if (url.includes('/api/patients')) {
+        requestedUrls.push(url)
+        const params = new URL(url, 'http://localhost').searchParams
+        const limit = Number(params.get('limit'))
+        const offset = Number(params.get('offset'))
+        const q = params.get('q') ?? ''
+        const matches = allPatients.filter((p) => p.full_name.includes(q))
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          headers: new Headers({ 'content-type': 'application/json' }),
+          text: () => Promise.resolve(JSON.stringify(matches.slice(offset, offset + limit))),
+        })
+      }
+      return Promise.reject(new Error(`Unhandled: ${url}`))
+    })
+    vi.stubGlobal('fetch', mockFetch)
+
+    const user = userEvent.setup()
+    render(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter>
+          <PatientsDirectory />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    )
+
+    // Page 1: 20 rows, one extra row requested to detect a next page.
+    await waitFor(() => {
+      expect(screen.getByText('KH-2026-0001')).toBeInTheDocument()
+    })
+    expect(requestedUrls[0]).toContain('limit=21')
+    expect(requestedUrls[0]).toContain('offset=0')
+    expect(screen.getByText('KH-2026-0020')).toBeInTheDocument()
+    expect(screen.queryByText('KH-2026-0021')).not.toBeInTheDocument()
+    expect(screen.getByText('Showing 1–20')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Previous' })).toBeDisabled()
+
+    // Page 2: the remaining 5 rows, Next disabled.
+    await user.click(screen.getByRole('button', { name: 'Next' }))
+    await waitFor(() => {
+      expect(screen.getByText('KH-2026-0021')).toBeInTheDocument()
+    })
+    expect(requestedUrls.some((u) => u.includes('offset=20'))).toBe(true)
+    expect(screen.getByText('KH-2026-0025')).toBeInTheDocument()
+    expect(screen.queryByText('KH-2026-0001')).not.toBeInTheDocument()
+    expect(screen.getByText('Showing 21–25')).toBeInTheDocument()
+    expect(screen.getByText('Page 2')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Next' })).toBeDisabled()
+
+    // A new search goes back to page 1.
+    await user.type(screen.getByPlaceholderText(/search by urn/i), 'Patient 2')
+    await waitFor(() => {
+      expect(screen.getByText('Page 1')).toBeInTheDocument()
+    })
+    const lastUrl = requestedUrls[requestedUrls.length - 1]
+    expect(lastUrl).toContain('q=Patient%202')
+    expect(lastUrl).toContain('offset=0')
+  })
+
   it('opens edit modal and saves demographic modifications with version_id', async () => {
     let capturedBody: unknown = null
 

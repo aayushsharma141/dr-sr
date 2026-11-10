@@ -5,6 +5,10 @@ import { AppShell } from '../components/AppShell'
 import { PatientEditModal } from '../components/PatientEditModal'
 import type { PatientOut } from '../api/types'
 
+// Rows shown per page. The list endpoint returns a plain array with no total,
+// so each page asks for one extra row to learn whether a next page exists.
+export const PATIENTS_PAGE_SIZE = 20
+
 export function PatientsDirectory() {
   const { data: me } = useMe()
   const navigate = useNavigate()
@@ -14,21 +18,31 @@ export function PatientsDirectory() {
   const [selectedPatientForEdit, setSelectedPatientForEdit] = useState<PatientOut | null>(null)
   const [isEditModalOpen, setIsEditModalOpen] = useState(false)
   const [successBanner, setSuccessBanner] = useState<string | null>(null)
+  const [page, setPage] = useState(0)
 
   useEffect(() => {
+    const next = searchInput.trim()
+    if (next === debouncedQuery) return
     const handler = setTimeout(() => {
-      setDebouncedQuery(searchInput.trim())
+      // A new search always starts again from the first page.
+      setDebouncedQuery(next)
+      setPage(0)
     }, 300)
     return () => clearTimeout(handler)
-  }, [searchInput])
+  }, [searchInput, debouncedQuery])
 
   const {
-    data: patients = [],
+    data: fetched = [],
     isPending,
     isError,
     error,
     refetch,
-  } = usePatients(debouncedQuery)
+  } = usePatients(debouncedQuery, PATIENTS_PAGE_SIZE + 1, page * PATIENTS_PAGE_SIZE)
+
+  const patients = fetched.slice(0, PATIENTS_PAGE_SIZE)
+  const hasNextPage = fetched.length > PATIENTS_PAGE_SIZE
+  const firstRowNumber = page * PATIENTS_PAGE_SIZE + 1
+  const lastRowNumber = page * PATIENTS_PAGE_SIZE + patients.length
 
   const handleEditClick = (patient: PatientOut) => {
     setSelectedPatientForEdit(patient)
@@ -128,6 +142,19 @@ export function PatientsDirectory() {
             className="p-4 bg-red-50 border border-red-200 rounded text-red-900 text-sm"
           >
             Failed to load patients: {error.message}
+          </div>
+        ) : patients.length === 0 && page > 0 ? (
+          <div className="bg-white p-12 text-center rounded-lg border border-neutral-200 space-y-4">
+            <p className="text-base font-semibold text-neutral-900">
+              No more patients on this page
+            </p>
+            <button
+              type="button"
+              onClick={() => setPage(0)}
+              className="inline-flex items-center justify-center px-4 py-2 text-sm font-medium text-neutral-700 bg-neutral-100 hover:bg-neutral-200 rounded focus-visible:outline-2 focus-visible:outline-neutral-500 cursor-pointer min-h-[44px]"
+            >
+              Back to first page
+            </button>
           </div>
         ) : patients.length === 0 ? (
           <div className="bg-white p-12 text-center rounded-lg border border-neutral-200 space-y-4">
@@ -234,6 +261,33 @@ export function PatientsDirectory() {
                 </tbody>
               </table>
             </div>
+            <nav
+              aria-label="Patient list pages"
+              className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 px-4 py-3 border-t border-neutral-200 bg-neutral-50 text-sm text-neutral-600"
+            >
+              <p role="status">
+                Showing {firstRowNumber}–{lastRowNumber}
+              </p>
+              <div className="flex items-center gap-2">
+                <span className="mr-1">Page {page + 1}</span>
+                <button
+                  type="button"
+                  onClick={() => setPage((p) => Math.max(0, p - 1))}
+                  disabled={page === 0}
+                  className="px-3 py-1.5 text-xs font-medium text-neutral-700 bg-white border border-neutral-300 hover:bg-neutral-100 rounded focus-visible:outline-2 focus-visible:outline-neutral-500 cursor-pointer min-h-[36px] disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  Previous
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPage((p) => p + 1)}
+                  disabled={!hasNextPage}
+                  className="px-3 py-1.5 text-xs font-medium text-neutral-700 bg-white border border-neutral-300 hover:bg-neutral-100 rounded focus-visible:outline-2 focus-visible:outline-neutral-500 cursor-pointer min-h-[36px] disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  Next
+                </button>
+              </div>
+            </nav>
           </div>
         )}
       </div>
