@@ -10,10 +10,10 @@
 **Status:** Product direction agreed in project discussions. One central server provides a single React + TypeScript app and FastAPI API to 3–5 browser clients on LAN. Internet is not required at runtime.
 
 ### ADR-15 — PostgreSQL for centralized transactions
-**Status:** Superseded by ADR-27 (2026-11-09). Previously: recommended target, subject to server hardware assessment. Do not share a SQLite database file over the network. PostgreSQL provides transactional concurrency, constraints and row-level locking.
+**Status:** Recommended target, subject to server hardware assessment. Do not share a SQLite database file over the network. PostgreSQL provides transactional concurrency, constraints and row-level locking.
 
 ### ADR-16 — FastAPI backend and React frontend
-**Status:** Superseded by ADR-27 (2026-11-09). Previously: proposed target. Backend owns business rules and authorization; one frontend has role-specific routes. Separate frontend apps per role are not required.
+**Status:** Proposed target. Backend owns business rules and authorization; one frontend has role-specific routes. Separate frontend apps per role are not required.
 
 ### ADR-17 — Fixed server-enforced role catalogue
 **Status:** Required scope; detailed matrix awaits client approval. Admin, Reception and Doctor. Every protected API endpoint must enforce permissions. Recommended doctor policy: read clinically relevant records, write assigned cases only.
@@ -45,12 +45,6 @@
 ### ADR-26 — Queue token monotonicity and permanent consumption
 **Status:** Confirmed operating policy (2026-11-06). Daily tokens are generated as strictly monotonically increasing integers scoped per `(doctor_id, appointment_date)`. Once assigned to an appointment, a token number is permanently consumed. When an appointment is marked `CANCELLED` or `NO_SHOW`, its token number is never backfilled, recycled, or reissued to another patient. Gaps in the active waiting queue are expected, audited, and preserved in appointment history.
 
-### ADR-27 — Replace the v3 FastAPI/React application with the Node.js LAN application
-**Status:** Decided by project owner on 2026-11-09. Plan and task IDs: `docs/plans/UI-ADOPTION-PLAN-2026-11-09.md`.
-**Decision:** The hospital application becomes the Node.js app in `hms/`: Node.js LTS, Express 5, SQLite through better-sqlite3 in WAL mode, and a plain ES-module browser app served by the same process, with no build step. It started from a from-scratch implementation that the owner preferred for its interface, workflow and simplicity. The v3 FastAPI + PostgreSQL backend and React frontend (tag `v3-fastapi-final`) stop receiving features and become the reference specification for Kalyan business rules until cutover, when they move to `legacy/v3-fastapi/`. Nothing is deleted.
-**Supersedes:** ADR-15 (PostgreSQL) and ADR-16 (FastAPI + React). ADR-14 still holds, apart from its stack names: one central server and browsers on the LAN, with no internet at runtime.
-**Conditions:** The database file is opened only by the single server process and is never placed on a network share. Every business invariant in `AGENTS.md` and ADR-17 to ADR-26 still applies and must be re-implemented in `hms/` before go-live, including three roles, Reception-only payment collection, Admin-only reversals, per-doctor tokens, immutable finalised records, 409 on stale edits and FY receipt numbering. Any real data in the v3 PostgreSQL database moves one way only, with a reconciliation report, and the source database is never modified.
-
 ## Open decisions — do not silently assume
 
 | ID | Decision | Recommendation | Status |
@@ -59,7 +53,7 @@
 | OD-02 | Doctor record visibility | Read clinically relevant records; write assigned only | Pending |
 | OD-03 | Financial reversal authority | Admin only, mandatory reason | Pending |
 | OD-04 | Receipt sequence reset | Calendar or financial year; client chooses | Pending |
-| OD-05 | Genuine v2 data exists? | Inspect before migration; demo data is not production data | Resolved 2026-11-09: owner states there is no real patient data; go-live starts from a fresh install (ADR-27) |
+| OD-05 | Genuine v2 data exists? | Inspect before migration; demo data is not production data | Pending |
 | OD-06 | Printer | Standard Epson A4 desktop printer on plain A4 sheet; thermal not used | Resolved |
 | OD-07 | HTTPS | Prefer HTTPS; HTTP only by explicit approval on isolated LAN | Pending |
 | OD-08 | Idle timeout and lockout thresholds | Agree during security acceptance | Pending |

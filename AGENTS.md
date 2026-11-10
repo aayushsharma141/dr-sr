@@ -3,12 +3,8 @@
 ## Mission
 Maintain and stabilize the existing Kalyan Hospital offline LAN management application. Do not rebuild the application or redesign working modules without a documented reason.
 
-Documented replacement (ADR-27, 2026-11-09): the project owner chose to replace the v3 FastAPI + React + PostgreSQL application with the Node.js application in `hms/`. The plan and task IDs (SW-xx) are in `docs/plans/UI-ADOPTION-PLAN-2026-11-09.md`. Until cutover, `backend/` and `frontend/` (tag `v3-fastapi-final`) are the reference specification for Kalyan business rules. Do not build new features in them.
-
 ## Architecture
 Inspect the real codebase before assuming the stack. Preserve existing frontend, backend and database architecture unless a verified defect requires change.
-- Target (ADR-27): `hms/`, built on Node.js LTS, Express 5, SQLite through better-sqlite3 (WAL), and a plain ES-module browser app with no build step, served by the same process on the LAN. Only that process opens the database file; never put it on a network share.
-- Reference only: `backend/` (FastAPI + PostgreSQL), `frontend/` (React + TypeScript) and `legacy/app/` (PySide6 desktop).
 
 ## Hospital business invariants
 1. One permanent patient URN across all departments.
