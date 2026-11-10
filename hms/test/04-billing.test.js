@@ -79,7 +79,7 @@ test('billing and payments', async (t) => {
     assert.equal(res.status, 201, JSON.stringify(res.body));
     assert.equal(res.body.invoice.status, 'partially_paid');
     assert.equal(res.body.invoice.balancePaise, invoice.totalPaise - rupees(300));
-    assert.match(res.body.receiptNo, /^RCPT-\d{8}-\d{4}$/);
+    assert.match(res.body.receiptNo, /^RCPT?-(?:\d{4}-\d{4}|\d{8})-\d{4}$/);
   });
 
   await t.test('overpayment and unreferenced card payments are refused', async () => {

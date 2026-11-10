@@ -70,10 +70,10 @@ export default async function patientView(root, { params, query, navigate }) {
           </div>
           <div class="row row--wrap" style="gap:8px">
             ${session.can('visit.write')
-              ? (chart.stats.openVisit
-                  ? `<button class="btn btn--primary" data-action="open-visit">${ui.icon('stethoscope')}<span>Continue visit</span></button>`
-                  : `<button class="btn btn--primary" data-action="new-visit">${ui.icon('stethoscope')}<span>New visit</span></button>`)
-              : ''}
+      ? (chart.stats.openVisit
+        ? `<button class="btn btn--primary" data-action="open-visit">${ui.icon('stethoscope')}<span>Continue visit</span></button>`
+        : `<button class="btn btn--primary" data-action="new-visit">${ui.icon('stethoscope')}<span>New visit</span></button>`)
+      : ''}
             ${session.can('appointment.write') ? `<button class="btn" data-action="book">${ui.icon('calendar')}<span>Book</span></button>` : ''}
             ${session.can('invoice.write') ? `<button class="btn" data-action="invoice">${ui.icon('receipt')}<span>Bill</span></button>` : ''}
             ${session.can('patient.write') ? `<button class="btn" data-action="edit">${ui.icon('edit')}<span>Edit</span></button>` : ''}
@@ -81,13 +81,13 @@ export default async function patientView(root, { params, query, navigate }) {
         </div>
 
         ${criticalAllergies.length
-          ? `<div class="alert alert--danger mt-2">${ui.icon('alert')}
+      ? `<div class="alert alert--danger mt-2">${ui.icon('alert')}
               <div><strong>Allergy alert:</strong> ${criticalAllergies.map((a) => ui.esc(a.substance)).join(', ')}
               ${criticalAllergies.some((a) => a.reaction) ? `<span class="xs"> (${ui.esc(criticalAllergies.map((a) => a.reaction).filter(Boolean).join('; '))})</span>` : ''}
               </div></div>`
-          : patient.allergiesSummary
-            ? `<div class="alert alert--warn mt-2">${ui.icon('alert')}<div><strong>Allergies:</strong> ${ui.esc(patient.allergiesSummary)}</div></div>`
-            : ''}
+      : patient.allergiesSummary
+        ? `<div class="alert alert--warn mt-2">${ui.icon('alert')}<div><strong>Allergies:</strong> ${ui.esc(patient.allergiesSummary)}</div></div>`
+        : ''}
       </div>
     </div>
 
@@ -309,11 +309,11 @@ export default async function patientView(root, { params, query, navigate }) {
                     ${v.chiefComplaint ? `<div class="visit-row__note">${ui.esc(v.chiefComplaint)}</div>` : ''}
                   </button>`).join('')}
               </div>`
-              : `<div class="card-body">${ui.emptyState({
-                  iconName: 'stethoscope', title: 'No visits yet',
-                  message: 'Open a visit to record vitals, notes, diagnoses and prescriptions.',
-                  action: session.can('visit.write') ? '<button class="btn btn--sm btn--primary" data-action="new-visit">Start a visit</button>' : '',
-                })}</div>`}
+        : `<div class="card-body">${ui.emptyState({
+          iconName: 'stethoscope', title: 'No visits yet',
+          message: 'Open a visit to record vitals, notes, diagnoses and prescriptions.',
+          action: session.can('visit.write') ? '<button class="btn btn--sm btn--primary" data-action="new-visit">Start a visit</button>' : '',
+        })}</div>`}
           </section>
         </div>
         <div id="visit-detail"></div>
@@ -401,11 +401,11 @@ export default async function patientView(root, { params, query, navigate }) {
                   </tr>`).join('')}</tbody>
               </table></div>` : ''}
             ${session.can('vitals.write') && canClinical
-              ? `<button class="btn btn--sm" data-action="add-vitals">${ui.icon('plus', 14)}<span>Record vitals</span></button>`
-              : ''}
+        ? `<button class="btn btn--sm" data-action="add-vitals">${ui.icon('plus', 14)}<span>Record vitals</span></button>`
+        : ''}
             ${session.can('clinical.write') && isOpen && !isMine
-              ? `<div class="muted xs mt-1">${v.doctorId ? `Only ${ui.esc(v.doctorName || 'the assigned doctor')} can change this visit's clinical record.` : 'No doctor is assigned to this visit yet.'}</div>`
-              : ''}
+        ? `<div class="muted xs mt-1">${v.doctorId ? `Only ${ui.esc(v.doctorName || 'the assigned doctor')} can change this visit's clinical record.` : 'No doctor is assigned to this visit yet.'}</div>`
+        : ''}
           </div>
           ${canClinical ? `<div class="card-foot row row--wrap" style="gap:8px">
               <button class="btn btn--sm" data-action="add-note">${ui.icon('clipboard', 14)}<span>Add note</span></button>
@@ -690,11 +690,13 @@ export default async function patientView(root, { params, query, navigate }) {
                   <span class="strong sm">${ui.esc(a.title || a.originalName)}</span>
                   <div class="muted xs">${ui.esc(ui.titleCase(a.category))} · ${ui.esc(ui.bytes(a.sizeBytes))} · ${ui.esc(a.uploadedByName || '—')} · ${ui.esc(ui.fmtDateTime(a.createdAt))}</div>
                 </span>
-                <button class="btn btn--sm" data-download="${a.id}" data-name="${ui.esc(a.originalName)}">${ui.icon('download', 14)}<span>Open</span></button>
+                ${a.canView !== false
+        ? `<button class="btn btn--sm" data-download="${a.id}" data-name="${ui.esc(a.originalName)}">${ui.icon('download', 14)}<span>Open</span></button>`
+        : `<span class="pill pill--muted" title="Clinical document — doctor only">Restricted</span>`}
                 ${canWrite ? `<button class="icon-btn" data-delete-doc="${a.id}" title="Remove">${ui.icon('trash', 15)}</button>` : ''}
               </div>`).join('') : ui.emptyState({
-                iconName: 'file', title: 'No documents', message: 'Upload scans, lab reports or signed consent forms.',
-              })}
+          iconName: 'file', title: 'No documents', message: 'Upload scans, lab reports or signed consent forms.',
+        })}
           </div>
         </section>
 
@@ -828,19 +830,19 @@ export default async function patientView(root, { params, query, navigate }) {
                   <div class="row row--wrap mt-2" style="gap:8px;justify-content:flex-end">
                     <button class="btn btn--sm" data-action="view-plan" data-plan-id="${p.id}">View sessions</button>
                     ${isDoctor && p.status === 'active' && p.completedSessions < p.totalSessions
-                      ? `<button class="btn btn--sm btn--primary" data-action="log-session" data-plan-id="${p.id}">Log session</button>`
-                      : ''}
+        ? `<button class="btn btn--sm btn--primary" data-action="log-session" data-plan-id="${p.id}">Log session</button>`
+        : ''}
                   </div>
                   <div id="plan-sessions-${p.id}" class="mt-2 hidden"></div>
                 </div>
               </div>
             `).join('')}
           </div>` : ui.emptyState({
-            iconName: 'activity',
-            title: 'No treatment plans',
-            message: 'Physiotherapy rehabilitation plans and session tracking will appear here.',
-            action: isDoctor ? '<button class="btn btn--sm btn--primary" data-action="new-plan">Create treatment plan</button>' : '',
-          })}
+          iconName: 'activity',
+          title: 'No treatment plans',
+          message: 'Physiotherapy rehabilitation plans and session tracking will appear here.',
+          action: isDoctor ? '<button class="btn btn--sm btn--primary" data-action="new-plan">Create treatment plan</button>' : '',
+        })}
         </div>
       </section>
     `;
@@ -1004,10 +1006,10 @@ export default async function patientView(root, { params, query, navigate }) {
           <label for="m-${f.name}">${ui.esc(f.label)}${f.required ? ' <span class="req">*</span>' : ''}</label>
           <select class="select" id="m-${f.name}" name="${f.name}" ${f.required ? 'required' : ''}>
             ${f.options.map((o) => {
-              const val = typeof o === 'string' ? o : o.value;
-              const label = typeof o === 'string' ? o : o.label;
-              return `<option value="${ui.esc(val)}">${ui.esc(label)}</option>`;
-            }).join('')}
+          const val = typeof o === 'string' ? o : o.value;
+          const label = typeof o === 'string' ? o : o.label;
+          return `<option value="${ui.esc(val)}">${ui.esc(label)}</option>`;
+        }).join('')}
           </select>
           <div class="field-error hidden" data-error-for="${f.name}"></div>
         </div>`;
@@ -1071,20 +1073,26 @@ export default async function patientView(root, { params, query, navigate }) {
       title: 'Start a visit',
       subtitle: `Opening a new visit for ${patient.fullName}`,
       fields: [
-        { name: 'visitType', label: 'Visit type', type: 'select', options: [
-          { value: 'opd', label: 'OPD consultation' },
-          { value: 'follow_up', label: 'Follow-up' },
-          { value: 'emergency', label: 'Emergency' },
-          { value: 'ipd', label: 'In-patient (IPD)' },
-          { value: 'teleconsult', label: 'Teleconsultation' },
-        ], required: true },
-        { name: 'department', label: 'Department', type: 'select', options: [
-          'General Medicine', 'Cardiology', 'Orthopaedics', 'Paediatrics', 'Gynaecology',
-          'Dermatology', 'ENT', 'Ophthalmology', 'Dentistry', 'Emergency', 'Other',
-        ] },
-        { name: 'doctorId', label: 'Consulting doctor', type: 'select', options: doctors.length
-          ? doctors.map((d) => ({ value: String(d.id), label: `${d.fullName}${d.specialty ? ` — ${d.specialty}` : ''}` }))
-          : [{ value: '', label: 'No doctors on staff yet' }] },
+        {
+          name: 'visitType', label: 'Visit type', type: 'select', options: [
+            { value: 'opd', label: 'OPD consultation' },
+            { value: 'follow_up', label: 'Follow-up' },
+            { value: 'emergency', label: 'Emergency' },
+            { value: 'ipd', label: 'In-patient (IPD)' },
+            { value: 'teleconsult', label: 'Teleconsultation' },
+          ], required: true
+        },
+        {
+          name: 'department', label: 'Department', type: 'select', options: [
+            'General Medicine', 'Cardiology', 'Orthopaedics', 'Paediatrics', 'Gynaecology',
+            'Dermatology', 'ENT', 'Ophthalmology', 'Dentistry', 'Emergency', 'Other',
+          ]
+        },
+        {
+          name: 'doctorId', label: 'Consulting doctor', type: 'select', options: doctors.length
+            ? doctors.map((d) => ({ value: String(d.id), label: `${d.fullName}${d.specialty ? ` — ${d.specialty}` : ''}` }))
+            : [{ value: '', label: 'No doctors on staff yet' }]
+        },
         { name: 'chiefComplaint', label: 'Chief complaint', type: 'textarea', span: '2', placeholder: 'What brings the patient in today?' },
       ],
       submitLabel: 'Open visit',
@@ -1127,14 +1135,16 @@ export default async function patientView(root, { params, query, navigate }) {
       subtitle: 'Notes are signed separately and become read-only once signed.',
       width: 'wide',
       fields: [
-        { name: 'noteType', label: 'Note type', type: 'select', options: [
-          { value: 'consultation', label: 'Consultation' },
-          { value: 'progress', label: 'Progress' },
-          { value: 'nursing', label: 'Nursing' },
-          { value: 'procedure', label: 'Procedure' },
-          { value: 'discharge', label: 'Discharge' },
-          { value: 'other', label: 'Other' },
-        ], required: true },
+        {
+          name: 'noteType', label: 'Note type', type: 'select', options: [
+            { value: 'consultation', label: 'Consultation' },
+            { value: 'progress', label: 'Progress' },
+            { value: 'nursing', label: 'Nursing' },
+            { value: 'procedure', label: 'Procedure' },
+            { value: 'discharge', label: 'Discharge' },
+            { value: 'other', label: 'Other' },
+          ], required: true
+        },
         { name: 'subject', label: 'Subject', placeholder: 'e.g. Initial assessment' },
         { name: 'body', label: 'Note', type: 'textarea', span: '2', required: true, placeholder: 'History, examination findings, assessment and plan…' },
       ],
@@ -1153,11 +1163,13 @@ export default async function patientView(root, { params, query, navigate }) {
       fields: [
         { name: 'description', label: 'Diagnosis', required: true, placeholder: 'e.g. Acute viral pharyngitis' },
         { name: 'code', label: 'ICD-10 code', placeholder: 'e.g. J02.9' },
-        { name: 'kind', label: 'Type', type: 'select', options: [
-          { value: 'primary', label: 'Primary' },
-          { value: 'secondary', label: 'Secondary' },
-          { value: 'provisional', label: 'Provisional' },
-        ] },
+        {
+          name: 'kind', label: 'Type', type: 'select', options: [
+            { value: 'primary', label: 'Primary' },
+            { value: 'secondary', label: 'Secondary' },
+            { value: 'provisional', label: 'Provisional' },
+          ]
+        },
       ],
       submitLabel: 'Add diagnosis',
       onSubmit: async (values) => {
@@ -1197,12 +1209,14 @@ export default async function patientView(root, { params, query, navigate }) {
       fields: [
         { name: 'substance', label: 'Substance', required: true, placeholder: 'e.g. Penicillin' },
         { name: 'reaction', label: 'Reaction', placeholder: 'e.g. rash, swelling' },
-        { name: 'severity', label: 'Severity', type: 'select', options: [
-          { value: 'mild', label: 'Mild' },
-          { value: 'moderate', label: 'Moderate' },
-          { value: 'severe', label: 'Severe' },
-          { value: 'life_threatening', label: 'Life threatening' },
-        ] },
+        {
+          name: 'severity', label: 'Severity', type: 'select', options: [
+            { value: 'mild', label: 'Mild' },
+            { value: 'moderate', label: 'Moderate' },
+            { value: 'severe', label: 'Severe' },
+            { value: 'life_threatening', label: 'Life threatening' },
+          ]
+        },
       ],
       submitLabel: 'Save allergy',
       extraAlert: `<div class="alert alert--warn">${ui.icon('alert')}<div class="xs">Severe allergies are shown as a red banner at the top of this chart.</div></div>`,
@@ -1221,9 +1235,11 @@ export default async function patientView(root, { params, query, navigate }) {
       fields: [
         { name: 'date', label: 'Date', type: 'date', required: true, value: new Date().toISOString().slice(0, 10) },
         { name: 'time', label: 'Time', type: 'time', required: true, value: '10:00' },
-        { name: 'doctorId', label: 'Doctor', type: 'select', options: (state.doctors || []).length
-          ? state.doctors.map((d) => ({ value: String(d.id), label: d.fullName }))
-          : [{ value: '', label: 'No doctors on staff yet' }] },
+        {
+          name: 'doctorId', label: 'Doctor', type: 'select', options: (state.doctors || []).length
+            ? state.doctors.map((d) => ({ value: String(d.id), label: d.fullName }))
+            : [{ value: '', label: 'No doctors on staff yet' }]
+        },
         { name: 'durationMin', label: 'Duration (minutes)', type: 'number', value: 15 },
         { name: 'reason', label: 'Reason', span: '2', placeholder: 'e.g. review of lab reports' },
       ],
@@ -1274,19 +1290,21 @@ export default async function patientView(root, { params, query, navigate }) {
       subtitle: `Record completed session for ${patient.fullName}`,
       fields: [
         { name: 'sessionDate', label: 'Date', type: 'date', value: today, required: true },
-        { name: 'vasScore', label: 'VAS pain score (0: none, 10: worst)', type: 'select', options: [
-          { value: '0', label: '0 — No pain' },
-          { value: '1', label: '1 — Very mild' },
-          { value: '2', label: '2 — Discomforting' },
-          { value: '3', label: '3 — Tolerable' },
-          { value: '4', label: '4 — Distressing' },
-          { value: '5', label: '5 — Very distressing' },
-          { value: '6', label: '6 — Intense' },
-          { value: '7', label: '7 — Very intense' },
-          { value: '8', label: '8 — Utterly horrible' },
-          { value: '9', label: '9 — Excruciating' },
-          { value: '10', label: '10 — Unbearable' },
-        ], required: true },
+        {
+          name: 'vasScore', label: 'VAS pain score (0: none, 10: worst)', type: 'select', options: [
+            { value: '0', label: '0 — No pain' },
+            { value: '1', label: '1 — Very mild' },
+            { value: '2', label: '2 — Discomforting' },
+            { value: '3', label: '3 — Tolerable' },
+            { value: '4', label: '4 — Distressing' },
+            { value: '5', label: '5 — Very distressing' },
+            { value: '6', label: '6 — Intense' },
+            { value: '7', label: '7 — Very intense' },
+            { value: '8', label: '8 — Utterly horrible' },
+            { value: '9', label: '9 — Excruciating' },
+            { value: '10', label: '10 — Unbearable' },
+          ], required: true
+        },
         { name: 'modalities', label: 'Modalities applied', placeholder: 'e.g. IFT, Ultrasound, Hot Pack, Traction' },
         { name: 'clinicalNotes', label: 'Clinical progress notes', type: 'textarea', span: '2', placeholder: 'Patient response, range of motion, exercises performed…' },
       ],
@@ -1326,21 +1344,24 @@ export default async function patientView(root, { params, query, navigate }) {
         <div class="rx-sheet">
           <div class="receipt-head">
             <div>
+              <div class="receipt-hospital-hi">${ui.esc(settings.hospitalNameHi || 'कल्याण हॉस्पिटल')}</div>
               <div class="receipt-hospital">${ui.esc(settings.hospitalName || 'Kalyan Hospital')}</div>
-              <div class="xs">${ui.esc(settings.hospitalAddress || '')}</div>
+              <div class="xs muted">${ui.esc(settings.trustNameHi || 'श्री वशिष्ठ कल्याण ट्रस्ट')} · ${ui.esc(settings.trustName || 'Sri Vashishtha Kalyan Trust')}</div>
+              <div class="xs">${ui.esc(settings.hospitalAddress || 'Hospital Road, Ara, Bhojpur, Bihar - 802301')}</div>
               <div class="xs">${ui.esc(settings.hospitalPhone || '')}</div>
             </div>
             <div class="receipt-meta">
+              <div><strong>PRESCRIPTION / पर्ची</strong></div>
               <div><strong>${ui.esc(state.patient.fullName)}</strong></div>
               <div>${ui.esc(state.patient.mrn)} · ${ui.esc(ui.fmtAge(state.patient.dob, state.patient.age))} · ${ui.esc(ui.sexLabel(state.patient.sex))}</div>
               <div>${ui.esc(ui.fmtDate(v.createdAt, { withTime: true }))}</div>
             </div>
           </div>
-          <div class="mt-2 xs"><strong>Diagnosis:</strong> ${(detail.diagnoses || []).filter((d) => !d.cancelledAt).map((d) => ui.esc(d.description)).join('; ') || '—'}</div>
-          <div class="rx-head mt-2"><span>#</span><span>Medicine</span><span>Dose / frequency</span><span>Duration</span></div>
+          <div class="mt-2 xs"><strong>Diagnosis / निदान:</strong> ${(detail.diagnoses || []).filter((d) => !d.cancelledAt).map((d) => ui.esc(d.description)).join('; ') || '—'}</div>
+          <div class="rx-head mt-2"><span>#</span><span>औषधि (Medicine)</span><span>मात्रा / विधि (Dose / Frequency)</span><span>अवधि (Duration)</span></div>
           ${rows || '<div class="muted sm mt-2">No medicines prescribed.</div>'}
           <div class="receipt-foot">
-            <div>${ui.esc(settings.disclaimer || '')}</div>
+            <div>${ui.esc(settings.printFooterEn || settings.disclaimer || '')}</div>
             <div style="text-align:right">
               <div style="height:34px"></div>
               <div style="border-top:1px solid #333;padding-top:3px">${ui.esc(v.doctorName || 'Prescriber')}</div>

@@ -11,7 +11,30 @@ const { audit, idParam, expectedVersion, updateVersioned } = require('../lib/req
 const { requirePerm } = require('../auth');
 const { todayLocal } = require('../lib/domain');
 
-const METHODS = ['cash', 'card', 'upi', 'netbanking', 'cheque', 'insurance', 'waived'];
+const METHODS = ['cash', 'card', 'upi'];
+
+function getReceiptKey(cycle, dateIso = todayLocal()) {
+  const parts = dateIso.slice(0, 10).split('-');
+  const year = parseInt(parts[0], 10);
+  const month = parseInt(parts[1], 10);
+  if (cycle === 'calendar_year') {
+    return String(year);
+  }
+  if (cycle === 'financial_year') {
+    const startYear = month >= 4 ? year : year - 1;
+    const endYear = startYear + 1;
+    return `${startYear}-${endYear}`;
+  }
+  return dateIso.slice(0, 10).replace(/-/g, '');
+}
+
+function nextReceiptNumber(ctx) {
+  const cycle = ctx.store.getSetting('receipt_cycle', 'financial_year');
+  const prefix = ctx.store.getSetting('receipt_prefix', 'RCP');
+  const key = getReceiptKey(cycle);
+  const seq = ctx.store.nextSequence(`seq:receipt:${key}`);
+  return `${prefix}-${key}-${String(seq).padStart(4, '0')}`;
+}
 
 function invoiceStatusFor(total, paid) {
   if (paid <= 0) return 'open';
@@ -54,6 +77,7 @@ function mapPayment(row) {
     isVoid: !!row.is_void,
     voidedAt: row.voided_at,
     voidReason: row.void_reason,
+    printCount: row.print_count || 0,
   };
 }
 
@@ -301,6 +325,167 @@ module.exports = function billingRoutes(ctx) {
     });
   });
 
+  // Invariant 8: Multiple charges can accumulate within a visit.
+  router.post('/invoices/:id/items', requirePerm('invoice.write'), (req, res) => {
+    const id = idParam(req);
+    const invoice = db.prepare('SELECT * FROM invoices WHERE id = ?').get(id);
+    if (!invoice) throw new ApiError(404, 'Invoice not found.');
+    if (invoice.status === 'void') throw new ApiError(409, 'Cannot add items to a void invoice.');
+
+    const rawItems = Array.isArray(req.body?.items) ? req.body.items : (req.body?.description || req.body?.serviceId ? [req.body] : []);
+    if (rawItems.length === 0) throw new ApiError(400, 'Add at least one service or charge.');
+
+    const items = rawItems.map((raw, index) => {
+      const iv = new Validator(raw);
+      const serviceId = iv.int('serviceId', { min: 1 });
+      const description = iv.str('description', { max: 200 });
+      const qty = iv.int('qty', { min: 1, max: 999 }) || 1;
+      const unitPricePaise = iv.int('unitPricePaise', { min: 0, max: 100000000 });
+      iv.throwIfInvalid();
+
+      let finalDescription = description;
+      let finalPrice = unitPricePaise;
+      if (serviceId) {
+        const service = db.prepare('SELECT * FROM services WHERE id = ?').get(serviceId);
+        if (!service) throw new ApiError(400, `Line ${index + 1}: service not found.`);
+        finalDescription = description || service.name;
+        finalPrice = unitPricePaise === null || unitPricePaise === undefined ? service.price_paise : unitPricePaise;
+      }
+      if (!finalDescription) throw new ApiError(400, `Line ${index + 1}: a description is required.`);
+      if (finalPrice === null || finalPrice === undefined) throw new ApiError(400, `Line ${index + 1}: a price is required.`);
+      return { serviceId, description: finalDescription, qty, unitPricePaise: finalPrice, lineTotalPaise: qty * finalPrice };
+    });
+
+    const addedPaise = items.reduce((sum, item) => sum + item.lineTotalPaise, 0);
+    const now = new Date().toISOString();
+
+    db.transaction(() => {
+      const insertItem = db.prepare(
+        `INSERT INTO invoice_items (invoice_id, service_id, description, qty, unit_price_paise, line_total_paise)
+         VALUES (?,?,?,?,?,?)`,
+      );
+      for (const item of items) {
+        insertItem.run(id, item.serviceId, item.description, item.qty, item.unitPricePaise, item.lineTotalPaise);
+      }
+      const newSubtotal = invoice.subtotal_paise + addedPaise;
+      const newTotal = newSubtotal - invoice.discount_paise + invoice.tax_paise;
+      const newBalance = newTotal - invoice.paid_paise;
+      const newStatus = invoiceStatusFor(newTotal, invoice.paid_paise);
+      db.prepare(
+        'UPDATE invoices SET subtotal_paise = ?, total_paise = ?, balance_paise = ?, status = ?, updated_at = ? WHERE id = ?',
+      ).run(newSubtotal, newTotal, newBalance, newStatus, now, id);
+    })();
+
+    audit(ctx, req, {
+      action: 'invoice.add_items',
+      entityType: 'invoice',
+      entityId: id,
+      patientId: invoice.patient_id,
+      detail: { addedPaise, lines: items.length },
+    });
+
+    const updated = db.prepare('SELECT * FROM invoices WHERE id = ?').get(id);
+    const allItems = db.prepare('SELECT * FROM invoice_items WHERE invoice_id = ? ORDER BY id').all(id);
+    res.status(201).json({
+      invoice: mapInvoice(updated),
+      items: allItems.map((i) => ({
+        id: i.id, serviceId: i.service_id, description: i.description, qty: i.qty,
+        unitPricePaise: i.unit_price_paise, lineTotalPaise: i.line_total_paise,
+      })),
+    });
+  });
+
+  router.post('/visits/:id/charges', requirePerm('invoice.write'), (req, res) => {
+    const visitId = idParam(req);
+    const visit = db.prepare('SELECT * FROM visits WHERE id = ?').get(visitId);
+    if (!visit) throw new ApiError(404, 'Visit not found.');
+
+    const rawItems = Array.isArray(req.body?.items) ? req.body.items : (req.body?.description || req.body?.serviceId ? [req.body] : []);
+    if (rawItems.length === 0) throw new ApiError(400, 'Add at least one service or charge.');
+
+    const items = rawItems.map((raw, index) => {
+      const iv = new Validator(raw);
+      const serviceId = iv.int('serviceId', { min: 1 });
+      const description = iv.str('description', { max: 200 });
+      const qty = iv.int('qty', { min: 1, max: 999 }) || 1;
+      const unitPricePaise = iv.int('unitPricePaise', { min: 0, max: 100000000 });
+      iv.throwIfInvalid();
+
+      let finalDescription = description;
+      let finalPrice = unitPricePaise;
+      if (serviceId) {
+        const service = db.prepare('SELECT * FROM services WHERE id = ?').get(serviceId);
+        if (!service) throw new ApiError(400, `Line ${index + 1}: service not found.`);
+        finalDescription = description || service.name;
+        finalPrice = unitPricePaise === null || unitPricePaise === undefined ? service.price_paise : unitPricePaise;
+      }
+      if (!finalDescription) throw new ApiError(400, `Line ${index + 1}: a description is required.`);
+      if (finalPrice === null || finalPrice === undefined) throw new ApiError(400, `Line ${index + 1}: a price is required.`);
+      return { serviceId, description: finalDescription, qty, unitPricePaise: finalPrice, lineTotalPaise: qty * finalPrice };
+    });
+
+    const addedPaise = items.reduce((sum, item) => sum + item.lineTotalPaise, 0);
+    const now = new Date().toISOString();
+
+    const invoiceId = db.transaction(() => {
+      const openInv = db
+        .prepare("SELECT * FROM invoices WHERE visit_id = ? AND status IN ('open','partially_paid') ORDER BY id DESC LIMIT 1")
+        .get(visitId);
+
+      if (openInv) {
+        const insertItem = db.prepare(
+          `INSERT INTO invoice_items (invoice_id, service_id, description, qty, unit_price_paise, line_total_paise)
+           VALUES (?,?,?,?,?,?)`,
+        );
+        for (const item of items) {
+          insertItem.run(openInv.id, item.serviceId, item.description, item.qty, item.unitPricePaise, item.lineTotalPaise);
+        }
+        const newSubtotal = openInv.subtotal_paise + addedPaise;
+        const newTotal = newSubtotal - openInv.discount_paise + openInv.tax_paise;
+        const newBalance = newTotal - openInv.paid_paise;
+        const newStatus = invoiceStatusFor(newTotal, openInv.paid_paise);
+        db.prepare(
+          'UPDATE invoices SET subtotal_paise = ?, total_paise = ?, balance_paise = ?, status = ?, updated_at = ? WHERE id = ?',
+        ).run(newSubtotal, newTotal, newBalance, newStatus, now, openInv.id);
+        return openInv.id;
+      }
+
+      const prefix = ctx.store.getSetting('invoice_prefix', 'INV');
+      const day = now.slice(0, 10).replace(/-/g, '');
+      const seq = ctx.store.nextSequence(`seq:invoice:${day}`);
+      const invoiceNo = `${prefix}-${day}-${String(seq).padStart(4, '0')}`;
+      const total = addedPaise;
+      const info = db
+        .prepare(
+          `INSERT INTO invoices (invoice_no, patient_id, visit_id, status, subtotal_paise, discount_paise, tax_paise,
+             total_paise, paid_paise, balance_paise, notes, created_by, created_at, updated_at)
+           VALUES (?,?,?,?,?,?,?,?,0,?,?,?,?,?)`,
+        )
+        .run(invoiceNo, visit.patient_id, visitId, total === 0 ? 'paid' : 'open', total, 0, 0,
+          total, total, `Charges for visit ${visit.visit_no}`, req.user.id, now, now);
+      const newId = Number(info.lastInsertRowid);
+      const insertItem = db.prepare(
+        `INSERT INTO invoice_items (invoice_id, service_id, description, qty, unit_price_paise, line_total_paise)
+         VALUES (?,?,?,?,?,?)`,
+      );
+      for (const item of items) {
+        insertItem.run(newId, item.serviceId, item.description, item.qty, item.unitPricePaise, item.lineTotalPaise);
+      }
+      return newId;
+    })();
+
+    audit(ctx, req, {
+      action: 'visit.add_charges',
+      entityType: 'visit',
+      entityId: visitId,
+      patientId: visit.patient_id,
+      detail: { invoiceId, addedPaise, lines: items.length },
+    });
+
+    const row = db.prepare('SELECT * FROM invoices WHERE id = ?').get(invoiceId);
+    res.status(201).json({ invoice: mapInvoice(row) });
+  });
+
   router.post('/invoices/:id/payments', requirePerm('payment.collect'), (req, res) => {
     const id = idParam(req);
     const invoice = db.prepare('SELECT * FROM invoices WHERE id = ?').get(id);
@@ -323,7 +508,7 @@ module.exports = function billingRoutes(ctx) {
         }],
       });
     }
-    if (!['cash', 'waived'].includes(method) && !reference) {
+    if (method !== 'cash' && !reference) {
       throw new ApiError(400, 'Please correct the highlighted fields.', {
         code: 'validation_failed',
         details: [{ field: 'reference', message: 'Add the transaction reference for non-cash payments.' }],
@@ -331,10 +516,7 @@ module.exports = function billingRoutes(ctx) {
     }
 
     const now = new Date().toISOString();
-    const day = now.slice(0, 10).replace(/-/g, '');
-    const prefix = ctx.store.getSetting('receipt_prefix', 'RCPT');
-    const seq = ctx.store.nextSequence(`seq:receipt:${day}`);
-    const receiptNo = `${prefix}-${day}-${String(seq).padStart(4, '0')}`;
+    const receiptNo = nextReceiptNumber(ctx);
 
     const result = db.transaction(() => {
       const info = db
@@ -420,6 +602,66 @@ module.exports = function billingRoutes(ctx) {
     res.json({ ok: true });
   });
 
+  router.get('/payments/:id/receipt', requirePerm('billing.read'), (req, res) => {
+    const id = idParam(req);
+    const payment = db
+      .prepare(
+        `SELECT pay.*, u.full_name AS received_by_name FROM payments pay
+         LEFT JOIN users u ON u.id = pay.received_by WHERE pay.id = ?`,
+      )
+      .get(id);
+    if (!payment) throw new ApiError(404, 'Payment not found.');
+
+    const isDuplicate = (payment.print_count || 0) > 0;
+    const invoice = db.prepare('SELECT * FROM invoices WHERE id = ?').get(payment.invoice_id);
+    const patient = db.prepare('SELECT id, mrn, full_name, phone, address_line, city, district, state FROM patients WHERE id = ?').get(payment.patient_id);
+
+    res.json({
+      ok: true,
+      isDuplicate,
+      printCount: payment.print_count || 0,
+      payment: mapPayment(payment),
+      invoice: invoice ? mapInvoice(invoice) : null,
+      patient,
+    });
+  });
+
+  router.post('/payments/:id/print', requirePerm('billing.read'), (req, res) => {
+    const id = idParam(req);
+    const payment = db
+      .prepare(
+        `SELECT pay.*, u.full_name AS received_by_name FROM payments pay
+         LEFT JOIN users u ON u.id = pay.received_by WHERE pay.id = ?`,
+      )
+      .get(id);
+    if (!payment) throw new ApiError(404, 'Payment not found.');
+
+    const isDuplicate = (payment.print_count || 0) > 0;
+    const newPrintCount = (payment.print_count || 0) + 1;
+
+    db.prepare('UPDATE payments SET print_count = ? WHERE id = ?').run(newPrintCount, id);
+
+    audit(ctx, req, {
+      action: isDuplicate ? 'receipt.reprint' : 'receipt.print',
+      entityType: 'payment',
+      entityId: id,
+      patientId: payment.patient_id,
+      detail: { receiptNo: payment.receipt_no, isDuplicate, printCount: newPrintCount },
+    });
+
+    const invoice = db.prepare('SELECT * FROM invoices WHERE id = ?').get(payment.invoice_id);
+    const patient = db.prepare('SELECT id, mrn, full_name, phone, address_line, city, district, state FROM patients WHERE id = ?').get(payment.patient_id);
+
+    res.json({
+      ok: true,
+      isDuplicate,
+      printCount: newPrintCount,
+      payment: { ...mapPayment(payment), printCount: newPrintCount },
+      invoice: invoice ? mapInvoice(invoice) : null,
+      patient,
+    });
+  });
+
   // ---------------------------------------------------------------------------
   // Reports
   // ---------------------------------------------------------------------------
@@ -487,6 +729,50 @@ module.exports = function billingRoutes(ctx) {
         invoiceId: r.id, invoiceNo: r.invoice_no, balancePaise: r.balance_paise, createdAt: r.created_at,
         patientId: r.patient_id, mrn: r.mrn, patientName: r.full_name, phone: r.phone,
       })),
+    });
+  });
+
+  router.get('/billing/dues', requirePerm('billing.read'), (req, res) => {
+    const q = String(req.query.q || '').trim().slice(0, 60);
+    const where = ["i.status IN ('open','partially_paid')"];
+    const params = {};
+    if (q) {
+      where.push('(p.mrn LIKE @like OR p.full_name LIKE @like OR p.phone LIKE @like)');
+      params.like = likePattern(q);
+    }
+    const whereSql = where.join(' AND ');
+
+    const rows = db
+      .prepare(
+        `SELECT p.id AS patient_id, p.mrn, p.full_name, p.phone, p.district,
+                COUNT(i.id) AS invoice_count,
+                SUM(i.balance_paise) AS total_due_paise,
+                MIN(i.created_at) AS oldest_invoice_at,
+                MAX(i.created_at) AS latest_invoice_at
+         FROM invoices i
+         JOIN patients p ON p.id = i.patient_id
+         WHERE ${whereSql}
+         GROUP BY p.id, p.mrn, p.full_name, p.phone, p.district
+         ORDER BY total_due_paise DESC`,
+      )
+      .all(params);
+
+    const totalDue = rows.reduce((sum, r) => sum + r.total_due_paise, 0);
+
+    res.json({
+      patients: rows.map((r) => ({
+        patientId: r.patient_id,
+        mrn: r.mrn,
+        fullName: r.full_name,
+        phone: r.phone,
+        district: r.district,
+        invoiceCount: r.invoice_count,
+        totalDuePaise: r.total_due_paise,
+        oldestInvoiceAt: r.oldest_invoice_at,
+        latestInvoiceAt: r.latest_invoice_at,
+      })),
+      totalDuePaise: totalDue,
+      patientCount: rows.length,
     });
   });
 

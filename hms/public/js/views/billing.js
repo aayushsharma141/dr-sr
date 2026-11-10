@@ -32,6 +32,7 @@ export default async function billingView(root, { query, navigate }) {
           · ${ui.inr(data.summary.collectedPaise)} collected</div>
       </div>
       <div class="page-head-actions">
+        <button class="btn" data-action="dues">${ui.icon('wallet')}<span>Pending dues</span></button>
         <button class="btn" data-action="report">${ui.icon('printer')}<span>Day report</span></button>
         ${canWrite ? `<button class="btn btn--primary" data-action="new">${ui.icon('plus')}<span>New invoice</span></button>` : ''}
       </div>
@@ -116,6 +117,10 @@ export default async function billingView(root, { query, navigate }) {
   }
   for (const button of root.querySelectorAll('[data-page]')) {
     button.addEventListener('click', () => rerun({ page: Number(button.dataset.page) }));
+  }
+
+  for (const button of root.querySelectorAll('[data-action="dues"]')) {
+    button.addEventListener('click', () => openPendingDuesModal());
   }
 
   for (const button of root.querySelectorAll('[data-action="report"]')) {
@@ -383,5 +388,48 @@ export async function openDayReport(date) {
             <div style="border-top:1px solid #333;padding-top:3px">Cashier signature</div></div>
         </div>
       </div>`,
+  });
+}
+
+async function openPendingDuesModal() {
+  const data = await api.get('/api/billing/dues');
+  ui.modal({
+    title: 'Pending patient dues',
+    subtitle: `${data.patientCount} patients with outstanding balances · Total ${ui.inr(data.totalDuePaise)}`,
+    width: 'wide',
+    body: `
+      ${data.patients.length ? `
+        <div class="table-wrap"><table class="table">
+          <thead>
+            <tr>
+              <th>Patient</th>
+              <th>Phone</th>
+              <th>District</th>
+              <th class="right">Invoices</th>
+              <th class="right">Total Due</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            ${data.patients.map((p) => `
+              <tr>
+                <td><strong><a href="#/patients/${p.patientId}?tab=billing">${ui.esc(p.fullName)}</a></strong> <span class="muted sm">(${ui.esc(p.mrn)})</span></td>
+                <td>${ui.esc(p.phone || '—')}</td>
+                <td>${ui.esc(p.district || 'Bhojpur')}</td>
+                <td class="right">${p.invoiceCount}</td>
+                <td class="right money money--due"><strong>${ui.inr(p.totalDuePaise)}</strong></td>
+                <td class="right"><a class="btn btn--sm" href="#/patients/${p.patientId}?tab=billing">View</a></td>
+              </tr>`).join('')}
+          </tbody>
+          <tfoot>
+            <tr>
+              <td colspan="4" class="right strong">Total outstanding dues</td>
+              <td class="right money money--due strong">${ui.inr(data.totalDuePaise)}</td>
+              <td></td>
+            </tr>
+          </tfoot>
+        </table></div>` : ui.emptyState({ iconName: 'check', title: 'No pending dues', message: 'All patient invoices are settled.' })}
+    `,
+    footer: `<button class="btn" type="button" data-close>Close</button>`,
   });
 }

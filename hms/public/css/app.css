@@ -602,12 +602,14 @@ table.table { width: 100%; border-collapse: collapse; font-size: 13.2px; }
   @page { margin: 14mm; }
 }
 
-.receipt { font-size: 13px; color: #111; }
-.receipt-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; padding-bottom: 12px; border-bottom: 2px solid #111; }
-.receipt-hospital { font-size: 18px; font-weight: 700; letter-spacing: -.01em; }
+.receipt { font-size: 13px; color: #111; font-family: 'Nirmala UI', system-ui, -apple-system, sans-serif; }
+.receipt-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; padding-bottom: 12px; border-bottom: 2px solid #991b1b; }
+.receipt-hospital-hi { font-size: 20px; font-weight: 700; color: #991b1b; line-height: 1.2; font-family: 'Nirmala UI', sans-serif; }
+.receipt-hospital { font-size: 16px; font-weight: 700; letter-spacing: -.01em; color: #111827; }
+.duplicate-banner { background: #fef2f2; border: 2px dashed #dc2626; color: #991b1b; font-weight: 700; text-align: center; padding: 6px 12px; margin-bottom: 12px; font-size: 13px; letter-spacing: .05em; border-radius: 4px; }
 .receipt-meta { text-align: right; font-size: 12px; }
 .receipt table { width: 100%; border-collapse: collapse; margin-top: 12px; }
-.receipt th { text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: .05em; border-bottom: 1px solid #999; padding: 6px 4px; }
+.receipt th { text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: .05em; border-bottom: 1px solid #991b1b; padding: 6px 4px; }
 .receipt td { padding: 6px 4px; border-bottom: 1px dotted #ccc; }
 .receipt tfoot td { border-bottom: 0; padding: 4px; }
 .receipt .totals { margin-left: auto; width: 280px; margin-top: 8px; }
@@ -615,6 +617,6 @@ table.table { width: 100%; border-collapse: collapse; font-size: 13.2px; }
 .receipt .grand td { font-weight: 700; border-top: 1.5px solid #111; padding-top: 6px; }
 .receipt-foot { margin-top: 18px; font-size: 11px; color: #555; display: flex; justify-content: space-between; gap: 20px; }
 
-.rx-sheet { font-size: 13px; }
+.rx-sheet { font-size: 13px; font-family: 'Nirmala UI', system-ui, -apple-system, sans-serif; }
 .rx-line { display: grid; grid-template-columns: 22px 1.6fr 1fr 1fr; gap: 8px; padding: 7px 0; border-bottom: 1px dotted #ccc; }
 .rx-head { display: grid; grid-template-columns: 22px 1.6fr 1fr 1fr; gap: 8px; font-size: 11px; text-transform: uppercase; letter-spacing: .05em; color: #555; border-bottom: 1px solid #999; padding-bottom: 5px; }

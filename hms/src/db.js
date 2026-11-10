@@ -82,7 +82,7 @@ const DEFAULT_SETTINGS = {
   currency: 'INR',
   mrn_prefix: 'KH',
   invoice_prefix: 'INV',
-  receipt_prefix: 'RCPT',
+  receipt_prefix: 'RCP',
   visit_prefix: 'V',
   opd_fee_default: '0',
   session_idle_minutes: String(config.session.idleMinutes),
@@ -147,7 +147,7 @@ function openDatabase(options = {}) {
     db.close();
     throw new Error(
       `Database schema v${currentVersion} is newer than this application (v${targetVersion}). ` +
-        'Upgrade the application before starting it.',
+      'Upgrade the application before starting it.',
     );
   }
 
@@ -290,7 +290,7 @@ function applyMigrations(store, pending, fromVersion, options = {}) {
       const where = backup ? ` The pre-upgrade backup is data/backups/${backup.filename}.` : '';
       throw new Error(
         `Database upgrade ${migration.name} failed: ${err.message}. ` +
-          `The database is still at schema v${reached}.${where}`,
+        `The database is still at schema v${reached}.${where}`,
       );
     }
   }

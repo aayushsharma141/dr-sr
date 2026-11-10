@@ -137,18 +137,24 @@ module.exports = function attachmentRoutes(ctx) {
          WHERE a.patient_id = ? AND a.is_deleted = 0 ORDER BY a.created_at DESC`,
       )
       .all(patientId);
+
+    const isReception = req.user.role === 'reception';
     res.json({
-      attachments: rows.map((a) => ({
-        id: a.id,
-        visitId: a.visit_id,
-        category: a.category,
-        title: a.title,
-        originalName: a.original_name,
-        mimeType: a.mime_type,
-        sizeBytes: a.size_bytes,
-        uploadedByName: a.uploaded_by_name,
-        createdAt: a.created_at,
-      })),
+      attachments: rows.map((a) => {
+        const isClinical = ['lab', 'imaging'].includes(a.category);
+        return {
+          id: a.id,
+          visitId: a.visit_id,
+          category: a.category,
+          title: a.title,
+          originalName: a.original_name,
+          mimeType: a.mime_type,
+          sizeBytes: a.size_bytes,
+          uploadedByName: a.uploaded_by_name,
+          createdAt: a.created_at,
+          canView: !(isReception && isClinical),
+        };
+      }),
     });
   });
 
@@ -157,6 +163,12 @@ module.exports = function attachmentRoutes(ctx) {
     const id = idParam(req);
     const row = db.prepare('SELECT * FROM attachments WHERE id = ? AND is_deleted = 0').get(id);
     if (!row) throw new ApiError(404, 'Document not found.');
+
+    // D6: Doctors view; Reception may upload but cannot view clinical categories (lab, imaging)
+    if (req.user.role === 'reception' && ['lab', 'imaging'].includes(row.category)) {
+      throw new ApiError(403, 'Reception cannot access clinical documents (lab and imaging).');
+    }
+
     const filePath = path.join(ctx.config.paths.uploads, row.stored_name);
     if (!fs.existsSync(filePath)) throw new ApiError(410, 'The stored file is missing from the server. Restore it from a backup.');
 

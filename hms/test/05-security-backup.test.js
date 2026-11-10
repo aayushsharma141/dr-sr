@@ -19,7 +19,7 @@ test('documents, audit trail and backups', async (t) => {
   const env = await boot();
   t.after(() => env.close());
   const { client: admin } = await setupAdmin(env);
-  const { reception: desk } = await makeTeam(env, admin);
+  const { reception: desk, doctor } = await makeTeam(env, admin);
   const patient = await createPatient(desk, { firstName: 'Farhan', lastName: 'Qureshi', phone: '9898989898' });
 
   await t.test('tar archives round-trip', () => {
@@ -60,13 +60,19 @@ test('documents, audit trail and backups', async (t) => {
     assert.equal(raw.subarray(0, 4).toString('latin1'), 'KHE1');
 
     const download = await fetch(`${env.base}/api/attachments/${attachmentId}`, {
-      headers: { 'x-session-token': desk.token },
+      headers: { 'x-session-token': doctor.token },
     });
     assert.equal(download.status, 200);
     const bytes = Buffer.from(await download.arrayBuffer());
     assert.deepEqual(bytes, PDF);
     assert.match(download.headers.get('content-disposition'), /attachment/);
     assert.equal(download.headers.get('x-content-type-options'), 'nosniff');
+
+    // D6: Reception cannot download clinical category (lab / imaging)
+    const deskDownload = await fetch(`${env.base}/api/attachments/${attachmentId}`, {
+      headers: { 'x-session-token': desk.token },
+    });
+    assert.equal(deskDownload.status, 403, 'reception cannot view clinical documents');
 
     const anonymous = await env.client().get(`/api/attachments/${attachmentId}`);
     assert.equal(anonymous.status, 401);
