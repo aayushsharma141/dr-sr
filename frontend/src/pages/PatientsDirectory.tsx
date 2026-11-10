@@ -107,7 +107,7 @@ export function PatientsDirectory() {
               type="search"
               value={searchInput}
               onChange={(e) => setSearchInput(e.target.value)}
-              placeholder="Search by URN (e.g. KH-2026-0001), mobile number, or patient name..."
+              placeholder="Search by URN (e.g. KH-26-P-11-00001), mobile number, or patient name..."
               className="w-full px-4 py-3 pl-10 border border-neutral-300 rounded-md text-sm text-neutral-900 focus-visible:outline-2 focus-visible:outline-red-800"
             />
             <span

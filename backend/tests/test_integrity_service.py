@@ -118,3 +118,43 @@ def test_cleanup_only_findings_leave_the_report_healthy(db_session, tmp_path: Pa
         + (report.cleanup_checks)
         == report.total_checks
     )
+
+
+def test_integrity_new_format_urn_sequence_check(db_session):
+    """New URN format KH-YY-P-MM-NNNNN produces no false gap warnings when sequential."""
+    from kalyan_api.models import UrnSequence
+    from kalyan_api.services.integrity_service import check_urn_sequence_gaps
+
+    # Add 2 consecutive patients for 2026
+    p1 = Patient(
+        urn="KH-26-P-11-00001",
+        full_name="Patient One",
+        guardian_name="Guardian",
+        gender="M",
+        age_years=30,
+        mobile="9876543210",
+        address="Address 1",
+    )
+    p2 = Patient(
+        urn="KH-26-P-11-00002",
+        full_name="Patient Two",
+        guardian_name="Guardian",
+        gender="F",
+        age_years=28,
+        mobile="9876543211",
+        address="Address 2",
+    )
+    db_session.add_all([p1, p2])
+    # Sync counter
+    seq = db_session.get(UrnSequence, 2026)
+    if not seq:
+        seq = UrnSequence(year=2026, last_seq=2)
+        db_session.add(seq)
+    else:
+        seq.last_seq = max(seq.last_seq, 2)
+    db_session.flush()
+
+    res = check_urn_sequence_gaps(db_session)
+    assert res.passed is True
+    assert len(res.discrepancies) == 0
+

@@ -162,7 +162,7 @@ export function PatientCorrectionPage() {
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search by URN (e.g. KH-2026-0001), patient name, mobile, or legacy hospital ID..."
+              placeholder="Search by URN (e.g. KH-26-P-11-00001), patient name, mobile, or legacy hospital ID..."
               className="flex-1 min-h-11 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-xs focus-visible:outline-2 focus-visible:outline-[#8E1C3D]"
             />
             <button

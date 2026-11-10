@@ -66,7 +66,7 @@ ISSUE_SEVERITY: dict[str, Severity] = {
     "orphan_asset_file": "CLEANUP",
 }
 
-URN_PATTERN = re.compile(r"^KH-(\d{4})-(\d+)$")
+URN_PATTERN = re.compile(r"^KH-(\d{2})-P-(\d{2})-(\d{5})$")
 # Cap on listed missing numbers per year so a pathological gap cannot bloat the response.
 MAX_LISTED_GAPS_PER_YEAR = 200
 
@@ -237,8 +237,9 @@ def check_urn_sequence_gaps(session: Session) -> CheckResult:
         match = URN_PATTERN.fullmatch(urn or "")
         if match is None:
             continue
-        year = int(match.group(1))
-        seqs_by_year.setdefault(year, set()).add(int(match.group(2)))
+        year = 2000 + int(match.group(1))
+        seq = int(match.group(3))
+        seqs_by_year.setdefault(year, set()).add(seq)
 
     counters: dict[int, int] = {
         int(year): int(last_seq)
