@@ -555,6 +555,7 @@ export interface DoctorOut {
   name_hi: string | null
   qualification: string | null
   registration_number: string | null
+  cabin_code?: string | null
   default_fee_paise: number
   is_active: boolean
   version_id: number
@@ -567,6 +568,7 @@ export interface DoctorCreate {
   name_hi?: string | null
   qualification?: string | null
   registration_number?: string | null
+  cabin_code?: string | null
   default_fee_paise?: number
 }
 
@@ -575,8 +577,14 @@ export interface DoctorUpdate {
   name_hi?: string | null
   qualification?: string | null
   registration_number?: string | null
+  cabin_code?: string | null
   default_fee_paise: number
   is_active: boolean
+  version_id: number
+}
+
+export interface DoctorMeSettingsUpdate {
+  default_fee_paise: number
   version_id: number
 }
 

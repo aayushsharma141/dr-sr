@@ -146,6 +146,7 @@ def test_golden_role_permissions_snapshot() -> None:
                 Permission.DASHBOARD_DOCTOR,
                 Permission.SETTINGS_READ,
                 Permission.DOCTOR_READ,
+                Permission.DOCTOR_SETTINGS_WRITE,
                 Permission.FEE_READ,
                 Permission.PATIENT_READ,
                 Permission.APPOINTMENT_READ,

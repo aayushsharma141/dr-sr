@@ -353,6 +353,15 @@ export const router = createBrowserRouter([
               }
             },
           },
+          {
+            path: '/doctor/settings',
+            lazy: async () => {
+              const { DoctorSettings } = await import('./pages/DoctorSettings')
+              return {
+                Component: DoctorSettings,
+              }
+            },
+          },
         ],
       },
     ],

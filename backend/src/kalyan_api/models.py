@@ -116,12 +116,22 @@ class Doctor(Base):
     """Doctor profile entity (SET-02) referenced by users and clinical encounters."""
 
     __tablename__ = "doctors"
+    __table_args__ = (
+        Index(
+            "ix_doctors_active_cabin_code",
+            "cabin_code",
+            unique=True,
+            postgresql_where=text("cabin_code IS NOT NULL AND is_active = true"),
+            sqlite_where=text("cabin_code IS NOT NULL AND is_active = 1"),
+        ),
+    )
 
     id: Mapped[int] = mapped_column(BigInteger, Identity(always=False), primary_key=True)
     name_en: Mapped[str] = mapped_column(String(120), nullable=False)
     name_hi: Mapped[str | None] = mapped_column(String(120), nullable=True)
     qualification: Mapped[str | None] = mapped_column(String(120), nullable=True)
     registration_number: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    cabin_code: Mapped[str | None] = mapped_column(String(1), nullable=True)
     default_fee_paise: Mapped[int] = mapped_column(
         Integer, default=0, server_default="0", nullable=False
     )

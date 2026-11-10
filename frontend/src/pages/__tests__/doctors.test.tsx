@@ -25,6 +25,7 @@ const mockDoctors: DoctorOut[] = [
     name_hi: 'डॉ. रमेश शर्मा',
     qualification: 'MBBS, MD (Medicine)',
     registration_number: 'BR-12345',
+    cabin_code: 'A',
     default_fee_paise: 50000,
     is_active: true,
     version_id: 1,

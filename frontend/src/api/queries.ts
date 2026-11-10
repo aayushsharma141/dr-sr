@@ -73,6 +73,7 @@ import type {
   DepartmentUpdate,
   DepartmentDoctorOut,
   DoctorDepartmentAssignment,
+  DoctorMeSettingsUpdate,
   DoctorUpdate,
   FeeCreate,
   FeeOut,
@@ -629,6 +630,21 @@ export function useUpdateDoctor() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['doctors'] })
       invalidateAdminSummaries(qc)
+    },
+  })
+}
+
+export function useUpdateDoctorMeSettings() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (body: DoctorMeSettingsUpdate) =>
+      apiFetch<DoctorOut>('/doctors/me/settings', {
+        method: 'PATCH',
+        body,
+      }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['doctors'] })
+      qc.invalidateQueries({ queryKey: ['me'] })
     },
   })
 }

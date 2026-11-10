@@ -116,6 +116,14 @@ const NAVIGATION: NavigationItem[] = [
     roles: DOCTOR_ONLY,
   },
   {
+    key: 'doctor-settings',
+    label: 'My Settings',
+    description: 'Personal consultation fee and preferences',
+    path: '/doctor/settings',
+    icon: 'settings',
+    roles: DOCTOR_ONLY,
+  },
+  {
 
     key: 'billing',
     label: 'Billing & Payments',
@@ -436,6 +444,8 @@ function breadcrumbsFor(pathname: string, role: Role): Crumb[] {
     crumbs.push({ label: 'Consultation' })
   } else if (pathname === '/doctor/prescriptions/new') {
     crumbs.push({ label: 'New Prescription' })
+  } else if (pathname === '/doctor/settings') {
+    crumbs.push({ label: 'My Settings' })
   } else if (pathname.startsWith('/admin/')) {
     const match = findAdminModuleForPath(pathname)
     if (match && match.action.path !== match.module.canonicalPath) {

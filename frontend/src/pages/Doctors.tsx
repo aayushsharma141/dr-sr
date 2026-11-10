@@ -20,6 +20,7 @@ interface DoctorForm {
   name_hi: string
   qualification: string
   registration_number: string
+  cabin_code: string
   fee_rupees: string
   is_active: boolean
 }
@@ -35,6 +36,7 @@ const EMPTY_DOCTOR_FORM: DoctorForm = {
   name_hi: '',
   qualification: '',
   registration_number: '',
+  cabin_code: '',
   fee_rupees: '500',
   is_active: true,
 }
@@ -47,6 +49,7 @@ function doctorToForm(doc: DoctorOut): DoctorForm {
     name_hi: doc.name_hi ?? '',
     qualification: doc.qualification ?? '',
     registration_number: doc.registration_number ?? '',
+    cabin_code: doc.cabin_code ?? '',
     fee_rupees: String(doc.default_fee_paise / 100),
     is_active: doc.is_active,
   }
@@ -62,6 +65,7 @@ function doctorFormsEqual(a: DoctorForm, b: DoctorForm): boolean {
     a.name_hi === b.name_hi &&
     a.qualification === b.qualification &&
     a.registration_number === b.registration_number &&
+    a.cabin_code === b.cabin_code &&
     a.fee_rupees === b.fee_rupees &&
     a.is_active === b.is_active
   )
@@ -232,12 +236,15 @@ export function Doctors() {
       return
     }
 
+    const cabinCodeVal = docForm.cabin_code.trim() ? docForm.cabin_code.trim().toUpperCase() : null
+
     if (editingDoctor) {
       const body: DoctorUpdate = {
         name_en: docForm.name_en.trim(),
         name_hi: docForm.name_hi.trim() || null,
         qualification: docForm.qualification.trim() || null,
         registration_number: docForm.registration_number.trim() || null,
+        cabin_code: cabinCodeVal,
         default_fee_paise: feePaise,
         is_active: docForm.is_active,
         version_id: editingDoctor.version_id,
@@ -248,7 +255,11 @@ export function Doctors() {
         closeDoctorModal()
       } catch (err) {
         if (err instanceof ApiError && err.status === 409) {
-          setDocConflict(true)
+          if (err.code === 'cabin_code_taken') {
+            setDocErrors([err.message])
+          } else {
+            setDocConflict(true)
+          }
         } else {
           setDocErrors(errorMessages(err, 'Failed to update doctor profile'))
         }
@@ -259,6 +270,7 @@ export function Doctors() {
         name_hi: docForm.name_hi.trim() || null,
         qualification: docForm.qualification.trim() || null,
         registration_number: docForm.registration_number.trim() || null,
+        cabin_code: cabinCodeVal,
         default_fee_paise: feePaise,
       }
 
@@ -266,7 +278,11 @@ export function Doctors() {
         await createDoctorMutation.mutateAsync(body)
         closeDoctorModal()
       } catch (err) {
-        setDocErrors(errorMessages(err, 'Failed to create doctor profile'))
+        if (err instanceof ApiError && err.status === 409 && err.code === 'cabin_code_taken') {
+          setDocErrors([err.message])
+        } else {
+          setDocErrors(errorMessages(err, 'Failed to create doctor profile'))
+        }
       }
     }
   }
@@ -429,6 +445,7 @@ export function Doctors() {
                     <th scope="col" className="px-4 py-3">Hindi Name</th>
                     <th scope="col" className="px-4 py-3">Qualification</th>
                     <th scope="col" className="px-4 py-3">Registration No</th>
+                    <th scope="col" className="px-4 py-3">Cabin</th>
                     <th scope="col" className="px-4 py-3 text-right">Default Fee</th>
                     <th scope="col" className="px-4 py-3">Status</th>
                     <th scope="col" className="px-4 py-3 text-right">Actions</th>
@@ -444,6 +461,7 @@ export function Doctors() {
                         </td>
                         <td className="px-4 py-3 text-neutral-700">{doc.qualification || '-'}</td>
                         <td className="px-4 py-3 font-mono text-neutral-700">{doc.registration_number || '-'}</td>
+                        <td className="px-4 py-3 font-mono font-semibold text-neutral-800">{doc.cabin_code || '-'}</td>
                         <td className="px-4 py-3 text-right font-medium tabular-nums text-neutral-900">
                           {formatRupees(doc.default_fee_paise)}
                         </td>
@@ -654,6 +672,21 @@ export function Doctors() {
                     type="text"
                     value={docForm.registration_number}
                     onChange={(e) => setDocField('registration_number', e.target.value)}
+                    className={INPUT_CLASS}
+                  />
+                </div>
+
+                <div>
+                  <label htmlFor="doc-cabin-code" className="block text-sm font-medium text-neutral-800 mb-1">
+                    Cabin Code (Optional, A–Z)
+                  </label>
+                  <input
+                    id="doc-cabin-code"
+                    type="text"
+                    maxLength={1}
+                    value={docForm.cabin_code}
+                    onChange={(e) => setDocField('cabin_code', e.target.value.toUpperCase())}
+                    placeholder="e.g. A"
                     className={INPUT_CLASS}
                   />
                 </div>

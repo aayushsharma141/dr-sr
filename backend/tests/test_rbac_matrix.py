@@ -175,6 +175,11 @@ def test_rbac_matrix_cell(
     elif row.path == "/api/patients/check-duplicate":
         resolved_path = "/api/patients/check-duplicate?name=Test&mobile=9876543210"
 
+    elif row.path == "/api/doctors/me/settings":
+        if current_user and current_user.doctor_id:
+            target_entity = db_session.get(Doctor, current_user.doctor_id)
+        resolved_path = row.path
+
     elif "/api/doctors/{id}" in row.path:
         doc = Doctor(name_en=f"Dr. Target {uuid.uuid4().hex[:6]}", default_fee_paise=30000)
         db_session.add(doc)

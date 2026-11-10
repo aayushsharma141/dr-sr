@@ -2,7 +2,18 @@
 
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
+
+
+def _normalize_cabin_code(v: str | None) -> str | None:
+    if v is None:
+        return None
+    s = v.strip()
+    if not s:
+        return None
+    if len(s) != 1 or not s.isalpha():
+        raise ValueError("Cabin code must be a single letter A-Z")
+    return s.upper()
 
 
 class DoctorOut(BaseModel):
@@ -15,6 +26,7 @@ class DoctorOut(BaseModel):
     name_hi: str | None = None
     qualification: str | None = None
     registration_number: str | None = None
+    cabin_code: str | None = None
     default_fee_paise: int
     is_active: bool
     version_id: int
@@ -31,7 +43,13 @@ class DoctorCreate(BaseModel):
     name_hi: str | None = Field(default=None, max_length=120)
     qualification: str | None = Field(default=None, max_length=120)
     registration_number: str | None = Field(default=None, max_length=64)
+    cabin_code: str | None = Field(default=None)
     default_fee_paise: int = Field(default=0, ge=0)
+
+    @field_validator("cabin_code", mode="before")
+    @classmethod
+    def validate_cabin_code(cls, v: str | None) -> str | None:
+        return _normalize_cabin_code(v)
 
 
 class DoctorUpdate(BaseModel):
@@ -43,8 +61,23 @@ class DoctorUpdate(BaseModel):
     name_hi: str | None = Field(default=None, max_length=120)
     qualification: str | None = Field(default=None, max_length=120)
     registration_number: str | None = Field(default=None, max_length=64)
+    cabin_code: str | None = Field(default=None)
     default_fee_paise: int = Field(ge=0)
     is_active: bool = True
+    version_id: int = Field(ge=1)
+
+    @field_validator("cabin_code", mode="before")
+    @classmethod
+    def validate_cabin_code(cls, v: str | None) -> str | None:
+        return _normalize_cabin_code(v)
+
+
+class DoctorMeSettingsUpdate(BaseModel):
+    """Payload for a doctor updating their own consultation fee."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    default_fee_paise: int = Field(ge=0)
     version_id: int = Field(ge=1)
 
 
@@ -58,25 +91,23 @@ class FeeOut(BaseModel):
     fee_paise: int
     is_active: bool
     version_id: int
-    created_at: datetime
-    updated_at: datetime
 
 
 class FeeCreate(BaseModel):
-    """Payload for creating a consultation fee schedule."""
+    """Payload for creating a consultation fee schedule entry."""
 
     model_config = ConfigDict(extra="forbid")
 
-    name: str = Field(min_length=2, max_length=120)
+    name: str = Field(min_length=2, max_length=64)
     fee_paise: int = Field(ge=0)
 
 
 class FeeUpdate(BaseModel):
-    """Payload for modifying a consultation fee schedule."""
+    """Payload for updating a consultation fee with optimistic locking."""
 
     model_config = ConfigDict(extra="forbid")
 
-    name: str = Field(min_length=2, max_length=120)
+    name: str = Field(min_length=2, max_length=64)
     fee_paise: int = Field(ge=0)
     is_active: bool = True
     version_id: int = Field(ge=1)

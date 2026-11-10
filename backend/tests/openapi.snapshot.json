@@ -2346,6 +2346,17 @@
         "additionalProperties": false,
         "description": "Payload for creating a new doctor profile.",
         "properties": {
+          "cabin_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cabin Code"
+          },
           "default_fee_paise": {
             "default": 0,
             "minimum": 0.0,
@@ -2564,9 +2575,42 @@
         "title": "DoctorFollowUpResponse",
         "type": "object"
       },
+      "DoctorMeSettingsUpdate": {
+        "additionalProperties": false,
+        "description": "Payload for a doctor updating their own consultation fee.",
+        "properties": {
+          "default_fee_paise": {
+            "minimum": 0.0,
+            "title": "Default Fee Paise",
+            "type": "integer"
+          },
+          "version_id": {
+            "minimum": 1.0,
+            "title": "Version Id",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "default_fee_paise",
+          "version_id"
+        ],
+        "title": "DoctorMeSettingsUpdate",
+        "type": "object"
+      },
       "DoctorOut": {
         "description": "Doctor profile entity response.",
         "properties": {
+          "cabin_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cabin Code"
+          },
           "created_at": {
             "format": "date-time",
             "title": "Created At",
@@ -2886,6 +2930,17 @@
         "additionalProperties": false,
         "description": "Payload for updating a doctor profile with optimistic concurrency.",
         "properties": {
+          "cabin_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cabin Code"
+          },
           "default_fee_paise": {
             "minimum": 0.0,
             "title": "Default Fee Paise",
@@ -3579,7 +3634,7 @@
       },
       "FeeCreate": {
         "additionalProperties": false,
-        "description": "Payload for creating a consultation fee schedule.",
+        "description": "Payload for creating a consultation fee schedule entry.",
         "properties": {
           "fee_paise": {
             "minimum": 0.0,
@@ -3587,7 +3642,7 @@
             "type": "integer"
           },
           "name": {
-            "maxLength": 120,
+            "maxLength": 64,
             "minLength": 2,
             "title": "Name",
             "type": "string"
@@ -3603,11 +3658,6 @@
       "FeeOut": {
         "description": "Consultation fee schedule response.",
         "properties": {
-          "created_at": {
-            "format": "date-time",
-            "title": "Created At",
-            "type": "string"
-          },
           "fee_paise": {
             "title": "Fee Paise",
             "type": "integer"
@@ -3624,11 +3674,6 @@
             "title": "Name",
             "type": "string"
           },
-          "updated_at": {
-            "format": "date-time",
-            "title": "Updated At",
-            "type": "string"
-          },
           "version_id": {
             "title": "Version Id",
             "type": "integer"
@@ -3639,16 +3684,14 @@
           "name",
           "fee_paise",
           "is_active",
-          "version_id",
-          "created_at",
-          "updated_at"
+          "version_id"
         ],
         "title": "FeeOut",
         "type": "object"
       },
       "FeeUpdate": {
         "additionalProperties": false,
-        "description": "Payload for modifying a consultation fee schedule.",
+        "description": "Payload for updating a consultation fee with optimistic locking.",
         "properties": {
           "fee_paise": {
             "minimum": 0.0,
@@ -3661,7 +3704,7 @@
             "type": "boolean"
           },
           "name": {
-            "maxLength": 120,
+            "maxLength": 64,
             "minLength": 2,
             "title": "Name",
             "type": "string"
@@ -10323,6 +10366,49 @@
           }
         },
         "summary": "Create Doctor",
+        "tags": [
+          "doctors",
+          "fees"
+        ]
+      }
+    },
+    "/api/doctors/me/settings": {
+      "patch": {
+        "description": "Update consultation fee for the authenticated doctor.",
+        "operationId": "update_doctor_me_settings_api_doctors_me_settings_patch",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DoctorMeSettingsUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DoctorOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Doctor Me Settings",
         "tags": [
           "doctors",
           "fees"

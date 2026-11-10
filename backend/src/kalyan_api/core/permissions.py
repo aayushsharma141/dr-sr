@@ -38,6 +38,7 @@ class Permission(StrEnum):
     SETTINGS_WRITE = "settings:write"
     DOCTOR_READ = "doctor:read"
     DOCTOR_MANAGE = "doctor:manage"
+    DOCTOR_SETTINGS_WRITE = "doctor_settings:write"
     FEE_READ = "fee:read"
     FEE_MANAGE = "fee:manage"
     PATIENT_READ = "patient:read"
@@ -149,6 +150,7 @@ ROLE_PERMISSIONS: dict[Role, frozenset[Permission]] = {
             Permission.DASHBOARD_DOCTOR,
             Permission.SETTINGS_READ,
             Permission.DOCTOR_READ,
+            Permission.DOCTOR_SETTINGS_WRITE,
             Permission.FEE_READ,
             Permission.PATIENT_READ,
             Permission.APPOINTMENT_READ,
