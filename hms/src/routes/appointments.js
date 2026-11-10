@@ -23,7 +23,7 @@ module.exports = function appointmentRoutes(ctx) {
          FROM appointments a
          JOIN patients p ON p.id = a.patient_id
          LEFT JOIN users u ON u.id = a.doctor_id
-         WHERE date(a.scheduled_at,'localtime') = @date
+         WHERE date(a.scheduled_at,'+05:30') = @date
            AND (@doctorId IS NULL OR a.doctor_id = @doctorId)
          ORDER BY a.scheduled_at ASC`,
       )

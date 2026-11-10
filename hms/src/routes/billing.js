@@ -130,15 +130,15 @@ module.exports = function billingRoutes(ctx) {
     }
     if (req.query.unpaid === 'true') where.push("i.status IN ('open','partially_paid')");
     if (req.query.date) {
-      where.push("date(i.created_at,'localtime') = @date");
+      where.push("date(i.created_at,'+05:30') = @date");
       params.date = String(req.query.date).slice(0, 10);
     }
     if (req.query.from) {
-      where.push("date(i.created_at,'localtime') >= @from");
+      where.push("date(i.created_at,'+05:30') >= @from");
       params.from = String(req.query.from).slice(0, 10);
     }
     if (req.query.to) {
-      where.push("date(i.created_at,'localtime') <= @to");
+      where.push("date(i.created_at,'+05:30') <= @to");
       params.to = String(req.query.to).slice(0, 10);
     }
     const q = String(req.query.q || '').trim().slice(0, 60);
@@ -428,19 +428,19 @@ module.exports = function billingRoutes(ctx) {
     const byMethod = db
       .prepare(
         `SELECT method, COUNT(*) AS count, COALESCE(SUM(amount_paise),0) AS amount
-         FROM payments WHERE is_void = 0 AND date(received_at,'localtime') = ? GROUP BY method ORDER BY method`,
+         FROM payments WHERE is_void = 0 AND date(received_at,'+05:30') = ? GROUP BY method ORDER BY method`,
       )
       .all(date);
     const totals = db
       .prepare(
         `SELECT COUNT(*) AS count, COALESCE(SUM(amount_paise),0) AS amount
-         FROM payments WHERE is_void = 0 AND date(received_at,'localtime') = ?`,
+         FROM payments WHERE is_void = 0 AND date(received_at,'+05:30') = ?`,
       )
       .get(date);
     const invoiced = db
       .prepare(
         `SELECT COUNT(*) AS count, COALESCE(SUM(total_paise),0) AS amount
-         FROM invoices WHERE status <> 'void' AND date(created_at,'localtime') = ?`,
+         FROM invoices WHERE status <> 'void' AND date(created_at,'+05:30') = ?`,
       )
       .get(date);
     const outstanding = db
@@ -454,7 +454,7 @@ module.exports = function billingRoutes(ctx) {
         `SELECT pay.*, u.full_name AS received_by_name, i.invoice_no, p.full_name AS patient_name, p.mrn
          FROM payments pay JOIN invoices i ON i.id = pay.invoice_id JOIN patients p ON p.id = pay.patient_id
          LEFT JOIN users u ON u.id = pay.received_by
-         WHERE date(pay.received_at,'localtime') = ? ORDER BY pay.received_at DESC`,
+         WHERE date(pay.received_at,'+05:30') = ? ORDER BY pay.received_at DESC`,
       )
       .all(date);
 

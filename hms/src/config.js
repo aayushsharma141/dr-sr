@@ -5,9 +5,9 @@
  * in so a clinic PC needs nothing but `npm start`.
  */
 const path = require('node:path');
-
-// Clinic-local timezone. Set before anything formats a date so that SQLite's
-// 'localtime' modifier and JavaScript agree on what "today" means.
+// Clinic date handling uses the fixed offset '+05:30' (see src/lib/domain.js).
+// Set the process timezone before anything formats a date.
+// Dates are computed with the fixed clinic offset '+05:30' (see src/lib/domain.js).
 if (!process.env.TZ) process.env.TZ = 'Asia/Kolkata';
 
 const ROOT = path.resolve(__dirname, '..');

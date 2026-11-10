@@ -2,10 +2,16 @@
 
 /** Small domain helpers shared by several route modules. */
 
-/** Today's date as YYYY-MM-DD in the server's local timezone. */
+/**
+ * Clinic offset from UTC. Kalyan Hospital is in India (IST, UTC+05:30, no
+ * daylight saving), so a fixed offset is used everywhere: the SQL date
+ * modifier '+05:30' and this helper always agree, whatever the PC's clock says.
+ */
+const CLINIC_OFFSET_MINUTES = 330;
+
+/** Today's date as YYYY-MM-DD in clinic time. */
 function todayLocal(d = new Date()) {
-  const shifted = new Date(d.getTime() - d.getTimezoneOffset() * 60000);
-  return shifted.toISOString().slice(0, 10);
+  return new Date(d.getTime() + CLINIC_OFFSET_MINUTES * 60000).toISOString().slice(0, 10);
 }
 
 function ageFromDob(dob, onDate = new Date()) {

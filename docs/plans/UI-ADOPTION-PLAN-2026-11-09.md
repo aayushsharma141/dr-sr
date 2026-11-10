@@ -105,9 +105,9 @@ AGENTS.md rules apply throughout: one owner per file, a Git checkpoint before ev
 | ID | Question | Recommendation |
 |---|---|---|
 | D1 | Does the hospital server's `kalyan_prod` already hold real patients? | **Answered 2026-11-09: no real patient data.** SW-41 dropped; go-live starts from a fresh install |
-| D2 | Doctor clinical access: "read all, edit own" or strict silo? (EG-6 sign-off still pending) | Edit own in all cases; read scope as signed off |
+| D2 | Doctor clinical access: "read all, edit own" or strict silo? (EG-6 sign-off still pending) | **Answered: read all, edit own** (owner choice recorded 2026-11-05 in project memory; formal EG-6 sign-off still to be recorded in DECISIONS.md) |
 | D3 | What is one visit? | One patient's arrival on one day, covering every doctor seen that day |
-| D4 | What creates a charge automatically: consultation fee at check-in, package price at plan start, or manual only? | Ask reception and the trust administrator; don't guess |
+| D4 | What creates a charge automatically: consultation fee at check-in, package price at plan start, or manual only? | **Answered by owner 2026-11-10:** Consultation fee once and revisit fee at check-in + physio package fee at plan start. Strictly reception-only: fees are NEVER shown on doctor screens (hidden from doctor UI/endpoints). |
 | D5 | Which Phase 20 admin extras come across now? | Demographic correction and audited CSV export now; import wizard and template editor later |
 | D6 | Who may open lab and imaging documents? | Doctors view; Reception may upload but not view clinical categories |
 
@@ -179,3 +179,7 @@ Owner confirmed **D1 = no real patient data** (SW-40 resolved, SW-41 dropped, OD
 - Also fixed the doctor greeting ("Dr Verma" instead of "Dr").
 
 **Not covered yet:** printed documents do not use the new header/footer/Hindi settings or the logo (SW-20, SW-25, SW-27 build the prints). Attachments access for Reception awaits D6 (SW-28). Doctor read scope awaits D2. The settings and chart screens were checked in one browser at one size, not on the clinic PCs.
+
+### Session 2026-11-10
+- Verified commit `837d615` (Phase 1). Tests then showed 4 failures at 01:40 IST: the app used SQLite 'localtime' (machine clock, returned the previous day before 05:30 IST) while 'today' was computed in JS. Fixed: all 18 date queries and `todayLocal` now use the fixed clinic offset +05:30. 78/78 pass. Fix is **not committed**.
+- D2 and D4 answered as above; Phase 2 may start on SW-20.

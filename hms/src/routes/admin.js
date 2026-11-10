@@ -227,8 +227,8 @@ module.exports = function adminRoutes(ctx) {
     if (query.actorId) { where.push('actor_id = @actorId'); params.actorId = Number(query.actorId); }
     if (query.action) { where.push('action LIKE @action'); params.action = `%${String(query.action).slice(0, 60)}%`; }
     if (query.patientId) { where.push('patient_id = @patientId'); params.patientId = Number(query.patientId); }
-    if (query.from) { where.push("date(at,'localtime') >= @from"); params.from = String(query.from).slice(0, 10); }
-    if (query.to) { where.push("date(at,'localtime') <= @to"); params.to = String(query.to).slice(0, 10); }
+    if (query.from) { where.push("date(at,'+05:30') >= @from"); params.from = String(query.from).slice(0, 10); }
+    if (query.to) { where.push("date(at,'+05:30') <= @to"); params.to = String(query.to).slice(0, 10); }
     if (query.q) {
       where.push('(actor_name LIKE @q OR detail_json LIKE @q OR entity_id LIKE @q)');
       params.q = `%${String(query.q).slice(0, 60)}%`;

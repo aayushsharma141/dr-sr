@@ -12,12 +12,12 @@ module.exports = function dashboardRoutes(ctx) {
     const today = todayLocal();
 
     const appointmentsToday = db
-      .prepare("SELECT COUNT(*) AS n FROM appointments WHERE date(scheduled_at,'localtime') = ? AND status NOT IN ('cancelled')")
+      .prepare("SELECT COUNT(*) AS n FROM appointments WHERE date(scheduled_at,'+05:30') = ? AND status NOT IN ('cancelled')")
       .get(today).n;
     const openVisits = db.prepare("SELECT COUNT(*) AS n FROM visits WHERE status = 'open'").get().n;
-    const patientsToday = db.prepare("SELECT COUNT(*) AS n FROM patients WHERE date(created_at,'localtime') = ?").get(today).n;
+    const patientsToday = db.prepare("SELECT COUNT(*) AS n FROM patients WHERE date(created_at,'+05:30') = ?").get(today).n;
     const collections = db
-      .prepare("SELECT COALESCE(SUM(amount_paise),0) AS n FROM payments WHERE is_void = 0 AND date(received_at,'localtime') = ?")
+      .prepare("SELECT COALESCE(SUM(amount_paise),0) AS n FROM payments WHERE is_void = 0 AND date(received_at,'+05:30') = ?")
       .get(today).n;
     const outstanding = db
       .prepare("SELECT COALESCE(SUM(balance_paise),0) AS n, COUNT(*) AS c FROM invoices WHERE status IN ('open','partially_paid')")
@@ -40,7 +40,7 @@ module.exports = function dashboardRoutes(ctx) {
                 u.full_name AS doctor_name
          FROM appointments a JOIN patients p ON p.id = a.patient_id
          LEFT JOIN users u ON u.id = a.doctor_id
-         WHERE date(a.scheduled_at,'localtime') = ? AND a.status IN ('scheduled','arrived')
+         WHERE date(a.scheduled_at,'+05:30') = ? AND a.status IN ('scheduled','arrived')
          ORDER BY a.scheduled_at ASC LIMIT 12`,
       )
       .all(today);

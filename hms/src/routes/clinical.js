@@ -103,15 +103,15 @@ module.exports = function clinicalRoutes(ctx) {
       params.status = String(req.query.status);
     }
     if (req.query.date) {
-      where.push("date(v.created_at,'localtime') = @date");
+      where.push("date(v.created_at,'+05:30') = @date");
       params.date = String(req.query.date).slice(0, 10);
     }
     if (req.query.from) {
-      where.push("date(v.created_at,'localtime') >= @from");
+      where.push("date(v.created_at,'+05:30') >= @from");
       params.from = String(req.query.from).slice(0, 10);
     }
     if (req.query.to) {
-      where.push("date(v.created_at,'localtime') <= @to");
+      where.push("date(v.created_at,'+05:30') <= @to");
       params.to = String(req.query.to).slice(0, 10);
     }
     const whereSql = where.length ? `WHERE ${where.join(' AND ')}` : '';
