@@ -23,8 +23,8 @@ export interface AdminModule {
   status: AdminModuleStatus
   statusReason?: string
   actions: AdminModuleAction[]
-  /** Backwards compatibility alias for actions */
-  links: AdminModuleAction[]
+  /** Backwards compatibility alias for actions (optional) */
+  links?: AdminModuleAction[]
 }
 
 export interface AdminModuleGroupInfo {
@@ -49,7 +49,6 @@ export const ADMIN_MODULES: readonly AdminModule[] = [
     displayOrder: 1,
     status: 'available',
     actions: [{ label: 'Clinic settings', path: '/admin/settings' }],
-    links: [{ label: 'Clinic settings', path: '/admin/settings' }],
   },
   {
     id: 'doctor-clinical',
@@ -61,10 +60,6 @@ export const ADMIN_MODULES: readonly AdminModule[] = [
     displayOrder: 2,
     status: 'available',
     actions: [
-      { label: 'Doctors & fees', path: '/admin/doctors' },
-      { label: 'Departments', path: '/admin/departments' },
-    ],
-    links: [
       { label: 'Doctors & fees', path: '/admin/doctors' },
       { label: 'Departments', path: '/admin/departments' },
     ],
@@ -82,10 +77,6 @@ export const ADMIN_MODULES: readonly AdminModule[] = [
       { label: 'Billing & reversals', path: '/admin/billing' },
       { label: 'Pending dues', path: '/reception/dues' },
     ],
-    links: [
-      { label: 'Billing & reversals', path: '/admin/billing' },
-      { label: 'Pending dues', path: '/reception/dues' },
-    ],
   },
   {
     id: 'appointment-workflow',
@@ -96,7 +87,6 @@ export const ADMIN_MODULES: readonly AdminModule[] = [
     status: 'fixed',
     statusReason: 'Fixed by requirement APT-02; configuration awaits client decision',
     actions: [],
-    links: [],
   },
   {
     id: 'physiotherapy',
@@ -107,7 +97,6 @@ export const ADMIN_MODULES: readonly AdminModule[] = [
     status: 'fixed',
     statusReason: 'VAS 0-10 pain scale fixed by requirement; treatment catalogue awaits client decision',
     actions: [],
-    links: [],
   },
   {
     id: 'prescription-print',
@@ -120,7 +109,6 @@ export const ADMIN_MODULES: readonly AdminModule[] = [
     status: 'partial',
     statusReason: 'Print header and footer are edited on the Clinic settings page',
     actions: [{ label: 'Print header & footer', path: '/admin/settings' }],
-    links: [{ label: 'Print header & footer', path: '/admin/settings' }],
   },
 
   // --- System Administration ---
@@ -137,10 +125,6 @@ export const ADMIN_MODULES: readonly AdminModule[] = [
       { label: 'User accounts', path: '/admin/users' },
       { label: 'Roles & permissions', path: '/admin/roles' },
     ],
-    links: [
-      { label: 'User accounts', path: '/admin/users' },
-      { label: 'Roles & permissions', path: '/admin/roles' },
-    ],
   },
   {
     id: 'security-access',
@@ -152,7 +136,6 @@ export const ADMIN_MODULES: readonly AdminModule[] = [
     displayOrder: 8,
     status: 'available',
     actions: [{ label: 'Security & access', path: '/admin/security' }],
-    links: [{ label: 'Security & access', path: '/admin/security' }],
   },
   {
     id: 'audit-compliance',
@@ -164,7 +147,6 @@ export const ADMIN_MODULES: readonly AdminModule[] = [
     displayOrder: 9,
     status: 'available',
     actions: [{ label: 'Audit log viewer', path: '/admin/audit' }],
-    links: [{ label: 'Audit log viewer', path: '/admin/audit' }],
   },
   {
     id: 'backup-data',
@@ -179,10 +161,6 @@ export const ADMIN_MODULES: readonly AdminModule[] = [
       { label: 'Backup & restore', path: '/admin/backups' },
       { label: 'Data integrity', path: '/admin/integrity' },
     ],
-    links: [
-      { label: 'Backup & restore', path: '/admin/backups' },
-      { label: 'Data integrity', path: '/admin/integrity' },
-    ],
   },
   {
     id: 'system-health',
@@ -194,7 +172,6 @@ export const ADMIN_MODULES: readonly AdminModule[] = [
     displayOrder: 11,
     status: 'available',
     actions: [{ label: 'System health', path: '/admin/system' }],
-    links: [{ label: 'System health', path: '/admin/system' }],
   },
 ]
 
