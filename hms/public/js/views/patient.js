@@ -9,6 +9,7 @@ import { openPatientForm } from './patient-form.js';
 const TABS = [
   { id: 'overview', label: 'Overview' },
   { id: 'visits', label: 'Visits', perm: 'visit.read' },
+  { id: 'treatment', label: 'Treatment plans', perm: 'clinical.read' },
   { id: 'notes', label: 'Clinical notes', perm: 'clinical.read' },
   { id: 'vitals', label: 'Vitals', perm: 'clinical.read' },
   { id: 'medications', label: 'Medications', perm: 'clinical.read' },
@@ -128,6 +129,7 @@ export default async function patientView(root, { params, query, navigate }) {
     try {
       if (state.tab === 'overview') await renderOverview();
       else if (state.tab === 'visits') await renderVisits();
+      else if (state.tab === 'treatment') await renderTreatment();
       else if (state.tab === 'notes') await renderNotes();
       else if (state.tab === 'vitals') await renderVitals();
       else if (state.tab === 'medications') await renderMedications();
@@ -786,6 +788,117 @@ export default async function patientView(root, { params, query, navigate }) {
   }
 
   // =========================================================================
+  // Physiotherapy Treatment Plans (SW-26, AGENTS.md Invariant 11)
+  // =========================================================================
+  async function renderTreatment() {
+    const data = await api.get(`/api/treatment-plans?patientId=${patientId}`);
+    const plans = data.treatmentPlans || [];
+    const isDoctor = session.user.role === 'doctor';
+    const canSeeBilling = session.can('billing.read');
+
+    body.innerHTML = `
+      <section class="card">
+        <div class="card-head">
+          <div class="grow">
+            <h2>Physiotherapy Treatment Plans</h2>
+            <div class="muted xs">${plans.length} plan${plans.length === 1 ? '' : 's'} on record</div>
+          </div>
+          ${isDoctor ? `<button class="btn btn--sm btn--primary" data-action="new-plan">${ui.icon('plus')}<span>New plan</span></button>` : ''}
+        </div>
+        <div class="card-body">
+          ${plans.length ? `<div class="col" style="gap:16px">
+            ${plans.map((p) => `
+              <div class="card" style="border:1px solid var(--border)">
+                <div class="card-body">
+                  <div class="row row--wrap row--between mb-1">
+                    <div>
+                      <span class="strong" style="font-size:16px">${ui.esc(p.planName)}</span>
+                      ${ui.statusPill(p.status)}
+                      <div class="muted xs mt-1">
+                        Doctor: ${ui.esc(p.doctorName || '—')}
+                        ${p.conditionDiagnosis ? ` · Diagnosis: ${ui.esc(p.conditionDiagnosis)}` : ''}
+                        ${p.referredBy ? ` · Referred by: ${ui.esc(p.referredBy)}` : ''}
+                      </div>
+                    </div>
+                    <div style="text-align:right">
+                      <span class="pill pill--info" style="font-size:13px">Sessions: ${p.completedSessions} / ${p.totalSessions}</span>
+                      ${canSeeBilling && p.agreedPricePaise ? `<div class="muted xs mt-1">Package fee: ${ui.inr(p.agreedPricePaise)}</div>` : ''}
+                    </div>
+                  </div>
+                  <div class="row row--wrap mt-2" style="gap:8px;justify-content:flex-end">
+                    <button class="btn btn--sm" data-action="view-plan" data-plan-id="${p.id}">View sessions</button>
+                    ${isDoctor && p.status === 'active' && p.completedSessions < p.totalSessions
+                      ? `<button class="btn btn--sm btn--primary" data-action="log-session" data-plan-id="${p.id}">Log session</button>`
+                      : ''}
+                  </div>
+                  <div id="plan-sessions-${p.id}" class="mt-2 hidden"></div>
+                </div>
+              </div>
+            `).join('')}
+          </div>` : ui.emptyState({
+            iconName: 'activity',
+            title: 'No treatment plans',
+            message: 'Physiotherapy rehabilitation plans and session tracking will appear here.',
+            action: isDoctor ? '<button class="btn btn--sm btn--primary" data-action="new-plan">Create treatment plan</button>' : '',
+          })}
+        </div>
+      </section>
+    `;
+
+    body.querySelectorAll('[data-action="new-plan"]').forEach((btn) => {
+      btn.addEventListener('click', () => openNewTreatmentPlanModal());
+    });
+
+    body.querySelectorAll('[data-action="log-session"]').forEach((btn) => {
+      btn.addEventListener('click', () => openLogSessionModal(Number(btn.dataset.planId)));
+    });
+
+    body.querySelectorAll('[data-action="view-plan"]').forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        const planId = Number(btn.dataset.planId);
+        const container = body.querySelector(`#plan-sessions-${planId}`);
+        if (!container.classList.contains('hidden')) {
+          container.classList.add('hidden');
+          btn.textContent = 'View sessions';
+          return;
+        }
+        btn.textContent = 'Hide sessions';
+        container.innerHTML = ui.loadingRow();
+        container.classList.remove('hidden');
+        try {
+          const res = await api.get(`/api/treatment-plans/${planId}`);
+          const sessions = res.sessions || [];
+          if (!sessions.length) {
+            container.innerHTML = '<div class="muted sm p-2">No sessions logged yet.</div>';
+            return;
+          }
+          container.innerHTML = `
+            <div class="table-wrap mt-1">
+              <table class="table">
+                <thead><tr><th>#</th><th>Date</th><th>VAS Score</th><th>Modalities</th><th>Notes</th><th>Doctor</th></tr></thead>
+                <tbody>
+                  ${sessions.map((s) => `
+                    <tr>
+                      <td class="strong">${s.sessionNumber}</td>
+                      <td class="nowrap">${ui.esc(ui.fmtDate(s.sessionDate, { short: true }))}</td>
+                      <td>${s.vasScore !== null ? `<span class="pill ${s.vasScore > 6 ? 'pill--danger' : s.vasScore > 3 ? 'pill--warn' : 'pill--ok'}">VAS ${s.vasScore}/10</span>` : '—'}</td>
+                      <td>${ui.esc((s.modalities || []).join(', ') || '—')}</td>
+                      <td class="muted">${ui.esc(s.clinicalNotes || '—')}</td>
+                      <td class="muted xs">${ui.esc(s.doctorName || '—')}</td>
+                    </tr>
+                  `).join('')}
+                </tbody>
+              </table>
+            </div>
+          `;
+        } catch (err) {
+          container.innerHTML = `<div class="alert alert--danger">${ui.esc(err.message)}</div>`;
+        }
+      });
+    });
+  }
+
+  // =========================================================================
   // Billing
   // =========================================================================
   async function renderBilling() {
@@ -1125,6 +1238,71 @@ export default async function patientView(root, { params, query, navigate }) {
           reason: values.reason,
         });
         ui.toastOk('Appointment booked.');
+      },
+    });
+  }
+
+  function openNewTreatmentPlanModal() {
+    simpleForm({
+      title: 'New Treatment Plan',
+      subtitle: `Physiotherapy package for ${patient.fullName}`,
+      fields: [
+        { name: 'planName', label: 'Plan / package name', placeholder: 'e.g. Cervical Spondylosis Rehabilitation', required: true },
+        { name: 'totalSessions', label: 'Total sessions', type: 'number', placeholder: 'e.g. 10', required: true },
+        { name: 'conditionDiagnosis', label: 'Condition / diagnosis', placeholder: 'e.g. Lumbar disc prolapse L4-L5' },
+        { name: 'referredBy', label: 'Referred by', placeholder: 'e.g. Dr Verma' },
+      ],
+      submitLabel: 'Create plan',
+      onSubmit: async (values) => {
+        await api.post('/api/treatment-plans', {
+          patientId,
+          planName: values.planName,
+          totalSessions: Number(values.totalSessions),
+          conditionDiagnosis: values.conditionDiagnosis,
+          referredBy: values.referredBy,
+        });
+        ui.toastOk('Treatment plan created.');
+        renderTab();
+      },
+    });
+  }
+
+  function openLogSessionModal(planId) {
+    const today = new Date().toISOString().slice(0, 10);
+    simpleForm({
+      title: 'Log Treatment Session',
+      subtitle: `Record completed session for ${patient.fullName}`,
+      fields: [
+        { name: 'sessionDate', label: 'Date', type: 'date', value: today, required: true },
+        { name: 'vasScore', label: 'VAS pain score (0: none, 10: worst)', type: 'select', options: [
+          { value: '0', label: '0 — No pain' },
+          { value: '1', label: '1 — Very mild' },
+          { value: '2', label: '2 — Discomforting' },
+          { value: '3', label: '3 — Tolerable' },
+          { value: '4', label: '4 — Distressing' },
+          { value: '5', label: '5 — Very distressing' },
+          { value: '6', label: '6 — Intense' },
+          { value: '7', label: '7 — Very intense' },
+          { value: '8', label: '8 — Utterly horrible' },
+          { value: '9', label: '9 — Excruciating' },
+          { value: '10', label: '10 — Unbearable' },
+        ], required: true },
+        { name: 'modalities', label: 'Modalities applied', placeholder: 'e.g. IFT, Ultrasound, Hot Pack, Traction' },
+        { name: 'clinicalNotes', label: 'Clinical progress notes', type: 'textarea', span: '2', placeholder: 'Patient response, range of motion, exercises performed…' },
+      ],
+      submitLabel: 'Log session',
+      onSubmit: async (values) => {
+        const modalities = values.modalities
+          ? values.modalities.split(',').map((s) => s.trim()).filter(Boolean)
+          : [];
+        await api.post(`/api/treatment-plans/${planId}/sessions`, {
+          sessionDate: values.sessionDate,
+          vasScore: Number(values.vasScore),
+          modalities,
+          clinicalNotes: values.clinicalNotes,
+        });
+        ui.toastOk('Session logged.');
+        renderTab();
       },
     });
   }

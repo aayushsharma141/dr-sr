@@ -181,5 +181,14 @@ Owner confirmed **D1 = no real patient data** (SW-40 resolved, SW-41 dropped, OD
 **Not covered yet:** printed documents do not use the new header/footer/Hindi settings or the logo (SW-20, SW-25, SW-27 build the prints). Attachments access for Reception awaits D6 (SW-28). Doctor read scope awaits D2. The settings and chart screens were checked in one browser at one size, not on the clinic PCs.
 
 ### Session 2026-11-10
-- Verified commit `837d615` (Phase 1). Tests then showed 4 failures at 01:40 IST: the app used SQLite 'localtime' (machine clock, returned the previous day before 05:30 IST) while 'today' was computed in JS. Fixed: all 18 date queries and `todayLocal` now use the fixed clinic offset +05:30. 78/78 pass. Fix is **not committed**.
-- D2 and D4 answered as above; Phase 2 may start on SW-20.
+- Verified commit `837d615` (Phase 1). Tests then showed 4 failures at 01:40 IST: the app used SQLite 'localtime' (machine clock, returned the previous day before 05:30 IST) while 'today' was computed in JS. Fixed: all 18 date queries and `todayLocal` now use the fixed clinic offset +05:30. Committed as `c19964f`.
+- D2 and D4 answered: D2 = read all, edit own; D4 = consultation fee once and revisit fee at check-in + physio package fee at plan start. Strictly reception-only: doctor screens NEVER display fees, invoices or collections.
+- **Phase 2 Domain Implementation (SW-20 to SW-26):**
+  - SW-20: Sequential URN `KH-YYYY-XXXX` atomic per year; Bhojpur/Bihar defaults; duplicate warning via `GET /api/patients/check-duplicate`.
+  - SW-21: Departments table (`PHYSIOTHERAPY`, `OPHTHALMOLOGY`, `GENERAL`) with Hindi names; doctor profiles with fee attributes; doctor fee privacy (doctor role receives `consultationFeePaise: null`, `revisitFeePaise: null`).
+  - SW-22: `consultations` table under visits supporting multiple doctor consultations per visit (Invariant 3 & 5); `assertOwnVisit` allows treating doctor or consultation doctor to write clinical records while preserving D2 read-all for other doctors.
+  - SW-23: Independent monotonic per-doctor daily queue tokens (ADR-26); appointments list displays tokens; check-in attaches to open visit or creates today's visit.
+  - D4 check-in fee rule: auto-adds consultation fee on first visit; applies revisit fee if within `consultation_validity_days` (default 7 days); fee redacted in doctor check-in response.
+  - SW-26: Physiotherapy treatment plans and session logging (`/api/treatment-plans` and `/api/treatment-sessions`); package fee charged at plan start; Invariant 11 enforced via database trigger `trg_sync_treatment_plan_session_progress` (completed_sessions incremented ONLY on finalised session); session addenda; no deletes (SW-12 triggers).
+  - UI: New "Treatment plans" tab on patient chart; doctor forms hide fee fields entirely; appointments table displays tokens.
+  - Verification: 8 test suites, 84 tests pass, 0 fail (`test/08-phase2-domain.test.js` added).

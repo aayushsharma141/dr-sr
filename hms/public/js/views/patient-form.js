@@ -60,6 +60,7 @@ export function openPatientForm({ patient = null, onSaved } = {}) {
             ${field({ name: 'email', label: 'Email', type: 'email', value: p.email || '' })}
             ${field({ name: 'addressLine', label: 'Address', value: p.addressLine || '', span: '2', max: 200 })}
             ${field({ name: 'city', label: 'City / town', value: p.city || '' })}
+            ${field({ name: 'district', label: 'District', value: p.district || 'Bhojpur' })}
             ${field({ name: 'state', label: 'State', value: p.state || 'Bihar' })}
             ${field({ name: 'pincode', label: 'PIN code', value: p.pincode || '', max: 12 })}
             ${field({ name: 'occupation', label: 'Occupation', value: p.occupation || '' })}
@@ -95,6 +96,7 @@ export function openPatientForm({ patient = null, onSaved } = {}) {
           </div>
         </fieldset>
 
+        <div id="patient-duplicate-warning" class="alert alert--warn hidden"></div>
         <div id="patient-form-error" class="alert alert--danger hidden"></div>
         ${editing ? '' : `<div class="alert alert--info">${ui.icon('info')}<div class="xs">Ask for the patient's phone number — it is used to find the record at future visits. Duplicate names are common in a busy OPD.</div></div>`}
       </form>`,
@@ -106,7 +108,36 @@ export function openPatientForm({ patient = null, onSaved } = {}) {
 
   const form = handle.dialog.querySelector('#patient-form');
   const errorBox = handle.dialog.querySelector('#patient-form-error');
+  const dupBox = handle.dialog.querySelector('#patient-duplicate-warning');
   const saveButton = handle.dialog.querySelector('[data-save]');
+
+  if (!editing) {
+    const checkDup = async () => {
+      const fn = (form.querySelector('[name="firstName"]')?.value || '').trim();
+      const ln = (form.querySelector('[name="lastName"]')?.value || '').trim();
+      const fullName = [fn, ln].filter(Boolean).join(' ');
+      const phone = (form.querySelector('[name="phone"]')?.value || '').trim();
+      if (!fullName || phone.length < 10) {
+        dupBox?.classList.add('hidden');
+        return;
+      }
+      try {
+        const res = await api.get(`/api/patients/check-duplicate?name=${encodeURIComponent(fullName)}&phone=${encodeURIComponent(phone)}`);
+        if (res.hasDuplicate && res.matchingPatient) {
+          const match = res.matchingPatient;
+          dupBox.innerHTML = `${ui.icon('alert')}<div><strong>Possible duplicate:</strong> Patient already registered as <strong>${ui.esc(match.fullName)}</strong> (${ui.esc(match.mrn)}, Phone: ${ui.esc(match.phone)}). <a href="#/patients/${match.id}" target="_blank" style="text-decoration:underline">View existing chart</a></div>`;
+          dupBox.classList.remove('hidden');
+        } else {
+          dupBox.classList.add('hidden');
+        }
+      } catch {
+        dupBox?.classList.add('hidden');
+      }
+    };
+    form.querySelector('[name="phone"]')?.addEventListener('blur', checkDup);
+    form.querySelector('[name="firstName"]')?.addEventListener('blur', checkDup);
+    form.querySelector('[name="lastName"]')?.addEventListener('blur', checkDup);
+  }
 
   saveButton.addEventListener('click', async () => {
     errorBox.classList.add('hidden');

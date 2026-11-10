@@ -18,6 +18,7 @@ const patientRoutes = require('./routes/patients');
 const clinicalRoutes = require('./routes/clinical');
 const attachmentRoutes = require('./routes/attachments');
 const appointmentRoutes = require('./routes/appointments');
+const treatmentRoutes = require('./routes/treatment');
 const billingRoutes = require('./routes/billing');
 const dashboardRoutes = require('./routes/dashboard');
 const adminRoutes = require('./routes/admin');
@@ -116,6 +117,7 @@ function createApp(ctx) {
   app.use('/api', clinicalRoutes(ctx));
   app.use('/api', attachmentRoutes(ctx));
   app.use('/api', appointmentRoutes(ctx));
+  app.use('/api', treatmentRoutes(ctx));
   app.use('/api', billingRoutes(ctx));
   app.use('/api/admin', adminRoutes(ctx));
 

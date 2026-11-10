@@ -230,6 +230,32 @@ module.exports = function clinicalRoutes(ctx) {
         followUpDate: visit.follow_up_date,
         version: visit.version,
       },
+      consultations: db
+        .prepare(
+          `SELECT c.*, u.full_name AS doctor_name, d.name_en AS department_name, d.name_hi AS department_name_hi
+           FROM consultations c
+           LEFT JOIN users u ON u.id = c.doctor_id
+           LEFT JOIN departments d ON d.id = c.department_id
+           WHERE c.visit_id = ?
+           ORDER BY c.id ASC`,
+        )
+        .all(id)
+        .map((c) => ({
+          id: c.id,
+          visitId: c.visit_id,
+          doctorId: c.doctor_id,
+          doctorName: c.doctor_name,
+          departmentId: c.department_id,
+          departmentName: c.department_name,
+          departmentNameHi: c.department_name_hi,
+          token: c.token,
+          status: c.status,
+          chiefComplaint: c.chief_complaint,
+          startedAt: c.started_at,
+          completedAt: c.completed_at,
+          createdAt: c.created_at,
+          version: c.version,
+        })),
     };
 
     if (clinical) {
@@ -304,7 +330,7 @@ module.exports = function clinicalRoutes(ctx) {
       if (!req.user.permissions.includes('clinical.write')) {
         throw new ApiError(403, 'Only the treating doctor can record the outcome, follow-up or closing summary.');
       }
-      assertOwnVisit(req, visit);
+      assertOwnVisit(req, visit, db);
       Object.assign(patch, clinicalPatch);
     }
     if (!Object.keys(patch).length) return res.json({ ok: true, unchanged: true, version: visit.version });
@@ -325,7 +351,7 @@ module.exports = function clinicalRoutes(ctx) {
     const id = idParam(req);
     const visit = loadVisit(id);
     if (visit.status !== 'open') throw new ApiError(409, 'This visit is already closed.');
-    assertOwnVisit(req, visit);
+    assertOwnVisit(req, visit, db);
 
     const v = new Validator(req.body);
     const followUpDate = v.date('followUpDate');
@@ -354,7 +380,7 @@ module.exports = function clinicalRoutes(ctx) {
     const id = idParam(req);
     const visit = loadVisit(id);
     if (visit.status !== 'open') throw new ApiError(409, 'This visit is closed.');
-    assertOwnVisit(req, visit);
+    assertOwnVisit(req, visit, db);
 
     const v = new Validator(req.body);
     const fields = {
@@ -425,7 +451,7 @@ module.exports = function clinicalRoutes(ctx) {
     const id = idParam(req);
     const visit = loadVisit(id);
     assertVisitOpen(visit);
-    assertOwnVisit(req, visit);
+    assertOwnVisit(req, visit, db);
 
     const v = new Validator(req.body);
     const noteType = v.enumOf('noteType', NOTE_TYPES) || 'progress';
@@ -518,7 +544,7 @@ module.exports = function clinicalRoutes(ctx) {
     const id = idParam(req);
     const visit = loadVisit(id);
     assertVisitOpen(visit);
-    assertOwnVisit(req, visit);
+    assertOwnVisit(req, visit, db);
     const v = new Validator(req.body);
     const description = v.str('description', { required: true, max: 300, label: 'Diagnosis' });
     const code = v.str('code', { max: 20 });
@@ -540,7 +566,7 @@ module.exports = function clinicalRoutes(ctx) {
     const diagnosisId = idParam(req, 'diagnosisId');
     const visit = loadVisit(id);
     assertVisitOpen(visit);
-    assertOwnVisit(req, visit);
+    assertOwnVisit(req, visit, db);
     const row = db.prepare('SELECT * FROM diagnoses WHERE id = ? AND visit_id = ?').get(diagnosisId, id);
     if (!row) throw new ApiError(404, 'Diagnosis not found.');
     if (row.cancelled_at) throw new ApiError(409, 'This diagnosis is already cancelled.');
@@ -562,7 +588,7 @@ module.exports = function clinicalRoutes(ctx) {
     const id = idParam(req);
     const visit = loadVisit(id);
     assertVisitOpen(visit);
-    assertOwnVisit(req, visit);
+    assertOwnVisit(req, visit, db);
     const v = new Validator(req.body);
     const drugName = v.str('drugName', { required: true, max: 160, label: 'Medicine' });
     const strength = v.str('strength', { max: 40 });
@@ -594,7 +620,7 @@ module.exports = function clinicalRoutes(ctx) {
     const rxId = idParam(req, 'rxId');
     const visit = loadVisit(id);
     assertVisitOpen(visit);
-    assertOwnVisit(req, visit);
+    assertOwnVisit(req, visit, db);
     const row = db.prepare('SELECT * FROM prescriptions WHERE id = ? AND visit_id = ?').get(rxId, id);
     if (!row) throw new ApiError(404, 'Prescription not found.');
     if (row.cancelled_at) throw new ApiError(409, 'This prescription line is already cancelled.');

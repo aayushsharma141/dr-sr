@@ -105,7 +105,10 @@ test('schema upgrades', async (t) => {
     const real = loadMigrations();
     const broken = [...real, { version: real.length + 2, name: `${String(real.length + 2).padStart(3, '0')}-broken.sql`, sql: 'CREATE TABLE ok_part (id INTEGER); THIS IS NOT SQL;' }];
 
-    assert.throws(() => openDatabase({ dbPath: file, migrations: broken }), /broken\.sql failed.*still at schema v2/s);
+    assert.throws(
+      () => openDatabase({ dbPath: file, migrations: broken }),
+      new RegExp(`broken\\.sql failed.*still at schema v${SCHEMA_VERSION}`, 's'),
+    );
     const raw = new Database(file, { readonly: true });
     try {
       assert.equal(raw.prepare("SELECT value FROM app_meta WHERE key = 'schema_version'").get().value, String(SCHEMA_VERSION));

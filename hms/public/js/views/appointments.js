@@ -68,12 +68,13 @@ export default async function appointmentsView(root, { query, navigate }) {
     <div class="card">
       ${appts.length ? `<div class="table-wrap"><table class="table">
         <thead>
-          <tr><th>Time</th><th>Patient</th><th>Doctor</th><th>Reason</th><th>Status</th><th class="right">Actions</th></tr>
+          <tr><th>Time</th><th>Token</th><th>Patient</th><th>Doctor</th><th>Reason</th><th>Status</th><th class="right">Actions</th></tr>
         </thead>
         <tbody>
           ${appts.map((a) => `
             <tr>
               <td class="nowrap strong">${ui.esc(ui.fmtTime(a.scheduledAt))}<div class="cell-sub">${a.durationMin} min</div></td>
+              <td class="nowrap">${a.token ? `<span class="pill pill--info">#${a.token}</span>` : '<span class="muted">—</span>'}</td>
               <td>
                 <a class="cell-main" href="#/patients/${a.patientId}">${ui.esc(a.patientName)}</a>
                 <div class="cell-sub">${ui.esc(a.mrn)} · ${ui.esc(ui.fmtAge(a.dob, a.age))} · ${ui.esc(a.phone || '')}</div>
@@ -123,7 +124,7 @@ export default async function appointmentsView(root, { query, navigate }) {
       ui.setBusy(button, true, 'Checking in…');
       try {
         const res = await api.post(`/api/appointments/${button.dataset.checkin}/check-in`, {});
-        ui.toastOk(`Checked in — visit ${res.visitNo} opened.`);
+        ui.toastOk(`Checked in — Token #${res.token}, Visit ${res.visitNo}${res.feePaise ? ` (${ui.inr(res.feePaise)})` : ''}`);
         const appt = appts.find((a) => a.id === Number(button.dataset.checkin));
         navigate(`/patients/${appt.patientId}?tab=visits&visit=${res.visitId}`);
       } catch (err) {

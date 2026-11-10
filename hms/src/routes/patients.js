@@ -4,7 +4,7 @@ const express = require('express');
 
 const { Validator, ApiError, pagination, likePattern } = require('../lib/http');
 const { audit, idParam, expectedVersion, updateVersioned } = require('../lib/request');
-const { mapPatient } = require('../lib/domain');
+const { mapPatient, todayLocal } = require('../lib/domain');
 const { requirePerm } = require('../auth');
 
 const SEX = ['male', 'female', 'other', 'unknown'];
@@ -23,8 +23,10 @@ function buildPatientFields(v, { partial = false } = {}) {
     email: v.email('email'),
     addressLine: v.str('addressLine', { max: 200, ...opt }),
     city: v.str('city', { max: 80, ...opt }),
+    district: v.str('district', { max: 80, ...opt }),
     state: v.str('state', { max: 80, ...opt }),
     pincode: v.str('pincode', { max: 12, ...opt }),
+    photoPath: v.str('photoPath', { max: 500, ...opt }),
     bloodGroup: v.str('bloodGroup', { max: 8, ...opt }),
     maritalStatus: v.str('maritalStatus', { max: 30, ...opt }),
     occupation: v.str('occupation', { max: 80, ...opt }),
@@ -43,6 +45,31 @@ function buildPatientFields(v, { partial = false } = {}) {
 module.exports = function patientRoutes(ctx) {
   const router = express.Router();
   const db = ctx.db;
+
+  // ---------------------------------------------------------------------------
+  // Duplicate check (SW-20)
+  // ---------------------------------------------------------------------------
+  router.get('/check-duplicate', requirePerm('patient.read'), (req, res) => {
+    const name = String(req.query.name || '').trim().toLowerCase();
+    const phone = String(req.query.phone || '').trim().replace(/\D/g, '').slice(-10);
+    if (!name || !phone) return res.json({ hasDuplicate: false, matchingPatient: null });
+
+    const normName = name.replace(/\s+/g, ' ');
+    const row = db
+      .prepare(
+        `SELECT p.* FROM patients p
+         WHERE p.is_active = 1
+           AND LOWER(TRIM(p.full_name)) = @normName
+           AND (p.phone LIKE @phoneSuffix OR p.alt_phone LIKE @phoneSuffix)
+         LIMIT 1`,
+      )
+      .get({ normName, phoneSuffix: `%${phone}` });
+
+    if (row) {
+      return res.json({ hasDuplicate: true, matchingPatient: mapPatient(row) });
+    }
+    res.json({ hasDuplicate: false, matchingPatient: null });
+  });
 
   // ---------------------------------------------------------------------------
   // Search / list
@@ -116,19 +143,19 @@ module.exports = function patientRoutes(ctx) {
     }
 
     const now = new Date().toISOString();
-    const prefix = ctx.store.getSetting('mrn_prefix', 'KH');
-    const seq = ctx.store.nextSequence('seq:mrn');
-    const mrn = `${prefix}-${String(seq).padStart(6, '0')}`;
+    const year = todayLocal().slice(0, 4);
+    const seq = ctx.store.nextSequence(`seq:urn:${year}`);
+    const mrn = `KH-${year}-${String(seq).padStart(4, '0')}`;
     const fullName = [f.firstName, f.lastName].filter(Boolean).join(' ');
 
     const info = db
       .prepare(
         `INSERT INTO patients (mrn, first_name, last_name, full_name, dob, dob_estimated, age_years, sex,
-          phone, alt_phone, email, address_line, city, state, pincode, blood_group, marital_status, occupation,
+          phone, alt_phone, email, address_line, city, district, state, pincode, photo_path, blood_group, marital_status, occupation,
           guardian_name, guardian_relation, emergency_contact_name, emergency_contact_phone, id_type, id_number,
           allergies_summary, notes, created_by, updated_by, created_at, updated_at)
          VALUES (@mrn,@firstName,@lastName,@fullName,@dob,@dobEstimated,@ageYears,@sex,
-          @phone,@altPhone,@email,@addressLine,@city,@state,@pincode,@bloodGroup,@maritalStatus,@occupation,
+          @phone,@altPhone,@email,@addressLine,@city,@district,@state,@pincode,@photoPath,@bloodGroup,@maritalStatus,@occupation,
           @guardianName,@guardianRelation,@emergencyContactName,@emergencyContactPhone,@idType,@idNumber,
           @allergiesSummary,@notes,@userId,@userId,@now,@now)`,
       )
@@ -146,8 +173,10 @@ module.exports = function patientRoutes(ctx) {
         email: f.email,
         addressLine: f.addressLine,
         city: f.city,
-        state: f.state,
+        district: f.district || 'Bhojpur',
+        state: f.state || 'Bihar',
         pincode: f.pincode,
+        photoPath: f.photoPath || null,
         bloodGroup: f.bloodGroup,
         maritalStatus: f.maritalStatus,
         occupation: f.occupation,
@@ -261,8 +290,8 @@ module.exports = function patientRoutes(ctx) {
     const map = {
       firstName: 'first_name', lastName: 'last_name', dob: 'dob', dobEstimated: 'dob_estimated',
       ageYears: 'age_years', sex: 'sex', phone: 'phone', altPhone: 'alt_phone', email: 'email',
-      addressLine: 'address_line', city: 'city', state: 'state', pincode: 'pincode',
-      bloodGroup: 'blood_group', maritalStatus: 'marital_status', occupation: 'occupation',
+      addressLine: 'address_line', city: 'city', district: 'district', state: 'state', pincode: 'pincode',
+      photoPath: 'photo_path', bloodGroup: 'blood_group', maritalStatus: 'marital_status', occupation: 'occupation',
       guardianName: 'guardian_name', guardianRelation: 'guardian_relation',
       emergencyContactName: 'emergency_contact_name', emergencyContactPhone: 'emergency_contact_phone',
       idType: 'id_type', idNumber: 'id_number', allergiesSummary: 'allergies_summary', notes: 'notes',

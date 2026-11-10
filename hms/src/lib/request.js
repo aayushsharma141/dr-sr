@@ -80,16 +80,19 @@ function assertActiveDoctor(db, doctorId) {
 }
 
 /**
- * Doctors read every chart but change only their own consultations (D-04 as
- * updated 2026-11-07; read scope D2 still awaits sign-off).
+ * Doctors read every chart (D2) but change only their own consultations (SW-22 / Invariant 3).
+ * A doctor can edit if they are the primary doctor on the visit OR have an active consultation under it.
  */
-function assertOwnVisit(req, visit) {
+function assertOwnVisit(req, visit, db = null) {
+  if (visit.doctor_id === req.user.id) return;
+  if (db && visit.id) {
+    const consult = db.prepare('SELECT id FROM consultations WHERE visit_id = ? AND doctor_id = ? LIMIT 1').get(visit.id, req.user.id);
+    if (consult) return;
+  }
   if (!visit.doctor_id) {
     throw new ApiError(403, 'This visit has no doctor assigned yet. Reception must assign a doctor first.');
   }
-  if (visit.doctor_id !== req.user.id) {
-    throw new ApiError(403, 'Only the doctor assigned to this visit can change its clinical record.');
-  }
+  throw new ApiError(403, 'Only the doctor assigned to this visit can change its clinical record.');
 }
 
 function assertVisitOpen(visit) {

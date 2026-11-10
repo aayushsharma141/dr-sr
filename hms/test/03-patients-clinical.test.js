@@ -10,11 +10,17 @@ test('patients and clinical records', async (t) => {
   const { client: admin } = await setupAdmin(env);
   const { reception, doctor, doctorUser } = await makeTeam(env, admin);
 
-  await t.test('patients get sequential MRNs', async () => {
+  await t.test('patients get sequential URNs (KH-YYYY-XXXX)', async () => {
     const p1 = await createPatient(reception, { firstName: 'Anita', lastName: 'Kumari', phone: '9822000001' });
     const p2 = await createPatient(reception, { firstName: 'Vikram', lastName: 'Shah', phone: '9822000002' });
-    assert.match(p1.mrn, /^KH-\d{6}$/);
-    assert.equal(Number(p2.mrn.slice(3)) - Number(p1.mrn.slice(3)), 1);
+    assert.match(p1.mrn, /^KH-\d{4}-\d{4}$/);
+    assert.match(p2.mrn, /^KH-\d{4}-\d{4}$/);
+    assert.equal(p1.urn, p1.mrn);
+    const seq1 = Number(p1.mrn.slice(-4));
+    const seq2 = Number(p2.mrn.slice(-4));
+    assert.equal(seq2 - seq1, 1);
+    assert.equal(p1.district, 'Bhojpur');
+    assert.equal(p1.state, 'Bihar');
     assert.equal(p1.age >= 30 && p1.age <= 40, true);
     assert.equal(p1.version, 1);
   });
