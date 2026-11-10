@@ -179,11 +179,10 @@ def get_asset_file(
     return FileResponse(path, media_type=asset.mime_type, filename=asset.original_filename)
 
 
-@router.api_route(
-    "/assets/active-logo",
-    methods=["GET", "HEAD"],
-    dependencies=[Depends(public)],
-)
+# Separate GET and HEAD routes so each has its own OpenAPI operation ID
+# (a combined api_route gives both methods the same ID and renames GET's).
+@router.get("/assets/active-logo", dependencies=[Depends(public)])
+@router.head("/assets/active-logo", dependencies=[Depends(public)])
 def get_active_logo_endpoint(
     request: Request,
     session: SessionDep,

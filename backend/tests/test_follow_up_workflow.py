@@ -2,7 +2,14 @@
 
 from datetime import date, timedelta
 
-from kalyan_api.models import Appointment, ClinicalEncounter, FollowUpRecommendation, Patient
+from kalyan_api.models import (
+    Appointment,
+    ClinicalEncounter,
+    Department,
+    Doctor,
+    FollowUpRecommendation,
+    Patient,
+)
 
 
 def _create_test_patient(db_session, suffix="40") -> Patient:
@@ -194,3 +201,128 @@ def test_closing_recommendation_requires_reason(login_client, doctor_a_user, rec
     book_attempt = rec_client.post(f"/api/follow-ups/{rec_id}/book", json={})
     assert book_attempt.status_code == 409
     assert book_attempt.json()["code"] == "invalid_status"
+
+
+# ---------------------------------------------------------------------------
+# BR-012: follow-up booking must apply the same doctor, department and patient
+# rules as ordinary booking (ADR-23, ADR-24, ADR-25).
+# ---------------------------------------------------------------------------
+
+
+def _pending_recommendation(login_client, doctor_user, db_session, suffix: str):
+    patient = _create_test_patient(db_session, suffix)
+    encounter = _create_test_encounter(db_session, patient.id, doctor_user.doctor_id, doctor_user.id)
+    resp = login_client(doctor_user).post(
+        f"/api/encounters/{encounter.id}/follow-up",
+        json={
+            "recommended_date": (date.today() + timedelta(days=7)).isoformat(),
+            "clinical_reason": "Review progress",
+        },
+    )
+    assert resp.status_code == 201, resp.text
+    return patient, encounter, resp.json()["id"]
+
+
+def _assert_not_booked(db_session, rec_id: int, patient_id: int) -> None:
+    db_session.expire_all()
+    rec = db_session.get(FollowUpRecommendation, rec_id)
+    assert rec.status == "PENDING"
+    assert rec.booked_appointment_id is None
+    assert db_session.query(Appointment).filter_by(patient_id=patient_id).count() == 0
+
+
+def test_follow_up_booking_records_the_doctors_department(login_client, doctor_a_user, reception_user, db_session):
+    _patient, _encounter, rec_id = _pending_recommendation(login_client, doctor_a_user, db_session, "11")
+    doctor = db_session.get(Doctor, doctor_a_user.doctor_id)
+    expected_department_id = doctor.departments[0].id
+
+    resp = login_client(reception_user).post(f"/api/follow-ups/{rec_id}/book", json={})
+    assert resp.status_code == 200, resp.text
+
+    appt = db_session.get(Appointment, resp.json()["booked_appointment_id"])
+    assert appt.department_id == expected_department_id
+
+
+def test_follow_up_booking_rejects_inactive_doctor(login_client, doctor_a_user, reception_user, db_session):
+    patient, _encounter, rec_id = _pending_recommendation(login_client, doctor_a_user, db_session, "12")
+    db_session.get(Doctor, doctor_a_user.doctor_id).is_active = False
+    db_session.flush()
+
+    resp = login_client(reception_user).post(f"/api/follow-ups/{rec_id}/book", json={})
+    assert resp.status_code == 404, resp.text
+    assert resp.json()["code"] == "doctor_not_found"
+    _assert_not_booked(db_session, rec_id, patient.id)
+
+
+def test_follow_up_booking_rejects_inactive_department(login_client, doctor_a_user, reception_user, db_session):
+    patient, _encounter, rec_id = _pending_recommendation(login_client, doctor_a_user, db_session, "13")
+    for dept in db_session.get(Doctor, doctor_a_user.doctor_id).departments:
+        dept.is_active = False
+    db_session.flush()
+
+    resp = login_client(reception_user).post(f"/api/follow-ups/{rec_id}/book", json={})
+    assert resp.status_code == 422, resp.text
+    assert resp.json()["code"] == "department_inactive"
+    _assert_not_booked(db_session, rec_id, patient.id)
+
+
+def test_follow_up_booking_rejects_inactive_patient(login_client, doctor_a_user, reception_user, db_session):
+    patient, _encounter, rec_id = _pending_recommendation(login_client, doctor_a_user, db_session, "14")
+    patient.is_active = False
+    db_session.flush()
+
+    resp = login_client(reception_user).post(f"/api/follow-ups/{rec_id}/book", json={})
+    assert resp.status_code == 404, resp.text
+    assert resp.json()["code"] == "patient_not_found"
+    _assert_not_booked(db_session, rec_id, patient.id)
+
+
+def test_follow_up_booking_needs_department_when_doctor_has_several(login_client, doctor_a_user, reception_user, db_session):
+    patient, _encounter, rec_id = _pending_recommendation(login_client, doctor_a_user, db_session, "15")
+    doctor = db_session.get(Doctor, doctor_a_user.doctor_id)
+    eye = Department(code="TEST_FOLLOWUP_EYE", name_en="Test Follow-up Eye", is_active=True)
+    other = Department(code="TEST_FOLLOWUP_OTHER", name_en="Test Follow-up Other", is_active=True)
+    db_session.add_all([eye, other])
+    doctor.departments.append(eye)
+    db_session.flush()
+    rec_client = login_client(reception_user)
+
+    # Two active departments and none on the encounter: the caller must choose.
+    ambiguous = rec_client.post(f"/api/follow-ups/{rec_id}/book", json={})
+    assert ambiguous.status_code == 422, ambiguous.text
+    assert ambiguous.json()["code"] == "department_required"
+    _assert_not_booked(db_session, rec_id, patient.id)
+
+    # A department the doctor does not belong to is refused.
+    mismatch = rec_client.post(f"/api/follow-ups/{rec_id}/book", json={"department_id": other.id})
+    assert mismatch.status_code == 422, mismatch.text
+    assert mismatch.json()["code"] == "doctor_department_mismatch"
+    _assert_not_booked(db_session, rec_id, patient.id)
+
+    # Naming one of the doctor's departments books into it.
+    ok = rec_client.post(f"/api/follow-ups/{rec_id}/book", json={"department_id": eye.id})
+    assert ok.status_code == 200, ok.text
+    appt = db_session.get(Appointment, ok.json()["booked_appointment_id"])
+    assert appt.department_id == eye.id
+
+
+def test_follow_up_booking_prefers_the_encounter_department(login_client, doctor_a_user, reception_user, db_session):
+    patient = _create_test_patient(db_session, "16")
+    doctor = db_session.get(Doctor, doctor_a_user.doctor_id)
+    eye = Department(code="TEST_FOLLOWUP_EYE2", name_en="Test Follow-up Eye 2", is_active=True)
+    db_session.add(eye)
+    doctor.departments.append(eye)
+    db_session.flush()
+    encounter = _create_test_encounter(db_session, patient.id, doctor.id, doctor_a_user.id)
+    encounter.department_id = eye.id
+    db_session.flush()
+    create = login_client(doctor_a_user).post(
+        f"/api/encounters/{encounter.id}/follow-up",
+        json={"recommended_date": (date.today() + timedelta(days=7)).isoformat()},
+    )
+    assert create.status_code == 201, create.text
+
+    resp = login_client(reception_user).post(f"/api/follow-ups/{create.json()['id']}/book", json={})
+    assert resp.status_code == 200, resp.text
+    appt = db_session.get(Appointment, resp.json()["booked_appointment_id"])
+    assert appt.department_id == eye.id

@@ -3684,6 +3684,19 @@
             "description": "Optional override date (defaults to recommendation date)",
             "title": "Appointment Date"
           },
+          "department_id": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Department to book into. Optional when it can be inferred: the original encounter's department if the doctor belongs to it, otherwise the doctor's only active department.",
+            "title": "Department Id"
+          },
           "notes": {
             "anyOf": [
               {
@@ -9523,6 +9536,24 @@
       "get": {
         "description": "Stream current active hospital logo crest or default crest for login and printouts.",
         "operationId": "get_active_logo_endpoint_api_assets_active_logo_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Get Active Logo Endpoint",
+        "tags": [
+          "assets"
+        ]
+      },
+      "head": {
+        "description": "Stream current active hospital logo crest or default crest for login and printouts.",
+        "operationId": "get_active_logo_endpoint_api_assets_active_logo_head",
         "responses": {
           "200": {
             "content": {

@@ -39,10 +39,39 @@ from kalyan_api.schemas.follow_up import (
     FollowUpRecommendationCreate,
     ReceptionFollowUpResponse,
 )
+from kalyan_api.routers.appointments import lock_department_for_booking
 from kalyan_api.services import audit_service, token_service
 from kalyan_api.services.audit_service import AuditAction
 
 router = APIRouter(tags=["follow-ups"])
+
+
+def _infer_follow_up_department_id(session, rec: FollowUpRecommendation, doctor: Doctor) -> int:
+    """Pick the department for a follow-up booking when the caller did not name one.
+
+    Uses the original encounter's department if the recommended doctor belongs to it,
+    otherwise the doctor's only active department. Anything else is ambiguous, so the
+    caller must choose (422 department_required) rather than the server guessing.
+    """
+    member_ids = {d.id for d in doctor.departments}
+    encounter = session.get(ClinicalEncounter, rec.encounter_id)
+    if encounter is not None and encounter.department_id in member_ids:
+        return encounter.department_id
+
+    active = [d.id for d in doctor.departments if d.is_active]
+    if len(active) == 1:
+        return active[0]
+    if not active and len(member_ids) == 1:
+        # Report the real problem (inactive department) instead of "choose one".
+        return next(iter(member_ids))
+    raise ApiError(
+        status_code=422,
+        code="department_required",
+        message=(
+            "The department for this follow-up could not be worked out from the doctor "
+            "and the original consultation. Choose the department."
+        ),
+    )
 
 
 def _to_doctor_response(rec: FollowUpRecommendation) -> DoctorFollowUpResponse:
@@ -336,6 +365,31 @@ def book_follow_up(
 
     appt_date = payload.appointment_date or rec.recommended_date
 
+    # Same booking rules as POST /appointments (BR-012; ADR-23, ADR-24, ADR-25).
+    patient = rec.patient
+    if not patient or not patient.is_active:
+        raise ApiError(status_code=404, code="patient_not_found", message="Patient not found or inactive.")
+    doctor = rec.recommended_doctor
+    if not doctor or not doctor.is_active:
+        raise ApiError(status_code=404, code="doctor_not_found", message="Doctor not found or inactive.")
+
+    department_id = payload.department_id or _infer_follow_up_department_id(session, rec, doctor)
+    department = lock_department_for_booking(session, department_id)
+    if department is None:
+        raise ApiError(status_code=422, code="department_not_found", message="Selected department does not exist.")
+    if not department.is_active:
+        raise ApiError(
+            status_code=422,
+            code="department_inactive",
+            message="Selected department is inactive and cannot accept new appointments.",
+        )
+    if department not in doctor.departments:
+        raise ApiError(
+            status_code=422,
+            code="doctor_department_mismatch",
+            message="Selected doctor is not assigned to the selected department.",
+        )
+
     # Generate sequential token for doctor and date
     token_num = token_service.generate_next_daily_token(
         session, rec.recommended_doctor_id, appt_date
@@ -344,6 +398,7 @@ def book_follow_up(
     appt = Appointment(
         patient_id=rec.patient_id,
         doctor_id=rec.recommended_doctor_id,
+        department_id=department.id,
         appointment_date=appt_date,
         token_number=token_num,
         status=AppointmentStatus.BOOKED.value,

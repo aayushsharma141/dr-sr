@@ -588,6 +588,14 @@ def test_rbac_matrix_cell(
         doc_a_id = doc_a_user.doctor_id if doc_a_user else None
         if not doc_a_id:
             doc = Doctor(name_en=f"Dr. FUp {uuid.uuid4().hex[:6]}")
+            # Follow-up booking needs the doctor in an active department (BR-012),
+            # exactly as ordinary booking does.
+            fup_dept = db_session.scalar(select(Department).where(Department.is_active.is_(True)))
+            if not fup_dept:
+                fup_dept = Department(name_en="Physiotherapy / General OPD", is_active=True)
+                db_session.add(fup_dept)
+                db_session.flush()
+            doc.departments.append(fup_dept)
             db_session.add(doc)
             db_session.flush()
             doc_a_id = doc.id

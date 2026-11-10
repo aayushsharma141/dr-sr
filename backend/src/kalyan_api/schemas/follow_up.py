@@ -36,6 +36,15 @@ class FollowUpBookRequest(BaseModel):
         default=None, description="Optional override date (defaults to recommendation date)"
     )
     notes: str | None = Field(default=None, max_length=1000, description="Optional appointment notes")
+    department_id: int | None = Field(
+        default=None,
+        gt=0,
+        description=(
+            "Department to book into. Optional when it can be inferred: the original "
+            "encounter's department if the doctor belongs to it, otherwise the doctor's "
+            "only active department."
+        ),
+    )
 
 
 class DoctorFollowUpResponse(BaseModel):
