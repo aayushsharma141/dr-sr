@@ -559,11 +559,14 @@ export function AppShell({ name, role, children }: AppShellProps) {
         >
           <div className="flex items-center gap-3 min-w-0">
             <img
-              src="/kalyan-hospital-crest.webp"
+              src="/api/assets/active-logo"
               alt="Sri Vashishtha Kalyan Trust crest"
               className="h-10 w-10 shrink-0 rounded-full border border-[#C39A35] bg-white object-contain shadow-xs"
               width={40}
               height={40}
+              onError={(e) => {
+                ;(e.target as HTMLImageElement).src = '/kalyan-hospital-crest.webp'
+              }}
             />
             <div className={`min-w-0 ${isDesktopSidebar ? 'hidden lg:block' : 'block'}`}>
               <div className="truncate text-sm font-extrabold tracking-wide text-white" lang="hi">
@@ -720,11 +723,14 @@ export function AppShell({ name, role, children }: AppShellProps) {
         >
           <div className="flex items-center gap-3 min-w-0">
             <img
-              src="/kalyan-hospital-crest.webp"
+              src="/api/assets/active-logo"
               alt="Sri Vashishtha Kalyan Trust crest"
               className="h-10 w-10 shrink-0 rounded-full border border-[#C39A35] bg-white object-contain shadow-xs"
               width={40}
               height={40}
+              onError={(e) => {
+                ;(e.target as HTMLImageElement).src = '/kalyan-hospital-crest.webp'
+              }}
             />
             <div className={`min-w-0 ${isDesktopSidebar ? 'hidden lg:block' : 'block'}`}>
               <div className="truncate text-sm font-extrabold tracking-wide text-white" lang="hi">
@@ -851,12 +857,15 @@ export function AppShell({ name, role, children }: AppShellProps) {
               </svg>
             </button>
             <img
-              src="/kalyan-hospital-crest.webp"
+              src="/api/assets/active-logo"
               alt=""
               aria-hidden="true"
               className="hidden h-9 w-9 shrink-0 rounded-full border-2 border-[#C39A35] bg-white object-contain shadow-2xs sm:block"
               width={36}
               height={36}
+              onError={(e) => {
+                ;(e.target as HTMLImageElement).src = '/kalyan-hospital-crest.webp'
+              }}
             />
             <div className="min-w-0">
               <div className="flex items-center gap-2">

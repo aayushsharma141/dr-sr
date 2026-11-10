@@ -185,9 +185,12 @@ export function Login() {
           <div className="mb-6 flex w-full max-w-[500px] items-center gap-3.5 lg:hidden">
             <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-white p-1 shadow-md ring-1 ring-[#E8DCD5]">
               <img
-                src="/assets/kalyan_hospital_logo.png"
+                src="/api/assets/active-logo"
                 alt="Sri Vashishtha Kalyan Trust crest"
                 className="h-full w-full rounded-xl object-contain"
+                onError={(e) => {
+                  ;(e.target as HTMLImageElement).src = '/assets/kalyan_hospital_logo.png'
+                }}
               />
             </div>
             <div>

@@ -10,7 +10,8 @@ export const PRINT_INK = '#7A1B3C'
 const PURPLE = '#7131A0'
 const GREEN = '#15803D'
 
-const LOGO_SRC = '/assets/kalyan_hospital_logo.png'
+const LOGO_SRC = '/api/assets/active-logo'
+const FALLBACK_LOGO_SRC = '/assets/kalyan_hospital_logo.png'
 const CADUCEUS_SRC = '/assets/caduceus_emblem.png'
 
 /** Used only when the clinic settings have no addresses configured. */
@@ -56,7 +57,14 @@ export function LetterheadBanner({ clinicName }: { clinicName: string }) {
       className="grid grid-cols-[30mm_1fr_30mm] items-center px-3 py-1.5 text-white"
       style={{ backgroundColor: PRINT_CRIMSON }}
     >
-      <img src={LOGO_SRC} alt="Kalyan Hospital logo" className="h-[28mm] w-[28mm] object-contain" />
+      <img
+        src={LOGO_SRC}
+        alt="Kalyan Hospital logo"
+        className="h-[28mm] w-[28mm] object-contain"
+        onError={(e) => {
+          ;(e.target as HTMLImageElement).src = FALLBACK_LOGO_SRC
+        }}
+      />
       <div className="text-center">
         <h1 className="text-[36px] font-extrabold uppercase leading-none tracking-[0.12em]">
           {clinicName}

@@ -179,8 +179,9 @@ def get_asset_file(
     return FileResponse(path, media_type=asset.mime_type, filename=asset.original_filename)
 
 
-@router.get(
+@router.api_route(
     "/assets/active-logo",
+    methods=["GET", "HEAD"],
     dependencies=[Depends(public)],
 )
 def get_active_logo_endpoint(
@@ -194,11 +195,21 @@ def get_active_logo_endpoint(
         assets_dir = getattr(app_settings, "assets_dir", None)
         path = asset_service.get_asset_path(active_logo.filename, assets_dir=assets_dir)
         if path.is_file():
-            return FileResponse(path, media_type=active_logo.mime_type, filename=active_logo.original_filename)
+            return FileResponse(
+                path,
+                media_type=active_logo.mime_type,
+                filename=active_logo.original_filename,
+                content_disposition_type="inline",
+            )
 
     for fallback in _FALLBACK_LOGO_CANDIDATES:
         if fallback.is_file():
-            return FileResponse(fallback, media_type="image/png", filename="kalyan_hospital_logo.png")
+            return FileResponse(
+                fallback,
+                media_type="image/png",
+                filename="kalyan_hospital_logo.png",
+                content_disposition_type="inline",
+            )
 
     svg_fallback = (
         '<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128">'

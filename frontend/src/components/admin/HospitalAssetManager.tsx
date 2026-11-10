@@ -172,7 +172,7 @@ export function HospitalAssetManager({ layout }: HospitalAssetManagerProps = {})
 
       <div className="mt-4 flex aspect-[4/3] max-h-56 w-full items-center justify-center rounded-lg border-2 border-gold-500 bg-slate-50 p-4">
         <img
-          src="/api/assets/active-logo"
+          src={activeLogo ? `/api/assets/active-logo?v=${activeLogo.version}` : '/api/assets/active-logo'}
           alt="Active hospital crest"
           className="max-h-full max-w-full object-contain"
           onError={(e) => {

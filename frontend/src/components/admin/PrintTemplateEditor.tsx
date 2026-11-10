@@ -273,16 +273,31 @@ export function PrintTemplateEditor() {
           <div className="w-full max-w-[560px] mx-auto aspect-[1/1.414] bg-white rounded-lg shadow-md border border-slate-300 p-4 sm:p-6 flex flex-col justify-between text-slate-900 transition-all select-none overflow-hidden">
             {/* Document Top: Letterhead Banner */}
             <div>
-              <div className="bg-[#9E1B42] text-white p-3 rounded-xs text-center">
-                <h4 lang="hi" className="text-base sm:text-lg font-bold leading-tight">
-                  {headerHi || 'कल्याण हॉस्पिटल एवं फिजियोथेरेपी केंद्र'}
-                </h4>
-                <p className="text-xs sm:text-sm font-semibold tracking-wide uppercase opacity-95">
-                  {headerEn || 'Kalyan Hospital & Physiotherapy Centre'}
-                </p>
-                <div className="mt-1 border-t border-red-300/40 pt-1 text-xs text-red-100 uppercase tracking-widest font-mono">
-                  {DOCUMENT_TABS.find((t) => t.type === activeTab)?.label}
+              <div className="grid grid-cols-[40px_1fr_40px] sm:grid-cols-[48px_1fr_48px] items-center gap-2 bg-[#9E1B42] text-white p-3 rounded-xs text-center">
+                <img
+                  src="/api/assets/active-logo"
+                  alt="Kalyan Hospital logo"
+                  className="h-10 w-10 sm:h-12 sm:w-12 object-contain"
+                  onError={(e) => {
+                    ;(e.target as HTMLImageElement).src = '/assets/kalyan_hospital_logo.png'
+                  }}
+                />
+                <div>
+                  <h4 lang="hi" className="text-base sm:text-lg font-bold leading-tight">
+                    {headerHi || 'कल्याण हॉस्पिटल एवं फिजियोथेरेपी केंद्र'}
+                  </h4>
+                  <p className="text-xs sm:text-sm font-semibold tracking-wide uppercase opacity-95">
+                    {headerEn || 'Kalyan Hospital & Physiotherapy Centre'}
+                  </p>
+                  <div className="mt-1 border-t border-red-300/40 pt-1 text-xs text-red-100 uppercase tracking-widest font-mono">
+                    {DOCUMENT_TABS.find((t) => t.type === activeTab)?.label}
+                  </div>
                 </div>
+                <img
+                  src="/assets/caduceus_emblem.png"
+                  alt="Caduceus emblem"
+                  className="h-10 w-10 sm:h-12 sm:w-12 object-contain justify-self-end"
+                />
               </div>
 
               {/* Patient Identity Strip */}
