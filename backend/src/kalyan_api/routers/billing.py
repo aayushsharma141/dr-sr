@@ -28,6 +28,7 @@ from kalyan_api.db.session import SessionDep
 from kalyan_api.models import (
     Appointment,
     ClinicSettings,
+    Doctor,
     Patient,
     Payment,
     PaymentMethod,
@@ -117,11 +118,11 @@ def record_payment(
                 code="plan_not_found",
                 message="Treatment package not found for patient.",
             )
-        if plan.status != "ACTIVE":
+        if plan.status == "CANCELLED":
             raise ApiError(
                 status_code=422,
-                code="plan_not_active",
-                message=f"Cannot record payment for {plan.status.lower()} treatment package.",
+                code="plan_cancelled",
+                message="Cannot record payment for cancelled treatment package.",
             )
 
         # Calculate current sum of non-reversed payments
@@ -144,7 +145,7 @@ def record_payment(
                 ),
             )
 
-    # 3. If appointment linked, verify
+    # 3. If appointment linked, verify and block consultation fee overpayments (BR-004)
     if payload.appointment_id is not None:
         appt = session.get(Appointment, payload.appointment_id)
         if not appt or appt.patient_id != payload.patient_id:
@@ -153,6 +154,25 @@ def record_payment(
                 code="appointment_not_found",
                 message="Appointment not found for patient.",
             )
+        doctor = session.get(Doctor, appt.doctor_id)
+        if doctor and doctor.default_fee_paise > 0:
+            paid_stmt = select(func.coalesce(func.sum(Payment.amount_paise), 0)).where(
+                Payment.appointment_id == appt.id,
+                Payment.is_reversed.is_(False),
+            )
+            already_paid: int = session.scalar(paid_stmt) or 0
+            remaining_balance = doctor.default_fee_paise - already_paid
+            if payload.amount_paise > remaining_balance:
+                max_rupees = max(0, remaining_balance) / 100
+                attempted_rupees = payload.amount_paise / 100
+                raise ApiError(
+                    status_code=422,
+                    code="overpayment_rejected",
+                    message=(
+                        f"Payment of ₹{attempted_rupees:,.2f} exceeds remaining "
+                        f"consultation fee balance of ₹{max_rupees:,.2f}."
+                    ),
+                )
 
     # 4. Determine receipt sequence cycle from clinic settings
     settings = session.scalar(select(ClinicSettings).where(ClinicSettings.id == 1))

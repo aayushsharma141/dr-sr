@@ -64,7 +64,7 @@ Rules from AGENTS.md apply: one owner per file, a Git checkpoint before each bat
 | ID | Task | Fixes | Depends on |
 |---|---|---|---|
 | K-20 | Status follows the action. Check-in sets Arrived. Opening the consultation sets In consultation. Finalising sets Done. Cancel and No show need a confirmation and a reason. Same-status changes are rejected. Decide whether a consultation can be cancelled after it has started. | BR-005, BR-013, BR-014, BR-015 | K-00 |
-| K-21 | No duplicate active booking for the same patient, doctor and date. Follow-up booking checks the department and that the doctor is active. **2026-11-10: the BR-012 half is done (follow-up booking applies the same patient, doctor and department rules as normal booking, and records the department). The BR-006 half is waiting on the owner's choice: block a second same-day booking with the same doctor, or allow it with a reason.** | BR-006, BR-012 | K-00 |
+| K-21 | No duplicate active booking for the same patient, doctor and date (BR-006: blocked by default, allowed with >= 5 char override). Follow-up booking checks department and active doctor (BR-012). **DONE (2026-11-10).** | BR-006, BR-012 | K-00 |
 | K-22 | Doctor queue counts only real consultations. Cancelled and no-show are excluded. | BR-016 | K-20 |
 | K-23 | Read-only bill view endpoint per patient: charges (consultation fee, treatment package), payments under each charge, balance. Built over `payments` and `compute_pending_dues`. No new money table. | BR-003, BR-004 per K-01 | K-01 |
 | K-24 | "Today's work" endpoint, role-scoped. Reception gets waiting per doctor, still expected, and unpaid today. A doctor gets their own queue plus unfinished consultations. First check whether `routers/operations.py` or `routers/areas.py` already returns this, and extend rather than duplicate. | BR-024 | K-20 |
@@ -112,9 +112,10 @@ Each task adds pytest coverage and updates the OpenAPI snapshot and the RBAC mat
 | D4 | Audit hash chain | **Accepted:** later, separate change. |
 | D5 | Encrypted documents | **Accepted:** later. |
 | D6 | Meaning of "remove HMS integration" | **Settled (2026-11-10):** no HMS visuals, code or data; workflow ideas only. |
-| B2 | BR-003, BR-004 | **Open.** |
-| BR-018 | What a check-in charges | **Open.** |
-| BR-013 | May a started consultation be cancelled? | **Open.** |
+| B2 | BR-003, BR-004 | **Settled (2026-11-10):** Completed package with unpaid balance remains in pending dues and can be paid down; overpayments exceeding doctor's consultation fee are blocked. |
+| BR-018 | What a check-in charges | **Settled (2026-11-10):** Token desk displays doctor's configured standard consultation fee (`doctor.default_fee_paise`) (₹0 for package sessions). |
+| BR-013 | May a started consultation be cancelled? | **Settled (2026-11-10):** In-consultation appointments can be cancelled while draft with mandatory reason; blocked once consultation is finalised. |
+| BR-006 | Same-day duplicate booking | **Settled (2026-11-10):** Blocked by default; allowed if an override reason of at least 5 characters is provided (audited). |
 
 ---
 

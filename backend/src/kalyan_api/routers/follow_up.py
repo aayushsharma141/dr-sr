@@ -390,10 +390,47 @@ def book_follow_up(
             message="Selected doctor is not assigned to the selected department.",
         )
 
+    # Check duplicate appointment with the same doctor on the same date (BR-006)
+    active_statuses = [
+        AppointmentStatus.BOOKED.value,
+        AppointmentStatus.ARRIVED.value,
+        AppointmentStatus.IN_CONSULTATION.value,
+        AppointmentStatus.DONE.value,
+    ]
+    existing_appt = session.scalar(
+        select(Appointment).where(
+            Appointment.patient_id == rec.patient_id,
+            Appointment.doctor_id == rec.recommended_doctor_id,
+            Appointment.appointment_date == appt_date,
+            Appointment.status.in_(active_statuses),
+        )
+    )
+    if existing_appt is not None:
+        override = (payload.override_reason or "").strip()
+        if len(override) < 5:
+            raise ApiError(
+                status_code=409,
+                code="duplicate_appointment",
+                message=(
+                    "Patient already has an active appointment with this doctor on this date. "
+                    "An override reason of at least 5 characters is required."
+                ),
+                details={
+                    "existing_appointment_id": existing_appt.id,
+                    "existing_token_number": existing_appt.token_number,
+                    "existing_status": existing_appt.status,
+                },
+            )
+
     # Generate sequential token for doctor and date
     token_num = token_service.generate_next_daily_token(
         session, rec.recommended_doctor_id, appt_date
     )
+
+    override_text = (payload.override_reason or "").strip() or None
+    final_notes = payload.notes
+    if override_text:
+        final_notes = f"{final_notes} | [Override: {override_text}]" if final_notes else f"[Override: {override_text}]"
 
     appt = Appointment(
         patient_id=rec.patient_id,
@@ -402,7 +439,7 @@ def book_follow_up(
         appointment_date=appt_date,
         token_number=token_num,
         status=AppointmentStatus.BOOKED.value,
-        notes=payload.notes,
+        notes=final_notes,
         created_by_user_id=principal.user_id,
     )
     session.add(appt)
@@ -413,18 +450,22 @@ def book_follow_up(
     session.flush()
 
     ctx = build_audit_context(request, principal)
+    audit_after = {
+        "booked_appointment_id": appt.id,
+        "status": rec.status,
+        "appointment_date": appt_date.isoformat(),
+        "token_number": token_num,
+    }
+    if override_text:
+        audit_after["override_reason"] = override_text
+
     audit_service.record(
         session,
         ctx,
         action=AuditAction.FOLLOW_UP_BOOKED,
         entity_type="follow_up_recommendation",
         entity_id=rec.id,
-        after={
-            "booked_appointment_id": appt.id,
-            "status": rec.status,
-            "appointment_date": appt_date.isoformat(),
-            "token_number": token_num,
-        },
+        after=audit_after,
     )
 
     return _to_reception_response(rec)

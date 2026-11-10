@@ -45,6 +45,11 @@ class FollowUpBookRequest(BaseModel):
             "only active department."
         ),
     )
+    override_reason: str | None = Field(
+        default=None,
+        max_length=500,
+        description="Reason of at least 5 characters to override duplicate booking on the same date (BR-006)",
+    )
 
 
 class DoctorFollowUpResponse(BaseModel):

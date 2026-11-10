@@ -525,7 +525,9 @@ export function TokenGenerationPage() {
                 onChange={(e) => setSelectedServiceId(e.target.value)}
                 className="w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-xs font-medium text-slate-900 shadow-2xs focus:border-emerald-700 focus:outline-none focus:ring-1 focus:ring-emerald-700 min-h-[44px]"
               >
-                <option value="opd_consultation">OPD Consultation - ₹400.00</option>
+                <option value="opd_consultation">
+                  OPD Consultation - {selectedDoctor ? `₹${(selectedDoctor.default_fee_paise / 100).toFixed(2)}` : 'Doctor Fee'}
+                </option>
                 {fees?.map((f: FeeOut) => (
                   <option key={f.id} value={f.id}>
                     {f.name} - ₹{(f.fee_paise / 100).toFixed(2)}

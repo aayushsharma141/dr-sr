@@ -15,6 +15,11 @@ class AppointmentCreate(BaseModel):
     department_id: int = Field(..., gt=0, description="Configured department/specialty ID")
     appointment_date: date = Field(..., description="Scheduled appointment date")
     notes: str | None = Field(default=None, max_length=1000, description="Reception notes")
+    override_reason: str | None = Field(
+        default=None,
+        max_length=500,
+        description="Reason of at least 5 characters to override duplicate booking on the same date (BR-006)",
+    )
 
 
 class AppointmentStatusUpdate(BaseModel):

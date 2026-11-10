@@ -17,9 +17,11 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from kalyan_api import clock
 from kalyan_api.models import (
     Appointment,
     AuditLog,
+    Doctor,
     Patient,
     TreatmentPlan,
     User,
@@ -358,3 +360,116 @@ def test_doctor_cannot_record_or_reverse_payment(
         json={"reversal_reason": "Doctor trying to reverse payment"},
     )
     assert rev_resp.status_code == 403
+
+
+def test_completed_package_with_unpaid_balance_stays_in_pending_dues(
+    login_client: Any,
+    reception_user: User,
+    doctor_a_user: User,
+    db_session: Session,
+) -> None:
+    """BR-003: Completed treatment package with unpaid balance remains in pending dues and can be paid."""
+    pat = _create_test_patient(db_session, "06")
+    rec_c = login_client(reception_user)
+
+    plan = TreatmentPlan(
+        patient_id=pat.id,
+        doctor_id=doctor_a_user.doctor_id,
+        plan_name="Completed but Unpaid Plan",
+        condition_diagnosis="Low Back Pain",
+        total_sessions=5,
+        completed_sessions=5,
+        status="COMPLETED",
+        agreed_price_paise=300000,  # ₹3,000
+    )
+    db_session.add(plan)
+    db_session.flush()
+
+    # Verify plan shows up in pending dues
+    dues = rec_c.get("/api/billing/pending-dues").json()
+    due = next((d for d in dues if d["treatment_plan_id"] == plan.id), None)
+    assert due is not None
+    assert due["balance_paise"] == 300000
+
+    # Pay partial amount (₹2,000)
+    pay1 = rec_c.post(
+        "/api/payments",
+        json={
+            "patient_id": pat.id,
+            "treatment_plan_id": plan.id,
+            "amount_paise": 200000,
+            "payment_method": "CASH",
+        },
+    )
+    assert pay1.status_code == 201
+
+    # Remaining balance (₹1,000) is still in pending dues
+    dues2 = rec_c.get("/api/billing/pending-dues").json()
+    due2 = next((d for d in dues2 if d["treatment_plan_id"] == plan.id), None)
+    assert due2 is not None
+    assert due2["balance_paise"] == 100000
+
+
+def test_consultation_fee_overpayment_rejected(
+    login_client: Any,
+    reception_user: User,
+    doctor_a_user: User,
+    db_session: Session,
+) -> None:
+    """BR-004: Overpayment exceeding doctor's consultation fee is rejected."""
+    pat = _create_test_patient(db_session, "07")
+    rec_c = login_client(reception_user)
+
+    doctor = db_session.get(Doctor, doctor_a_user.doctor_id)
+    doctor.default_fee_paise = 40000  # ₹400
+    dept = doctor.departments[0]
+    db_session.flush()
+
+    book = rec_c.post(
+        "/api/appointments",
+        json={
+            "patient_id": pat.id,
+            "doctor_id": doctor.id,
+            "department_id": dept.id,
+            "appointment_date": clock.ist_today().isoformat(),
+        },
+    )
+    appt_id = book.json()["id"]
+
+    # Attempting to pay ₹500 when fee is ₹400 is rejected
+    overpay = rec_c.post(
+        "/api/payments",
+        json={
+            "patient_id": pat.id,
+            "appointment_id": appt_id,
+            "amount_paise": 50000,
+            "payment_method": "CASH",
+        },
+    )
+    assert overpay.status_code == 422
+    assert overpay.json()["code"] == "overpayment_rejected"
+
+    # Paying exact ₹400 succeeds
+    pay_ok = rec_c.post(
+        "/api/payments",
+        json={
+            "patient_id": pat.id,
+            "appointment_id": appt_id,
+            "amount_paise": 40000,
+            "payment_method": "CASH",
+        },
+    )
+    assert pay_ok.status_code == 201
+
+    # Second payment on same appointment is rejected as overpayment
+    second_pay = rec_c.post(
+        "/api/payments",
+        json={
+            "patient_id": pat.id,
+            "appointment_id": appt_id,
+            "amount_paise": 10000,
+            "payment_method": "CASH",
+        },
+    )
+    assert second_pay.status_code == 422
+    assert second_pay.json()["code"] == "overpayment_rejected"

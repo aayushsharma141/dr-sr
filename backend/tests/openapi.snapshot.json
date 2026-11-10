@@ -445,6 +445,19 @@
             "description": "Reception notes",
             "title": "Notes"
           },
+          "override_reason": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Reason of at least 5 characters to override duplicate booking on the same date (BR-006)",
+            "title": "Override Reason"
+          },
           "patient_id": {
             "description": "Target patient ID",
             "exclusiveMinimum": 0.0,
@@ -3709,6 +3722,19 @@
             ],
             "description": "Optional appointment notes",
             "title": "Notes"
+          },
+          "override_reason": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Reason of at least 5 characters to override duplicate booking on the same date (BR-006)",
+            "title": "Override Reason"
           }
         },
         "title": "FollowUpBookRequest",
