@@ -11,6 +11,8 @@ build/
 node_modules/
 *.tsbuildinfo
 coverage/
+.coverage
+.coverage.*
 backend/var/
 var/
 graphify-out/
