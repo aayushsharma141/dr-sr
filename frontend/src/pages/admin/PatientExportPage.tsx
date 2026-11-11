@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { PatientExportDialog } from '../../components/admin/PatientExportDialog'
+import { AdminPageHeader } from '../../components/admin/AdminPageHeader'
 import { AppShell } from '../../components/AppShell'
 import { useMe } from '../../api/queries'
 
@@ -12,23 +13,19 @@ export function PatientExportPage() {
     <AppShell name={me?.full_name ?? 'Admin'} role={me?.role ?? 'ADMIN'}>
       <div className="space-y-6">
         {/* Page Header */}
-        <div className="flex flex-col justify-between gap-4 border-b border-slate-200 pb-5 sm:flex-row sm:items-center">
-          <div>
-            <h1 className="text-2xl font-bold tracking-tight text-slate-900">
-              Export Patients
-            </h1>
-            <p className="mt-1 text-sm text-slate-600">
-              Permission-checked, field-selective, formula-sanitized dataset streaming in CSV and Excel formats.
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={() => setIsDialogOpen(true)}
-            className="inline-flex min-h-11 cursor-pointer items-center justify-center rounded-lg bg-[#8E1C3D] px-6 py-2.5 font-medium text-white shadow-xs hover:bg-[#721631] focus-visible:outline-2 focus-visible:outline-[#8E1C3D]"
-          >
-            Export Patient Dataset
-          </button>
-        </div>
+        <AdminPageHeader
+          title="Export Patients"
+          description="Permission-checked, field-selective, formula-sanitized dataset streaming in CSV and Excel formats."
+          actions={
+            <button
+              type="button"
+              onClick={() => setIsDialogOpen(true)}
+              className="inline-flex min-h-11 cursor-pointer items-center justify-center rounded-lg bg-[#8E1C3D] px-6 py-2.5 font-medium text-white shadow-xs hover:bg-[#721631] focus-visible:outline-2 focus-visible:outline-[#8E1C3D]"
+            >
+              Export Patient Dataset
+            </button>
+          }
+        />
 
         {/* Success notification banner */}
         {lastExportedFile && (

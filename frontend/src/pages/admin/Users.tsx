@@ -13,6 +13,8 @@ import {
 } from '../../api/queries'
 import { ApiError, apiFetch } from '../../api/client'
 import { AppShell } from '../../components/AppShell'
+import { AdminPageHeader } from '../../components/admin/AdminPageHeader'
+import { TableSkeleton } from '../../components/AdminSkeleton'
 import { Modal } from '../../components/Modal'
 import { ConflictBanner } from '../../components/ConflictBanner'
 import { InlineAlert } from '../../components/InlineAlert'
@@ -235,11 +237,7 @@ function LoginHistoryDialog({ user, onClose }: { user: UserOut; onClose: () => v
       dismiss="any"
       className="max-w-5xl"
     >
-      {isPending && (
-        <p role="status" className="text-sm text-neutral-700">
-          Loading sign-in history...
-        </p>
-      )}
+      {isPending && <TableSkeleton label="Loading sign-in history..." rows={4} columns={4} />}
       {isError && (
         <InlineAlert tone="error">
           Could not load the sign-in history: {error.message}{' '}
@@ -252,10 +250,10 @@ function LoginHistoryDialog({ user, onClose }: { user: UserOut; onClose: () => v
         <p className="text-sm text-neutral-700">No sign-in or security events are recorded for this account yet.</p>
       )}
       {data && data.length > 0 && (
-        <div className="overflow-x-auto rounded border border-neutral-200">
+        <div className="max-h-[60vh] overflow-auto rounded border border-neutral-200">
           <table className="w-full text-left text-sm text-neutral-800">
             <caption className="sr-only">Sign-in history for {user.username}</caption>
-            <thead className="bg-neutral-50 border-b border-neutral-200 text-neutral-700 font-semibold">
+            <thead className="sticky top-0 z-10 bg-neutral-50 border-b border-neutral-200 text-neutral-700 font-semibold">
               <tr>
                 <th scope="col" className="px-3 py-2">When</th>
                 <th scope="col" className="px-3 py-2">Event</th>
@@ -266,10 +264,11 @@ function LoginHistoryDialog({ user, onClose }: { user: UserOut; onClose: () => v
               </tr>
             </thead>
             <tbody className="divide-y divide-neutral-200">
-              {data.map((entry) => {
+              {data.map((entry, index) => {
                 const details = historyDetails(entry, user.username)
+                const rowDelay = index * 50
                 return (
-                  <tr key={entry.id} className="align-top">
+                  <tr key={entry.id} className="align-top transition-colors" style={{ transitionDelay: `${rowDelay}ms` }}>
                     <td className="px-3 py-2 whitespace-nowrap">{formatDateTime(entry.occurred_at)}</td>
                     <td className="px-3 py-2">{HISTORY_ACTION_LABEL[entry.action] ?? entry.action}</td>
                     <td className="px-3 py-2">
@@ -504,17 +503,15 @@ export function Users() {
   return (
     <AppShell name={me?.full_name ?? 'Admin'} role={me?.role ?? 'ADMIN'}>
       <div className="space-y-6">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-bold text-neutral-900">User Accounts</h1>
-            <p className="text-sm text-neutral-600 mt-1">
-              Staff sign-in accounts, roles, account status, lockouts and password resets.
-            </p>
-          </div>
-          <button type="button" onClick={openCreateDialog} className={`${BTN_PRIMARY} self-start sm:self-auto`}>
-            Create User
-          </button>
-        </div>
+        <AdminPageHeader
+          title="User Accounts"
+          description="Staff sign-in accounts, roles, account status, lockouts and password resets."
+          actions={
+            <button type="button" onClick={openCreateDialog} className={BTN_PRIMARY}>
+              Create User
+            </button>
+          }
+        />
 
         {successNotice && (
           <InlineAlert tone="success" onDismiss={() => setSuccessNotice(null)}>
@@ -522,11 +519,7 @@ export function Users() {
           </InlineAlert>
         )}
 
-        {isPending && (
-          <div className="p-8 text-center bg-white rounded border border-neutral-200">
-            <p role="status" className="text-neutral-600">Loading user accounts...</p>
-          </div>
-        )}
+        {isPending && <TableSkeleton label="Loading user accounts..." rows={5} columns={6} />}
 
         {isError && <InlineAlert tone="error">Failed to load users: {error.message}</InlineAlert>}
 
@@ -553,10 +546,10 @@ export function Users() {
               })}
             </div>
 
-            <div className="bg-white rounded-lg border border-neutral-200 overflow-x-auto shadow-xs">
+            <div className="bg-white rounded-lg border border-neutral-200 max-h-[70vh] overflow-auto shadow-xs">
               <table className="w-full text-left text-sm text-neutral-800">
                 <caption className="sr-only">User accounts</caption>
-                <thead className="bg-neutral-50 border-b border-neutral-200 text-neutral-700 font-semibold">
+                <thead className="sticky top-0 z-10 bg-neutral-50 border-b border-neutral-200 text-neutral-700 font-semibold">
                   <tr>
                     <th scope="col" className="px-4 py-3">Account</th>
                     <th scope="col" className="px-4 py-3">Role</th>
@@ -574,11 +567,12 @@ export function Users() {
                       </td>
                     </tr>
                   )}
-                  {visibleUsers.map((u) => {
+                  {visibleUsers.map((u, index) => {
                     const remaining = u.locked_until ? formatRemaining(u.locked_until, now) : null
+                    const rowDelay = index * 50
                     const self = isSelf(u)
                     return (
-                      <tr key={u.id} className="align-top hover:bg-neutral-50 transition-colors">
+                      <tr key={u.id} className="align-top hover:bg-neutral-50 transition-colors" style={{ transitionDelay: `${rowDelay}ms` }}>
                         <td className="px-4 py-3">
                           <div className="font-medium text-neutral-900">
                             {u.full_name}

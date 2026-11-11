@@ -201,6 +201,7 @@ def get_patient_timeline(
             )
 
     # 4. Treatment Plans
+    can_see_billing = Permission.PAYMENT_READ in principal.permissions
     plan_stmt = (
         select(TreatmentPlan)
         .where(TreatmentPlan.patient_id == patient_id)
@@ -209,14 +210,28 @@ def get_patient_timeline(
     plans = session.execute(plan_stmt).scalars().all()
     for plan in plans:
         doc_name = plan.doctor.name_en if plan.doctor else "Doctor"
-        price_rupees = plan.agreed_price_paise / 100
+        price_rupees = plan.agreed_price_paise / 100 if can_see_billing else None
+        subtitle_parts = [_doctor_title(doc_name)]
+        if price_rupees is not None:
+            subtitle_parts.append(f"₹{price_rupees:,.2f}")
+
+        plan_meta = {
+            "treatment_plan_id": plan.id,
+            "plan_name": plan.plan_name,
+            "status": plan.status,
+            "total_sessions": plan.total_sessions,
+            "completed_sessions": plan.completed_sessions,
+        }
+        if can_see_billing:
+            plan_meta["agreed_price_paise"] = plan.agreed_price_paise
+
         items.append(
             TimelineItemOut(
                 id=f"TREATMENT_PLAN-{plan.id}",
                 event_type="TREATMENT_PLAN",
                 event_date=plan.created_at,
                 title=f"Package: {plan.plan_name}",
-                subtitle=f"{_doctor_title(doc_name)} · ₹{price_rupees:,.2f}",
+                subtitle=" · ".join(subtitle_parts),
                 summary=(
                     (
                         f"Diagnosis: {plan.condition_diagnosis or 'N/A'} | "
@@ -227,14 +242,7 @@ def get_patient_timeline(
                 ),
                 badge=plan.status,
                 badge_variant="default" if plan.status == "ACTIVE" else "outline",
-                metadata={
-                    "treatment_plan_id": plan.id,
-                    "plan_name": plan.plan_name,
-                    "status": plan.status,
-                    "total_sessions": plan.total_sessions,
-                    "completed_sessions": plan.completed_sessions,
-                    "agreed_price_paise": plan.agreed_price_paise,
-                },
+                metadata=plan_meta,
             )
         )
 
@@ -285,54 +293,55 @@ def get_patient_timeline(
             )
         )
 
-    # 6. Payments and Reversals
-    pay_stmt = (
-        select(Payment)
-        .where(Payment.patient_id == patient_id)
-        .options(
-            selectinload(Payment.treatment_plan),
-            selectinload(Payment.created_by_user),
-            selectinload(Payment.reversed_by_user),
-        )
-    )
-    payments = session.execute(pay_stmt).scalars().all()
-    for pay in payments:
-        amount_rupees = pay.amount_paise / 100
-        cashier = pay.created_by_user.username if pay.created_by_user else "Staff"
-        status_badge = "REVERSED" if pay.is_reversed else "PAID"
-        badge_var = "destructive" if pay.is_reversed else "default"
-        subtitle_txt = f"Receipt: {pay.receipt_number} · Method: {pay.payment_method}"
-        if pay.treatment_plan:
-            subtitle_txt += f" · Package: {pay.treatment_plan.plan_name}"
-
-        summary_txt = f"Collected by @{cashier}"
-        if pay.is_reversed:
-            summary_txt += (
-                f" | REVERSED: '{pay.reversal_reason}' by @{pay.reversed_by_user.username}"
-                if pay.reversed_by_user
-                else f" | REVERSED: '{pay.reversal_reason}'"
-            )
-
-        items.append(
-            TimelineItemOut(
-                id=f"PAYMENT-{pay.id}",
-                event_type="PAYMENT",
-                event_date=pay.created_at,
-                title=f"Payment Received: ₹{amount_rupees:,.2f}",
-                subtitle=subtitle_txt,
-                summary=summary_txt,
-                badge=status_badge,
-                badge_variant=badge_var,
-                metadata={
-                    "payment_id": pay.id,
-                    "receipt_number": pay.receipt_number,
-                    "amount_paise": pay.amount_paise,
-                    "payment_method": pay.payment_method,
-                    "is_reversed": pay.is_reversed,
-                    "reversal_reason": pay.reversal_reason,
-                },
+    # 6. Payments and Reversals (only roles with PAYMENT_READ; barred from DOCTOR)
+    if can_see_billing:
+        pay_stmt = (
+            select(Payment)
+            .where(Payment.patient_id == patient_id)
+            .options(
+                selectinload(Payment.treatment_plan),
+                selectinload(Payment.created_by_user),
+                selectinload(Payment.reversed_by_user),
             )
         )
+        payments = session.execute(pay_stmt).scalars().all()
+        for pay in payments:
+            amount_rupees = pay.amount_paise / 100
+            cashier = pay.created_by_user.username if pay.created_by_user else "Staff"
+            status_badge = "REVERSED" if pay.is_reversed else "PAID"
+            badge_var = "destructive" if pay.is_reversed else "default"
+            subtitle_txt = f"Receipt: {pay.receipt_number} · Method: {pay.payment_method}"
+            if pay.treatment_plan:
+                subtitle_txt += f" · Package: {pay.treatment_plan.plan_name}"
+
+            summary_txt = f"Collected by @{cashier}"
+            if pay.is_reversed:
+                summary_txt += (
+                    f" | REVERSED: '{pay.reversal_reason}' by @{pay.reversed_by_user.username}"
+                    if pay.reversed_by_user
+                    else f" | REVERSED: '{pay.reversal_reason}'"
+                )
+
+            items.append(
+                TimelineItemOut(
+                    id=f"PAYMENT-{pay.id}",
+                    event_type="PAYMENT",
+                    event_date=pay.created_at,
+                    title=f"Payment Received: ₹{amount_rupees:,.2f}",
+                    subtitle=subtitle_txt,
+                    summary=summary_txt,
+                    badge=status_badge,
+                    badge_variant=badge_var,
+                    metadata={
+                        "payment_id": pay.id,
+                        "receipt_number": pay.receipt_number,
+                        "amount_paise": pay.amount_paise,
+                        "payment_method": pay.payment_method,
+                        "is_reversed": pay.is_reversed,
+                        "reversal_reason": pay.reversal_reason,
+                    },
+                )
+            )
 
     # Sort chronological descending by event_date
     items.sort(key=lambda it: it.event_date, reverse=True)

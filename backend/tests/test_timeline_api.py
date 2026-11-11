@@ -240,3 +240,32 @@ def test_timeline_reception_access(
     # Encounters and prescriptions are hidden from Reception
     assert "ENCOUNTER" not in event_types
     assert "PRESCRIPTION" not in event_types
+
+
+def test_timeline_doctor_cannot_see_payments_or_prices(
+    doctor_a_user: User,
+    doctor_b_user: User,
+    admin_user: User,
+    db_session: Session,
+    login_client: type[TestClient],
+) -> None:
+    """Doctor timeline omits financial rows (payments) and prices (RB-2, SEC-04)."""
+    pat = _seed_patient_activity(
+        db_session, doctor_a_user.doctor_id, doctor_b_user.doctor_id, admin_user
+    )
+
+    doc_c = login_client(doctor_a_user)
+    resp = doc_c.get(f"/api/patients/{pat.id}/timeline")
+    assert resp.status_code == 200
+    timeline = resp.json()
+
+    event_types = set(it["event_type"] for it in timeline)
+    # Doctors lack PAYMENT_READ permission; no PAYMENT items may appear in timeline
+    assert "PAYMENT" not in event_types
+
+    # Treatment plans must not leak agreed price to doctors
+    plan_items = [it for it in timeline if it["event_type"] == "TREATMENT_PLAN"]
+    assert len(plan_items) > 0
+    for plan in plan_items:
+        assert "₹" not in plan["subtitle"]
+        assert "agreed_price_paise" not in plan["metadata"]

@@ -78,6 +78,15 @@ def test_audit_logs_admin_list_and_filter(
         assert "password_hash" not in before_str
         assert "password_hash" not in after_str
 
+    # 5. Query distinct actions
+    resp_actions = adm_c.get("/api/audit-logs/actions")
+    assert resp_actions.status_code == 200
+    actions_list = resp_actions.json()
+    assert isinstance(actions_list, list)
+    assert "SETTINGS_UPDATED" in actions_list
+    assert "USER_CREATED" in actions_list
+    assert actions_list == sorted(actions_list)
+
 
 def test_audit_logs_role_restrictions(
     reception_user: User,
@@ -99,3 +108,8 @@ def test_audit_logs_role_restrictions(
     doc_c = login_client(doctor_a_user)
     resp_doc = doc_c.get("/api/audit-logs")
     assert resp_doc.status_code == 403
+
+    # /api/audit-logs/actions role restrictions
+    assert client.get("/api/audit-logs/actions").status_code == 401
+    assert rec_c.get("/api/audit-logs/actions").status_code == 403
+    assert doc_c.get("/api/audit-logs/actions").status_code == 403

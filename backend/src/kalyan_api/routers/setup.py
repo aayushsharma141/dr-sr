@@ -128,7 +128,7 @@ def setup_first_admin(
         )
 
     # 5. Verify the submitted setup code in constant time
-    if not verify_setup_code(request.app, payload.setup_code):
+    if not verify_setup_code(request.app, payload.setup_code, now=now):
         throttle_service.register_failure(session, peer_ip, now)
         _, _, should_rotate = register_setup_failure(request.app, peer_ip, now)
 

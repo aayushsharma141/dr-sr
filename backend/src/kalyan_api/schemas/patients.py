@@ -32,6 +32,12 @@ class PatientOut(BaseModel):
     updated_at: datetime
 
 
+class PatientCountResponse(BaseModel):
+    """Total number of patients matching a directory search."""
+
+    total: int
+
+
 class PatientCreate(BaseModel):
     """Payload for registering a new patient with 12 canonical fields."""
 

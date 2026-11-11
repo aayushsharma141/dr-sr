@@ -15,6 +15,8 @@ import {
   summaryHeadline,
 } from '../../admin/integrity'
 import { AppShell } from '../../components/AppShell'
+import { AdminPageHeader } from '../../components/admin/AdminPageHeader'
+import { TableSkeleton } from '../../components/AdminSkeleton'
 import { InlineAlert } from '../../components/InlineAlert'
 
 const IST_ZONE = 'Asia/Kolkata'
@@ -289,9 +291,9 @@ function RecentRuns() {
           <p className="text-xs text-slate-500">Immutable audit log of automated and manual invariant diagnostics</p>
         </div>
       </div>
-      <div className="overflow-x-auto">
+      <div className="max-h-[60vh] overflow-auto">
         <table className="mt-3 w-full text-left text-xs">
-          <thead className="text-slate-500 border-b border-slate-100 uppercase tracking-wider">
+          <thead className="sticky top-0 z-10 bg-white text-slate-500 border-b border-slate-100 uppercase tracking-wider">
             <tr>
               <th className="py-2.5 pr-4 font-semibold">Timestamp</th>
               <th className="py-2.5 pr-4 font-semibold">Initiated By</th>
@@ -299,8 +301,8 @@ function RecentRuns() {
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
-            {runs.map((run) => (
-              <tr key={run.id} className="hover:bg-slate-50/50 transition-colors">
+            {runs.map((run, index) => (
+              <tr key={run.id} className="hover:bg-slate-50/50 transition-colors" style={{ transitionDelay: `${index * 50}ms` }}>
                 <td className="py-2.5 pr-4 font-medium text-slate-800">{formatIst(run.generated_at)}</td>
                 <td className="py-2.5 pr-4 font-semibold text-slate-700">{run.run_by_username ?? 'System'}</td>
                 <td className={`py-2.5 ${run.failed_checks ? 'font-bold text-red-700' : 'font-medium text-slate-700'}`}>
@@ -337,21 +339,21 @@ export function IntegrityDashboard() {
       <main className="mx-auto w-full max-w-[1600px] space-y-5 px-1 pb-8">
         {/* Header */}
         <header className="flex flex-col justify-between gap-4 rounded-xl border border-slate-200 bg-white p-5 shadow-xs sm:flex-row sm:items-center">
-          <div>
-            <div className="flex items-center gap-2.5">
+          <AdminPageHeader
+            icon={
               <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-rose-50 text-[#8E1C3D]">
                 <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
                 </svg>
               </span>
-              <h1 className="text-2xl font-bold tracking-tight text-slate-900">Data Integrity</h1>
-            </div>
-            <p className="mt-1 text-xs text-slate-600 font-medium">
-              {report
+            }
+            title="Data Integrity"
+            description={
+              report
                 ? `Last checked ${formatIst(report.generated_at)}${report.run_by_username ? ` by ${report.run_by_username}` : ''} · read-only`
-                : 'Checks patient IDs, payments, treatment progress and stored files. Read-only.'}
-            </p>
-          </div>
+                : 'Checks patient IDs, payments, treatment progress and stored files. Read-only.'
+            }
+          />
           <button
             type="button"
             disabled={busy || latest.isPending}
@@ -371,11 +373,7 @@ export function IntegrityDashboard() {
         {latest.isError && (
           <InlineAlert tone="error">Could not load the last result. Check your connection, then reload the page.</InlineAlert>
         )}
-        {latest.isPending && (
-          <div role="status" className="rounded-xl border border-slate-200 bg-white p-8 text-center text-sm font-medium text-slate-600 shadow-2xs">
-            Loading integrity diagnostics…
-          </div>
-        )}
+        {latest.isPending && <TableSkeleton label="Loading integrity diagnostics…" rows={3} columns={4} />}
 
         {latest.isSuccess && !report && (
           <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-2xs">

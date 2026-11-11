@@ -3,6 +3,7 @@ import { ApiError } from '../../api/client'
 import { useBackupRuns, useBackupSettings, useUpdateBackupSettings } from '../../api/queries'
 import type { BackupRunOut, BackupSettingsOut } from '../../api/types'
 import { ConflictBanner } from '../../components/ConflictBanner'
+import { TableSkeleton } from '../../components/AdminSkeleton'
 import { InlineAlert } from '../../components/InlineAlert'
 
 // Admin module 11. The Windows scheduled task reads these settings every 15 minutes. Backups stay
@@ -215,8 +216,8 @@ function RunHistory({ runs }: { runs: BackupRunOut[] }) {
           </tr>
         </thead>
         <tbody className="divide-y divide-slate-100">
-          {runs.map((run) => (
-            <tr key={run.id}>
+          {runs.map((run, index) => (
+            <tr key={run.id} className="transition-colors" style={{ transitionDelay: `${index * 50}ms` }}>
               <td className={CELL}>{formatIst(run.started_at)}</td>
               <td className={CELL}>{run.trigger === 'SCHEDULED' ? 'Scheduled' : 'Manual'}</td>
               <td className={CELL}>
@@ -253,7 +254,7 @@ export function BackupSchedulePanel() {
         Needs the Windows task from deploy\register-backup-task.ps1 on the server. Frequency and retention await client
         approval.
       </p>
-      {settings.isPending && <p role="status" className="mt-3 text-sm text-slate-700">Loading the backup schedule...</p>}
+      {settings.isPending && <TableSkeleton label="Loading the backup schedule..." rows={3} columns={3} className="mt-3" />}
       {settings.isError && (
         <InlineAlert tone="error" className="mt-3">
           Could not load the backup schedule: {settings.error.message}

@@ -3,6 +3,7 @@ import { usePendingDues, useMe } from '../api/queries'
 import type { PendingDueOut } from '../api/types'
 import { PaymentModal } from '../components/PaymentModal'
 import { AppShell } from '../components/AppShell'
+import { AdminPageHeader } from '../components/admin/AdminPageHeader'
 
 export const PendingDuesPage: React.FC = () => {
   const { data: me } = useMe()
@@ -33,26 +34,21 @@ export const PendingDuesPage: React.FC = () => {
 
   return (
     <AppShell name={me?.full_name ?? 'Staff'} role={me?.role ?? 'RECEPTION'}>
-      <div className="space-y-6">
-        {/* Header */}
-        <div className="flex flex-col gap-4 border-b border-slate-200 pb-4 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <h1 className="text-2xl font-bold tracking-tight text-slate-900">
-              Pending Dues
-            </h1>
-            <p className="mt-1 text-sm text-slate-600">
-              Dynamically computed outstanding balances across active treatment packages (BIL-03).
-            </p>
-          </div>
-          <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 shadow-2xs">
-            <div className="text-xs font-semibold uppercase tracking-wider text-amber-800">
-              Total Outstanding
+      <div className="mx-auto w-full max-w-[1600px] space-y-6">
+        <AdminPageHeader
+          title="Pending Dues"
+          description="Dynamically computed outstanding balances across active treatment packages (BIL-03)."
+          actions={
+            <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 shadow-2xs">
+              <div className="text-xs font-semibold uppercase tracking-wider text-amber-800">
+                Total Outstanding
+              </div>
+              <div className="text-xl font-black text-amber-900">
+                ₹{totalDuesRupees}
+              </div>
             </div>
-            <div className="text-xl font-black text-amber-900">
-              ₹{totalDuesRupees}
-            </div>
-          </div>
-        </div>
+          }
+        />
 
         {/* Filter Bar */}
         <div className="flex items-center gap-4">
@@ -91,8 +87,8 @@ export const PendingDuesPage: React.FC = () => {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-200">
-                  {filteredDues.map((due) => (
-                    <tr key={due.treatment_plan_id} className="hover:bg-slate-50/70 transition-colors">
+                  {filteredDues.map((due, index) => (
+                    <tr key={due.treatment_plan_id} className="hover:bg-slate-50/70 transition-colors" style={{ transitionDelay: `${index * 50}ms` }}>
                       <td className="px-4 py-3">
                         <div className="font-semibold text-slate-900">{due.patient_name}</div>
                         <div className="font-mono text-xs text-slate-500">{due.patient_urn}</div>

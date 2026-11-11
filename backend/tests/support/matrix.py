@@ -933,6 +933,18 @@ MATRIX: list[MatrixRow] = [
     ),
     MatrixRow(
         method="GET",
+        path="/api/patients/count",
+        body_factory=None,
+        expected={
+            "anonymous": 401,
+            "admin": 200,
+            "reception": 200,
+            "doctor_a": 200,
+            "doctor_b": 200,
+        },
+    ),
+    MatrixRow(
+        method="GET",
         path="/api/patients/{id}",
         body_factory=None,
         expected={
@@ -1475,6 +1487,18 @@ MATRIX: list[MatrixRow] = [
     MatrixRow(
         method="GET",
         path="/api/audit-logs",
+        body_factory=None,
+        expected={
+            "anonymous": 401,
+            "admin": 200,
+            "reception": 403,
+            "doctor_a": 403,
+            "doctor_b": 403,
+        },
+    ),
+    MatrixRow(
+        method="GET",
+        path="/api/audit-logs/actions",
         body_factory=None,
         expected={
             "anonymous": 401,

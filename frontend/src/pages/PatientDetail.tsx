@@ -136,13 +136,15 @@ export function PatientDetail() {
           </div>
           {patient && (
             <div className="flex items-center gap-3">
-              <button
-                type="button"
-                onClick={() => setIsEditModalOpen(true)}
-                className="px-4 py-2 bg-neutral-100 hover:bg-neutral-200 text-neutral-800 rounded text-sm font-medium focus-visible:outline-2 focus-visible:outline-neutral-500 min-h-[44px] cursor-pointer"
-              >
-                Edit Demographics
-              </button>
+              {(me?.role === 'ADMIN' || me?.role === 'RECEPTION') && (
+                <button
+                  type="button"
+                  onClick={() => setIsEditModalOpen(true)}
+                  className="px-4 py-2 bg-neutral-100 hover:bg-neutral-200 text-neutral-800 rounded text-sm font-medium focus-visible:outline-2 focus-visible:outline-neutral-500 min-h-[44px] cursor-pointer"
+                >
+                  Edit Demographics
+                </button>
+              )}
               <Link
                 to={`/reception/patients/${patient.id}/print`}
                 className="px-4 py-2 bg-red-900 hover:bg-red-800 text-white rounded text-sm font-medium focus-visible:outline-2 focus-visible:outline-red-800 min-h-[44px] inline-flex items-center justify-center cursor-pointer shadow-xs"

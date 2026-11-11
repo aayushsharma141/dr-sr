@@ -13,6 +13,7 @@ import {
 import { ApiError } from '../api/client'
 import { AppShell } from '../components/AppShell'
 import { QueueTicketPreview } from '../components/QueueTicketPreview'
+import { UnsavedChangesGuard } from '../components/UnsavedChangesGuard'
 import {
   IconCamera,
   IconCalendar,
@@ -83,9 +84,57 @@ export function PatientRegister() {
   const [formError, setFormError] = useState<string | null>(null)
   // Steps after the patient record was saved that did not complete (photo, visit, check-in).
   const [registrationWarnings, setRegistrationWarnings] = useState<string[]>([])
+  const [photoFailure, setPhotoFailure] = useState<{ patientId: number; fileName: string; message: string } | null>(null)
+  const [photoRetrying, setPhotoRetrying] = useState(false)
+  const [photoSavedNotice, setPhotoSavedNotice] = useState<string | null>(null)
   const [checkedIn, setCheckedIn] = useState(false)
   // Blocks a second submit while one is in flight (double-click, Enter key repeat).
   const submittingRef = useRef(false)
+  // Set just before a deliberate post-registration navigation.
+  const skipUnsavedGuardRef = useRef(false)
+
+  // Anything typed into the form means leaving now would lose work.
+  const isDirty = useMemo(
+    () =>
+      Boolean(
+        fullName.trim() ||
+          guardianName.trim() ||
+          gender !== 'M' ||
+          dob ||
+          ageYears !== '' ||
+          mobile.trim() ||
+          address.trim() ||
+          district.trim() !== 'Bhojpur' ||
+          state.trim() !== 'Bihar' ||
+          emergencyContact.trim() ||
+          allergies.trim() !== 'None reported' ||
+          notes.trim() ||
+          selectedDepartmentId !== '' ||
+          selectedDoctorId !== '' ||
+          visitType !== 'walk-in' ||
+          reasonForVisit.trim() ||
+          photoFile,
+      ),
+    [
+      fullName,
+      guardianName,
+      gender,
+      dob,
+      ageYears,
+      mobile,
+      address,
+      district,
+      state,
+      emergencyContact,
+      allergies,
+      notes,
+      selectedDepartmentId,
+      selectedDoctorId,
+      visitType,
+      reasonForVisit,
+      photoFile,
+    ],
+  )
 
   // Queries for departments & doctors
   const { data: departments } = useDepartments()
@@ -166,6 +215,8 @@ export function PatientRegister() {
   // Reset entire form
   const handleClear = () => {
     setRegistrationWarnings([])
+    setPhotoFailure(null)
+    setPhotoSavedNotice(null)
     setCheckedIn(false)
     setFullName('')
     setGuardianName('')
@@ -193,6 +244,24 @@ export function PatientRegister() {
     }
   }
 
+  const errorText = (err: unknown) =>
+    err instanceof Error && err.message ? err.message : 'unknown error'
+
+  const handleRetryPhoto = async () => {
+    if (!photoFailure || !photoFile) return
+    setPhotoRetrying(true)
+    setPhotoSavedNotice(null)
+    try {
+      await uploadPhotoMutation.mutateAsync({ id: photoFailure.patientId, file: photoFile })
+      setPhotoFailure(null)
+      setPhotoSavedNotice('Photo uploaded and saved to the patient record.')
+    } catch (retryErr) {
+      setPhotoFailure({ ...photoFailure, message: errorText(retryErr) })
+    } finally {
+      setPhotoRetrying(false)
+    }
+  }
+
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault()
     // A registered patient stays on screen until "Register Another" is used; never create a second one.
@@ -200,6 +269,8 @@ export function PatientRegister() {
     setFormError(null)
     setQuickSuccessNotice(null)
     setRegistrationWarnings([])
+    setPhotoFailure(null)
+    setPhotoSavedNotice(null)
     setCheckedIn(false)
 
     if (ageYears === '' || ageYears < 0) {
@@ -230,9 +301,6 @@ export function PatientRegister() {
       notes: notes.trim() || (reasonForVisit.trim() ? `Complaint: ${reasonForVisit.trim()}` : null),
     }
 
-    const errorText = (err: unknown) =>
-      err instanceof Error && err.message ? err.message : 'unknown error'
-
     submittingRef.current = true
     try {
       // 1. Register Patient Demographics. A failure here means nothing was saved.
@@ -248,9 +316,11 @@ export function PatientRegister() {
             file: photoFile,
           })
         } catch (photoErr) {
-          warnings.push(
-            `Photo was not saved (${errorText(photoErr)}). Add it from the patient file.`,
-          )
+          setPhotoFailure({
+            patientId: patient.id,
+            fileName: photoFile.name,
+            message: errorText(photoErr),
+          })
         }
       }
 
@@ -322,6 +392,7 @@ export function PatientRegister() {
 
   return (
     <AppShell name={me?.full_name || 'Reception Staff'} role={me?.role || 'RECEPTION'}>
+      <UnsavedChangesGuard dirty={isDirty && !createdPatient} bypassRef={skipUnsavedGuardRef} />
       {/* Full-width Widescreen Container: No max-w-5xl artificial constraints */}
       <div className="w-full space-y-5">
         {/* Top Header Bar filling desktop width */}
@@ -373,6 +444,55 @@ export function PatientRegister() {
           </div>
         )}
 
+        {photoFailure && (
+          <div
+            role="alert"
+            className="space-y-3 rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-950 shadow-xs"
+          >
+            <p className="font-bold">Patient saved, but the photo was not uploaded.</p>
+            <p>
+              {photoFailure.fileName}: {photoFailure.message}
+            </p>
+            <div className="flex flex-wrap items-center gap-3">
+              <button
+                type="button"
+                onClick={() => void handleRetryPhoto()}
+                disabled={photoRetrying || !photoFile}
+                className="inline-flex min-h-11 items-center gap-1.5 rounded-lg bg-amber-800 px-4 text-sm font-semibold text-white hover:bg-amber-900 disabled:opacity-50 cursor-pointer"
+              >
+                <IconCamera className="h-4 w-4" />
+                {photoRetrying ? 'Uploading…' : 'Retry photo upload'}
+              </button>
+              <button
+                type="button"
+                onClick={() => setPhotoFailure(null)}
+                className="inline-flex min-h-11 items-center rounded-lg border border-amber-400 bg-white px-4 text-sm font-semibold text-amber-950 hover:bg-amber-100 cursor-pointer"
+              >
+                Continue without photo
+              </button>
+            </div>
+          </div>
+        )}
+
+        {photoSavedNotice && (
+          <div
+            role="status"
+            className="flex items-center justify-between rounded-xl border border-emerald-300 bg-emerald-50 p-4 text-sm font-semibold text-emerald-950 shadow-xs"
+          >
+            <span className="flex items-center gap-2">
+              <IconCheck className="h-5 w-5 text-emerald-700" />
+              {photoSavedNotice}
+            </span>
+            <button
+              type="button"
+              onClick={() => setPhotoSavedNotice(null)}
+              className="text-xs font-bold text-emerald-800 hover:text-emerald-950 cursor-pointer"
+            >
+              Dismiss
+            </button>
+          </div>
+        )}
+
         {/* Quick Success Toast when 'Save and add another' is active */}
         {quickSuccessNotice && (
           <div
@@ -401,9 +521,11 @@ export function PatientRegister() {
           >
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div>
-                <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-200/70 px-3 py-1 text-xs font-bold text-emerald-900">
+                <span
+                  className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-bold ${photoFailure ? 'bg-amber-200/70 text-amber-900' : 'bg-emerald-200/70 text-emerald-900'}`}
+                >
                   <IconCheck className="h-4 w-4 text-emerald-800" />
-                  Registration Successful!
+                  {photoFailure ? 'Patient Registered — Photo Pending' : 'Registration Successful!'}
                 </span>
                 <h3 className="mt-2 text-xl font-bold text-slate-900">
                   {createdPatient.full_name}
@@ -434,7 +556,10 @@ export function PatientRegister() {
             <div className="flex flex-wrap items-center gap-3 pt-3 border-t border-emerald-200">
               <button
                 type="button"
-                onClick={() => navigate(`/reception/patients/${createdPatient.id}`)}
+                onClick={() => {
+                  skipUnsavedGuardRef.current = true
+                  navigate(`/reception/patients/${createdPatient.id}`)
+                }}
                 className="inline-flex min-h-11 items-center justify-center rounded-lg bg-emerald-800 px-5 text-sm font-semibold text-white hover:bg-emerald-900 shadow-xs cursor-pointer"
               >
                 View Patient File &amp; Card

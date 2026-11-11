@@ -275,7 +275,7 @@ export function ReceptionDashboard({ overview: initialOverview }: ReceptionDashb
       )}
 
       {/* 2. Area A: 6 Top-Level Operational KPI Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3.5">
+      <div className="admin-stagger grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3.5">
         {/* Card 1: Today's Registrations */}
         <button
           type="button"
@@ -873,23 +873,23 @@ export function ReceptionDashboard({ overview: initialOverview }: ReceptionDashb
                 {allAppointments.length > 0 ? (
                   <>
                     <div
-                      style={{ width: `${(waitingAppts.length / allAppointments.length) * 100}%` }}
-                      className="bg-amber-500 transition-all duration-300"
+                      style={{ width: `${(waitingAppts.length / allAppointments.length) * 100}%`, animationDelay: '0ms' }}
+                      className="admin-segment-grow bg-amber-500 transition-all duration-300"
                       title={`Waiting: ${waitingAppts.length}`}
                     />
                     <div
-                      style={{ width: `${(inConsultationAppts.length / allAppointments.length) * 100}%` }}
-                      className="bg-consult-600 transition-all duration-300"
+                      style={{ width: `${(inConsultationAppts.length / allAppointments.length) * 100}%`, animationDelay: '90ms' }}
+                      className="admin-segment-grow bg-consult-600 transition-all duration-300"
                       title={`In Consultation: ${inConsultationAppts.length}`}
                     />
                     <div
-                      style={{ width: `${(doneAppts.length / allAppointments.length) * 100}%` }}
-                      className="bg-emerald-600 transition-all duration-300"
+                      style={{ width: `${(doneAppts.length / allAppointments.length) * 100}%`, animationDelay: '180ms' }}
+                      className="admin-segment-grow bg-emerald-600 transition-all duration-300"
                       title={`Completed: ${doneAppts.length}`}
                     />
                     <div
-                      style={{ width: `${(bookedAppts.length / allAppointments.length) * 100}%` }}
-                      className="bg-neutral-400 transition-all duration-300"
+                      style={{ width: `${(bookedAppts.length / allAppointments.length) * 100}%`, animationDelay: '270ms' }}
+                      className="admin-segment-grow bg-neutral-400 transition-all duration-300"
                       title={`Booked: ${bookedAppts.length}`}
                     />
                   </>
@@ -931,14 +931,14 @@ export function ReceptionDashboard({ overview: initialOverview }: ReceptionDashb
               {/* Mini SVG Hourly Column Chart */}
               <div className="h-24 w-full flex items-end justify-between gap-1 pt-3 pb-1">
                 {overview.hourly_collections && overview.hourly_collections.length > 0 ? (
-                  overview.hourly_collections.map((pt) => {
+                  overview.hourly_collections.map((pt, index) => {
                     const maxVal = Math.max(...overview.hourly_collections!.map((p) => p.amount_paise), 10000)
                     const heightPercent = Math.min(100, Math.max(10, Math.round((pt.amount_paise / maxVal) * 85)))
                     return (
                       <div key={pt.hour} className="flex-1 flex flex-col items-center gap-1 group relative">
                         <div
-                          style={{ height: `${heightPercent}%` }}
-                          className={`w-full rounded-t transition:height 500ms ease-out ${pt.amount_paise > 0 ? 'bg-teal-600 group-hover:bg-teal-700' : 'bg-neutral-200'
+                          style={{ height: `${heightPercent}%`, animationDelay: `${index * 60}ms` }}
+                          className={`admin-bar-grow w-full rounded-t transition-[height] duration-500 ease-out ${pt.amount_paise > 0 ? 'bg-teal-600 group-hover:bg-teal-700' : 'bg-neutral-200'
                             }`}
                         />
                         <span className="text-xs text-neutral-500 font-mono">

@@ -232,8 +232,9 @@ describe('Registration desk: no second submit and no silent step failures (BR-00
     text: () => Promise.resolve(JSON.stringify(body)),
   })
 
-  function stubRegistrationApi(options: { photoFails: boolean }) {
+  function stubRegistrationApi(options: { photoFails: boolean; photoRetrySucceeds?: boolean }) {
     const postedPatients: unknown[] = []
+    let photoAttempts = 0
     const mockFetch = vi.fn().mockImplementation((url: string, init?: RequestInit) => {
       if (url.includes('/api/auth/me')) return Promise.resolve(jsonResponse(200, mockMe))
       if (url.includes('/api/patients/check-duplicate')) {
@@ -241,7 +242,9 @@ describe('Registration desk: no second submit and no silent step failures (BR-00
         return Promise.resolve(jsonResponse(200, noDup))
       }
       if (url.includes('/photo') && init?.method === 'POST') {
-        if (options.photoFails) return Promise.resolve(jsonResponse(500, { message: 'disk full' }))
+        photoAttempts += 1
+        const fails = options.photoFails && !(photoAttempts > 1 && options.photoRetrySucceeds)
+        if (fails) return Promise.resolve(jsonResponse(500, { message: 'disk full' }))
         return Promise.resolve(jsonResponse(200, { photo_path: 'p.jpg' }))
       }
       if (url.includes('/api/patients') && init?.method === 'POST') {
@@ -292,7 +295,7 @@ describe('Registration desk: no second submit and no silent step failures (BR-00
     expect(postedPatients).toHaveLength(1)
   })
 
-  it('reports a failed photo upload instead of showing a clean success', async () => {
+  it('reports a failed photo upload with a retry action instead of a clean success', async () => {
     stubRegistrationApi({ photoFails: true })
     const user = userEvent.setup()
     renderPage()
@@ -303,11 +306,51 @@ describe('Registration desk: no second submit and no silent step failures (BR-00
 
     await user.click(screen.getByRole('button', { name: /register patient/i }))
     await waitFor(() => {
-      expect(screen.getByText('Registration Successful!')).toBeInTheDocument()
+      expect(screen.getByText('Patient Registered — Photo Pending')).toBeInTheDocument()
     })
 
-    const warning = screen.getByRole('alert')
-    expect(warning).toHaveTextContent('Patient saved, but some steps did not complete')
-    expect(warning).toHaveTextContent('Photo was not saved')
+    const alert = screen.getByRole('alert')
+    expect(alert).toHaveTextContent('Patient saved, but the photo was not uploaded.')
+    expect(alert).toHaveTextContent('face.jpg')
+    expect(screen.getByRole('button', { name: /retry photo upload/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /continue without photo/i })).toBeInTheDocument()
+    expect(screen.queryByText('Registration Successful!')).not.toBeInTheDocument()
+  })
+
+  it('retries the photo and reports success without registering the patient twice', async () => {
+    const { postedPatients } = stubRegistrationApi({ photoFails: true, photoRetrySucceeds: true })
+    const user = userEvent.setup()
+    renderPage()
+    await fillRequiredFields(user)
+
+    const photo = new File(['jpeg-bytes'], 'face.jpg', { type: 'image/jpeg' })
+    await user.upload(screen.getByLabelText('Patient Photograph'), photo)
+
+    await user.click(screen.getByRole('button', { name: /register patient/i }))
+    const retry = await screen.findByRole('button', { name: /retry photo upload/i })
+    await user.click(retry)
+
+    await waitFor(() => {
+      expect(screen.getByText('Photo uploaded and saved to the patient record.')).toBeInTheDocument()
+    })
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+    expect(screen.getByText('Registration Successful!')).toBeInTheDocument()
+    expect(postedPatients).toHaveLength(1)
+  })
+
+  it('warns before unloading once the registration form has input', async () => {
+    stubRegistrationApi({ photoFails: false })
+    const user = userEvent.setup()
+    renderPage()
+
+    const clean = new Event('beforeunload', { cancelable: true })
+    window.dispatchEvent(clean)
+    expect(clean.defaultPrevented).toBe(false)
+
+    await user.type(screen.getByLabelText(/Full Name \*/i), 'Aarav')
+
+    const dirty = new Event('beforeunload', { cancelable: true })
+    window.dispatchEvent(dirty)
+    expect(dirty.defaultPrevented).toBe(true)
   })
 })

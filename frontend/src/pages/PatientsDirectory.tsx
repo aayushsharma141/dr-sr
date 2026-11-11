@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router'
-import { usePatients, useMe } from '../api/queries'
+import { usePatients, usePatientCount, useMe } from '../api/queries'
 import { AppShell } from '../components/AppShell'
+import { TableSkeleton } from '../components/AdminSkeleton'
 import { PatientEditModal } from '../components/PatientEditModal'
 import type { PatientOut } from '../api/types'
 
@@ -39,10 +40,15 @@ export function PatientsDirectory() {
     refetch,
   } = usePatients(debouncedQuery, PATIENTS_PAGE_SIZE + 1, page * PATIENTS_PAGE_SIZE)
 
+  const { data: countData } = usePatientCount(debouncedQuery)
+  const total = countData?.total
+
   const patients = fetched.slice(0, PATIENTS_PAGE_SIZE)
-  const hasNextPage = fetched.length > PATIENTS_PAGE_SIZE
+  const hasNextPage =
+    fetched.length > PATIENTS_PAGE_SIZE || (total !== undefined && (page + 1) * PATIENTS_PAGE_SIZE < total)
   const firstRowNumber = page * PATIENTS_PAGE_SIZE + 1
   const lastRowNumber = page * PATIENTS_PAGE_SIZE + patients.length
+  const totalPages = total !== undefined ? Math.max(1, Math.ceil(total / PATIENTS_PAGE_SIZE)) : undefined
 
   const handleEditClick = (patient: PatientOut) => {
     setSelectedPatientForEdit(patient)
@@ -71,12 +77,14 @@ export function PatientsDirectory() {
               Search and manage registered patients across the hospital LAN
             </p>
           </div>
-          <Link
-            to="/reception/patients/new"
-            className="inline-flex items-center justify-center px-4 py-2 bg-red-900 text-white rounded text-sm font-medium hover:bg-red-800 focus-visible:outline-2 focus-visible:outline-red-800 min-h-[44px] min-w-[44px] shadow-xs"
-          >
-            + Register New Patient
-          </Link>
+          {me?.role === 'RECEPTION' && (
+            <Link
+              to="/reception/patients/new"
+              className="inline-flex items-center justify-center px-4 py-2 bg-red-900 text-white rounded text-sm font-medium hover:bg-red-800 focus-visible:outline-2 focus-visible:outline-red-800 min-h-[44px] min-w-[44px] shadow-xs"
+            >
+              + Register New Patient
+            </Link>
+          )}
         </div>
 
         {successBanner && (
@@ -131,11 +139,7 @@ export function PatientsDirectory() {
 
         {/* Content Section */}
         {isPending ? (
-          <div className="bg-white p-12 text-center rounded-lg border border-neutral-200">
-            <p className="text-sm text-neutral-500" role="status">
-              Loading patients...
-            </p>
-          </div>
+          <TableSkeleton label="Loading patients..." rows={6} columns={8} />
         ) : isError ? (
           <div
             role="alert"
@@ -197,11 +201,12 @@ export function PatientsDirectory() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-neutral-200">
-                  {patients.map((p) => (
+                  {patients.map((p, index) => (
                     <tr
                       key={p.id}
                       className="hover:bg-neutral-50 transition-colors"
                       data-testid={`patient-row-${p.id}`}
+                      style={{ transitionDelay: `${index * 50}ms` }}
                     >
                       <td className="px-4 py-3 whitespace-nowrap">
                         <div className="w-10 h-10 rounded-full border border-neutral-200 bg-neutral-100 flex items-center justify-center overflow-hidden">
@@ -248,13 +253,15 @@ export function PatientsDirectory() {
                         >
                           View Card
                         </button>
-                        <button
-                          type="button"
-                          onClick={() => handleEditClick(p)}
-                          className="px-2.5 py-1.5 text-xs font-medium text-neutral-700 bg-neutral-100 hover:bg-neutral-200 rounded focus-visible:outline-2 focus-visible:outline-neutral-500 cursor-pointer min-h-[36px]"
-                        >
-                          Edit
-                        </button>
+                        {me?.role !== 'DOCTOR' && (
+                          <button
+                            type="button"
+                            onClick={() => handleEditClick(p)}
+                            className="px-2.5 py-1.5 text-xs font-medium text-neutral-700 bg-neutral-100 hover:bg-neutral-200 rounded focus-visible:outline-2 focus-visible:outline-neutral-500 cursor-pointer min-h-[36px]"
+                          >
+                            Edit
+                          </button>
+                        )}
                       </td>
                     </tr>
                   ))}
@@ -267,9 +274,13 @@ export function PatientsDirectory() {
             >
               <p role="status">
                 Showing {firstRowNumber}–{lastRowNumber}
+                {total !== undefined ? ` of ${total} patients` : ''}
               </p>
               <div className="flex items-center gap-2">
-                <span className="mr-1">Page {page + 1}</span>
+                <span className="mr-1">
+                  Page {page + 1}
+                  {totalPages !== undefined ? ` of ${totalPages}` : ''}
+                </span>
                 <button
                   type="button"
                   onClick={() => setPage((p) => Math.max(0, p - 1))}

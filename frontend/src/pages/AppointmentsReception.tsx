@@ -1,7 +1,9 @@
 import { useState } from 'react'
 import { Link, useSearchParams } from 'react-router'
 import { AppShell } from '../components/AppShell'
+import { TableSkeleton } from '../components/AdminSkeleton'
 import { ConflictBanner } from '../components/ConflictBanner'
+import { InlineAlert } from '../components/InlineAlert'
 import { Modal } from '../components/Modal'
 import {
   useAppointments,
@@ -12,6 +14,7 @@ import {
 } from '../api/queries'
 import type { Appointment, AppointmentStatus, DoctorOut } from '../api/types'
 import { istToday } from '../format'
+import { isVersionConflict } from '../api/client'
 import { IconTicket, IconUserPlus } from '../components/icons'
 
 
@@ -95,9 +98,7 @@ function FollowUpVisits() {
       </div>
 
       {isPending ? (
-        <div className="rounded-xl border border-slate-200 bg-white p-12 text-center text-sm text-slate-500" role="status">
-          Loading prescription follow-ups…
-        </div>
+        <TableSkeleton label="Loading prescription follow-ups…" rows={5} columns={6} />
       ) : isError ? (
         <div className="rounded-xl border border-red-200 bg-red-50 p-5 text-sm text-red-900" role="alert">
           Unable to load follow-ups: {error.message}
@@ -128,7 +129,8 @@ function FollowUpVisits() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {followUps.map((item) => {
+                {followUps.map((item, index) => {
+                  const rowDelay = index * 50
                   const date = item.follow_up_date || ''
                   const overdue = date < today
                   const dueToday = date === today
@@ -139,7 +141,7 @@ function FollowUpVisits() {
                       ? 'bg-amber-50 text-amber-800 ring-amber-200'
                       : 'bg-emerald-50 text-emerald-800 ring-emerald-200'
                   return (
-                    <tr key={item.id} className="hover:bg-slate-50/80">
+                    <tr key={item.id} className="hover:bg-slate-50/80 transition-colors" style={{ transitionDelay: `${rowDelay}ms` }}>
                       <td className="whitespace-nowrap px-4 py-3 font-semibold text-slate-800">
                         {date ? new Date(`${date}T00:00:00`).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'}
                       </td>
@@ -189,6 +191,7 @@ export function AppointmentsReception() {
   const [selectedDate, setSelectedDate] = useState(istToday)
   const [selectedDoctorId, setSelectedDoctorId] = useState<number | undefined>(undefined)
   const [conflictError, setConflictError] = useState<string | null>(null)
+  const [actionError, setActionError] = useState<string | null>(null)
 
   // Cancel dialog state
   const [cancellingAppt, setCancellingAppt] = useState<Appointment | null>(null)
@@ -224,6 +227,7 @@ export function AppointmentsReception() {
     reason?: string,
   ) => {
     setConflictError(null)
+    setActionError(null)
     try {
       await updateStatusMutation.mutateAsync({
         id: appt.id,
@@ -238,10 +242,10 @@ export function AppointmentsReception() {
         setCancelReason('')
       }
     } catch (err: unknown) {
-      if (err instanceof Error) {
-        setConflictError(err.message)
+      if (isVersionConflict(err)) {
+        setConflictError('Appointment was modified concurrently by another session.')
       } else {
-        setConflictError('Failed to update status.')
+        setActionError(err instanceof Error ? err.message : 'Failed to update status.')
       }
     }
   }
@@ -311,6 +315,12 @@ export function AppointmentsReception() {
                   refetch()
                 }}
               />
+            )}
+
+            {actionError && (
+              <InlineAlert tone="error" onDismiss={() => setActionError(null)}>
+                {actionError}
+              </InlineAlert>
             )}
 
             {/* CLINICAL OPD JOURNEY PIPELINE BANNER */}
@@ -486,7 +496,7 @@ export function AppointmentsReception() {
               </div>
 
               {isPending ? (
-                <div className="p-8 text-center text-neutral-500">Loading appointments schedule...</div>
+                <TableSkeleton label="Loading appointments schedule..." rows={5} columns={6} />
               ) : isError ? (
                 <div className="p-8 text-center text-red-700">Failed to load appointments: {error.message}</div>
               ) : appointments.length === 0 ? (
@@ -525,8 +535,8 @@ export function AppointmentsReception() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-neutral-200">
-                      {appointments.map((appt) => (
-                        <tr key={appt.id} className="hover:bg-neutral-50/80 transition-colors">
+                      {appointments.map((appt, index) => (
+                        <tr key={appt.id} className="hover:bg-neutral-50/80 transition-colors" style={{ transitionDelay: `${index * 50}ms` }}>
                           <td className="py-3 px-4 font-mono font-bold text-neutral-900 text-base">
                             <span className="inline-flex items-center px-2.5 py-1 rounded bg-neutral-100 text-neutral-900">
                               #{appt.token_number}

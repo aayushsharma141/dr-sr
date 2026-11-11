@@ -8,6 +8,7 @@ import { apiFetch, ApiError } from '../../api/client'
 import type { PatientOut, AdminPatientDemographicCorrection } from '../../api/types'
 import { ConflictBanner } from '../../components/ConflictBanner'
 import { DemographicCorrectionModal } from '../../components/admin/DemographicCorrectionModal'
+import { AdminPageHeader } from '../../components/admin/AdminPageHeader'
 import { AppShell } from '../../components/AppShell'
 
 export function PatientCorrectionPage() {
@@ -138,14 +139,10 @@ export function PatientCorrectionPage() {
     <AppShell name={me?.full_name ?? 'Admin'} role={me?.role ?? 'ADMIN'}>
       <div className="space-y-6">
         {/* Page Header */}
-        <div className="border-b border-slate-200 pb-4">
-          <h1 className="text-2xl font-bold tracking-tight text-slate-900">
-            Patient Corrections
-          </h1>
-          <p className="mt-1 text-sm text-slate-600">
-            Audited administrative workspace for correcting patient identity and contact records. Historical printouts retain their original issued snapshot.
-          </p>
-        </div>
+        <AdminPageHeader
+          title="Patient Corrections"
+          description="Audited administrative workspace for correcting patient identity and contact records. Historical printouts retain their original issued snapshot."
+        />
 
       {/* Patient Search Section */}
       <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-xs">
@@ -227,11 +224,12 @@ export function PatientCorrectionPage() {
                   <span>Select a patient to open correction form</span>
                 </div>
                 <div className="max-h-60 overflow-y-auto divide-y divide-slate-100 rounded-md border border-slate-200">
-                  {searchResults.map((p) => (
+                  {searchResults.map((p, index) => (
                     <button
                       key={p.id}
                       type="button"
                       onClick={() => setSelectedPatient(p)}
+                      style={{ transitionDelay: `${index * 50}ms` }}
                       className={`w-full text-left p-3 text-xs transition-colors cursor-pointer flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 ${
                         selectedPatient?.id === p.id
                           ? 'bg-rose-50 border-l-4 border-l-[#8E1C3D]'
@@ -559,9 +557,9 @@ export function PatientCorrectionPage() {
                 </span>
               </div>
 
-              <div className="rounded border border-slate-200 overflow-hidden">
+              <div className="max-h-[65vh] overflow-auto rounded border border-slate-200">
                 <table className="w-full border-collapse text-left text-xs">
-                  <thead className="bg-slate-100 font-semibold text-slate-700 border-b border-slate-200">
+                  <thead className="sticky top-0 z-10 bg-slate-100 font-semibold text-slate-700 border-b border-slate-200">
                     <tr>
                       <th className="py-2 px-3 w-1/3">Field</th>
                       <th className="py-2 px-3 w-1/3">Stored</th>
@@ -580,12 +578,13 @@ export function PatientCorrectionPage() {
                       { label: 'District', curr: selectedPatient.district, next: district.trim() },
                       { label: 'State', curr: selectedPatient.state, next: state.trim() },
                       { label: 'Emergency', curr: selectedPatient.emergency_contact || '—', next: emergencyContact.trim() || '—' },
-                    ].map((row) => {
+                    ].map((row, index) => {
                       const changed = row.curr !== row.next
                       return (
                         <tr
                           key={row.label}
-                          className={changed ? 'bg-rose-50/70 border-l-4 border-l-[#8E1C3D]' : 'bg-white'}
+                          className={`transition-colors ${changed ? 'bg-rose-50/70 border-l-4 border-l-[#8E1C3D]' : 'bg-white'}`}
+                          style={{ transitionDelay: `${index * 50}ms` }}
                         >
                           <td className="py-2 px-3 font-medium text-slate-700">
                             {row.label}

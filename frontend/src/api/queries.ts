@@ -728,6 +728,13 @@ export function usePatients(q: string = '', limit: number = 20, offset: number =
   })
 }
 
+export function usePatientCount(q: string = '') {
+  return useQuery({
+    queryKey: ['patients', 'count', { q }],
+    queryFn: () => apiFetch<{ total: number }>(`/patients/count?q=${encodeURIComponent(q)}`),
+  })
+}
+
 export function usePatient(id: number | null) {
   return useQuery({
     queryKey: ['patient', id],

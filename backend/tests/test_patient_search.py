@@ -99,3 +99,47 @@ def test_patient_multimodal_search(
 
     # 6. Detail retrieval for non-existent id
     assert rec_c.get("/api/patients/999999").status_code == 404
+
+
+def test_patient_count_matches_directory_search(
+    login_client: Any,
+    reception_user: User,
+    db_session: Session,
+) -> None:
+    """The count endpoint totals the same filtered rows the list endpoint returns."""
+    rec_c = login_client(reception_user)
+
+    p1 = Patient(
+        urn="KH-2026-0201",
+        full_name="Count Patient One",
+        guardian_name="Guardian One",
+        gender="M",
+        age_years=40,
+        mobile="9800000001",
+        address="Ara",
+    )
+    p2 = Patient(
+        urn="KH-2026-0202",
+        full_name="Count Patient Two",
+        guardian_name="Guardian Two",
+        gender="F",
+        age_years=35,
+        mobile="9800000002",
+        address="Bihiya",
+    )
+    db_session.add_all([p1, p2])
+    db_session.flush()
+
+    resp = rec_c.get("/api/patients/count")
+    assert resp.status_code == 200
+    assert resp.json()["total"] >= 2
+
+    resp = rec_c.get("/api/patients/count?q=0201")
+    assert resp.status_code == 200
+    assert resp.json()["total"] == 1
+
+    assert rec_c.get("/api/patients?q=0201").json()[0]["urn"] == "KH-2026-0201"
+
+
+def test_patient_count_anonymous_rejected(client: TestClient) -> None:
+    assert client.get("/api/patients/count").status_code == 401

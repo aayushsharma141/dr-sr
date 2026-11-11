@@ -23,6 +23,17 @@ router = APIRouter(tags=["audit"])
 
 
 @router.get(
+    "/audit-logs/actions",
+    response_model=list[str],
+    dependencies=[Depends(require(Permission.AUDIT_READ))],
+)
+def list_audit_actions(session: SessionDep) -> list[str]:
+    """Return sorted distinct list of audit action names recorded in the system."""
+    stmt = select(AuditLog.action).distinct().order_by(AuditLog.action.asc())
+    return list(session.scalars(stmt).all())
+
+
+@router.get(
     "/audit-logs",
     response_model=AuditLogListResponse,
     dependencies=[Depends(require(Permission.AUDIT_READ))],

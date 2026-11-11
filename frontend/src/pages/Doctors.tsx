@@ -10,6 +10,7 @@ import {
 } from '../api/queries'
 import { ApiError } from '../api/client'
 import { AppShell } from '../components/AppShell'
+import { TableSkeleton } from '../components/AdminSkeleton'
 import { ConflictBanner } from '../components/ConflictBanner'
 import { InlineAlert } from '../components/InlineAlert'
 import { Modal } from '../components/Modal'
@@ -435,7 +436,7 @@ export function Doctors() {
           </div>
 
           {doctorsLoading ? (
-            <p className="text-sm text-neutral-600 py-6 text-center">Loading doctors...</p>
+            <TableSkeleton label="Loading doctors..." rows={4} columns={7} />
           ) : (
             <div className="bg-white rounded-lg border border-neutral-200 overflow-x-auto shadow-xs">
               <table className="w-full text-left text-sm text-neutral-800">
@@ -453,8 +454,8 @@ export function Doctors() {
                 </thead>
                 <tbody className="divide-y divide-neutral-200">
                   {doctors && doctors.length > 0 ? (
-                    doctors.map((doc) => (
-                      <tr key={doc.id} className="hover:bg-neutral-50">
+                    doctors.map((doc, index) => (
+                      <tr key={doc.id} className="hover:bg-neutral-50 transition-colors" style={{ transitionDelay: `${index * 50}ms` }}>
                         <td className="px-4 py-3 font-medium text-neutral-900">{doc.name_en}</td>
                         <td className="px-4 py-3 text-neutral-700" lang={doc.name_hi ? 'hi' : undefined}>
                           {doc.name_hi || '-'}
@@ -535,7 +536,7 @@ export function Doctors() {
           )}
 
           {feesLoading ? (
-            <p className="text-sm text-neutral-600 py-6 text-center">Loading fees...</p>
+            <TableSkeleton label="Loading fees..." rows={3} columns={4} />
           ) : (
             <div className="bg-white rounded-lg border border-neutral-200 overflow-x-auto shadow-xs">
               <table className="w-full text-left text-sm text-neutral-800">
@@ -549,8 +550,8 @@ export function Doctors() {
                 </thead>
                 <tbody className="divide-y divide-neutral-200">
                   {visibleFees.length > 0 ? (
-                    visibleFees.map((fee) => (
-                      <tr key={fee.id} className={fee.is_active ? 'hover:bg-neutral-50' : 'bg-neutral-50'}>
+                    visibleFees.map((fee, index) => (
+                      <tr key={fee.id} className={`transition-colors ${fee.is_active ? 'hover:bg-neutral-50' : 'bg-neutral-50'}`} style={{ transitionDelay: `${index * 50}ms` }}>
                         <td className="px-4 py-3 font-medium text-neutral-900">{fee.name}</td>
                         <td className="px-4 py-3 text-right font-semibold tabular-nums text-neutral-900">
                           {formatRupees(fee.fee_paise)}

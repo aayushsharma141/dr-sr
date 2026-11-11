@@ -1,6 +1,7 @@
 import { useMe } from '../../api/queries'
 import { AppShell } from '../../components/AppShell'
 import { PrintTemplateEditor } from '../../components/admin/PrintTemplateEditor'
+import { AdminPageHeader } from '../../components/admin/AdminPageHeader'
 
 export function PrintTemplatesPage() {
   const { data: me } = useMe()
@@ -9,12 +10,10 @@ export function PrintTemplatesPage() {
   return (
     <AppShell name={name} role="ADMIN">
       <div className="mx-auto w-full max-w-[1600px] space-y-6">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-900">Print Templates</h1>
-          <p className="mt-1 text-sm text-slate-600">
-            Configure per-document bilingual header and footer texts for prescriptions, receipts, identity cards, and consultation summaries.
-          </p>
-        </div>
+        <AdminPageHeader
+          title="Print Templates"
+          description="Configure per-document bilingual header and footer texts for prescriptions, receipts, identity cards, and consultation summaries."
+        />
 
         <PrintTemplateEditor />
       </div>

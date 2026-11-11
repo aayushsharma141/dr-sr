@@ -92,6 +92,14 @@ describe('Patients Directory and Profile Screens', () => {
           text: () => Promise.resolve(JSON.stringify(mockMe)),
         })
       }
+      if (url.includes('/api/patients/count')) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          headers: new Headers({ 'content-type': 'application/json' }),
+          text: () => Promise.resolve(JSON.stringify({ total: mockPatients.length })),
+        })
+      }
       if (url.includes('/api/patients')) {
         return Promise.resolve({
           ok: true,
@@ -141,12 +149,20 @@ describe('Patients Directory and Profile Screens', () => {
         })
       }
       if (url.includes('/api/patients')) {
-        requestedUrls.push(url)
         const params = new URL(url, 'http://localhost').searchParams
         const limit = Number(params.get('limit'))
         const offset = Number(params.get('offset'))
         const q = params.get('q') ?? ''
         const matches = allPatients.filter((p) => p.full_name.includes(q))
+        if (url.includes('/api/patients/count')) {
+          return Promise.resolve({
+            ok: true,
+            status: 200,
+            headers: new Headers({ 'content-type': 'application/json' }),
+            text: () => Promise.resolve(JSON.stringify({ total: matches.length })),
+          })
+        }
+        requestedUrls.push(url)
         return Promise.resolve({
           ok: true,
           status: 200,
@@ -175,7 +191,8 @@ describe('Patients Directory and Profile Screens', () => {
     expect(requestedUrls[0]).toContain('offset=0')
     expect(screen.getByText('KH-2026-0020')).toBeInTheDocument()
     expect(screen.queryByText('KH-2026-0021')).not.toBeInTheDocument()
-    expect(screen.getByText('Showing 1–20')).toBeInTheDocument()
+    expect(await screen.findByText('Showing 1–20 of 25 patients')).toBeInTheDocument()
+    expect(screen.getByText('Page 1 of 2')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Previous' })).toBeDisabled()
 
     // Page 2: the remaining 5 rows, Next disabled.
@@ -186,14 +203,14 @@ describe('Patients Directory and Profile Screens', () => {
     expect(requestedUrls.some((u) => u.includes('offset=20'))).toBe(true)
     expect(screen.getByText('KH-2026-0025')).toBeInTheDocument()
     expect(screen.queryByText('KH-2026-0001')).not.toBeInTheDocument()
-    expect(screen.getByText('Showing 21–25')).toBeInTheDocument()
-    expect(screen.getByText('Page 2')).toBeInTheDocument()
+    expect(screen.getByText('Showing 21–25 of 25 patients')).toBeInTheDocument()
+    expect(screen.getByText('Page 2 of 2')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Next' })).toBeDisabled()
 
     // A new search goes back to page 1.
     await user.type(screen.getByPlaceholderText(/search by urn/i), 'Patient 2')
     await waitFor(() => {
-      expect(screen.getByText('Page 1')).toBeInTheDocument()
+      expect(screen.getByText(/^Page 1( of \d+)?$/)).toBeInTheDocument()
     })
     const lastUrl = requestedUrls[requestedUrls.length - 1]
     expect(lastUrl).toContain('q=Patient%202')
@@ -226,6 +243,14 @@ describe('Patients Directory and Profile Screens', () => {
                 version_id: 2,
               }),
             ),
+        })
+      }
+      if (url.includes('/api/patients/count')) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          headers: new Headers({ 'content-type': 'application/json' }),
+          text: () => Promise.resolve(JSON.stringify({ total: mockPatients.length })),
         })
       }
       if (url.includes('/api/patients')) {
@@ -318,6 +343,14 @@ describe('Patients Directory and Profile Screens', () => {
                 version_id: 2,
               }),
             ),
+        })
+      }
+      if (url.includes('/api/patients/count')) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          headers: new Headers({ 'content-type': 'application/json' }),
+          text: () => Promise.resolve(JSON.stringify({ total: mockPatients.length })),
         })
       }
       if (url.includes('/api/patients')) {
@@ -661,5 +694,97 @@ describe('Patients Directory and Profile Screens', () => {
       expect(screen.getByText('PATIENT_UPDATED')).toBeInTheDocument()
     })
     expect(screen.getByText('admin')).toBeInTheDocument()
+  })
+
+  it('hides registration and edit actions from DOCTOR role in directory and patient file', async () => {
+    const doctorMe: Me = {
+      ...mockMe,
+      role: 'DOCTOR',
+      username: 'dr.dwivedi',
+      full_name: 'Dr. Madan Mohan Dwivedi',
+      doctor_id: 1,
+      permissions: ['patient:read', 'consultation:read', 'consultation:write'],
+    }
+
+    const mockFetch = vi.fn().mockImplementation((url: string) => {
+      if (url.includes('/api/auth/me')) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          headers: new Headers({ 'content-type': 'application/json' }),
+          text: () => Promise.resolve(JSON.stringify(doctorMe)),
+        })
+      }
+      if (url.includes('/api/patients/count')) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          headers: new Headers({ 'content-type': 'application/json' }),
+          text: () => Promise.resolve(JSON.stringify({ total: 1 })),
+        })
+      }
+      if (url.includes('/api/patients/101')) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          headers: new Headers({ 'content-type': 'application/json' }),
+          text: () => Promise.resolve(JSON.stringify(mockPatients[0])),
+        })
+      }
+      if (url.includes('/api/patients/')) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          headers: new Headers({ 'content-type': 'application/json' }),
+          text: () => Promise.resolve(JSON.stringify([mockPatients[0]])),
+        })
+      }
+      if (url.includes('/api/patients')) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          headers: new Headers({ 'content-type': 'application/json' }),
+          text: () => Promise.resolve(JSON.stringify([mockPatients[0]])),
+        })
+      }
+      return Promise.reject(new Error(`Unhandled: ${url}`))
+    })
+    vi.stubGlobal('fetch', mockFetch)
+
+    const { unmount } = render(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter>
+          <PatientsDirectory />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    )
+
+    await waitFor(() => {
+      expect(screen.getByText('KH-2026-0001')).toBeInTheDocument()
+    })
+    // Doctor cannot register patients or edit demographic rows
+    expect(screen.queryByRole('link', { name: /\+ register new patient/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /^edit$/i })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /view card/i })).toBeInTheDocument()
+
+    unmount()
+
+    // Test PatientDetail view with doctor role
+    render(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter initialEntries={['/reception/patients/101']}>
+          <Routes>
+            <Route path="/reception/patients/:id" element={<PatientDetail />} />
+          </Routes>
+        </MemoryRouter>
+      </QueryClientProvider>,
+    )
+
+    await waitFor(() => {
+      expect(screen.getByText('KH-2026-0001')).toBeInTheDocument()
+    })
+    // Doctor can view file and print card, but cannot edit demographics
+    expect(screen.queryByRole('button', { name: /edit demographics/i })).not.toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /print card/i })).toBeInTheDocument()
   })
 })

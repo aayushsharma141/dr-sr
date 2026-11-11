@@ -197,16 +197,21 @@ function KeyFigure({
   value,
   icon,
   tone,
+  index = 0,
   children,
 }: {
   label: string
   value: string
   icon: ReactNode
   tone: keyof typeof CHIP
+  index?: number
   children?: ReactNode
 }) {
   return (
-    <div className={CARD}>
+    <div
+      className={`${CARD} admin-fade-up transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md`}
+      style={{ animationDelay: `${index * 70}ms` }}
+    >
       <div className="flex items-center gap-3">
         <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full border ${CHIP[tone]}`}>{icon}</div>
         <div className="min-w-0">
@@ -258,10 +263,29 @@ function CollectionsChart({ rows }: { rows: { month: string; paise: number }[] }
             </text>
           </g>
         ))}
-        <path d={area} fill="url(#admin-collections-fill)" />
-        <path d={line} fill="none" stroke="var(--color-brand-700)" strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round" />
+        <path d={area} fill="url(#admin-collections-fill)" className="admin-area-in" />
+        <path
+          d={line}
+          fill="none"
+          stroke="var(--color-brand-700)"
+          strokeWidth="2.5"
+          strokeLinejoin="round"
+          strokeLinecap="round"
+          pathLength={1}
+          className="admin-line-draw"
+        />
         {rows.map((r, i) => (
-          <circle key={r.month} cx={x(i)} cy={y(r.paise)} r="4" fill="white" stroke="var(--color-brand-700)" strokeWidth="2">
+          <circle
+            key={r.month}
+            cx={x(i)}
+            cy={y(r.paise)}
+            r="4"
+            fill="white"
+            stroke="var(--color-brand-700)"
+            strokeWidth="2"
+            className="admin-area-in"
+            style={{ animationDelay: `${0.3 + i * 0.08}s` }}
+          >
             <title>{`${r.month}: ${rupees(r.paise)}`}</title>
           </circle>
         ))}
@@ -304,7 +328,7 @@ function DepartmentDonut({ rows, totalPaise }: { rows: DepartmentCollection[]; t
             : `Collected by department: ${rows.map((d) => `${d.name} ${d.percentage}%`).join(', ')}`
         }>
           <circle cx="50" cy="50" r={R} fill="none" stroke="var(--color-slate-100)" strokeWidth="16" />
-          {colored.map((d) => {
+          {colored.map((d, i) => {
             const len = (d.percentage / 100) * C
             const el = (
               <circle
@@ -317,6 +341,8 @@ function DepartmentDonut({ rows, totalPaise }: { rows: DepartmentCollection[]; t
                 strokeWidth="16"
                 strokeDasharray={`${len} ${C - len}`}
                 strokeDashoffset={-offset}
+                className="admin-donut-in"
+                style={{ animationDelay: `${i * 90}ms` }}
               >
                 <title>{`${d.name}: ${rupees(d.collected_paise)} (${d.percentage}%)`}</title>
               </circle>
@@ -358,8 +384,8 @@ function MonthBars({ rows, label }: { rows: { month: string; value: number }[]; 
           <span className="text-xs font-semibold tabular-nums text-slate-700">{r.value}</span>
           <div className="flex h-20 w-full items-end">
             <div
-              className={`w-full rounded-t ${i === rows.length - 1 ? 'bg-brand-700' : 'bg-brand-700/30'}`}
-              style={{ height: `${Math.max(r.value > 0 ? 6 : 0, (r.value / max) * 100)}%` }}
+              className={`admin-bar-grow w-full rounded-t ${i === rows.length - 1 ? 'bg-brand-700' : 'bg-brand-700/30'}`}
+              style={{ height: `${Math.max(r.value > 0 ? 6 : 0, (r.value / max) * 100)}%`, animationDelay: `${i * 70}ms` }}
             />
           </div>
           <span className="text-xs text-slate-600">{r.month}</span>
@@ -441,7 +467,7 @@ function NeedsAttention({ overview, className }: { overview: Partial<AdminOvervi
         </p>
       ) : (
         <ul className="-my-2 divide-y divide-slate-100">
-          {items.map((item) => {
+          {items.map((item, itemIndex) => {
             const body = (
               <>
                 <span className="min-w-0">
@@ -458,12 +484,18 @@ function NeedsAttention({ overview, className }: { overview: Partial<AdminOvervi
                 {item.to ? (
                   <Link
                     to={item.to}
-                    className="flex items-center justify-between gap-2 py-3 text-sm hover:text-brand-700 focus-visible:outline-2 focus-visible:outline-brand-700"
+                    className="admin-fade-up flex items-center justify-between gap-2 rounded py-3 text-sm transition-colors hover:bg-slate-50/70 hover:text-brand-700 focus-visible:outline-2 focus-visible:outline-brand-700"
+                    style={{ animationDelay: `${itemIndex * 60}ms` }}
                   >
                     {body}
                   </Link>
                 ) : (
-                  <div className="flex items-center justify-between gap-2 py-3 text-sm">{body}</div>
+                  <div
+                    className="admin-fade-up flex items-center justify-between gap-2 rounded py-3 text-sm transition-colors hover:bg-slate-50/70"
+                    style={{ animationDelay: `${itemIndex * 60}ms` }}
+                  >
+                    {body}
+                  </div>
                 )}
               </li>
             )
@@ -498,7 +530,16 @@ function AppointmentsToday({ overview }: { overview: Partial<AdminOverview> }) {
         <>
           <p className="text-3xl font-bold tabular-nums text-slate-900">{total}</p>
           <div className="mt-3 flex h-2.5 overflow-hidden rounded-full bg-slate-100" aria-hidden="true">
-            {segments.map((s) => s.n > 0 && <div key={s.key} className={s.color} style={{ width: `${(s.n / total) * 100}%` }} />)}
+            {segments.map(
+              (s, index) =>
+                s.n > 0 && (
+                  <div
+                    key={s.key}
+                    className={`${s.color} admin-segment-grow`}
+                    style={{ width: `${(s.n / total) * 100}%`, animationDelay: `${index * 90}ms` }}
+                  />
+                ),
+            )}
           </div>
           <dl className="mt-3 grid grid-cols-[minmax(0,1fr)_auto] gap-x-3 gap-y-1 text-sm">
             {segments.map((s) => (
@@ -570,9 +611,13 @@ function SystemHealth({ overview }: { overview: Partial<AdminOverview> }) {
       }
     >
       <ul className="space-y-2.5 text-sm">
-        {rows.map((r) => (
+        {rows.map((r, index) => (
           <li key={r.label}>
-            <Link to={r.to} className="flex items-center justify-between gap-3 hover:text-brand-700 focus-visible:outline-2 focus-visible:outline-brand-700">
+            <Link
+              to={r.to}
+              className="admin-fade-up flex items-center justify-between gap-3 rounded px-1 py-0.5 transition-colors hover:bg-slate-50/70 hover:text-brand-700 focus-visible:outline-2 focus-visible:outline-brand-700"
+              style={{ animationDelay: `${index * 60}ms` }}
+            >
               <span className="flex items-center gap-2 text-slate-700">
                 {r.ok === false ? (
                   <IconAlertTriangle size={16} className="text-amber-700" aria-label="Needs checking" />
@@ -612,8 +657,12 @@ function DoctorsToday({ overview }: { overview: Partial<AdminOverview> }) {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 tabular-nums">
-              {doctors.map((d) => (
-                <tr key={d.doctor_id}>
+              {doctors.map((d, index) => (
+                <tr
+                  key={d.doctor_id}
+                  className="admin-fade-up transition-colors hover:bg-slate-50/70"
+                  style={{ animationDelay: `${index * 60}ms` }}
+                >
                   <td className="py-2 pr-3 font-medium text-slate-900">{d.name}</td>
                   <td className="px-3 py-2 text-right">{d.waiting}</td>
                   <td className="px-3 py-2 text-right">{d.in_consultation}</td>
@@ -648,7 +697,11 @@ function RecentAdminActions({ actions }: { actions: RecentAdminActionOut[] | und
       ) : (
         <ul className="-my-2 divide-y divide-slate-100 text-sm">
           {actions.slice(0, 6).map((a, i) => (
-            <li key={`${a.occurred_at}-${a.action}-${i}`} className="flex flex-wrap items-baseline justify-between gap-x-3 py-2">
+            <li
+              key={`${a.occurred_at}-${a.action}-${i}`}
+              className="admin-fade-up flex flex-wrap items-baseline justify-between gap-x-3 rounded py-2 transition-colors hover:bg-slate-50/70"
+              style={{ animationDelay: `${i * 60}ms` }}
+            >
               <span className="min-w-0 text-slate-900">
                 {ACTION_WORDS[a.action] ?? sentence(a.action)}
                 <span className="text-slate-600"> by {a.actor_username ?? 'System'}</span>
@@ -689,6 +742,7 @@ export function AdminDashboard({ overview }: { overview: Partial<AdminOverview> 
         </h2>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
           <KeyFigure
+            index={0}
             label="Collected this month"
             value={month ? rupees(month.collections_paise.current) : monthNote}
             icon={<IconRupee size={22} aria-hidden="true" />}
@@ -697,6 +751,7 @@ export function AdminDashboard({ overview }: { overview: Partial<AdminOverview> 
             {month && <Delta value={month.collections_paise} unit="₹" />}
           </KeyFigure>
           <KeyFigure
+            index={1}
             label="Collected today"
             value={cash ? rupees(cash.gross_paise - cash.reversed_paise) : NOT_REPORTED}
             icon={<IconReceipt size={22} aria-hidden="true" />}
@@ -713,6 +768,7 @@ export function AdminDashboard({ overview }: { overview: Partial<AdminOverview> 
             )}
           </KeyFigure>
           <KeyFigure
+            index={2}
             label="New patients this month"
             value={month ? count(month.new_patients.current) : monthNote}
             icon={<IconUserPlus size={22} aria-hidden="true" />}
@@ -721,6 +777,7 @@ export function AdminDashboard({ overview }: { overview: Partial<AdminOverview> 
             {month && <Delta value={month.new_patients} />}
           </KeyFigure>
           <KeyFigure
+            index={3}
             label="Pending dues"
             value={typeof overview.outstanding_dues_paise === 'number' ? rupees(overview.outstanding_dues_paise) : NOT_REPORTED}
             icon={<IconWallet size={22} aria-hidden="true" />}

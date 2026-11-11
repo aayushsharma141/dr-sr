@@ -23,6 +23,7 @@ from kalyan_api.db.session import SessionDep
 from kalyan_api.models import Patient
 from kalyan_api.schemas.patients import (
     DuplicateCheckResponse,
+    PatientCountResponse,
     PatientCreate,
     PatientOut,
     PatientUpdate,
@@ -145,18 +146,8 @@ def check_duplicate_patient(
     return DuplicateCheckResponse(has_duplicate=False, matching_patient=None)
 
 
-@router.get(
-    "",
-    dependencies=[Depends(require(Permission.PATIENT_READ))],
-    response_model=list[PatientOut],
-)
-def list_or_search_patients(
-    session: SessionDep,
-    q: str | None = Query(default=None, description="Search query matching URN, mobile, or name."),
-    limit: int = Query(default=50, ge=1, le=100),
-    offset: int = Query(default=0, ge=0),
-) -> list[PatientOut]:
-    """Search patients across URN, 10-digit mobile, and English/Devanagari full name."""
+def _patient_search_stmt(q: str | None):
+    """Build the shared directory filter for URN, mobile, and name searches."""
     stmt = select(Patient)
 
     if q and q.strip():
@@ -172,9 +163,43 @@ def list_or_search_patients(
 
         stmt = stmt.where(or_(*conditions))
 
-    stmt = stmt.order_by(Patient.created_at.desc(), Patient.id.desc()).limit(limit).offset(offset)
+    return stmt
+
+
+@router.get(
+    "",
+    dependencies=[Depends(require(Permission.PATIENT_READ))],
+    response_model=list[PatientOut],
+)
+def list_or_search_patients(
+    session: SessionDep,
+    q: str | None = Query(default=None, description="Search query matching URN, mobile, or name."),
+    limit: int = Query(default=50, ge=1, le=100),
+    offset: int = Query(default=0, ge=0),
+) -> list[PatientOut]:
+    """Search patients across URN, 10-digit mobile, and English/Devanagari full name."""
+    stmt = (
+        _patient_search_stmt(q)
+        .order_by(Patient.created_at.desc(), Patient.id.desc())
+        .limit(limit)
+        .offset(offset)
+    )
     results = session.scalars(stmt).all()
     return [PatientOut.model_validate(p) for p in results]
+
+
+@router.get(
+    "/count",
+    dependencies=[Depends(require(Permission.PATIENT_READ))],
+    response_model=PatientCountResponse,
+)
+def count_patients(
+    session: SessionDep,
+    q: str | None = Query(default=None, description="Search query matching URN, mobile, or name."),
+) -> PatientCountResponse:
+    """Total patients matching the same search the directory list endpoint uses."""
+    stmt = select(func.count()).select_from(_patient_search_stmt(q).subquery())
+    return PatientCountResponse(total=session.scalar(stmt) or 0)
 
 
 @router.get(

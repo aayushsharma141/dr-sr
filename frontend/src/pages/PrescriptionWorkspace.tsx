@@ -2,6 +2,7 @@ import { useState, useId } from 'react'
 import { useSearchParams, Link } from 'react-router'
 import { AppShell } from '../components/AppShell'
 import { PrescriptionPrint } from '../components/PrescriptionPrint'
+import { UnsavedChangesGuard } from '../components/UnsavedChangesGuard'
 import {
   usePatient,
   usePatientPrescriptions,
@@ -58,6 +59,20 @@ export function PrescriptionWorkspace() {
 
   // Query for historical prescription viewing
   const { data: historicalRx } = usePrescription(viewHistoryRxId || 0)
+
+  // Any field typed into or medication added means leaving now would lose work.
+  const isDirty =
+    Boolean(diagnosis.trim() || dietaryAdvice.trim() || generalAdvice.trim() || followUpDate) ||
+    items.length > 1 ||
+    items.some(
+      (it, index) =>
+        it.medicine_name.trim() !== '' ||
+        it.dosage.trim() !== '' ||
+        (index === 0 &&
+          (it.frequency !== '1-0-1' ||
+            it.duration_days !== 5 ||
+            (it.instructions ?? '') !== 'After meals')),
+    )
 
   const handleAddItem = () => {
     const nextOrder = items.length + 1
@@ -167,6 +182,7 @@ export function PrescriptionWorkspace() {
 
   return (
     <AppShell name={me?.full_name || 'Doctor'} role="DOCTOR">
+      <UnsavedChangesGuard dirty={isDirty} />
       {/* Printable slip modal */}
       {activePrintRx && (
         <PrescriptionPrint

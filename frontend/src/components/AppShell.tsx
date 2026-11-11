@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useClinicBranding } from '../api/branding'
 import { useMyDepartments, type SpecialtyCode } from '../api/specialty'
 import { Link, useLocation, useNavigate } from 'react-router'
@@ -511,6 +511,20 @@ export function AppShell({ name, role, children }: AppShellProps) {
   const integrityProblems = countBySeverity(groupFindings(latestIntegrity.data)).ERROR
   const [mobileOpen, setMobileOpen] = useState(false)
   const [now, setNow] = useState(() => new Date())
+  const [isOnline, setIsOnline] = useState(() => (typeof navigator !== 'undefined' ? navigator.onLine : true))
+  const mobileMenuButtonRef = useRef<HTMLButtonElement>(null)
+  const drawerRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    const handleOnline = () => setIsOnline(true)
+    const handleOffline = () => setIsOnline(false)
+    window.addEventListener('online', handleOnline)
+    window.addEventListener('offline', handleOffline)
+    return () => {
+      window.removeEventListener('online', handleOnline)
+      window.removeEventListener('offline', handleOffline)
+    }
+  }, [])
 
   useEffect(() => {
     const timer = window.setInterval(() => setNow(new Date()), 30_000)
@@ -519,13 +533,43 @@ export function AppShell({ name, role, children }: AppShellProps) {
 
   useEffect(() => {
     if (!mobileOpen) return
+    const origOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+
+    const drawerEl = drawerRef.current
+    const focusables = drawerEl?.querySelectorAll<HTMLElement>(
+      'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+    )
+    if (focusables && focusables.length > 0) {
+      focusables[0].focus()
+    }
+
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
+        e.preventDefault()
         setMobileOpen(false)
+        mobileMenuButtonRef.current?.focus()
+        return
+      }
+      if (e.key === 'Tab' && drawerEl && focusables && focusables.length > 0) {
+        const first = focusables[0]
+        const last = focusables[focusables.length - 1]
+        if (e.shiftKey && document.activeElement === first) {
+          e.preventDefault()
+          last.focus()
+        } else if (!e.shiftKey && document.activeElement === last) {
+          e.preventDefault()
+          first.focus()
+        }
       }
     }
+
     window.addEventListener('keydown', handleKeyDown)
-    return () => window.removeEventListener('keydown', handleKeyDown)
+    return () => {
+      document.body.style.overflow = origOverflow
+      window.removeEventListener('keydown', handleKeyDown)
+      mobileMenuButtonRef.current?.focus()
+    }
   }, [mobileOpen])
 
   const clock = useMemo(() => formatClock(now), [now])
@@ -848,6 +892,7 @@ export function AppShell({ name, role, children }: AppShellProps) {
         <div className="flex min-h-[56px] items-center justify-between gap-3 px-4 py-2 sm:px-6">
           <div className="flex min-w-0 items-center gap-3">
             <button
+              ref={mobileMenuButtonRef}
               type="button"
               onClick={() => setMobileOpen(true)}
               aria-label="Open navigation menu"
@@ -892,7 +937,28 @@ export function AppShell({ name, role, children }: AppShellProps) {
 
           <div className="flex shrink-0 items-center gap-3 sm:gap-4">
             <div className="hidden text-right lg:block">
-              <p className="text-xs font-bold text-slate-800">{clock}</p>
+              <div className="flex items-center justify-end gap-2">
+                <p className="text-xs font-bold text-slate-800">{clock}</p>
+                {isOnline ? (
+                  <span
+                    className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-xs font-semibold text-emerald-800 bg-emerald-50 border border-emerald-200"
+                    title="Hospital LAN server connection active"
+                  >
+                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" aria-hidden="true" />
+                    LAN
+                  </span>
+                ) : (
+                  <span
+                    className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-xs font-bold text-amber-900 bg-amber-50 border border-amber-300"
+                    role="status"
+                    aria-live="polite"
+                    title="LAN connection disrupted — workstation offline"
+                  >
+                    <span className="h-1.5 w-1.5 rounded-full bg-amber-500" aria-hidden="true" />
+                    Offline
+                  </span>
+                )}
+              </div>
               <p className="text-xs text-slate-600 font-medium">{branding.locationLine}</p>
             </div>
             <div className="hidden sm:block text-right border-l border-slate-200 pl-3">
@@ -952,6 +1018,7 @@ export function AppShell({ name, role, children }: AppShellProps) {
       {/* Mobile Drawer */}
       {mobileOpen && (
         <div
+          ref={drawerRef}
           id="mobile-hospital-navigation"
           role="dialog"
           aria-modal="true"
@@ -960,11 +1027,14 @@ export function AppShell({ name, role, children }: AppShellProps) {
         >
           <button
             type="button"
-            className="absolute inset-0 bg-slate-950/60"
+            className="absolute inset-0 bg-slate-950/60 transition-opacity duration-200"
             aria-label="Close navigation menu"
-            onClick={() => setMobileOpen(false)}
+            onClick={() => {
+              setMobileOpen(false)
+              mobileMenuButtonRef.current?.focus()
+            }}
           />
-          <div className="relative z-10 h-full">{renderSidebar(true)}</div>
+          <div className="relative z-10 h-full animate-in slide-in-from-left duration-200 ease-out">{renderSidebar(true)}</div>
         </div>
       )}
     </div>

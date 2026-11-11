@@ -1,11 +1,14 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { Link, useSearchParams } from 'react-router'
 import { AppShell } from '../../components/AppShell'
+import { AdminPageHeader } from '../../components/admin/AdminPageHeader'
+import { TableSkeleton } from '../../components/AdminSkeleton'
 import { Modal } from '../../components/Modal'
 import { useBackups, useCreateBackup, useRestoreBackup, useMe } from '../../api/queries'
 import type { BackupArchiveInfo } from '../../api/types'
 import { PatientExportDialog } from '../../components/admin/PatientExportDialog'
 import { ImportWizard } from '../../components/admin/ImportWizard'
+import { BackupSchedulePanel } from './BackupSchedulePanel'
 
 type ArchiveKind = 'manual' | 'scheduled' | 'safety' | 'test'
 type ArchiveFilter = 'all' | ArchiveKind
@@ -167,10 +170,10 @@ export function BackupManagerPage() {
               <span aria-hidden="true">/</span>
               <span>Backup & Recovery</span>
             </div>
-            <h1 className="text-2xl font-bold tracking-tight text-slate-900">Backup & Restore</h1>
-            <p className="mt-1 max-w-3xl text-sm text-slate-600">
-              Review backup copies, check archive integrity, and manage data portability (patient spreadsheet import & dataset export).
-            </p>
+            <AdminPageHeader
+              title="Backup & Restore"
+              description="Review backup copies, check archive integrity, and manage data portability (patient spreadsheet import & dataset export)."
+            />
           </div>
           <div className="flex shrink-0 flex-wrap gap-2">
             <button
@@ -342,23 +345,7 @@ export function BackupManagerPage() {
 
           {activeTab === 'schedule' ? (
             <div className="p-5 sm:p-7">
-              <div className="max-w-2xl rounded-xl border border-amber-200 bg-amber-50 p-4">
-                <h2 className="text-base font-bold text-amber-950">Schedule information is not connected</h2>
-                <p className="mt-2 text-sm leading-6 text-amber-900">
-                  The current backup API reports archive files but does not provide the active schedule, retention settings or next run time. These values are intentionally not guessed or presented as configured.
-                </p>
-                <p className="mt-2 text-sm leading-6 text-amber-900">
-                  Ask the system administrator to confirm that automatic backups are enabled on the hospital server and that the latest scheduled run completed successfully.
-                </p>
-              </div>
-              <div className="mt-5 rounded-lg border border-slate-200 p-4">
-                <h3 className="text-sm font-bold text-slate-900">What is still needed to manage schedules here?</h3>
-                <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-slate-600">
-                  <li>A server API for schedule frequency, enabled state and next run.</li>
-                  <li>Approved backup destinations and retention settings.</li>
-                  <li>Execution history, failure details and audit events.</li>
-                </ul>
-              </div>
+              <BackupSchedulePanel />
             </div>
           ) : (
             <>
@@ -407,13 +394,13 @@ export function BackupManagerPage() {
                 </div>
               </div>
 
-              {isPending && <div role="status" className="p-8 text-center text-sm text-slate-500">Loading backup archives…</div>}
+              {isPending && <TableSkeleton label="Loading backup archives…" rows={5} columns={6} />}
               {isError && <div role="alert" className="p-8 text-center text-sm text-red-700">Backup archives could not be loaded: {error?.message}</div>}
               {!isPending && !isError && (
                 <>
-                  <div className="overflow-x-auto">
+                  <div className="max-h-[65vh] overflow-auto">
                     <table className="w-full min-w-[760px] text-left text-sm">
-                      <thead className="bg-slate-50 text-[11px] font-bold uppercase tracking-wide text-slate-500">
+                      <thead className="sticky top-0 z-10 bg-slate-50 text-[11px] font-bold uppercase tracking-wide text-slate-500">
                         <tr>
                           <th scope="col" className="px-4 py-3">Archive</th>
                           <th scope="col" className="px-4 py-3">Type</th>
@@ -426,10 +413,11 @@ export function BackupManagerPage() {
                       <tbody className="divide-y divide-slate-100">
                         {visibleArchives.length === 0 ? (
                           <tr><td colSpan={6} className="px-4 py-12 text-center text-sm text-slate-500">No archives match these filters. Try changing the search or date range.</td></tr>
-                        ) : visibleArchives.map((archive) => {
+                        ) : visibleArchives.map((archive, index) => {
                           const kind = archiveKind(archive)
+                          const rowDelay = index * 50
                           return (
-                            <tr key={archive.filename} className="hover:bg-slate-50/80">
+                            <tr key={archive.filename} className="hover:bg-slate-50/80 transition-colors" style={{ transitionDelay: `${rowDelay}ms` }}>
                               <td className="max-w-[320px] px-4 py-3">
                                 <p className="break-all font-mono text-xs font-semibold text-slate-800">{archive.filename}</p>
                                 {archive.label && <p className="mt-1 text-xs text-slate-500">{archive.label}</p>}

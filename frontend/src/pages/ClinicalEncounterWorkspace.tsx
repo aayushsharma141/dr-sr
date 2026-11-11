@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { useParams, useSearchParams, useNavigate, Link } from 'react-router'
 import { AppShell } from '../components/AppShell'
 import { ConflictBanner } from '../components/ConflictBanner'
+import { InlineAlert } from '../components/InlineAlert'
 import { Modal } from '../components/Modal'
 import { VitalsBiometricsSection } from '../components/VitalsBiometricsSection'
 import { SpecialtyPhysiotherapyForm, type PhysiotherapyFormData } from '../components/SpecialtyPhysiotherapyForm'
@@ -12,6 +13,8 @@ import { AppointmentBookingModal } from '../components/AppointmentBookingModal'
 import { ConsultationSummaryPrint } from '../components/ConsultationSummaryPrint'
 import { QuickPhraseBar } from '../components/QuickPhraseBar'
 import { asSpecialty, useBookedAppointment, useMyDepartments } from '../api/specialty'
+import { isVersionConflict } from '../api/client'
+import { UnsavedChangesGuard } from '../components/UnsavedChangesGuard'
 import {
   IconStethoscope,
   IconHeartRateMonitor,
@@ -157,6 +160,7 @@ function EncounterWorkspace() {
   const [autoSaveStatus, setAutoSaveStatus] = useState<AutoSaveStatus>('IDLE')
   const [lastSavedTime, setLastSavedTime] = useState<string | null>(null)
   const [conflictError, setConflictError] = useState<string | null>(null)
+  const [generalError, setGeneralError] = useState<string | null>(null)
   const [actionSuccess, setActionSuccess] = useState<string | null>(null)
   const [showFinaliseConfirm, setShowFinaliseConfirm] = useState(false)
   const [finaliseError, setFinaliseError] = useState<string | null>(null)
@@ -170,6 +174,7 @@ function EncounterWorkspace() {
 
   // Track user modifications
   const isDirtyRef = useRef(false)
+  const [unsavedEdits, setUnsavedEdits] = useState(false)
   const autoSaveTimerRef = useRef<NodeJS.Timeout | null>(null)
 
   // Mutations
@@ -275,8 +280,9 @@ function EncounterWorkspace() {
       setLastSavedTime(timeStr)
       setAutoSaveStatus('SAVED')
       isDirtyRef.current = false
-    } catch (err: any) {
-      if (err?.status === 409) {
+      setUnsavedEdits(false)
+    } catch (err: unknown) {
+      if (isVersionConflict(err)) {
         setConflictError('Encounter was modified concurrently by another session.')
       } else {
         setAutoSaveStatus('OFFLINE_ERROR')
@@ -305,6 +311,7 @@ function EncounterWorkspace() {
   const scheduleAutoSave = useCallback(() => {
     if (isFinalised) return
     isDirtyRef.current = true
+    setUnsavedEdits(true)
     if (autoSaveTimerRef.current) {
       clearTimeout(autoSaveTimerRef.current)
     }
@@ -446,6 +453,8 @@ function EncounterWorkspace() {
 
       const res = await finaliseMutation.mutateAsync(targetId)
       setIsFinalised(true)
+      isDirtyRef.current = false
+      setUnsavedEdits(false)
       setFinalisedAt(res.finalised_at)
       setVersionId(res.version_id)
       setShowFinaliseConfirm(false)
@@ -471,8 +480,12 @@ function EncounterWorkspace() {
       setAddenda((prev) => [...prev, newAddendum])
       setAddendumText('')
       setActionSuccess('Addendum successfully appended to consultation record.')
-    } catch (err: any) {
-      setConflictError(err?.message || 'Failed to append addendum.')
+    } catch (err: unknown) {
+      if (isVersionConflict(err)) {
+        setConflictError('Encounter was modified concurrently by another session.')
+      } else {
+        setGeneralError(err instanceof Error ? err.message : 'Failed to append addendum.')
+      }
     }
   }
 
@@ -520,6 +533,7 @@ function EncounterWorkspace() {
 
   return (
     <AppShell name={me?.full_name || 'Doctor'} role="DOCTOR">
+      <UnsavedChangesGuard dirty={unsavedEdits && !isFinalised} />
       <div className="min-h-screen bg-[#0E131F] text-slate-100 pb-20">
         {/* Sticky Top Clinical Header matching Mockup */}
         <header
@@ -738,6 +752,12 @@ function EncounterWorkspace() {
                 if (encounterId > 0) refetchEncounter()
               }}
             />
+          )}
+
+          {generalError && (
+            <InlineAlert tone="error" onDismiss={() => setGeneralError(null)}>
+              {generalError}
+            </InlineAlert>
           )}
 
           {actionSuccess && (

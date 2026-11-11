@@ -4579,6 +4579,20 @@
         "title": "PasswordPolicyOut",
         "type": "object"
       },
+      "PatientCountResponse": {
+        "description": "Total number of patients matching a directory search.",
+        "properties": {
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "total"
+        ],
+        "title": "PatientCountResponse",
+        "type": "object"
+      },
       "PatientCreate": {
         "additionalProperties": false,
         "description": "Payload for registering a new patient with 12 canonical fields.",
@@ -9828,6 +9842,32 @@
         ]
       }
     },
+    "/api/audit-logs/actions": {
+      "get": {
+        "description": "Return sorted distinct list of audit action names recorded in the system.",
+        "operationId": "list_audit_actions_api_audit_logs_actions_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "title": "Response List Audit Actions Api Audit Logs Actions Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "List Audit Actions",
+        "tags": [
+          "audit"
+        ]
+      }
+    },
     "/api/auth/change-password": {
       "post": {
         "description": "Change user password, enforce NIST policy, revoke all sessions, and issue fresh session.",
@@ -11924,6 +11964,58 @@
           }
         },
         "summary": "Check Duplicate Patient",
+        "tags": [
+          "patients"
+        ]
+      }
+    },
+    "/api/patients/count": {
+      "get": {
+        "description": "Total patients matching the same search the directory list endpoint uses.",
+        "operationId": "count_patients_api_patients_count_get",
+        "parameters": [
+          {
+            "description": "Search query matching URN, mobile, or name.",
+            "in": "query",
+            "name": "q",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Search query matching URN, mobile, or name.",
+              "title": "Q"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PatientCountResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Count Patients",
         "tags": [
           "patients"
         ]
