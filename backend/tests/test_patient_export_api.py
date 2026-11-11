@@ -14,6 +14,7 @@ Guarantees tested:
 """
 
 import io
+from datetime import date
 from typing import Any
 
 import openpyxl
@@ -22,6 +23,8 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from kalyan_api.models import (
+    Appointment,
+    AppointmentStatus,
     AuditLog,
     ClinicalEncounter,
     Department,
@@ -325,3 +328,78 @@ def test_patient_export_department_and_audit_event(
     assert audit_row.after_data["row_count"] >= 1
     assert "encounters" in audit_row.after_data["fields"]
     assert audit_row.after_data["scope"]["department_id"] == dept.id
+
+
+def test_patient_export_department_matches_appointments_by_department(
+    login_client: Any,
+    admin_user: User,
+    doctor_a_user: User,
+    db_session: Session,
+) -> None:
+    """A patient with only an appointment is exported under the appointment's department.
+
+    Regression: the filter compared Appointment.doctor_id with the department id, so such a
+    patient was left out unless the two numbers happened to be equal.
+    """
+    admin_c: TestClient = login_client(admin_user)
+    doctor = db_session.get(Doctor, doctor_a_user.doctor_id)
+    assert doctor is not None
+
+    def make_department(code: str) -> Department:
+        dept = Department(code=code, name_en=code.title(), is_active=True)
+        db_session.add(dept)
+        db_session.flush()
+        return dept
+
+    dept_in = make_department("EXPORT_SCOPE_IN")
+    if dept_in.id == doctor.id:
+        # Keep the ids different, so the old doctor-id comparison cannot pass by coincidence.
+        dept_in = make_department("EXPORT_SCOPE_IN_2")
+    dept_out = make_department("EXPORT_SCOPE_OUT")
+    assert dept_in.id != doctor.id
+
+    def make_patient(urn: str, name: str) -> Patient:
+        patient = Patient(
+            urn=urn,
+            full_name=name,
+            guardian_name="Guardian",
+            gender="F",
+            age_years=30,
+            mobile="9800000003",
+            address="Ara",
+            district="Bhojpur",
+            state="Bihar",
+            is_active=True,
+        )
+        db_session.add(patient)
+        db_session.flush()
+        return patient
+
+    pat_in = make_patient("KH-2026-9030", "Appointment Only Patient")
+    pat_out = make_patient("KH-2026-9040", "Other Department Patient")
+    for token, (patient, dept) in enumerate(((pat_in, dept_in), (pat_out, dept_out)), start=1):
+        db_session.add(
+            Appointment(
+                patient_id=patient.id,
+                doctor_id=doctor.id,
+                department_id=dept.id,
+                appointment_date=date(2026, 11, 20),
+                token_number=token,
+                status=AppointmentStatus.BOOKED.value,
+                created_by_user_id=admin_user.id,
+            )
+        )
+    db_session.commit()
+
+    res = admin_c.post(
+        "/api/admin/exports",
+        json={
+            "reason": "Department scope regression check",
+            "format": "csv",
+            "scope": {"department_id": dept_in.id},
+            "fields": ["urn", "full_name"],
+        },
+    )
+    assert res.status_code == 200, res.text
+    assert "KH-2026-9030" in res.text
+    assert "KH-2026-9040" not in res.text

@@ -116,7 +116,7 @@ def query_export_rows(
             ),
             Patient.id.in_(
                 select(Appointment.patient_id).where(
-                    Appointment.doctor_id == scope.department_id,
+                    Appointment.department_id == scope.department_id,
                     *[
                         Appointment.appointment_date >= scope.start_date
                         if scope.start_date
