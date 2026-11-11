@@ -86,7 +86,8 @@ class Department(Base):
         CheckConstraint("length(trim(name_en)) >= 2", name="departments_name_nonblank"),
     )
     id: Mapped[int] = mapped_column(BigInteger, Identity(always=False), primary_key=True)
-    # Stable machine code (PHYSIOTHERAPY, OPHTHALMOLOGY) that selects the specialty template (D-19-03).
+    # Stable machine code (PHYSIOTHERAPY, OPHTHALMOLOGY) that selects the specialty template
+    # (D-19-03).
     code: Mapped[str] = mapped_column(
         String(64), unique=True, nullable=False, default=_department_code_from_name
     )
@@ -690,9 +691,15 @@ class ClinicalEncounter(Base):
     encounter_date: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
-    symptoms: Mapped[str] = mapped_column(Text, default="", server_default=text("''"), nullable=True)
-    clinical_notes: Mapped[str] = mapped_column(Text, default="", server_default=text("''"), nullable=True)
-    diagnosis: Mapped[str] = mapped_column(Text, default="", server_default=text("''"), nullable=True)
+    symptoms: Mapped[str] = mapped_column(
+        Text, default="", server_default=text("''"), nullable=True
+    )
+    clinical_notes: Mapped[str] = mapped_column(
+        Text, default="", server_default=text("''"), nullable=True
+    )
+    diagnosis: Mapped[str] = mapped_column(
+        Text, default="", server_default=text("''"), nullable=True
+    )
     is_finalised: Mapped[bool] = mapped_column(
         Boolean, default=False, server_default=text("false"), nullable=False
     )
@@ -953,8 +960,10 @@ class Prescription(Base):
             "status IN ('DRAFT', 'AUTHORISED', 'CANCELLED')", name="ck_prescriptions_status"
         ),
         CheckConstraint(
-            "(status != 'CANCELLED' AND cancelled_at IS NULL AND cancellation_reason IS NULL AND cancelled_by_user_id IS NULL) "
-            "OR (status = 'CANCELLED' AND cancelled_at IS NOT NULL AND length(trim(cancellation_reason)) >= 3 AND cancelled_by_user_id IS NOT NULL)",
+            "(status != 'CANCELLED' AND cancelled_at IS NULL AND cancellation_reason IS NULL AND "
+            "cancelled_by_user_id IS NULL) "
+            "OR (status = 'CANCELLED' AND cancelled_at IS NOT NULL AND "
+            "length(trim(cancellation_reason)) >= 3 AND cancelled_by_user_id IS NOT NULL)",
             name="ck_prescriptions_cancellation",
         ),
         Index(
@@ -1189,7 +1198,9 @@ class ClinicalTemplateVersion(Base):
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
 
-    template: Mapped["ClinicalTemplate"] = relationship("ClinicalTemplate", back_populates="versions")
+    template: Mapped["ClinicalTemplate"] = relationship(
+        "ClinicalTemplate", back_populates="versions"
+    )
     responses: Mapped[list["ClinicalTemplateResponse"]] = relationship(
         "ClinicalTemplateResponse", back_populates="template_version"
     )
@@ -1199,9 +1210,7 @@ class ClinicalTemplateResponse(Base):
     """Encounter-specific specialty template response data."""
 
     __tablename__ = "clinical_template_responses"
-    __table_args__ = (
-        UniqueConstraint("encounter_id", name="uq_template_responses_encounter"),
-    )
+    __table_args__ = (UniqueConstraint("encounter_id", name="uq_template_responses_encounter"),)
 
     id: Mapped[int] = mapped_column(BigInteger, Identity(always=False), primary_key=True)
     encounter_id: Mapped[int] = mapped_column(
@@ -1223,8 +1232,12 @@ class ClinicalTemplateResponse(Base):
         nullable=False,
     )
 
-    encounter: Mapped["ClinicalEncounter"] = relationship("ClinicalEncounter", back_populates="template_response")
-    template_version: Mapped["ClinicalTemplateVersion"] = relationship("ClinicalTemplateVersion", back_populates="responses")
+    encounter: Mapped["ClinicalEncounter"] = relationship(
+        "ClinicalEncounter", back_populates="template_response"
+    )
+    template_version: Mapped["ClinicalTemplateVersion"] = relationship(
+        "ClinicalTemplateVersion", back_populates="responses"
+    )
 
 
 class VitalObservation(Base):
@@ -1297,7 +1310,9 @@ class VitalObservation(Base):
         nullable=False,
     )
 
-    encounter: Mapped["ClinicalEncounter"] = relationship("ClinicalEncounter", back_populates="vitals")
+    encounter: Mapped["ClinicalEncounter"] = relationship(
+        "ClinicalEncounter", back_populates="vitals"
+    )
     patient: Mapped["Patient"] = relationship("Patient")
 
 
@@ -1322,8 +1337,10 @@ class FollowUpRecommendation(Base):
             name="ck_follow_up_recommendations_status",
         ),
         CheckConstraint(
-            "(status != 'CLOSED' AND closed_reason IS NULL AND closed_by_user_id IS NULL AND closed_at IS NULL) "
-            "OR (status = 'CLOSED' AND closed_reason IS NOT NULL AND length(trim(closed_reason)) >= 3 AND closed_by_user_id IS NOT NULL AND closed_at IS NOT NULL)",
+            "(status != 'CLOSED' AND closed_reason IS NULL AND closed_by_user_id IS NULL AND "
+            "closed_at IS NULL) "
+            "OR (status = 'CLOSED' AND closed_reason IS NOT NULL AND length(trim(closed_reason)) "
+            ">= 3 AND closed_by_user_id IS NOT NULL AND closed_at IS NOT NULL)",
             name="ck_follow_up_recommendations_closure",
         ),
     )
@@ -1374,7 +1391,9 @@ class FollowUpRecommendation(Base):
     patient = relationship("Patient", lazy="joined")
     doctor = relationship("Doctor", foreign_keys=[doctor_id], lazy="joined")
     recommended_doctor = relationship("Doctor", foreign_keys=[recommended_doctor_id], lazy="joined")
-    booked_appointment = relationship("Appointment", foreign_keys=[booked_appointment_id], lazy="select")
+    booked_appointment = relationship(
+        "Appointment", foreign_keys=[booked_appointment_id], lazy="select"
+    )
     closed_by_user = relationship("User", foreign_keys=[closed_by_user_id], lazy="joined")
 
 
@@ -1442,7 +1461,8 @@ class PrintTemplate(Base):
     __table_args__ = (
         UniqueConstraint("document_type", name="uq_print_templates_document_type"),
         CheckConstraint(
-            "document_type IN ('prescription', 'receipt', 'registration_card', 'consultation_summary')",
+            "document_type IN ('prescription', 'receipt', 'registration_card', "
+            "'consultation_summary')",
             name="ck_print_templates_document_type",
         ),
         Index("ix_print_templates_updated_by", "updated_by_user_id"),
@@ -1483,11 +1503,21 @@ class PatientImportBatch(Base):
     id: Mapped[int] = mapped_column(BigInteger, Identity(always=False), primary_key=True)
     batch_id: Mapped[str] = mapped_column(String(64), unique=True, nullable=False, index=True)
     filename: Mapped[str] = mapped_column(String(255), nullable=False)
-    total_rows: Mapped[int] = mapped_column(Integer, default=0, server_default=text("0"), nullable=False)
-    valid_rows: Mapped[int] = mapped_column(Integer, default=0, server_default=text("0"), nullable=False)
-    duplicate_rows: Mapped[int] = mapped_column(Integer, default=0, server_default=text("0"), nullable=False)
-    invalid_rows: Mapped[int] = mapped_column(Integer, default=0, server_default=text("0"), nullable=False)
-    committed_rows: Mapped[int] = mapped_column(Integer, default=0, server_default=text("0"), nullable=False)
+    total_rows: Mapped[int] = mapped_column(
+        Integer, default=0, server_default=text("0"), nullable=False
+    )
+    valid_rows: Mapped[int] = mapped_column(
+        Integer, default=0, server_default=text("0"), nullable=False
+    )
+    duplicate_rows: Mapped[int] = mapped_column(
+        Integer, default=0, server_default=text("0"), nullable=False
+    )
+    invalid_rows: Mapped[int] = mapped_column(
+        Integer, default=0, server_default=text("0"), nullable=False
+    )
+    committed_rows: Mapped[int] = mapped_column(
+        Integer, default=0, server_default=text("0"), nullable=False
+    )
     status: Mapped[str] = mapped_column(
         String(32), default="STAGED", server_default=text("'STAGED'"), nullable=False
     )
@@ -1542,11 +1572,6 @@ class PatientImportRow(Base):
     duplicate_patient: Mapped["Patient | None"] = relationship(
         "Patient", foreign_keys=[duplicate_patient_id], lazy="select"
     )
-
-
-
-
-
 
 
 class IntegrityRun(Base):

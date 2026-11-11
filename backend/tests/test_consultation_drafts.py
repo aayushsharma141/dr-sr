@@ -1,4 +1,5 @@
-"""Automated tests for consultation drafts, autosave, finalisation validation, and tamper trigger (DWS-02, D-19-09, D-19-22, T-19-02)."""
+"""Automated tests for consultation drafts, autosave, finalisation validation, and tamper trigger
+(DWS-02, D-19-09, D-19-22, T-19-02)."""
 
 from datetime import date
 
@@ -10,7 +11,8 @@ from kalyan_api.models import Appointment, AppointmentStatus, ClinicalEncounter,
 
 
 def test_draft_consultation_save_and_update(login_client, doctor_a_user, db_session):
-    """Draft consultation can be created with empty/partial fields and updated repeatedly with version_id increments."""
+    """Draft consultation can be created with empty/partial fields and updated repeatedly with
+    version_id increments."""
     patient = Patient(
         urn="KH-2026-7101",
         full_name="Draft Patient",
@@ -82,8 +84,11 @@ def test_draft_consultation_save_and_update(login_client, doctor_a_user, db_sess
     assert data2["version_id"] == 3
 
 
-def test_finalisation_validates_mandatory_symptoms_and_diagnosis(login_client, doctor_a_user, db_session):
-    """Finalisation strictly requires symptoms and diagnosis to be non-empty (>= 2 chars) (D-19-09)."""
+def test_finalisation_validates_mandatory_symptoms_and_diagnosis(
+    login_client, doctor_a_user, db_session
+):
+    """Finalisation strictly requires symptoms and diagnosis to be non-empty (>= 2 chars)
+    (D-19-09)."""
     patient = Patient(
         urn="KH-2026-7102",
         full_name="Finalisation Validation Patient",
@@ -138,7 +143,9 @@ def test_finalisation_validates_mandatory_symptoms_and_diagnosis(login_client, d
     assert final_data["diagnosis"] == "Cervical Spondylosis"
 
 
-def test_appointment_check_in_sets_check_in_at(login_client, reception_user, doctor_a_user, db_session):
+def test_appointment_check_in_sets_check_in_at(
+    login_client, reception_user, doctor_a_user, db_session
+):
     """Marking appointment ARRIVED records check_in_at timestamp (D-19-04, DWS-03)."""
     patient = Patient(
         urn="KH-2026-7103",
@@ -194,7 +201,8 @@ def test_appointment_check_in_sets_check_in_at(login_client, reception_user, doc
 
 
 def test_trigger_allows_draft_updates_blocks_finalised_tampering(db_session, doctor_a_user):
-    """PostgreSQL tamper trigger allows updates while is_finalised=False, but strictly blocks when is_finalised=True (T-19-02)."""
+    """PostgreSQL tamper trigger allows updates while is_finalised=False, but strictly blocks when
+    is_finalised=True (T-19-02)."""
     patient = Patient(
         urn="KH-2026-7104",
         full_name="Trigger Test Patient",

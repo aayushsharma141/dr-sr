@@ -2,17 +2,20 @@
 
 Guarantees:
 - Doctors create follow-up recommendations during consultation.
-- Strict clinical privacy separation: Receptionist queries and schemas NEVER select or expose clinical_reason (D-19-19, R-3, T-19-07).
+- Strict clinical privacy separation: Receptionist queries and schemas NEVER select or expose
+  clinical_reason (D-19-19, R-3, T-19-07).
 - Both doctor and reception can convert recommendations to scheduled appointments (D-19-18).
-- Unbooked recommendations remain open/overdue until explicitly booked or closed with a reason (D-19-21).
+- Unbooked recommendations remain open/overdue until explicitly booked or closed with a reason
+  (D-19-21).
 """
 
-from datetime import date, datetime, timezone
+from datetime import UTC, date, datetime
 
 from fastapi import APIRouter, Depends, Query, Request
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
+from kalyan_api import clock
 from kalyan_api.core.errors import ApiError
 from kalyan_api.core.permissions import Permission, Role
 from kalyan_api.core.policy import require
@@ -32,6 +35,7 @@ from kalyan_api.models import (
     FollowUpStatus,
     Patient,
 )
+from kalyan_api.routers.appointments import lock_department_for_booking
 from kalyan_api.schemas.follow_up import (
     DoctorFollowUpResponse,
     FollowUpBookRequest,
@@ -39,7 +43,6 @@ from kalyan_api.schemas.follow_up import (
     FollowUpRecommendationCreate,
     ReceptionFollowUpResponse,
 )
-from kalyan_api.routers.appointments import lock_department_for_booking
 from kalyan_api.services import audit_service, token_service
 from kalyan_api.services.audit_service import AuditAction
 
@@ -228,7 +231,7 @@ def get_encounter_follow_up(
             message="Only authenticated doctors can inspect clinical follow-up details.",
         )
 
-    encounter = get_scoped_or_404(
+    get_scoped_or_404(
         session,
         ClinicalEncounter,
         id,
@@ -292,7 +295,9 @@ def list_reception_follow_ups(
         )
         .join(Patient, FollowUpRecommendation.patient_id == Patient.id)
         .join(Doctor, FollowUpRecommendation.recommended_doctor_id == Doctor.id)
-        .order_by(FollowUpRecommendation.recommended_date.asc(), FollowUpRecommendation.created_at.desc())
+        .order_by(
+            FollowUpRecommendation.recommended_date.asc(), FollowUpRecommendation.created_at.desc()
+        )
     )
 
     if status:
@@ -305,7 +310,7 @@ def list_reception_follow_ups(
         stmt = stmt.where(FollowUpRecommendation.recommended_date <= date_to)
 
     if overdue is True:
-        today = date.today()
+        today = clock.ist_today()
         stmt = stmt.where(
             FollowUpRecommendation.status == FollowUpStatus.PENDING.value,
             FollowUpRecommendation.recommended_date < today,
@@ -343,7 +348,7 @@ def book_follow_up(
     session: SessionDep,
     principal: Principal = Depends(current_principal),
 ) -> ReceptionFollowUpResponse:
-    """Convert recommendation to a scheduled appointment (D-19-18). Accessible by Doctor or Reception."""
+    """Convert recommendation to a scheduled appointment (D-19-18). Accessible by Doctor or Reception."""  # noqa: E501 - published as the OpenAPI description; wrapping changes the text
     stmt = (
         select(FollowUpRecommendation)
         .where(FollowUpRecommendation.id == id)
@@ -354,13 +359,20 @@ def book_follow_up(
     )
     rec = session.execute(stmt).scalar_one_or_none()
     if not rec:
-        raise ApiError(status_code=404, code="follow_up_not_found", message="Follow-up recommendation not found.")
+        raise ApiError(
+            status_code=404,
+            code="follow_up_not_found",
+            message="Follow-up recommendation not found.",
+        )
 
     if rec.status != FollowUpStatus.PENDING.value:
         raise ApiError(
             status_code=409,
             code="invalid_status",
-            message=f"Cannot book follow-up with status '{rec.status}'. Only PENDING recommendations can be booked.",
+            message=(
+                f"Cannot book follow-up with status '{rec.status}'. Only PENDING recommendations "
+                "can be booked."
+            ),
         )
 
     appt_date = payload.appointment_date or rec.recommended_date
@@ -368,15 +380,23 @@ def book_follow_up(
     # Same booking rules as POST /appointments (BR-012; ADR-23, ADR-24, ADR-25).
     patient = rec.patient
     if not patient or not patient.is_active:
-        raise ApiError(status_code=404, code="patient_not_found", message="Patient not found or inactive.")
+        raise ApiError(
+            status_code=404, code="patient_not_found", message="Patient not found or inactive."
+        )
     doctor = rec.recommended_doctor
     if not doctor or not doctor.is_active:
-        raise ApiError(status_code=404, code="doctor_not_found", message="Doctor not found or inactive.")
+        raise ApiError(
+            status_code=404, code="doctor_not_found", message="Doctor not found or inactive."
+        )
 
     department_id = payload.department_id or _infer_follow_up_department_id(session, rec, doctor)
     department = lock_department_for_booking(session, department_id)
     if department is None:
-        raise ApiError(status_code=422, code="department_not_found", message="Selected department does not exist.")
+        raise ApiError(
+            status_code=422,
+            code="department_not_found",
+            message="Selected department does not exist.",
+        )
     if not department.is_active:
         raise ApiError(
             status_code=422,
@@ -430,7 +450,11 @@ def book_follow_up(
     override_text = (payload.override_reason or "").strip() or None
     final_notes = payload.notes
     if override_text:
-        final_notes = f"{final_notes} | [Override: {override_text}]" if final_notes else f"[Override: {override_text}]"
+        final_notes = (
+            f"{final_notes} | [Override: {override_text}]"
+            if final_notes
+            else f"[Override: {override_text}]"
+        )
 
     appt = Appointment(
         patient_id=rec.patient_id,
@@ -494,13 +518,20 @@ def close_follow_up(
     )
     rec = session.execute(stmt).scalar_one_or_none()
     if not rec:
-        raise ApiError(status_code=404, code="follow_up_not_found", message="Follow-up recommendation not found.")
+        raise ApiError(
+            status_code=404,
+            code="follow_up_not_found",
+            message="Follow-up recommendation not found.",
+        )
 
     if rec.status != FollowUpStatus.PENDING.value:
         raise ApiError(
             status_code=409,
             code="invalid_status",
-            message=f"Cannot close follow-up with status '{rec.status}'. Only PENDING recommendations can be closed.",
+            message=(
+                f"Cannot close follow-up with status '{rec.status}'. Only PENDING recommendations "
+                "can be closed."
+            ),
         )
 
     reason = payload.reason.strip()
@@ -514,7 +545,7 @@ def close_follow_up(
     rec.status = FollowUpStatus.CLOSED.value
     rec.closed_reason = reason
     rec.closed_by_user_id = principal.user_id
-    rec.closed_at = datetime.now(timezone.utc)
+    rec.closed_at = datetime.now(UTC)
     session.flush()
 
     ctx = build_audit_context(request, principal)

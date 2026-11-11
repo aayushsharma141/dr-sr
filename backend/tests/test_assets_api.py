@@ -21,7 +21,10 @@ from kalyan_api.config import Settings
 from kalyan_api.models import AuditLog, HospitalAsset, User
 from kalyan_api.services.asset_service import MAX_ASSET_BYTES
 
-VALID_PNG = b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01\x08\x06\x00\x00\x00\x1f\x15c4"
+VALID_PNG = (
+    b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR"
+    b"\x00\x00\x00\x01\x00\x00\x00\x01\x08\x06\x00\x00\x00\x1f\x15c4"
+)
 VALID_JPEG = b"\xff\xd8\xff\xe0\x00\x10JFIF\x00\x01\x01\x00\x00\x01\x00\x01\x00\x00"
 VALID_PDF = b"%PDF-1.4\n1 0 obj\n<<>>\nendobj\ntrailer\n<<>>\n%%EOF"
 VALID_WEBP = b"RIFF\x14\x00\x00\x00WEBPVP8 \x08\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"
@@ -72,9 +75,15 @@ def test_upload_logo_versions_and_deactivation(
     assert (assets_dir / file2_name).is_file()
 
     # Verify database state
-    assets = db_session.execute(
-        select(HospitalAsset).where(HospitalAsset.asset_type == "LOGO").order_by(HospitalAsset.version.asc())
-    ).scalars().all()
+    assets = (
+        db_session.execute(
+            select(HospitalAsset)
+            .where(HospitalAsset.asset_type == "LOGO")
+            .order_by(HospitalAsset.version.asc())
+        )
+        .scalars()
+        .all()
+    )
     assert len(assets) == 2
     assert assets[0].version == 1 and assets[0].is_active is False
     assert assets[1].version == 2 and assets[1].is_active is True
@@ -146,7 +155,8 @@ def test_validation_rejects_malicious_and_oversized_files(
     admin_user: User,
     login_client,
 ) -> None:
-    """Asset service validates magic bytes and rejects spoofed extensions or oversized files with 422."""
+    """Asset service validates magic bytes and rejects spoofed extensions or oversized files with
+    422."""
     client: TestClient = login_client(admin_user)
 
     # 1. Spoofed extension: named .png but contains text/binary executable

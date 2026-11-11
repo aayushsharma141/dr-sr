@@ -82,11 +82,13 @@ class DuplicateCheckResponse(BaseModel):
 
 
 class AdminPatientDemographicCorrection(BaseModel):
-    """Payload for administrative demographic correction with mandatory reason and concurrency check (D-20-02, D-20-03)."""
+    """Payload for administrative demographic correction with mandatory reason and concurrency check (D-20-02, D-20-03)."""  # noqa: E501 - published as the OpenAPI description; wrapping changes the text
 
     model_config = ConfigDict(extra="forbid")
 
-    reason: str = Field(..., min_length=5, max_length=1000, description="Documented reason for correction")
+    reason: str = Field(
+        ..., min_length=5, max_length=1000, description="Documented reason for correction"
+    )
     version_id: int = Field(..., ge=1, description="Expected version_id for optimistic locking")
     full_name: str = Field(..., min_length=2, max_length=120)
     guardian_name: str = Field(..., min_length=2, max_length=120)

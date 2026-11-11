@@ -1,7 +1,7 @@
-"""Automated tests for vitals observation recording, server-side BMI engine, and physiological limits (DWS-06, T-19-05)."""
+"""Automated tests for vitals observation recording, server-side BMI engine, and physiological
+limits (DWS-06, T-19-05)."""
 
 from datetime import date
-from decimal import Decimal
 
 import pytest
 from sqlalchemy import text

@@ -368,7 +368,8 @@ def test_completed_package_with_unpaid_balance_stays_in_pending_dues(
     doctor_a_user: User,
     db_session: Session,
 ) -> None:
-    """BR-003: Completed treatment package with unpaid balance remains in pending dues and can be paid."""
+    """BR-003: Completed treatment package with unpaid balance remains in pending dues and can be
+    paid."""
     pat = _create_test_patient(db_session, "06")
     rec_c = login_client(reception_user)
 

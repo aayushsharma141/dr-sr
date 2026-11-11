@@ -62,8 +62,10 @@ def upgrade() -> None:
     op.create_check_constraint(
         "ck_prescriptions_cancellation",
         "prescriptions",
-        "(status != 'CANCELLED' AND cancelled_at IS NULL AND cancellation_reason IS NULL AND cancelled_by_user_id IS NULL) "
-        "OR (status = 'CANCELLED' AND cancelled_at IS NOT NULL AND length(trim(cancellation_reason)) >= 3 AND cancelled_by_user_id IS NOT NULL)",
+        "(status != 'CANCELLED' AND cancelled_at IS NULL AND cancellation_reason IS NULL AND "
+        "cancelled_by_user_id IS NULL) "
+        "OR (status = 'CANCELLED' AND cancelled_at IS NOT NULL AND "
+        "length(trim(cancellation_reason)) >= 3 AND cancelled_by_user_id IS NOT NULL)",
     )
 
     # 3. Add partial unique index for active prescription per encounter
@@ -99,7 +101,9 @@ def downgrade() -> None:
     op.drop_constraint("ck_prescriptions_cancellation", "prescriptions", type_="check")
     op.drop_constraint("ck_prescriptions_status", "prescriptions", type_="check")
 
-    op.drop_constraint("prescriptions_cancelled_by_user_id_fkey", "prescriptions", type_="foreignkey")
+    op.drop_constraint(
+        "prescriptions_cancelled_by_user_id_fkey", "prescriptions", type_="foreignkey"
+    )
     op.drop_column("prescriptions", "cancellation_reason")
     op.drop_column("prescriptions", "cancelled_by_user_id")
     op.drop_column("prescriptions", "cancelled_at")

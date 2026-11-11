@@ -66,13 +66,18 @@ def create_doctor(
     """Create a new doctor profile (ADMIN only)."""
     if payload.cabin_code:
         clash = session.scalar(
-            select(Doctor).where(Doctor.cabin_code == payload.cabin_code, Doctor.is_active.is_(True))
+            select(Doctor).where(
+                Doctor.cabin_code == payload.cabin_code, Doctor.is_active.is_(True)
+            )
         )
         if clash:
             raise ApiError(
                 status_code=409,
                 code="cabin_code_taken",
-                message=f"Cabin code '{payload.cabin_code}' is already assigned to active doctor Dr. {clash.name_en}",
+                message=(
+                    f"Cabin code '{payload.cabin_code}' is already assigned to active doctor Dr. "
+                    f"{clash.name_en}"
+                ),
             )
 
     doc = Doctor(
@@ -191,7 +196,10 @@ def update_doctor(
             raise ApiError(
                 status_code=409,
                 code="cabin_code_taken",
-                message=f"Cabin code '{payload.cabin_code}' is already assigned to active doctor Dr. {clash.name_en}",
+                message=(
+                    f"Cabin code '{payload.cabin_code}' is already assigned to active doctor Dr. "
+                    f"{clash.name_en}"
+                ),
             )
 
     before_state = {

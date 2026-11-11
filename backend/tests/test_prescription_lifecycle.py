@@ -1,8 +1,7 @@
-"""Tests for prescription lifecycle, authorisation, printing gate, cancellation and reissuance (DWS-07, D-19-14, D-19-15)."""
+"""Tests for prescription lifecycle, authorisation, printing gate, cancellation and reissuance
+(DWS-07, D-19-14, D-19-15)."""
 
-from sqlalchemy import select
-
-from kalyan_api.models import ClinicalEncounter, Patient, Prescription, PrescriptionStatus
+from kalyan_api.models import ClinicalEncounter, Patient
 
 
 def _create_test_patient(db_session, suffix="30") -> Patient:
@@ -22,7 +21,9 @@ def _create_test_patient(db_session, suffix="30") -> Patient:
     return patient
 
 
-def _create_test_encounter(db_session, patient_id: int, doctor_id: int, user_id: int, diagnosis="Dry Eye Syndrome") -> ClinicalEncounter:
+def _create_test_encounter(
+    db_session, patient_id: int, doctor_id: int, user_id: int, diagnosis="Dry Eye Syndrome"
+) -> ClinicalEncounter:
     encounter = ClinicalEncounter(
         patient_id=patient_id,
         doctor_id=doctor_id,
@@ -40,7 +41,9 @@ def _create_test_encounter(db_session, patient_id: int, doctor_id: int, user_id:
 def test_prescription_draft_authorise_lifecycle(login_client, doctor_a_user, db_session):
     """Doctor creates a DRAFT prescription, updates it, authorises it, and verifies print gate."""
     patient = _create_test_patient(db_session, "01")
-    encounter = _create_test_encounter(db_session, patient.id, doctor_a_user.doctor_id, doctor_a_user.id)
+    encounter = _create_test_encounter(
+        db_session, patient.id, doctor_a_user.doctor_id, doctor_a_user.id
+    )
     doc_client = login_client(doctor_a_user)
 
     # 1. Create prescription in DRAFT status
@@ -124,7 +127,9 @@ def test_prescription_draft_authorise_lifecycle(login_client, doctor_a_user, db_
     assert auth_data["is_printable"] is True
 
     # 4. Attempt to modify authorised prescription -> Must fail with HTTP 409
-    tamper_resp = doc_client.put(f"/api/prescriptions/{rx_id}", json={"diagnosis": "Attempted Tampering"})
+    tamper_resp = doc_client.put(
+        f"/api/prescriptions/{rx_id}", json={"diagnosis": "Attempted Tampering"}
+    )
     assert tamper_resp.status_code == 409
     assert tamper_resp.json()["code"] == "prescription_locked"
 
@@ -132,7 +137,9 @@ def test_prescription_draft_authorise_lifecycle(login_client, doctor_a_user, db_
 def test_cannot_authorise_empty_prescription(login_client, doctor_a_user, db_session):
     """Authorisation fails if prescription has 0 items or no diagnosis."""
     patient = _create_test_patient(db_session, "02")
-    encounter = _create_test_encounter(db_session, patient.id, doctor_a_user.doctor_id, doctor_a_user.id, diagnosis="Blepharitis")
+    encounter = _create_test_encounter(
+        db_session, patient.id, doctor_a_user.doctor_id, doctor_a_user.id, diagnosis="Blepharitis"
+    )
     doc_client = login_client(doctor_a_user)
 
     # Create empty draft
@@ -155,9 +162,16 @@ def test_cannot_authorise_empty_prescription(login_client, doctor_a_user, db_ses
 
 
 def test_prescription_cancellation_and_reissuance(login_client, doctor_a_user, db_session):
-    """Authorised prescription can be cancelled with reason, unlocking re-issuance for the encounter (D-19-15)."""
+    """Authorised prescription can be cancelled with reason, unlocking re-issuance for the encounter
+    (D-19-15)."""
     patient = _create_test_patient(db_session, "03")
-    encounter = _create_test_encounter(db_session, patient.id, doctor_a_user.doctor_id, doctor_a_user.id, diagnosis="Cataract Early")
+    encounter = _create_test_encounter(
+        db_session,
+        patient.id,
+        doctor_a_user.doctor_id,
+        doctor_a_user.id,
+        diagnosis="Cataract Early",
+    )
     doc_client = login_client(doctor_a_user)
 
     # 1. Create and authorise prescription
@@ -214,12 +228,19 @@ def test_prescription_cancellation_and_reissuance(login_client, doctor_a_user, d
     # 4. Cancel with valid reason
     cancel_resp = doc_client.post(
         f"/api/prescriptions/{rx1_id}/cancel",
-        json={"reason": "Patient reported allergic stinging sensation; switched to preservative-free drop."},
+        json={
+            "reason": (
+                "Patient reported allergic stinging sensation; switched to preservative-free drop."
+            )
+        },
     )
     assert cancel_resp.status_code == 200, cancel_resp.text
     cancelled_data = cancel_resp.json()
     assert cancelled_data["status"] == "CANCELLED"
-    assert cancelled_data["cancellation_reason"] == "Patient reported allergic stinging sensation; switched to preservative-free drop."
+    assert (
+        cancelled_data["cancellation_reason"]
+        == "Patient reported allergic stinging sensation; switched to preservative-free drop."
+    )
     assert cancelled_data["cancelled_at"] is not None
     assert cancelled_data["cancelled_by_user_id"] == doctor_a_user.id
     assert cancelled_data["is_printable"] is False

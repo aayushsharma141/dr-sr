@@ -15,7 +15,9 @@ class FollowUpRecommendationCreate(BaseModel):
         default=None, gt=0, description="Target doctor ID (defaults to current doctor)"
     )
     clinical_reason: str | None = Field(
-        default=None, max_length=1000, description="Clinical rationale (doctor-only, hidden from reception)"
+        default=None,
+        max_length=1000,
+        description="Clinical rationale (doctor-only, hidden from reception)",
     )
 
 
@@ -35,7 +37,9 @@ class FollowUpBookRequest(BaseModel):
     appointment_date: date | None = Field(
         default=None, description="Optional override date (defaults to recommendation date)"
     )
-    notes: str | None = Field(default=None, max_length=1000, description="Optional appointment notes")
+    notes: str | None = Field(
+        default=None, max_length=1000, description="Optional appointment notes"
+    )
     department_id: int | None = Field(
         default=None,
         gt=0,
@@ -48,7 +52,10 @@ class FollowUpBookRequest(BaseModel):
     override_reason: str | None = Field(
         default=None,
         max_length=500,
-        description="Reason of at least 5 characters to override duplicate booking on the same date (BR-006)",
+        description=(
+            "Reason of at least 5 characters to override duplicate booking on the same date "
+            "(BR-006)"
+        ),
     )
 
 

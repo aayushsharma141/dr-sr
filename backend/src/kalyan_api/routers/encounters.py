@@ -244,7 +244,15 @@ def list_unfinished_encounters(
             patient_urn=e.patient.urn if e.patient else "",
             patient_name=e.patient.full_name if e.patient else "",
             department_id=e.department_id,
-            department_name=e.department.name_en if e.department else ("Physiotherapy" if e.department_id == 1 else "Ophthalmology" if e.department_id == 2 else "General"),
+            department_name=e.department.name_en
+            if e.department
+            else (
+                "Physiotherapy"
+                if e.department_id == 1
+                else "Ophthalmology"
+                if e.department_id == 2
+                else "General"
+            ),
             started_at=e.created_at,
             is_finalised=e.is_finalised,
         )
@@ -420,7 +428,8 @@ def finalise_encounter(
             if payload.diagnosis is not None:
                 enc.diagnosis = payload.diagnosis
 
-        # Strictly validate that chief complaint (symptoms) and diagnosis are non-empty and at least 2 chars
+        # Strictly validate that chief complaint (symptoms) and diagnosis are non-empty and at least
+        # 2 chars
         symptoms_val = (enc.symptoms or "").strip()
         diagnosis_val = (enc.diagnosis or "").strip()
 
@@ -428,14 +437,19 @@ def finalise_encounter(
             raise ApiError(
                 status_code=422,
                 code="symptoms_required",
-                message="Chief complaint is required to finalise the consultation (minimum 2 characters).",
+                message=(
+                    "Chief complaint is required to finalise the consultation (minimum 2 "
+                    "characters)."
+                ),
             )
 
         if len(diagnosis_val) < 2:
             raise ApiError(
                 status_code=422,
                 code="diagnosis_required",
-                message="Diagnosis is required to finalise the consultation (minimum 2 characters).",
+                message=(
+                    "Diagnosis is required to finalise the consultation (minimum 2 characters)."
+                ),
             )
 
         # Validate specialty template response required fields if response exists (D-19-09, DWS-05)
@@ -462,7 +476,10 @@ def finalise_encounter(
                     raise ApiError(
                         status_code=422,
                         code="template_required_fields_missing",
-                        message=f"Required specialty template fields missing: {', '.join(missing_fields)}",
+                        message=(
+                            "Required specialty template fields missing: "
+                            f"{', '.join(missing_fields)}"
+                        ),
                     )
 
         enc.is_finalised = True
@@ -570,7 +587,7 @@ def get_encounter_template_response(
     principal: Principal = Depends(current_principal),
 ) -> TemplateResponseRead:
     """Retrieve saved specialty template responses for encounter."""
-    enc = get_scoped_or_404(
+    get_scoped_or_404(
         session,
         ClinicalEncounter,
         id,
@@ -646,4 +663,3 @@ def save_encounter_template_response(
         session.flush()
         session.refresh(new_resp)
         return TemplateResponseRead.model_validate(new_resp)
-

@@ -2,7 +2,6 @@
 
 from fastapi import APIRouter, Depends, Request, Response
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import select, update
 
 from kalyan_api import clock
@@ -23,7 +22,6 @@ from kalyan_api.schemas.auth import (
     ChangePasswordRequest,
     LoginRequest,
     MeResponse,
-    SessionConflictResponse,
 )
 from kalyan_api.services import audit_service, auth_service, throttle_service
 from kalyan_api.services.audit_service import AuditAction, Outcome
@@ -183,7 +181,9 @@ def login(
                 status_code=409,
                 content={
                     "code": "session_in_use",
-                    "message": "An active session already exists for this account on another device.",
+                    "message": (
+                        "An active session already exists for this account on another device."
+                    ),
                     "active_session": {
                         "ip": str(active_sess.ip) if active_sess.ip else None,
                         "user_agent": active_sess.user_agent,

@@ -1,4 +1,5 @@
-"""Comprehensive end-to-end clinical consultation integration gate test suite for Phase 19 (DWS-01..10).
+"""Comprehensive end-to-end clinical consultation integration gate test suite for Phase 19
+(DWS-01..10).
 
 Covers:
 1. Check-In & Arrival (DWS-03)
@@ -13,12 +14,11 @@ Covers:
 10. Single Session Concurrency Control & Audited Takeover (DWS-10)
 """
 
+from collections.abc import Callable
 from datetime import date, timedelta
-from typing import Callable
 
-import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import select, text
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from kalyan_api import clock
@@ -27,11 +27,7 @@ from kalyan_api.models import (
     Appointment,
     AppointmentStatus,
     AuditLog,
-    AuthSession,
-    ClinicalEncounter,
-    ClinicalTemplate,
     Department,
-    Doctor,
     Patient,
     User,
 )
@@ -48,7 +44,8 @@ def test_phase19_clinical_consultation_end_to_end_gate(
     db_session: Session,
     test_settings: Settings,
 ) -> None:
-    """Execute complete multi-specialty clinical workflow roundtrip certifying all 10 Phase 19 requirements."""
+    """Execute complete multi-specialty clinical workflow roundtrip certifying all 10 Phase 19
+    requirements."""
     # -------------------------------------------------------------------------
     # Setup: Ensure Physiotherapy & Ophthalmology departments and doctor linkages
     # -------------------------------------------------------------------------

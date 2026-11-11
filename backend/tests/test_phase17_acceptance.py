@@ -207,7 +207,8 @@ def test_disaster_recovery_rehearsal(
         assert restored_patient is not None
         assert restored_patient.full_name == "Disaster Recovery Drill Patient"
 
-    # 8. Clean up any photo and asset artifacts extracted during restore before running integrity check
+    # 8. Clean up any photo and asset artifacts extracted during restore before running integrity
+    # check
     if settings.photos_dir.exists():
         for photo in settings.photos_dir.glob("*"):
             if photo.is_file():

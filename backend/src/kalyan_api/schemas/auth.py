@@ -16,7 +16,7 @@ class LoginRequest(BaseModel):
 
 
 class SessionConflictResponse(BaseModel):
-    """Returned with HTTP 409 Conflict when a user account already has an active session (DWS-10)."""
+    """Returned with HTTP 409 Conflict when a user account already has an active session (DWS-10)."""  # noqa: E501 - published as the OpenAPI description; wrapping changes the text
 
     code: str = "session_in_use"
     message: str

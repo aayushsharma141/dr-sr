@@ -7,18 +7,17 @@ Guarantees tested:
 - POST /api/admin/imports/{batch_id}/validate runs validation and duplicate candidate matching.
 - GET /api/admin/imports/{batch_id}/duplicates returns candidate comparisons.
 - POST /api/admin/imports/{batch_id}/resolve updates decisions to SKIP or IMPORT_AS_NEW.
-- POST /api/admin/imports/{batch_id}/commit executes safety backup, mints URNs, inserts patients, and writes PATIENT_IMPORT_COMMITTED audit event.
+- POST /api/admin/imports/{batch_id}/commit executes safety backup, mints URNs, inserts patients,
+  and writes PATIENT_IMPORT_COMMITTED audit event.
 - Backup failure halts commit with HTTP 500 without modifying patients (D-20-12).
 - GET /api/admin/imports/{batch_id}/errors streams error CSV for offline correction.
 """
 
-import io
 import json
 from pathlib import Path
 from typing import Any
 from unittest.mock import patch
 
-import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -34,28 +33,37 @@ def test_patient_import_endpoints_rbac(
     reception_user: User,
     doctor_a_user: User,
 ) -> None:
-    """All import endpoints require Permission.PATIENT_IMPORT; denied for anonymous, reception, doctor."""
+    """All import endpoints require Permission.PATIENT_IMPORT; denied for anonymous, reception,
+    doctor."""
     csv_bytes = b"Name,Guardian,Sex,Age,Mobile,Address\nRam,Dashrath,M,30,9876543210,Ara\n"
 
     # Anonymous denied (401)
-    res_anon_inspect = client.post("/api/admin/imports/inspect", files={"file": ("test.csv", csv_bytes, "text/csv")})
+    res_anon_inspect = client.post(
+        "/api/admin/imports/inspect", files={"file": ("test.csv", csv_bytes, "text/csv")}
+    )
     assert res_anon_inspect.status_code == 401
     assert client.get("/api/admin/imports/nonexistent-batch").status_code == 401
 
     # Reception denied (403)
     rec_c: TestClient = login_client(reception_user)
-    res_rec_inspect = rec_c.post("/api/admin/imports/inspect", files={"file": ("test.csv", csv_bytes, "text/csv")})
+    res_rec_inspect = rec_c.post(
+        "/api/admin/imports/inspect", files={"file": ("test.csv", csv_bytes, "text/csv")}
+    )
     assert res_rec_inspect.status_code == 403
     assert rec_c.get("/api/admin/imports/nonexistent-batch").status_code == 403
 
     # Doctor denied (403)
     doc_c: TestClient = login_client(doctor_a_user)
-    res_doc_inspect = doc_c.post("/api/admin/imports/inspect", files={"file": ("test.csv", csv_bytes, "text/csv")})
+    res_doc_inspect = doc_c.post(
+        "/api/admin/imports/inspect", files={"file": ("test.csv", csv_bytes, "text/csv")}
+    )
     assert res_doc_inspect.status_code == 403
 
     # Admin allowed (200)
     admin_c: TestClient = login_client(admin_user)
-    res_admin_inspect = admin_c.post("/api/admin/imports/inspect", files={"file": ("test.csv", csv_bytes, "text/csv")})
+    res_admin_inspect = admin_c.post(
+        "/api/admin/imports/inspect", files={"file": ("test.csv", csv_bytes, "text/csv")}
+    )
     assert res_admin_inspect.status_code == 200
     data = res_admin_inspect.json()
     assert data["total_rows"] == 1
@@ -71,11 +79,11 @@ def test_full_import_lifecycle_and_audit(
 
     # 1. Inspect file
     csv_content = (
-        "Name,Guardian,Gender,Age,Mobile,Address,OldID\n"
-        "Vinit Kumar,Manoj Kumar,M,28,9876501111,Bhojpur Ara,OLD-V1\n"
-        "Pooja Kumari,Ashok Kumar,F,24,9876502222,Station Road Ara,OLD-V2\n"
-        "Bad Row Patient,,M,30,12345,Bhojpur,\n"
-    ).encode("utf-8")
+        b"Name,Guardian,Gender,Age,Mobile,Address,OldID\n"
+        b"Vinit Kumar,Manoj Kumar,M,28,9876501111,Bhojpur Ara,OLD-V1\n"
+        b"Pooja Kumari,Ashok Kumar,F,24,9876502222,Station Road Ara,OLD-V2\n"
+        b"Bad Row Patient,,M,30,12345,Bhojpur,\n"
+    )
 
     inspect_res = admin_c.post(
         "/api/admin/imports/inspect",
@@ -182,11 +190,13 @@ def test_duplicate_review_and_resolve_flow(
     db_session.flush()
 
     csv_content = (
-        "full_name,guardian_name,gender,age_years,mobile,address\n"
-        "Deepak Verma,Harish Verma,M,33,9876543333,Bhojpur Town\n"
-    ).encode("utf-8")
+        b"full_name,guardian_name,gender,age_years,mobile,address\n"
+        b"Deepak Verma,Harish Verma,M,33,9876543333,Bhojpur Town\n"
+    )
 
-    mapping = {k: k for k in ["full_name", "guardian_name", "gender", "age_years", "mobile", "address"]}
+    mapping = {
+        k: k for k in ["full_name", "guardian_name", "gender", "age_years", "mobile", "address"]
+    }
     stage_res = admin_c.post(
         "/api/admin/imports",
         files={"file": ("dup.csv", csv_content, "text/csv")},
@@ -230,11 +240,13 @@ def test_commit_halts_on_precommit_backup_failure(
     admin_c: TestClient = login_client(admin_user)
 
     csv_content = (
-        "full_name,guardian_name,gender,age_years,mobile,address\n"
-        "Test Fail Patient,Test Guardian,M,22,9876588888,Test Address\n"
-    ).encode("utf-8")
+        b"full_name,guardian_name,gender,age_years,mobile,address\n"
+        b"Test Fail Patient,Test Guardian,M,22,9876588888,Test Address\n"
+    )
 
-    mapping = {k: k for k in ["full_name", "guardian_name", "gender", "age_years", "mobile", "address"]}
+    mapping = {
+        k: k for k in ["full_name", "guardian_name", "gender", "age_years", "mobile", "address"]
+    }
     stage_res = admin_c.post(
         "/api/admin/imports",
         files={"file": ("fail.csv", csv_content, "text/csv")},
@@ -244,7 +256,9 @@ def test_commit_halts_on_precommit_backup_failure(
     admin_c.post(f"/api/admin/imports/{batch_id}/validate")
 
     # Trigger backup failure (D-20-12)
-    with patch("kalyan_api.services.backup_service.create_backup", side_effect=OSError("Disk write error")):
+    with patch(
+        "kalyan_api.services.backup_service.create_backup", side_effect=OSError("Disk write error")
+    ):
         commit_res = admin_c.post(f"/api/admin/imports/{batch_id}/commit")
         assert commit_res.status_code == 500
         err_json = commit_res.json()
@@ -254,4 +268,3 @@ def test_commit_halts_on_precommit_backup_failure(
     # Verify no patient was created
     pt = db_session.scalar(select(Patient).where(Patient.mobile == "9876588888"))
     assert pt is None
-

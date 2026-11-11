@@ -87,7 +87,7 @@ def create_treatment_plan(
         raise ApiError(status_code=404, code="patient_not_found", message="Patient not found.")
 
     if payload.encounter_id is not None:
-        encounter = get_scoped_or_404(
+        get_scoped_or_404(
             session,
             ClinicalEncounter,
             payload.encounter_id,

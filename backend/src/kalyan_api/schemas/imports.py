@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict
 
 
 class InspectFileResponse(BaseModel):
@@ -123,4 +123,3 @@ class CommitBatchResponse(BaseModel):
     safety_backup_file: str | None = None
     urn_range_start: str | None = None
     urn_range_end: str | None = None
-

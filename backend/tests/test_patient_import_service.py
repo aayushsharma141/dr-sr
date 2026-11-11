@@ -22,7 +22,6 @@ from sqlalchemy.orm import Session
 
 from kalyan_api.config import Settings
 from kalyan_api.models import Patient, PatientImportBatch, PatientImportRow, User
-from kalyan_api.services import import_service
 from kalyan_api.services.import_service import (
     PreCommitBackupFailedError,
     commit_batch,
@@ -48,7 +47,10 @@ def _create_test_xlsx_bytes(headers: list[str], rows: list[list[object]]) -> byt
 
 def test_inspect_file_csv_encodings() -> None:
     # 1. Standard UTF-8
-    utf8_csv = "Name,Guardian,Sex,Age,Mobile,Address\nRam Kumar,Dashrath Kumar,M,25,9876543210,Ara Bihar\n".encode("utf-8")
+    utf8_csv = (
+        b"Name,Guardian,Sex,Age,Mobile,Address\n"
+        b"Ram Kumar,Dashrath Kumar,M,25,9876543210,Ara Bihar\n"
+    )
     info = inspect_file(utf8_csv, "patients.csv")
     assert info["file_type"] == "csv"
     assert info["encoding"] == "utf-8"
@@ -59,14 +61,21 @@ def test_inspect_file_csv_encodings() -> None:
     assert info["suggested_mapping"]["Guardian"] == "guardian_name"
 
     # 2. UTF-8 with BOM
-    bom_csv = b"\xef\xbb\xbfName,Guardian,Gender,Age,Mobile,Address\nSita,Janak,F,24,9876543211,Janakpur\n"
+    bom_csv = (
+        b"\xef\xbb\xbfName,Guardian,Gender,Age,Mobile,Address\n"
+        b"Sita,Janak,F,24,9876543211,Janakpur\n"
+    )
     info_bom = inspect_file(bom_csv, "patients_bom.csv")
     assert info_bom["encoding"] == "utf-8-sig"
     assert info_bom["total_rows"] == 1
     assert info_bom["sample_rows"][0]["Name"] == "Sita"
 
     # 3. Windows-1252 with special characters
-    win1252_csv = "Name;Father;Gender;Age;Phone;Address\nRenée;André;F;30;9876543212;Patna\n".encode("windows-1252")
+    win1252_csv = (
+        "Name;Father;Gender;Age;Phone;Address\nRenée;André;F;30;9876543212;Patna\n".encode(
+            "windows-1252"
+        )
+    )
     info_win = inspect_file(win1252_csv, "patients_win.csv")
     assert info_win["encoding"] == "windows-1252"
     assert info_win["delimiter"] == ";"
@@ -74,7 +83,15 @@ def test_inspect_file_csv_encodings() -> None:
 
 
 def test_inspect_file_xlsx() -> None:
-    headers = ["Patient Name", "Father Name", "Gender", "Age", "Phone Number", "Village / Town", "Old URN"]
+    headers = [
+        "Patient Name",
+        "Father Name",
+        "Gender",
+        "Age",
+        "Phone Number",
+        "Village / Town",
+        "Old URN",
+    ]
     rows = [
         ["Mohan Lal", "Sohan Lal", "Male", 45, "919876543210", "Jagdishpur", "OLD-101"],
         ["Geeta Devi", "Mohan Lal", "Female", 40, "9876543213", "Bhojpur", "OLD-102"],
@@ -96,13 +113,13 @@ def test_stage_and_validate_batch_with_invalid_rows(
     admin_user: User,
 ) -> None:
     csv_content = (
-        "Name,Guardian,Sex,Age,Mobile,Address,OldID\n"
-        "Valid Patient,Valid Guardian,M,30,9876543210,Main Road Ara,OLD-001\n"
-        "No Guardian Patient,,F,25,9876543211,Station Road Ara,\n"
-        "Bad Mobile Patient,Good Guardian,M,28,12345,Station Road Ara,\n"
-        "Bad Gender Patient,Good Guardian,X,28,9876543212,Station Road Ara,\n"
-        "Bad Age Patient,Good Guardian,F,abc,9876543213,Station Road Ara,\n"
-    ).encode("utf-8")
+        b"Name,Guardian,Sex,Age,Mobile,Address,OldID\n"
+        b"Valid Patient,Valid Guardian,M,30,9876543210,Main Road Ara,OLD-001\n"
+        b"No Guardian Patient,,F,25,9876543211,Station Road Ara,\n"
+        b"Bad Mobile Patient,Good Guardian,M,28,12345,Station Road Ara,\n"
+        b"Bad Gender Patient,Good Guardian,X,28,9876543212,Station Road Ara,\n"
+        b"Bad Age Patient,Good Guardian,F,abc,9876543213,Station Road Ara,\n"
+    )
 
     mapping = {
         "Name": "full_name",
@@ -167,14 +184,25 @@ def test_duplicate_detection_and_resolution(
     # Row 3: Similar name + same mobile
     # Row 4: Completely distinct patient
     csv_content = (
-        "full_name,guardian_name,gender,age_years,mobile,address,legacy_urn\n"
-        "Rajesh Sharma,Omprakash Sharma,M,42,9876500001,Bhojpur Bihar,\n"
-        "Different Name,Different Guardian,F,30,9876599999,Other Address,OLD-REG-901\n"
-        "Rajesh Kumar Sharma,Omprakash,M,42,9876500001,Different Road Ara,\n"
-        "Anil Verma,Sunil Verma,M,35,9876511111,New Mohalla Ara,\n"
-    ).encode("utf-8")
+        b"full_name,guardian_name,gender,age_years,mobile,address,legacy_urn\n"
+        b"Rajesh Sharma,Omprakash Sharma,M,42,9876500001,Bhojpur Bihar,\n"
+        b"Different Name,Different Guardian,F,30,9876599999,Other Address,OLD-REG-901\n"
+        b"Rajesh Kumar Sharma,Omprakash,M,42,9876500001,Different Road Ara,\n"
+        b"Anil Verma,Sunil Verma,M,35,9876511111,New Mohalla Ara,\n"
+    )
 
-    mapping = {col: col for col in ["full_name", "guardian_name", "gender", "age_years", "mobile", "address", "legacy_urn"]}
+    mapping = {
+        col: col
+        for col in [
+            "full_name",
+            "guardian_name",
+            "gender",
+            "age_years",
+            "mobile",
+            "address",
+            "legacy_urn",
+        ]
+    }
 
     batch = stage_batch(db_session, admin_user.id, "duplicates.csv", csv_content, mapping)
     summary = validate_batch(db_session, batch.batch_id)
@@ -215,13 +243,24 @@ def test_commit_batch_allocates_gap_free_urns_and_runs_backup(
     test_settings: Settings,
 ) -> None:
     csv_content = (
-        "full_name,guardian_name,gender,age_years,mobile,address,legacy_urn\n"
-        "Committed Patient One,Guardian One,M,25,9876522221,Address One,OLD-001\n"
-        "Invalid Row Missing Mobile,Guardian Two,F,26,,Address Two,\n"
-        "Committed Patient Two,Guardian Three,F,27,9876522223,Address Three,OLD-003\n"
-    ).encode("utf-8")
+        b"full_name,guardian_name,gender,age_years,mobile,address,legacy_urn\n"
+        b"Committed Patient One,Guardian One,M,25,9876522221,Address One,OLD-001\n"
+        b"Invalid Row Missing Mobile,Guardian Two,F,26,,Address Two,\n"
+        b"Committed Patient Two,Guardian Three,F,27,9876522223,Address Three,OLD-003\n"
+    )
 
-    mapping = {col: col for col in ["full_name", "guardian_name", "gender", "age_years", "mobile", "address", "legacy_urn"]}
+    mapping = {
+        col: col
+        for col in [
+            "full_name",
+            "guardian_name",
+            "gender",
+            "age_years",
+            "mobile",
+            "address",
+            "legacy_urn",
+        ]
+    }
     batch = stage_batch(db_session, admin_user.id, "commit_test.csv", csv_content, mapping)
     validate_batch(db_session, batch.batch_id)
 
@@ -254,21 +293,28 @@ def test_commit_batch_aborts_on_backup_failure(
     test_settings: Settings,
 ) -> None:
     csv_content = (
-        "full_name,guardian_name,gender,age_years,mobile,address\n"
-        "Aborted Patient,Guardian X,M,30,9876533333,Address Abort\n"
-    ).encode("utf-8")
+        b"full_name,guardian_name,gender,age_years,mobile,address\n"
+        b"Aborted Patient,Guardian X,M,30,9876533333,Address Abort\n"
+    )
 
-    mapping = {col: col for col in ["full_name", "guardian_name", "gender", "age_years", "mobile", "address"]}
+    mapping = {
+        col: col
+        for col in ["full_name", "guardian_name", "gender", "age_years", "mobile", "address"]
+    }
     batch = stage_batch(db_session, admin_user.id, "abort_test.csv", csv_content, mapping)
     validate_batch(db_session, batch.batch_id)
 
-    with patch("kalyan_api.services.backup_service.create_backup", side_effect=RuntimeError("Disk full")):
+    with patch(
+        "kalyan_api.services.backup_service.create_backup", side_effect=RuntimeError("Disk full")
+    ):
         with pytest.raises(PreCommitBackupFailedError):
             commit_batch(db_session, admin_user.id, batch.batch_id, cfg=test_settings)
 
     # Invariants: batch not committed, patient never created
     db_session.rollback()
-    reloaded_batch = db_session.scalar(select(PatientImportBatch).where(PatientImportBatch.batch_id == batch.batch_id))
+    reloaded_batch = db_session.scalar(
+        select(PatientImportBatch).where(PatientImportBatch.batch_id == batch.batch_id)
+    )
     assert reloaded_batch is None or reloaded_batch.status != "COMMITTED"
 
     patient = db_session.scalar(select(Patient).where(Patient.mobile == "9876533333"))
@@ -280,11 +326,14 @@ def test_export_error_records_csv(
     admin_user: User,
 ) -> None:
     csv_content = (
-        "full_name,guardian_name,gender,age_years,mobile,address\n"
-        "=Malformed Formula Name,,M,30,9876544444,Address Four\n"
-    ).encode("utf-8")
+        b"full_name,guardian_name,gender,age_years,mobile,address\n"
+        b"=Malformed Formula Name,,M,30,9876544444,Address Four\n"
+    )
 
-    mapping = {col: col for col in ["full_name", "guardian_name", "gender", "age_years", "mobile", "address"]}
+    mapping = {
+        col: col
+        for col in ["full_name", "guardian_name", "gender", "age_years", "mobile", "address"]
+    }
     batch = stage_batch(db_session, admin_user.id, "error_test.csv", csv_content, mapping)
     validate_batch(db_session, batch.batch_id)
 
@@ -294,4 +343,3 @@ def test_export_error_records_csv(
     assert "guardian_name" in csv_text
     # Formula injection sanitized with leading quote
     assert "'=Malformed Formula Name" in csv_text
-

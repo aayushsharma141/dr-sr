@@ -287,9 +287,11 @@ def upgrade() -> None:
 
                 IF encounter_finalised = TRUE THEN
                     IF TG_OP = 'DELETE' THEN
-                        RAISE EXCEPTION 'Cannot delete % for a finalised clinical encounter.', TG_TABLE_NAME;
+                        RAISE EXCEPTION 'Cannot delete % for a finalised clinical encounter.',
+                            TG_TABLE_NAME;
                     ELSE
-                        RAISE EXCEPTION 'Cannot modify % for a finalised clinical encounter.', TG_TABLE_NAME;
+                        RAISE EXCEPTION 'Cannot modify % for a finalised clinical encounter.',
+                            TG_TABLE_NAME;
                     END IF;
                 END IF;
 
@@ -332,13 +334,23 @@ def upgrade() -> None:
 
 def downgrade() -> None:
     op.execute("REVOKE SELECT, INSERT, UPDATE, DELETE ON vital_observations FROM kalyan_app;")
-    op.execute("REVOKE SELECT, INSERT, UPDATE, DELETE ON clinical_template_responses FROM kalyan_app;")
-    op.execute("REVOKE SELECT, INSERT, UPDATE, DELETE ON clinical_template_versions FROM kalyan_app;")
+    op.execute(
+        "REVOKE SELECT, INSERT, UPDATE, DELETE ON clinical_template_responses FROM kalyan_app;"
+    )
+    op.execute(
+        "REVOKE SELECT, INSERT, UPDATE, DELETE ON clinical_template_versions FROM kalyan_app;"
+    )
     op.execute("REVOKE SELECT, INSERT, UPDATE, DELETE ON clinical_templates FROM kalyan_app;")
     op.execute("REVOKE SELECT, INSERT, UPDATE, DELETE ON departments FROM kalyan_app;")
 
-    op.execute("DROP TRIGGER IF EXISTS trg_prevent_finalised_encounter_vitals_tampering ON vital_observations;")
-    op.execute("DROP TRIGGER IF EXISTS trg_prevent_finalised_encounter_template_response_tampering ON clinical_template_responses;")
+    op.execute(
+        "DROP TRIGGER IF EXISTS trg_prevent_finalised_encounter_vitals_tampering ON "
+        "vital_observations;"
+    )
+    op.execute(
+        "DROP TRIGGER IF EXISTS trg_prevent_finalised_encounter_template_response_tampering ON "
+        "clinical_template_responses;"
+    )
 
     op.execute(
         """
@@ -377,5 +389,9 @@ def downgrade() -> None:
     op.drop_table("clinical_template_responses")
     op.drop_table("clinical_template_versions")
     op.drop_table("clinical_templates")
-    op.drop_constraint("fk_clinical_encounters_department_id_departments", "clinical_encounters", type_="foreignkey")
+    op.drop_constraint(
+        "fk_clinical_encounters_department_id_departments",
+        "clinical_encounters",
+        type_="foreignkey",
+    )
     op.drop_table("departments")

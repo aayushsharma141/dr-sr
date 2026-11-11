@@ -8,10 +8,9 @@ from sqlalchemy.exc import IntegrityError
 from kalyan_api.models import Appointment, AppointmentStatus, ClinicalEncounter, Patient
 
 
-def test_encounter_creation_idempotent_reopens_existing(
-    login_client, doctor_a_user, db_session
-):
-    """Starting an encounter for an appointment with an existing encounter returns 200 and the existing encounter."""
+def test_encounter_creation_idempotent_reopens_existing(login_client, doctor_a_user, db_session):
+    """Starting an encounter for an appointment with an existing encounter returns 200 and the
+    existing encounter."""
     patient = Patient(
         urn="KH-2026-7001",
         full_name="Single Encounter Patient",
@@ -75,7 +74,8 @@ def test_encounter_creation_idempotent_reopens_existing(
 
 
 def test_database_enforces_unique_appointment_encounter_index(db_session, doctor_a_user):
-    """Database level partial unique index blocks duplicate encounters for the same appointment (T-19-01)."""
+    """Database level partial unique index blocks duplicate encounters for the same appointment
+    (T-19-01)."""
     patient = Patient(
         urn="KH-2026-7002",
         full_name="DB Constraint Patient",
@@ -129,7 +129,8 @@ def test_database_enforces_unique_appointment_encounter_index(db_session, doctor
 
 
 def test_encounters_without_appointment_allowed_multiple(db_session, doctor_a_user):
-    """Encounters without appointment (walk-in without token) can be created multiple times for the same patient."""
+    """Encounters without appointment (walk-in without token) can be created multiple times for the
+    same patient."""
     patient = Patient(
         urn="KH-2026-7003",
         full_name="No Appointment Patient",

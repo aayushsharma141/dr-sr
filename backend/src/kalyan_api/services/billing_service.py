@@ -13,7 +13,8 @@ from kalyan_api.schemas.billing import PendingDueOut
 
 
 def compute_pending_dues(session: Session) -> list[PendingDueOut]:
-    """Return active and completed treatment packages with a positive outstanding balance, newest first (BR-003)."""
+    """Return active and completed treatment packages with a positive outstanding balance, newest
+    first (BR-003)."""
     stmt = (
         select(TreatmentPlan)
         .where(TreatmentPlan.status.in_(["ACTIVE", "COMPLETED"]))

@@ -21,7 +21,7 @@ from kalyan_api.core.principal import (
     build_audit_context,
     current_principal,
 )
-from kalyan_api.core.scope import ScopeFamily, get_scoped_or_404, row_scope
+from kalyan_api.core.scope import ScopeFamily, get_scoped_or_404
 from kalyan_api.db.session import SessionDep
 from kalyan_api.models import (
     TreatmentPlan,

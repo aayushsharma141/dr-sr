@@ -1,7 +1,8 @@
 """Tests for print template REST API and audit event recording (SET-01, BIL-04, D-20-04).
 
 Guarantees:
-- Admin can list all 4 print templates (prescription, receipt, registration_card, consultation_summary).
+- Admin can list all 4 print templates (prescription, receipt, registration_card,
+  consultation_summary).
 - Admin can fetch a single print template by document type.
 - Admin can update bilingual header and footer text per document type.
 - Stale version submissions return HTTP 409 version_conflict.
@@ -9,12 +10,11 @@ Guarantees:
 - Non-admin users (Reception, Doctor) or unauthenticated requests are denied.
 """
 
-import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from kalyan_api.models import AuditLog, PrintDocumentType, PrintTemplate, User
+from kalyan_api.models import AuditLog, PrintDocumentType, User
 from kalyan_api.services.audit_service import AuditAction
 
 

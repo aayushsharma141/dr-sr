@@ -8,7 +8,10 @@ from pydantic import BaseModel, ConfigDict, Field
 
 warnings.filterwarnings(
     "ignore",
-    message='Field name "schema_json" in "ClinicalTemplateVersionRead" shadows an attribute in parent "BaseModel"',
+    message=(
+        'Field name "schema_json" in "ClinicalTemplateVersionRead" shadows an attribute in parent '
+        '"BaseModel"'
+    ),
     category=UserWarning,
 )
 
@@ -87,7 +90,11 @@ PHYSIOTHERAPY_V1_SCHEMA: dict[str, Any] = {
                     "type": "select",
                     "options": ["0/5", "1/5", "2/5", "3/5", "4/5", "5/5"],
                 },
-                {"key": "functional_limitations", "label": "Functional Limitations", "type": "text"},
+                {
+                    "key": "functional_limitations",
+                    "label": "Functional Limitations",
+                    "type": "text",
+                },
                 {
                     "key": "ambulation_status",
                     "label": "Ambulation Status",
@@ -284,4 +291,3 @@ class PrintTemplateUpdate(BaseModel):
     footer_en: str | None = None
     footer_hi: str | None = None
     version: int = Field(..., description="Current template version for optimistic locking")
-

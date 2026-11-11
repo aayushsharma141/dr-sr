@@ -1,7 +1,9 @@
-"""Tests for follow-up recommendations workflow and reception privacy separation (DWS-08, D-19-18, D-19-19, D-19-20, D-19-21)."""
+"""Tests for follow-up recommendations workflow and reception privacy separation (DWS-08, D-19-18,
+D-19-19, D-19-20, D-19-21)."""
 
-from datetime import date, timedelta
+from datetime import timedelta
 
+from kalyan_api.clock import ist_today
 from kalyan_api.models import (
     Appointment,
     ClinicalEncounter,
@@ -29,7 +31,13 @@ def _create_test_patient(db_session, suffix="40") -> Patient:
     return patient
 
 
-def _create_test_encounter(db_session, patient_id: int, doctor_id: int, user_id: int, diagnosis="Knee Osteoarthritis Grade 2") -> ClinicalEncounter:
+def _create_test_encounter(
+    db_session,
+    patient_id: int,
+    doctor_id: int,
+    user_id: int,
+    diagnosis="Knee Osteoarthritis Grade 2",
+) -> ClinicalEncounter:
     encounter = ClinicalEncounter(
         patient_id=patient_id,
         doctor_id=doctor_id,
@@ -44,17 +52,23 @@ def _create_test_encounter(db_session, patient_id: int, doctor_id: int, user_id:
     return encounter
 
 
-def test_doctor_creates_and_retrieves_follow_up(login_client, doctor_a_user, doctor_b_user, db_session):
+def test_doctor_creates_and_retrieves_follow_up(
+    login_client, doctor_a_user, doctor_b_user, db_session
+):
     """Doctor records follow-up recommendation with clinical reason and retrieves it."""
     patient = _create_test_patient(db_session, "01")
-    encounter = _create_test_encounter(db_session, patient.id, doctor_a_user.doctor_id, doctor_a_user.id)
+    encounter = _create_test_encounter(
+        db_session, patient.id, doctor_a_user.doctor_id, doctor_a_user.id
+    )
     doc_a_client = login_client(doctor_a_user)
 
-    target_date = (date.today() + timedelta(days=14)).isoformat()
+    target_date = (ist_today() + timedelta(days=14)).isoformat()
     payload = {
         "recommended_date": target_date,
         # recommended_doctor_id omitted: defaults to current doctor per D-19-20
-        "clinical_reason": "Evaluate response to quadriceps strengthening and hyaluronic acid trial.",
+        "clinical_reason": (
+            "Evaluate response to quadriceps strengthening and hyaluronic acid trial."
+        ),
     }
 
     create_resp = doc_a_client.post(f"/api/encounters/{encounter.id}/follow-up", json=payload)
@@ -65,7 +79,10 @@ def test_doctor_creates_and_retrieves_follow_up(login_client, doctor_a_user, doc
     assert data["doctor_id"] == doctor_a_user.doctor_id
     assert data["recommended_doctor_id"] == doctor_a_user.doctor_id
     assert data["recommended_date"] == target_date
-    assert data["clinical_reason"] == "Evaluate response to quadriceps strengthening and hyaluronic acid trial."
+    assert (
+        data["clinical_reason"]
+        == "Evaluate response to quadriceps strengthening and hyaluronic acid trial."
+    )
     assert data["status"] == "PENDING"
     assert data["booked_appointment_id"] is None
 
@@ -73,7 +90,10 @@ def test_doctor_creates_and_retrieves_follow_up(login_client, doctor_a_user, doc
     get_resp = doc_a_client.get(f"/api/encounters/{encounter.id}/follow-up")
     assert get_resp.status_code == 200
     get_data = get_resp.json()
-    assert get_data["clinical_reason"] == "Evaluate response to quadriceps strengthening and hyaluronic acid trial."
+    assert (
+        get_data["clinical_reason"]
+        == "Evaluate response to quadriceps strengthening and hyaluronic acid trial."
+    )
 
     # Duplicate creation on same encounter is rejected (409)
     dup_resp = doc_a_client.post(f"/api/encounters/{encounter.id}/follow-up", json=payload)
@@ -81,14 +101,21 @@ def test_doctor_creates_and_retrieves_follow_up(login_client, doctor_a_user, doc
     assert dup_resp.json()["code"] == "follow_up_exists"
 
 
-def test_reception_cannot_view_clinical_reason(login_client, doctor_a_user, reception_user, db_session):
-    """Reception querying follow-up recommendations receives projected data with ZERO clinical reason (D-19-19, R-3, T-19-07)."""
+def test_reception_cannot_view_clinical_reason(
+    login_client, doctor_a_user, reception_user, db_session
+):
+    """Reception querying follow-up recommendations receives projected data with ZERO clinical
+    reason (D-19-19, R-3, T-19-07)."""
     patient = _create_test_patient(db_session, "02")
-    encounter = _create_test_encounter(db_session, patient.id, doctor_a_user.doctor_id, doctor_a_user.id)
+    encounter = _create_test_encounter(
+        db_session, patient.id, doctor_a_user.doctor_id, doctor_a_user.id
+    )
     doc_client = login_client(doctor_a_user)
 
-    target_date = (date.today() + timedelta(days=7)).isoformat()
-    sensitive_clinical_reason = "CONFIDENTIAL: Suspected neurodegenerative gait ataxia, re-evaluate cerebellar signs."
+    target_date = (ist_today() + timedelta(days=7)).isoformat()
+    sensitive_clinical_reason = (
+        "CONFIDENTIAL: Suspected neurodegenerative gait ataxia, re-evaluate cerebellar signs."
+    )
     doc_client.post(
         f"/api/encounters/{encounter.id}/follow-up",
         json={
@@ -120,13 +147,17 @@ def test_reception_cannot_view_clinical_reason(login_client, doctor_a_user, rece
     assert sensitive_clinical_reason not in rec_resp.text
 
 
-def test_booking_recommendation_converts_to_appointment(login_client, doctor_a_user, reception_user, db_session):
+def test_booking_recommendation_converts_to_appointment(
+    login_client, doctor_a_user, reception_user, db_session
+):
     """Receptionist or Doctor books an appointment from a pending recommendation (D-19-18)."""
     patient = _create_test_patient(db_session, "03")
-    encounter = _create_test_encounter(db_session, patient.id, doctor_a_user.doctor_id, doctor_a_user.id)
+    encounter = _create_test_encounter(
+        db_session, patient.id, doctor_a_user.doctor_id, doctor_a_user.id
+    )
     doc_client = login_client(doctor_a_user)
 
-    target_date = (date.today() + timedelta(days=10)).isoformat()
+    target_date = (ist_today() + timedelta(days=10)).isoformat()
     create_resp = doc_client.post(
         f"/api/encounters/{encounter.id}/follow-up",
         json={
@@ -161,13 +192,18 @@ def test_booking_recommendation_converts_to_appointment(login_client, doctor_a_u
     assert dup_book.json()["code"] == "invalid_status"
 
 
-def test_closing_recommendation_requires_reason(login_client, doctor_a_user, reception_user, db_session):
-    """Recommendation can be closed with recorded reason and never expires automatically (D-19-21)."""
+def test_closing_recommendation_requires_reason(
+    login_client, doctor_a_user, reception_user, db_session
+):
+    """Recommendation can be closed with recorded reason and never expires automatically
+    (D-19-21)."""
     patient = _create_test_patient(db_session, "04")
-    encounter = _create_test_encounter(db_session, patient.id, doctor_a_user.doctor_id, doctor_a_user.id)
+    encounter = _create_test_encounter(
+        db_session, patient.id, doctor_a_user.doctor_id, doctor_a_user.id
+    )
     doc_client = login_client(doctor_a_user)
 
-    past_date = (date.today() - timedelta(days=5)).isoformat()
+    past_date = (ist_today() - timedelta(days=5)).isoformat()
     create_resp = doc_client.post(
         f"/api/encounters/{encounter.id}/follow-up",
         json={
@@ -211,11 +247,13 @@ def test_closing_recommendation_requires_reason(login_client, doctor_a_user, rec
 
 def _pending_recommendation(login_client, doctor_user, db_session, suffix: str):
     patient = _create_test_patient(db_session, suffix)
-    encounter = _create_test_encounter(db_session, patient.id, doctor_user.doctor_id, doctor_user.id)
+    encounter = _create_test_encounter(
+        db_session, patient.id, doctor_user.doctor_id, doctor_user.id
+    )
     resp = login_client(doctor_user).post(
         f"/api/encounters/{encounter.id}/follow-up",
         json={
-            "recommended_date": (date.today() + timedelta(days=7)).isoformat(),
+            "recommended_date": (ist_today() + timedelta(days=7)).isoformat(),
             "clinical_reason": "Review progress",
         },
     )
@@ -231,8 +269,12 @@ def _assert_not_booked(db_session, rec_id: int, patient_id: int) -> None:
     assert db_session.query(Appointment).filter_by(patient_id=patient_id).count() == 0
 
 
-def test_follow_up_booking_records_the_doctors_department(login_client, doctor_a_user, reception_user, db_session):
-    _patient, _encounter, rec_id = _pending_recommendation(login_client, doctor_a_user, db_session, "11")
+def test_follow_up_booking_records_the_doctors_department(
+    login_client, doctor_a_user, reception_user, db_session
+):
+    _patient, _encounter, rec_id = _pending_recommendation(
+        login_client, doctor_a_user, db_session, "11"
+    )
     doctor = db_session.get(Doctor, doctor_a_user.doctor_id)
     expected_department_id = doctor.departments[0].id
 
@@ -243,8 +285,12 @@ def test_follow_up_booking_records_the_doctors_department(login_client, doctor_a
     assert appt.department_id == expected_department_id
 
 
-def test_follow_up_booking_rejects_inactive_doctor(login_client, doctor_a_user, reception_user, db_session):
-    patient, _encounter, rec_id = _pending_recommendation(login_client, doctor_a_user, db_session, "12")
+def test_follow_up_booking_rejects_inactive_doctor(
+    login_client, doctor_a_user, reception_user, db_session
+):
+    patient, _encounter, rec_id = _pending_recommendation(
+        login_client, doctor_a_user, db_session, "12"
+    )
     db_session.get(Doctor, doctor_a_user.doctor_id).is_active = False
     db_session.flush()
 
@@ -254,8 +300,12 @@ def test_follow_up_booking_rejects_inactive_doctor(login_client, doctor_a_user, 
     _assert_not_booked(db_session, rec_id, patient.id)
 
 
-def test_follow_up_booking_rejects_inactive_department(login_client, doctor_a_user, reception_user, db_session):
-    patient, _encounter, rec_id = _pending_recommendation(login_client, doctor_a_user, db_session, "13")
+def test_follow_up_booking_rejects_inactive_department(
+    login_client, doctor_a_user, reception_user, db_session
+):
+    patient, _encounter, rec_id = _pending_recommendation(
+        login_client, doctor_a_user, db_session, "13"
+    )
     for dept in db_session.get(Doctor, doctor_a_user.doctor_id).departments:
         dept.is_active = False
     db_session.flush()
@@ -266,8 +316,12 @@ def test_follow_up_booking_rejects_inactive_department(login_client, doctor_a_us
     _assert_not_booked(db_session, rec_id, patient.id)
 
 
-def test_follow_up_booking_rejects_inactive_patient(login_client, doctor_a_user, reception_user, db_session):
-    patient, _encounter, rec_id = _pending_recommendation(login_client, doctor_a_user, db_session, "14")
+def test_follow_up_booking_rejects_inactive_patient(
+    login_client, doctor_a_user, reception_user, db_session
+):
+    patient, _encounter, rec_id = _pending_recommendation(
+        login_client, doctor_a_user, db_session, "14"
+    )
     patient.is_active = False
     db_session.flush()
 
@@ -277,8 +331,12 @@ def test_follow_up_booking_rejects_inactive_patient(login_client, doctor_a_user,
     _assert_not_booked(db_session, rec_id, patient.id)
 
 
-def test_follow_up_booking_needs_department_when_doctor_has_several(login_client, doctor_a_user, reception_user, db_session):
-    patient, _encounter, rec_id = _pending_recommendation(login_client, doctor_a_user, db_session, "15")
+def test_follow_up_booking_needs_department_when_doctor_has_several(
+    login_client, doctor_a_user, reception_user, db_session
+):
+    patient, _encounter, rec_id = _pending_recommendation(
+        login_client, doctor_a_user, db_session, "15"
+    )
     doctor = db_session.get(Doctor, doctor_a_user.doctor_id)
     eye = Department(code="TEST_FOLLOWUP_EYE", name_en="Test Follow-up Eye", is_active=True)
     other = Department(code="TEST_FOLLOWUP_OTHER", name_en="Test Follow-up Other", is_active=True)
@@ -306,7 +364,9 @@ def test_follow_up_booking_needs_department_when_doctor_has_several(login_client
     assert appt.department_id == eye.id
 
 
-def test_follow_up_booking_prefers_the_encounter_department(login_client, doctor_a_user, reception_user, db_session):
+def test_follow_up_booking_prefers_the_encounter_department(
+    login_client, doctor_a_user, reception_user, db_session
+):
     patient = _create_test_patient(db_session, "16")
     doctor = db_session.get(Doctor, doctor_a_user.doctor_id)
     eye = Department(code="TEST_FOLLOWUP_EYE2", name_en="Test Follow-up Eye 2", is_active=True)
@@ -318,7 +378,7 @@ def test_follow_up_booking_prefers_the_encounter_department(login_client, doctor
     db_session.flush()
     create = login_client(doctor_a_user).post(
         f"/api/encounters/{encounter.id}/follow-up",
-        json={"recommended_date": (date.today() + timedelta(days=7)).isoformat()},
+        json={"recommended_date": (ist_today() + timedelta(days=7)).isoformat()},
     )
     assert create.status_code == 201, create.text
 

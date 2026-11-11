@@ -2,26 +2,22 @@
 
 Requirements:
 - Payments, prescriptions, and clinical encounters capture demographic snapshots upon creation.
-- Reprints of historical documents render the stored snapshot, NOT the corrected patient demographic.
+- Reprints of historical documents render the stored snapshot, NOT the corrected patient
+  demographic.
 - Payment tamper protection prevents modifying snapshot fields.
 """
 
+import uuid
 from datetime import UTC, datetime
 from typing import Any
-import uuid
 
-import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import select, update
 from sqlalchemy.orm import Session
 
 from kalyan_api.models import (
     Appointment,
-    ClinicalEncounter,
     Patient,
     Payment,
-    Prescription,
-    PrescriptionItem,
     User,
 )
 
@@ -69,7 +65,8 @@ def test_issuance_captures_snapshots_and_retains_after_correction(
     doctor_a_user: User,
     db_session: Session,
 ) -> None:
-    """Documents store snapshot patient details at creation; subsequent patient correction does not alter them."""
+    """Documents store snapshot patient details at creation; subsequent patient correction does not
+    alter them."""
     uid = uuid.uuid4().hex[:4]
     patient, appt = _setup_patient_and_appointment(db_session, reception_user, doctor_a_user, uid)
 

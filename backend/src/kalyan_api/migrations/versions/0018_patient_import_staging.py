@@ -121,7 +121,8 @@ def upgrade() -> None:
     # 3. Grant runtime table privileges to kalyan_app on PostgreSQL
     if is_postgres:
         op.execute(
-            "GRANT SELECT, INSERT, UPDATE, DELETE ON patient_import_batches, patient_import_rows TO kalyan_app;"
+            "GRANT SELECT, INSERT, UPDATE, DELETE ON patient_import_batches, patient_import_rows "
+            "TO kalyan_app;"
         )
         op.execute("GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO kalyan_app;")
 
@@ -129,4 +130,3 @@ def upgrade() -> None:
 def downgrade() -> None:
     op.drop_table("patient_import_rows")
     op.drop_table("patient_import_batches")
-

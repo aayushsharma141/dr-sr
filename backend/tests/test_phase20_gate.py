@@ -11,7 +11,8 @@ Guarantees:
    - Optimistic concurrency (409 version_conflict) enforced.
    - Historical snapshot isolation: payments, prescriptions, and clinical encounters
      preserve their point-in-time patient demographics after correction.
-   - Database tamper protection: direct SQL UPDATE on payment snapshot columns is blocked by trigger.
+   - Database tamper protection: direct SQL UPDATE on payment snapshot columns is blocked by
+     trigger.
 3. Hospital Asset Management:
    - Multipart asset upload with magic byte verification and ASSET_UPLOADED audit log.
    - Unauthenticated GET /api/assets/active-logo streams active crest.
@@ -33,13 +34,12 @@ Guarantees:
    - PATIENT_EXPORTED audit event with reason and row count.
 """
 
-from datetime import UTC, datetime
-import io
 import json
-from pathlib import Path
 import tarfile
-from typing import Any
 import uuid
+from datetime import UTC, datetime
+from pathlib import Path
+from typing import Any
 from unittest.mock import patch
 
 import pytest
@@ -51,22 +51,20 @@ from kalyan_api.config import Settings
 from kalyan_api.models import (
     Appointment,
     AuditLog,
-    ClinicalEncounter,
     HospitalAsset,
     Patient,
     PatientImportBatch,
-    Payment,
-    Prescription,
     PrintDocumentType,
-    PrintTemplate,
     User,
 )
-from kalyan_api.services.asset_service import get_asset_path
 from kalyan_api.services.audit_service import AuditAction
 from kalyan_api.services.backup_service import create_backup, verify_backup_bundle
 from kalyan_api.services.integrity_service import check_asset_storage_integrity
 
-VALID_PNG = b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01\x08\x06\x00\x00\x00\x1f\x15c4"
+VALID_PNG = (
+    b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR"
+    b"\x00\x00\x00\x01\x00\x00\x00\x01\x08\x06\x00\x00\x00\x1f\x15c4"
+)
 
 
 def _create_gate_patient(
@@ -107,7 +105,8 @@ def test_phase20_permissions_enforcement(
     doctor_a_user: User,
     db_session: Session,
 ) -> None:
-    """Validate RBAC permissions matrix across all new Phase 20 endpoints and assert Admin lacks patient:update."""
+    """Validate RBAC permissions matrix across all new Phase 20 endpoints and assert Admin lacks
+    patient:update."""
     uid = uuid.uuid4().hex[:4]
     patient = _create_gate_patient(db_session, f"P1{uid}")
 
@@ -136,8 +135,14 @@ def test_phase20_permissions_enforcement(
         "district": "Bhojpur",
         "state": "Bihar",
     }
-    assert rec_c.patch(f"/api/admin/patients/{patient.id}/demographics", json=corr_payload).status_code == 403
-    assert doc_c.patch(f"/api/admin/patients/{patient.id}/demographics", json=corr_payload).status_code == 403
+    assert (
+        rec_c.patch(f"/api/admin/patients/{patient.id}/demographics", json=corr_payload).status_code
+        == 403
+    )
+    assert (
+        doc_c.patch(f"/api/admin/patients/{patient.id}/demographics", json=corr_payload).status_code
+        == 403
+    )
 
     # 1.2 /api/admin/assets
     assert admin_c.get("/api/admin/assets").status_code == 200
@@ -150,10 +155,27 @@ def test_phase20_permissions_enforcement(
     assert doc_c.get("/api/admin/templates").status_code == 403
 
     # 1.4 /api/admin/imports
-    dummy_csv = b"full_name,guardian_name,gender,age_years,mobile,address\nTest,G,M,30,9876543210,Ara\n"
-    assert admin_c.post("/api/admin/imports/inspect", files={"file": ("test.csv", dummy_csv, "text/csv")}).status_code == 200
-    assert rec_c.post("/api/admin/imports/inspect", files={"file": ("test.csv", dummy_csv, "text/csv")}).status_code == 403
-    assert doc_c.post("/api/admin/imports/inspect", files={"file": ("test.csv", dummy_csv, "text/csv")}).status_code == 403
+    dummy_csv = (
+        b"full_name,guardian_name,gender,age_years,mobile,address\nTest,G,M,30,9876543210,Ara\n"
+    )
+    assert (
+        admin_c.post(
+            "/api/admin/imports/inspect", files={"file": ("test.csv", dummy_csv, "text/csv")}
+        ).status_code
+        == 200
+    )
+    assert (
+        rec_c.post(
+            "/api/admin/imports/inspect", files={"file": ("test.csv", dummy_csv, "text/csv")}
+        ).status_code
+        == 403
+    )
+    assert (
+        doc_c.post(
+            "/api/admin/imports/inspect", files={"file": ("test.csv", dummy_csv, "text/csv")}
+        ).status_code
+        == 403
+    )
 
     # 1.5 /api/admin/exports
     export_payload = {
@@ -172,7 +194,8 @@ def test_phase20_permissions_enforcement(
         json={"full_name": "Attempted Admin Tamper", "version_id": patient.version_id},
     )
     assert admin_rec_patch.status_code == 403, (
-        f"Expected HTTP 403 Forbidden for Admin on /api/patients/{{id}}, got {admin_rec_patch.status_code}"
+        f"Expected HTTP 403 Forbidden for Admin on /api/patients/{{id}}, got "
+        f"{admin_rec_patch.status_code}"
     )
 
     # Reception DOES have patient:update on PATCH /api/patients/{id}
@@ -193,7 +216,8 @@ def test_phase20_demographic_correction_and_snapshot_isolation(
     doctor_a_user: User,
     db_session: Session,
 ) -> None:
-    """Verify demographic correction with diff, optimistic locking, snapshot column isolation, and trigger lock."""
+    """Verify demographic correction with diff, optimistic locking, snapshot column isolation, and
+    trigger lock."""
     uid = uuid.uuid4().hex[:4]
     num_uid = "".join(c for c in uid if c.isdigit()) or "1234"
     orig_name = f"Rajendra Prasad {uid}"
@@ -355,7 +379,8 @@ def test_phase20_demographic_correction_and_snapshot_isolation(
     assert audit.after_data["full_name"] == corrected_name
     assert audit.after_data["mobile"] == corrected_mobile
 
-    # 2.6 Historical Snapshot Isolation: Payment, Prescription, and Encounter retain original snapshot values
+    # 2.6 Historical Snapshot Isolation: Payment, Prescription, and Encounter retain original
+    # snapshot values
     receipt_resp = rec_c.get(f"/api/payments/{payment_id}/receipt")
     assert receipt_resp.status_code == 200
     receipt_data = receipt_resp.json()
@@ -399,7 +424,8 @@ def test_phase20_hospital_asset_management(
     monkeypatch: pytest.MonkeyPatch,
     test_settings: Settings,
 ) -> None:
-    """Verify asset upload, unauthenticated active-logo retrieval, deactivation, integrity check, and backup bundling."""
+    """Verify asset upload, unauthenticated active-logo retrieval, deactivation, integrity check,
+    and backup bundling."""
     assets_dir = tmp_path / "assets"
     assets_dir.mkdir(parents=True, exist_ok=True)
     monkeypatch.setattr(test_settings, "assets_dir", assets_dir)
@@ -490,7 +516,8 @@ def test_phase20_print_templates_and_locking(
     admin_user: User,
     db_session: Session,
 ) -> None:
-    """Verify print templates listing, patching with Hindi/English, optimistic locking (409), and audit logging."""
+    """Verify print templates listing, patching with Hindi/English, optimistic locking (409), and
+    audit logging."""
     admin_c: TestClient = login_client(admin_user)
 
     # 4.1 Fetch print templates
@@ -555,7 +582,8 @@ def test_phase20_patient_import_pipeline(
     monkeypatch: pytest.MonkeyPatch,
     test_settings: Settings,
 ) -> None:
-    """Verify 8-stage import pipeline: staging, duplicate resolution as SKIP, backup, gap-free URNs, error CSV, audit."""
+    """Verify 8-stage import pipeline: staging, duplicate resolution as SKIP, backup, gap-free URNs,
+    error CSV, audit."""
     uid = uuid.uuid4().hex[:4]
     admin_c: TestClient = login_client(admin_user)
 
@@ -585,7 +613,7 @@ def test_phase20_patient_import_pipeline(
         f'Valid Imported Patient,Father Name,M,32,9876501199,"New Sector Road Ara",OLD-IMP-V1\n'
         f'Duplicate Candidate Patient,Guardian Name,M,40,{dup_mobile},"{dup_address}",OLD-IMP-DUP\n'
         f'Invalid Patient Missing Guardian,,F,28,9876502299,"Village Bad Row Ara",OLD-IMP-INV\n'
-    ).encode("utf-8")
+    ).encode()
 
     # 5.1 Inspect
     inspect_resp = admin_c.post(
@@ -652,7 +680,8 @@ def test_phase20_patient_import_pipeline(
     )
     assert resolve_resp.status_code == 200
 
-    # 5.5 Commit Batch: pre-commit safety backup, gap-free URN allocation, exactly 1 patient committed
+    # 5.5 Commit Batch: pre-commit safety backup, gap-free URN allocation, exactly 1 patient
+    # committed
     fake_archive = backup_dest / f"kalyan_backup_gate_preimport_{uid}.tar.gz"
     fake_archive.write_bytes(b"dummy_tar_archive")
     with patch("kalyan_api.services.backup_service.create_backup") as mock_backup:
@@ -670,9 +699,7 @@ def test_phase20_patient_import_pipeline(
     assert start_urn.startswith("KH-")
 
     # Verify newly committed patient in database
-    committed_patient = db_session.scalar(
-        select(Patient).where(Patient.mobile == "9876501199")
-    )
+    committed_patient = db_session.scalar(select(Patient).where(Patient.mobile == "9876501199"))
     assert committed_patient is not None
     assert committed_patient.urn == start_urn
     assert committed_patient.legacy_urn == "OLD-IMP-V1"
@@ -716,7 +743,8 @@ def test_phase20_patient_export_streaming(
     admin_user: User,
     db_session: Session,
 ) -> None:
-    """Verify formula injection neutralization ('=1+2) in streaming patient export and audit logging."""
+    """Verify formula injection neutralization ('=1+2) in streaming patient export and audit
+    logging."""
     uid = uuid.uuid4().hex[:4]
     num_uid = "".join(c for c in uid if c.isdigit()) or "5678"
     formula_address = "=1+2 SpreadSheet Formula Injection Test"

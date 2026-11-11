@@ -74,7 +74,9 @@ async def stage_import_batch(
         if not isinstance(mapping_dict, dict):
             raise ValueError("column_mapping must be a JSON object")
     except Exception as exc:
-        raise ApiError(status_code=422, code="invalid_mapping", message=f"Invalid column mapping JSON: {exc}") from exc
+        raise ApiError(
+            status_code=422, code="invalid_mapping", message=f"Invalid column mapping JSON: {exc}"
+        ) from exc
 
     file_bytes = await file.read()
     try:
@@ -118,7 +120,9 @@ def get_import_batch(
         select(PatientImportBatch).where(PatientImportBatch.batch_id == batch_id)
     )
     if not batch:
-        raise ApiError(status_code=404, code="batch_not_found", message=f"Import batch {batch_id} not found")
+        raise ApiError(
+            status_code=404, code="batch_not_found", message=f"Import batch {batch_id} not found"
+        )
     return BatchSummaryResponse.model_validate(batch)
 
 
@@ -153,10 +157,14 @@ def get_duplicate_candidates(
     session: SessionDep,
     batch_id: str,
 ) -> DuplicateListResponse:
-    """Retrieve duplicate candidate rows alongside existing patient records for side-by-side review."""
-    batch = session.scalar(select(PatientImportBatch).where(PatientImportBatch.batch_id == batch_id))
+    """Retrieve duplicate candidate rows alongside existing patient records for side-by-side review."""  # noqa: E501 - published as the OpenAPI description; wrapping changes the text
+    batch = session.scalar(
+        select(PatientImportBatch).where(PatientImportBatch.batch_id == batch_id)
+    )
     if not batch:
-        raise ApiError(status_code=404, code="batch_not_found", message=f"Import batch {batch_id} not found")
+        raise ApiError(
+            status_code=404, code="batch_not_found", message=f"Import batch {batch_id} not found"
+        )
 
     rows = session.scalars(
         select(PatientImportRow)
@@ -200,9 +208,13 @@ def resolve_duplicates(
     payload: ResolveDuplicatesRequest,
 ) -> dict[str, Any]:
     """Record explicit duplicate resolution decisions ('SKIP' or 'IMPORT_AS_NEW')."""
-    batch = session.scalar(select(PatientImportBatch).where(PatientImportBatch.batch_id == batch_id))
+    batch = session.scalar(
+        select(PatientImportBatch).where(PatientImportBatch.batch_id == batch_id)
+    )
     if not batch:
-        raise ApiError(status_code=404, code="batch_not_found", message=f"Import batch {batch_id} not found")
+        raise ApiError(
+            status_code=404, code="batch_not_found", message=f"Import batch {batch_id} not found"
+        )
 
     for item in payload.resolutions:
         try:
@@ -239,7 +251,9 @@ def commit_import_batch(
             message=f"Import commit aborted because pre-import safety backup failed: {exc}",
         ) from exc
     except Exception as exc:
-        raise ApiError(status_code=500, code="commit_failed", message=f"Commit failed: {exc}") from exc
+        raise ApiError(
+            status_code=500, code="commit_failed", message=f"Commit failed: {exc}"
+        ) from exc
 
     ctx = build_audit_context(request, principal)
     audit_service.record(
@@ -280,4 +294,3 @@ def export_error_records(
             "Content-Disposition": f'attachment; filename="import_errors_{batch_id[:8]}.csv"',
         },
     )
-

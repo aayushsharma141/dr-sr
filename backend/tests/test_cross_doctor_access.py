@@ -4,17 +4,20 @@ Guarantees:
 - Any authenticated doctor can read finalised encounters, prescriptions, timelines,
   treatment plans, and therapy sessions authored by any doctor in the hospital (DWS-04).
 - Reading another doctor's clinical record automatically records an in-transaction
-  CROSS_DOCTOR_CLINICAL_READ entry in audit_logs with actor_doctor_id, record_doctor_id, and patient_id.
+  CROSS_DOCTOR_CLINICAL_READ entry in audit_logs with actor_doctor_id, record_doctor_id, and
+  patient_id.
 - Reading own clinical record does NOT record a CROSS_DOCTOR_CLINICAL_READ audit entry.
-- Write attempts (update, finalise, add addenda, cancel) on another doctor's record are strictly rejected with HTTP 404.
-- Reception and Admin roles are unconditionally denied access to clinical encounters and prescriptions (HTTP 403/404).
-- get_scoped_or_404 directly raises HTTP 404 not_found for non-doctor roles under ScopeFamily.CLINICAL_READ.
+- Write attempts (update, finalise, add addenda, cancel) on another doctor's record are strictly
+  rejected with HTTP 404.
+- Reception and Admin roles are unconditionally denied access to clinical encounters and
+  prescriptions (HTTP 403/404).
+- get_scoped_or_404 directly raises HTTP 404 not_found for non-doctor roles under
+  ScopeFamily.CLINICAL_READ.
 """
 
 from typing import Any
 
 import pytest
-from fastapi.testclient import TestClient
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -22,7 +25,12 @@ from kalyan_api.core.errors import ApiError
 from kalyan_api.core.permissions import Role
 from kalyan_api.core.principal import Principal
 from kalyan_api.core.scope import ScopeFamily, get_scoped_or_404
-from kalyan_api.models import AuditLog, ClinicalEncounter, Patient, Prescription, TreatmentPlan, User
+from kalyan_api.models import (
+    AuditLog,
+    ClinicalEncounter,
+    Patient,
+    User,
+)
 from kalyan_api.services.audit_service import AuditAction
 
 
@@ -47,7 +55,8 @@ def test_doctor_b_reads_doctor_a_encounter_audited(
     doctor_b_user: User,
     db_session: Session,
 ) -> None:
-    """Doctor B reads Doctor A's finalised encounter -> 200 with CROSS_DOCTOR_CLINICAL_READ audit log."""
+    """Doctor B reads Doctor A's finalised encounter -> 200 with CROSS_DOCTOR_CLINICAL_READ audit
+    log."""
     patient = _create_test_patient(db_session, "01")
     client_a = login_client(doctor_a_user)
     client_b = login_client(doctor_b_user)
@@ -78,13 +87,16 @@ def test_doctor_b_reads_doctor_a_encounter_audited(
     assert data["diagnosis"] == "Lumbar Radiculopathy"
 
     # 3. Verify in-transaction audit log recorded
-    logs = db_session.execute(
-        select(AuditLog)
-        .where(
-            AuditLog.action == AuditAction.CROSS_DOCTOR_CLINICAL_READ,
-            AuditLog.entity_id == str(enc_id),
+    logs = (
+        db_session.execute(
+            select(AuditLog).where(
+                AuditLog.action == AuditAction.CROSS_DOCTOR_CLINICAL_READ,
+                AuditLog.entity_id == str(enc_id),
+            )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
 
     assert len(logs) == 1
     audit_entry = logs[0]
@@ -123,12 +135,16 @@ def test_doctor_a_reads_own_encounter_no_cross_audit(
     assert read_resp.status_code == 200
 
     # Verify NO cross-doctor audit log was generated
-    logs = db_session.execute(
-        select(AuditLog).where(
-            AuditLog.action == AuditAction.CROSS_DOCTOR_CLINICAL_READ,
-            AuditLog.entity_id == str(enc_id),
+    logs = (
+        db_session.execute(
+            select(AuditLog).where(
+                AuditLog.action == AuditAction.CROSS_DOCTOR_CLINICAL_READ,
+                AuditLog.entity_id == str(enc_id),
+            )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     assert len(logs) == 0
 
 
@@ -138,7 +154,8 @@ def test_doctor_b_write_attempts_rejected_with_404(
     doctor_b_user: User,
     db_session: Session,
 ) -> None:
-    """Doctor B attempting to modify, finalise, or add addendum to Doctor A's encounter is rejected with 404."""
+    """Doctor B attempting to modify, finalise, or add addendum to Doctor A's encounter is rejected
+    with 404."""
     patient = _create_test_patient(db_session, "03")
     client_a = login_client(doctor_a_user)
     client_b = login_client(doctor_b_user)
@@ -250,7 +267,8 @@ def test_reception_and_admin_denied_reading_clinical_records(
     admin_user: User,
     db_session: Session,
 ) -> None:
-    """Reception and Admin roles are strictly blocked from reading clinical encounters and prescriptions."""
+    """Reception and Admin roles are strictly blocked from reading clinical encounters and
+    prescriptions."""
     patient = _create_test_patient(db_session, "05")
     client_a = login_client(doctor_a_user)
     client_rec = login_client(reception_user)
@@ -303,7 +321,8 @@ def test_scope_helpers_direct_denial_reception_and_admin(
     admin_user: User,
     db_session: Session,
 ) -> None:
-    """Direct scope helper invocation raises 404 not_found for non-doctor roles under CLINICAL_READ."""
+    """Direct scope helper invocation raises 404 not_found for non-doctor roles under
+    CLINICAL_READ."""
     patient = _create_test_patient(db_session, "06")
 
     enc = ClinicalEncounter(

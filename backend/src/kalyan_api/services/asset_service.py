@@ -61,7 +61,9 @@ def validate_asset_bytes(data: bytes) -> tuple[str, str]:
     prefix = data[:1024].lstrip()
     if prefix.startswith(b"<svg") or (prefix.startswith(b"<?xml") and b"<svg" in prefix):
         return ".svg", "image/svg+xml"
-    if b"<svg" in prefix and (b"http://www.w3.org/2000/svg" in data[:2048] or b"</svg>" in data[-1024:]):
+    if b"<svg" in prefix and (
+        b"http://www.w3.org/2000/svg" in data[:2048] or b"</svg>" in data[-1024:]
+    ):
         return ".svg", "image/svg+xml"
 
     raise ApiError(
@@ -88,7 +90,9 @@ def save_asset(
         raise ApiError(
             status_code=422,
             code="invalid_asset_type",
-            message=f"Invalid asset type '{asset_type}'. Allowed: {', '.join(sorted(valid_types))}.",
+            message=(
+                f"Invalid asset type '{asset_type}'. Allowed: {', '.join(sorted(valid_types))}."
+            ),
         )
 
     ext, mime_type = validate_asset_bytes(file_bytes)

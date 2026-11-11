@@ -36,7 +36,8 @@ def upgrade() -> None:
         sa.Column("department_id", sa.BigInteger(), nullable=True),
     )
 
-    # 3. Partial unique index on clinical_encounters (appointment_id) WHERE appointment_id IS NOT NULL
+    # 3. Partial unique index on clinical_encounters (appointment_id) WHERE appointment_id IS NOT
+    # NULL
     op.create_index(
         "uq_clinical_encounters_appointment_id",
         "clinical_encounters",
@@ -45,7 +46,8 @@ def upgrade() -> None:
         postgresql_where=sa.text("appointment_id IS NOT NULL"),
     )
 
-    # 4. Alter symptoms, clinical_notes, diagnosis on clinical_encounters to allow nullable with default ''
+    # 4. Alter symptoms, clinical_notes, diagnosis on clinical_encounters to allow nullable with
+    # default ''
     op.alter_column(
         "clinical_encounters",
         "symptoms",
@@ -104,7 +106,8 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    # 1. Restore PostgreSQL function fn_prevent_finalised_encounter_tampering() to previous definition
+    # 1. Restore PostgreSQL function fn_prevent_finalised_encounter_tampering() to previous
+    # definition
     op.execute(
         """
         CREATE OR REPLACE FUNCTION fn_prevent_finalised_encounter_tampering()

@@ -78,7 +78,9 @@ def validate_status_transition(
             raise ApiError(
                 status_code=422,
                 code="cannot_cancel_finalised",
-                message="Cannot cancel an appointment whose consultation has already been finalised.",
+                message=(
+                    "Cannot cancel an appointment whose consultation has already been finalised."
+                ),
             )
 
     # Doctor-only transition enforcement: IN_CONSULTATION and DONE must be initiated by DOCTOR

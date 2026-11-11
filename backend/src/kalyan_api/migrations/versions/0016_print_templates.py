@@ -57,7 +57,8 @@ def upgrade() -> None:
         ),
         sa.UniqueConstraint("document_type", name="uq_print_templates_document_type"),
         sa.CheckConstraint(
-            "document_type IN ('prescription', 'receipt', 'registration_card', 'consultation_summary')",
+            "document_type IN ('prescription', 'receipt', 'registration_card', "
+            "'consultation_summary')",
             name="ck_print_templates_document_type",
         ),
     )

@@ -3,10 +3,14 @@
 Guarantees:
 - POST /api/admin/assets: Accepts multipart upload, validates magic bytes up to 10 MB,
   increments logo version and marks prior logos inactive. Guarded by SETTINGS_WRITE.
-- GET /api/admin/assets: Lists all historical and active assets with metadata. Guarded by SETTINGS_WRITE.
-- POST /api/admin/assets/{id}/deactivate: Deactivates asset without deleting physical file. Guarded by SETTINGS_WRITE.
-- GET /api/admin/assets/{id}/file: Streams raw asset bytes for authenticated admin preview. Guarded by SETTINGS_WRITE.
-- GET /api/assets/active-logo: Serves active hospital logo or fallback image without session cookie. Policy: public.
+- GET /api/admin/assets: Lists all historical and active assets with metadata. Guarded by
+  SETTINGS_WRITE.
+- POST /api/admin/assets/{id}/deactivate: Deactivates asset without deleting physical file. Guarded
+  by SETTINGS_WRITE.
+- GET /api/admin/assets/{id}/file: Streams raw asset bytes for authenticated admin preview. Guarded
+  by SETTINGS_WRITE.
+- GET /api/assets/active-logo: Serves active hospital logo or fallback image without session cookie.
+  Policy: public.
 """
 
 from datetime import datetime
@@ -15,7 +19,6 @@ from pathlib import Path
 from fastapi import APIRouter, Depends, File, Form, Request, UploadFile
 from fastapi.responses import FileResponse, Response
 from pydantic import BaseModel, ConfigDict
-from sqlalchemy.orm import Session
 
 from kalyan_api.core.errors import ApiError
 from kalyan_api.core.permissions import Permission
@@ -168,13 +171,17 @@ def get_asset_file(
     """Stream raw asset file for authenticated admin review."""
     asset = session.get(HospitalAsset, asset_id)
     if not asset:
-        raise ApiError(status_code=404, code="asset_not_found", message=f"Asset {asset_id} not found.")
+        raise ApiError(
+            status_code=404, code="asset_not_found", message=f"Asset {asset_id} not found."
+        )
     app_settings = getattr(request.app.state, "settings", None)
     assets_dir = getattr(app_settings, "assets_dir", None)
     path = asset_service.get_asset_path(asset.filename, assets_dir=assets_dir)
     if not path.is_file():
         raise ApiError(
-            status_code=404, code="asset_file_missing", message="Physical asset file not found on disk."
+            status_code=404,
+            code="asset_file_missing",
+            message="Physical asset file not found on disk.",
         )
     return FileResponse(path, media_type=asset.mime_type, filename=asset.original_filename)
 
@@ -213,7 +220,8 @@ def get_active_logo_endpoint(
     svg_fallback = (
         '<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128">'
         '<rect width="128" height="128" fill="#131b2e"/>'
-        '<text x="64" y="68" fill="#C39A35" font-family="sans-serif" font-size="14" text-anchor="middle">KALYAN</text>'
-        '</svg>'
+        '<text x="64" y="68" fill="#C39A35" font-family="sans-serif" font-size="14" '
+        'text-anchor="middle">KALYAN</text>'
+        "</svg>"
     )
     return Response(content=svg_fallback, media_type="image/svg+xml")

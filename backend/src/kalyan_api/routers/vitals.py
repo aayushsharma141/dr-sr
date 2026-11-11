@@ -52,7 +52,7 @@ def get_encounter_vitals(
     principal: Principal = Depends(current_principal),
 ) -> VitalObservationResponse:
     """Retrieve recorded vitals and biometrics for encounter."""
-    enc = get_scoped_or_404(
+    get_scoped_or_404(
         session,
         ClinicalEncounter,
         encounter_id,

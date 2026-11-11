@@ -9,10 +9,9 @@ Requirements:
 - Non-admin callers (Reception, Doctor, Anonymous) are denied.
 """
 
-from typing import Any
 import uuid
+from typing import Any
 
-import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -52,7 +51,8 @@ def test_admin_search_patients(
     doctor_a_user: User,
     db_session: Session,
 ) -> None:
-    """GET /api/admin/patients/search finds patients by URN, legacy URN, name, or mobile; guarded by PATIENT_CORRECT."""
+    """GET /api/admin/patients/search finds patients by URN, legacy URN, name, or mobile; guarded by
+    PATIENT_CORRECT."""
     uid = uuid.uuid4().hex[:4]
     p1 = _create_patient(db_session, f"A{uid}", legacy_urn=f"OLD-HOSP-{uid}")
     p2 = _create_patient(db_session, f"B{uid}")
@@ -96,7 +96,8 @@ def test_admin_corrects_demographics_successfully(
     admin_user: User,
     db_session: Session,
 ) -> None:
-    """Admin corrects demographic fields; version_id increments and PATIENT_CORRECTED audit is written."""
+    """Admin corrects demographic fields; version_id increments and PATIENT_CORRECTED audit is
+    written."""
     uid = uuid.uuid4().hex[:4]
     pat = _create_patient(db_session, f"C{uid}")
     orig_version = pat.version_id
@@ -212,15 +213,21 @@ def test_correction_rejects_forbidden_fields(
     }
 
     # Attempting to supply urn
-    r_urn = admin_c.patch(f"/api/admin/patients/{pat.id}/demographics", json={**base, "urn": "KH-9999-9999"})
+    r_urn = admin_c.patch(
+        f"/api/admin/patients/{pat.id}/demographics", json={**base, "urn": "KH-9999-9999"}
+    )
     assert r_urn.status_code == 422
 
     # Attempting to supply allergies
-    r_alg = admin_c.patch(f"/api/admin/patients/{pat.id}/demographics", json={**base, "allergies": "Penicillin"})
+    r_alg = admin_c.patch(
+        f"/api/admin/patients/{pat.id}/demographics", json={**base, "allergies": "Penicillin"}
+    )
     assert r_alg.status_code == 422
 
     # Attempting to supply notes
-    r_notes = admin_c.patch(f"/api/admin/patients/{pat.id}/demographics", json={**base, "notes": "New note"})
+    r_notes = admin_c.patch(
+        f"/api/admin/patients/{pat.id}/demographics", json={**base, "notes": "New note"}
+    )
     assert r_notes.status_code == 422
 
 

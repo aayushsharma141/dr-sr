@@ -1,4 +1,5 @@
-"""Automated tests for specialty clinical templates registry, response persistence, and validation (DWS-05, D-19-09..13, T-19-04)."""
+"""Automated tests for specialty clinical templates registry, response persistence, and validation
+(DWS-05, D-19-09..13, T-19-04)."""
 
 from datetime import date
 
@@ -10,8 +11,6 @@ from kalyan_api.models import (
     Appointment,
     AppointmentStatus,
     ClinicalEncounter,
-    ClinicalTemplate,
-    ClinicalTemplateResponse,
     Department,
     Patient,
 )
@@ -66,7 +65,8 @@ def _create_test_patient_and_encounter(db_session, doctor_user, department_code=
 
 
 def test_templates_registry_and_versions(login_client, doctor_a_user, db_session):
-    """Active templates for Physiotherapy and Ophthalmology are discoverable with schema versions."""
+    """Active templates for Physiotherapy and Ophthalmology are discoverable with schema
+    versions."""
     client = login_client(doctor_a_user)
 
     # 1. List active templates
@@ -142,7 +142,8 @@ def test_template_response_persistence_and_update(login_client, doctor_a_user, d
 def test_encounter_finalisation_enforces_required_template_fields(
     login_client, doctor_a_user, db_session
 ):
-    """Encounter finalisation strictly enforces required fields from specialty template (D-19-09)."""
+    """Encounter finalisation strictly enforces required fields from specialty template
+    (D-19-09)."""
     _, enc = _create_test_patient_and_encounter(db_session, doctor_a_user, "PHYSIOTHERAPY")
     client = login_client(doctor_a_user)
 
@@ -201,7 +202,8 @@ def test_encounter_finalisation_enforces_required_template_fields(
 def test_finalised_encounter_tamper_trigger_blocks_response_modification(
     login_client, doctor_a_user, db_session
 ):
-    """Once encounter is finalised, template responses cannot be modified via API or database trigger (T-19-04, CLN-02)."""
+    """Once encounter is finalised, template responses cannot be modified via API or database
+    trigger (T-19-04, CLN-02)."""
     _, enc = _create_test_patient_and_encounter(db_session, doctor_a_user, "PHYSIOTHERAPY")
     client = login_client(doctor_a_user)
 
@@ -243,7 +245,8 @@ def test_finalised_encounter_tamper_trigger_blocks_response_modification(
     with pytest.raises(DBAPIError) as exc_info:
         db_session.execute(
             text(
-                "UPDATE clinical_template_responses SET response_data = '{\"tampered\": true}' WHERE encounter_id = :id"
+                "UPDATE clinical_template_responses SET response_data = '{\"tampered\": true}' "
+                "WHERE encounter_id = :id"
             ),
             {"id": enc.id},
         )

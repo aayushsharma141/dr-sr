@@ -1,6 +1,5 @@
 """Tests for forced first-login password change and NIST-style password policy."""
 
-import hashlib
 from collections.abc import Callable
 
 from fastapi import APIRouter, Depends, FastAPI

@@ -1,7 +1,7 @@
 """Tests for the Reception Dashboard overview endpoint (GET /api/reception/overview)."""
 
-from datetime import timedelta
 from typing import Any
+
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
@@ -79,4 +79,6 @@ def test_reception_overview_shape_and_metrics(
 
     after = rec_c.get(OVERVIEW).json()
     assert after["registrations_today"] - before["registrations_today"] == 1
-    assert after["appointments_today"]["ARRIVED"] - before["appointments_today"].get("ARRIVED", 0) == 1
+    assert (
+        after["appointments_today"]["ARRIVED"] - before["appointments_today"].get("ARRIVED", 0) == 1
+    )

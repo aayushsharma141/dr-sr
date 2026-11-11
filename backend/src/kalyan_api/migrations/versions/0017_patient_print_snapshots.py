@@ -51,9 +51,7 @@ def upgrade() -> None:
     op.add_column(
         "clinical_encounters", sa.Column("patient_mobile", sa.String(length=15), nullable=True)
     )
-    op.add_column(
-        "clinical_encounters", sa.Column("patient_address", sa.Text(), nullable=True)
-    )
+    op.add_column("clinical_encounters", sa.Column("patient_address", sa.Text(), nullable=True))
 
     # 5. Backfill procedure with trigger protection update
     bind = op.get_bind()
@@ -131,24 +129,35 @@ def upgrade() -> None:
     else:
         op.execute("""
             UPDATE payments
-            SET patient_name = (SELECT full_name FROM patients WHERE patients.id = payments.patient_id),
+            SET patient_name = (SELECT full_name FROM patients
+                WHERE patients.id = payments.patient_id),
                 patient_urn = (SELECT urn FROM patients WHERE patients.id = payments.patient_id),
-                patient_mobile = (SELECT mobile FROM patients WHERE patients.id = payments.patient_id),
-                patient_address = (SELECT address FROM patients WHERE patients.id = payments.patient_id);
+                patient_mobile = (SELECT mobile FROM patients
+                    WHERE patients.id = payments.patient_id),
+                patient_address = (SELECT address FROM patients
+                    WHERE patients.id = payments.patient_id);
         """)
         op.execute("""
             UPDATE prescriptions
-            SET patient_name = (SELECT full_name FROM patients WHERE patients.id = prescriptions.patient_id),
-                patient_urn = (SELECT urn FROM patients WHERE patients.id = prescriptions.patient_id),
-                patient_mobile = (SELECT mobile FROM patients WHERE patients.id = prescriptions.patient_id),
-                patient_address = (SELECT address FROM patients WHERE patients.id = prescriptions.patient_id);
+            SET patient_name = (SELECT full_name FROM patients
+                WHERE patients.id = prescriptions.patient_id),
+                patient_urn = (SELECT urn FROM patients
+                    WHERE patients.id = prescriptions.patient_id),
+                patient_mobile = (SELECT mobile FROM patients
+                    WHERE patients.id = prescriptions.patient_id),
+                patient_address = (SELECT address FROM patients
+                    WHERE patients.id = prescriptions.patient_id);
         """)
         op.execute("""
             UPDATE clinical_encounters
-            SET patient_name = (SELECT full_name FROM patients WHERE patients.id = clinical_encounters.patient_id),
-                patient_urn = (SELECT urn FROM patients WHERE patients.id = clinical_encounters.patient_id),
-                patient_mobile = (SELECT mobile FROM patients WHERE patients.id = clinical_encounters.patient_id),
-                patient_address = (SELECT address FROM patients WHERE patients.id = clinical_encounters.patient_id);
+            SET patient_name = (SELECT full_name FROM patients
+                WHERE patients.id = clinical_encounters.patient_id),
+                patient_urn = (SELECT urn FROM patients
+                    WHERE patients.id = clinical_encounters.patient_id),
+                patient_mobile = (SELECT mobile FROM patients
+                    WHERE patients.id = clinical_encounters.patient_id),
+                patient_address = (SELECT address FROM patients
+                    WHERE patients.id = clinical_encounters.patient_id);
         """)
 
 

@@ -165,7 +165,11 @@ def book_appointment(
     override_text = (payload.override_reason or "").strip() or None
     final_notes = payload.notes
     if override_text:
-        final_notes = f"{final_notes} | [Override: {override_text}]" if final_notes else f"[Override: {override_text}]"
+        final_notes = (
+            f"{final_notes} | [Override: {override_text}]"
+            if final_notes
+            else f"[Override: {override_text}]"
+        )
 
     appt = Appointment(
         patient_id=payload.patient_id,

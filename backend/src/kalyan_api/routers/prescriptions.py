@@ -10,7 +10,7 @@ Guarantees:
 - Sequential medication order validation.
 """
 
-from datetime import date, datetime, timezone
+from datetime import UTC, date, datetime
 
 from fastapi import APIRouter, Depends, Query, Request
 from sqlalchemy import select
@@ -140,20 +140,27 @@ def create_prescription(
         active_rx = session.execute(
             select(Prescription).where(
                 Prescription.encounter_id == payload.encounter_id,
-                Prescription.status.in_([
-                    PrescriptionStatus.DRAFT.value,
-                    PrescriptionStatus.AUTHORISED.value,
-                ]),
+                Prescription.status.in_(
+                    [
+                        PrescriptionStatus.DRAFT.value,
+                        PrescriptionStatus.AUTHORISED.value,
+                    ]
+                ),
             )
         ).scalar_one_or_none()
         if active_rx:
             raise ApiError(
                 status_code=409,
                 code="active_prescription_exists",
-                message="An active prescription already exists for this encounter. Cancel it to reissue a new prescription.",
+                message=(
+                    "An active prescription already exists for this encounter. Cancel it to "
+                    "reissue a new prescription."
+                ),
             )
 
-    target_status = payload.status.upper() if payload.status else PrescriptionStatus.AUTHORISED.value
+    target_status = (
+        payload.status.upper() if payload.status else PrescriptionStatus.AUTHORISED.value
+    )
     if target_status not in (PrescriptionStatus.DRAFT.value, PrescriptionStatus.AUTHORISED.value):
         raise ApiError(
             status_code=422,
@@ -162,8 +169,15 @@ def create_prescription(
         )
 
     # Inherit diagnosis from encounter if omitted (D-19-17)
-    diagnosis = payload.diagnosis.strip() if payload.diagnosis and payload.diagnosis.strip() else None
-    if not diagnosis and encounter is not None and encounter.diagnosis and encounter.diagnosis.strip():
+    diagnosis = (
+        payload.diagnosis.strip() if payload.diagnosis and payload.diagnosis.strip() else None
+    )
+    if (
+        not diagnosis
+        and encounter is not None
+        and encounter.diagnosis
+        and encounter.diagnosis.strip()
+    ):
         diagnosis = encounter.diagnosis.strip()
 
     if not diagnosis or len(diagnosis) < 2:
@@ -189,7 +203,7 @@ def create_prescription(
             message="Each prescription item must have a unique item order.",
         )
 
-    now_utc = datetime.now(timezone.utc)
+    now_utc = datetime.now(UTC)
     rx = Prescription(
         patient_id=payload.patient_id,
         patient_name=patient.full_name,
@@ -270,7 +284,7 @@ def update_prescription_draft(
     session: SessionDep,
     principal: Principal = Depends(current_principal),
 ) -> PrescriptionOut:
-    """Modify an in-progress prescription draft. Authorised prescriptions return HTTP 409 (DWS-07)."""
+    """Modify an in-progress prescription draft. Authorised prescriptions return HTTP 409 (DWS-07)."""  # noqa: E501 - published as the OpenAPI description; wrapping changes the text
     if principal.role != Role.DOCTOR or principal.doctor_id is None:
         raise ApiError(
             status_code=403,
@@ -291,7 +305,9 @@ def update_prescription_draft(
         raise ApiError(
             status_code=409,
             code="prescription_locked",
-            message="Authorised prescriptions cannot be modified. Cancel and reissue to make changes.",
+            message=(
+                "Authorised prescriptions cannot be modified. Cancel and reissue to make changes."
+            ),
         )
 
     if payload.version_id is not None and rx.version_id != payload.version_id:
@@ -399,7 +415,10 @@ def authorise_prescription(
         raise ApiError(
             status_code=409,
             code="invalid_status_transition",
-            message=f"Cannot authorise prescription with status '{rx.status}'. Only DRAFT can be authorised.",
+            message=(
+                f"Cannot authorise prescription with status '{rx.status}'. Only DRAFT can be "
+                "authorised."
+            ),
         )
 
     if not rx.items:
@@ -416,7 +435,7 @@ def authorise_prescription(
             message="Valid clinical diagnosis is required to authorise prescription.",
         )
 
-    now_utc = datetime.now(timezone.utc)
+    now_utc = datetime.now(UTC)
     rx.status = PrescriptionStatus.AUTHORISED.value
     rx.authorised_at = now_utc
     session.flush()
@@ -483,7 +502,7 @@ def cancel_prescription(
             message="Cancellation reason must be at least 3 characters.",
         )
 
-    now_utc = datetime.now(timezone.utc)
+    now_utc = datetime.now(UTC)
     rx.status = PrescriptionStatus.CANCELLED.value
     rx.cancelled_at = now_utc
     rx.cancelled_by_user_id = principal.user_id

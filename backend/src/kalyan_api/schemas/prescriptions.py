@@ -54,7 +54,9 @@ class PrescriptionCancelRequest(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    reason: str = Field(min_length=3, max_length=1000, description="Clinical or administrative cancellation reason")
+    reason: str = Field(
+        min_length=3, max_length=1000, description="Clinical or administrative cancellation reason"
+    )
 
 
 class PrescriptionCreate(BaseModel):
@@ -66,9 +68,13 @@ class PrescriptionCreate(BaseModel):
     encounter_id: int | None = Field(
         default=None, gt=0, description="Optional linked clinical encounter ID"
     )
-    status: str = Field(default="AUTHORISED", description="Prescription status: DRAFT or AUTHORISED")
+    status: str = Field(
+        default="AUTHORISED", description="Prescription status: DRAFT or AUTHORISED"
+    )
     diagnosis: str | None = Field(
-        default=None, max_length=1000, description="Clinical diagnosis (inherited from encounter if omitted)"
+        default=None,
+        max_length=1000,
+        description="Clinical diagnosis (inherited from encounter if omitted)",
     )
     dietary_advice: str | None = Field(default=None, max_length=1000)
     general_advice: str | None = Field(default=None, max_length=1000)
@@ -88,7 +94,9 @@ class PrescriptionUpdate(BaseModel):
     general_advice: str | None = Field(default=None, max_length=1000)
     follow_up_date: date | None = Field(default=None)
     items: list[PrescriptionItemCreate] | None = Field(default=None)
-    version_id: int | None = Field(default=None, description="Expected version_id for optimistic locking")
+    version_id: int | None = Field(
+        default=None, description="Expected version_id for optimistic locking"
+    )
 
 
 class PrescriptionOut(BaseModel):

@@ -80,10 +80,12 @@ def correct_patient_demographics(
     session: SessionDep,
     principal: Principal = Depends(current_principal),
 ) -> PatientOut:
-    """Administratively correct patient demographics with optimistic concurrency and permanent audit log."""
+    """Administratively correct patient demographics with optimistic concurrency and permanent audit log."""  # noqa: E501 - published as the OpenAPI description; wrapping changes the text
     patient = session.scalar(select(Patient).where(Patient.id == id).with_for_update())
     if not patient:
-        raise ApiError(status_code=404, code="patient_not_found", message=f"Patient #{id} not found")
+        raise ApiError(
+            status_code=404, code="patient_not_found", message=f"Patient #{id} not found"
+        )
 
     require_version(patient, payload.version_id, "patient")
 

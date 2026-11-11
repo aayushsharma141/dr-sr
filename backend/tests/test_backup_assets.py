@@ -16,16 +16,18 @@ from pathlib import Path
 import pytest
 from sqlalchemy.orm import Session
 
-from kalyan_api.config import Settings, get_settings
+from kalyan_api.config import Settings
 from kalyan_api.models import AssetType, HospitalAsset, User
 from kalyan_api.services.backup_service import (
     create_backup,
-    restore_backup,
     verify_backup_bundle,
 )
 from kalyan_api.services.integrity_service import check_asset_storage_integrity
 
-DUMMY_PNG = b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01\x08\x06\x00\x00\x00\x1f\x15c4"
+DUMMY_PNG = (
+    b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR"
+    b"\x00\x00\x00\x01\x00\x00\x00\x01\x08\x06\x00\x00\x00\x1f\x15c4"
+)
 DUMMY_PDF = b"%PDF-1.4\n1 0 obj\n<<>>\nendobj\ntrailer\n<<>>\n%%EOF"
 
 
@@ -198,9 +200,13 @@ def test_asset_storage_integrity_check(
 
     res3 = check_asset_storage_integrity(db_session, test_settings)
     assert res3.passed is False
-    assert any(d["issue"] == "missing_asset_file" and d["filename"] == missing_fname for d in res3.discrepancies)
+    assert any(
+        d["issue"] == "missing_asset_file" and d["filename"] == missing_fname
+        for d in res3.discrepancies
+    )
 
-    # 4. Supply file for missing asset so DB assets are satisfied, then create an untracked orphan file
+    # 4. Supply file for missing asset so DB assets are satisfied, then create an untracked orphan
+    # file
     (assets_dir / missing_fname).write_bytes(DUMMY_PDF)
     orphan_file = assets_dir / "untracked_orphan.jpg"
     orphan_file.write_bytes(b"\xff\xd8\xff\xe0")
@@ -208,4 +214,7 @@ def test_asset_storage_integrity_check(
     res4 = check_asset_storage_integrity(db_session, test_settings)
     assert res4.passed is False
     assert not any(d["issue"] == "missing_asset_file" for d in res4.discrepancies)
-    assert any(d["issue"] == "orphan_asset_file" and d["filename"] == "untracked_orphan.jpg" for d in res4.discrepancies)
+    assert any(
+        d["issue"] == "orphan_asset_file" and d["filename"] == "untracked_orphan.jpg"
+        for d in res4.discrepancies
+    )

@@ -1,28 +1,27 @@
-"""Integration tests for patient dataset export API, streaming delivery, formula neutralization, and audit logging (D-20-15 to D-20-20).
+"""Integration tests for patient dataset export API, streaming delivery, formula neutralization, and
+audit logging (D-20-15 to D-20-20).
 
 Guarantees tested:
 - RBAC: Anonymous gets 401, Reception/Doctor get 403, Admin gets 200.
 - Payload validation: reason < 5 chars returns 422, invalid field returns 422.
-- STRIDE T-20-16: Formula injection strings starting with '=', '+', '-', or '@' are neutralized with a leading apostrophe.
-- Streaming formats: CSV (text/csv) and XLSX (application/vnd.openxmlformats-officedocument.spreadsheetml.sheet).
+- STRIDE T-20-16: Formula injection strings starting with '=', '+', '-', or '@' are neutralized with
+  a leading apostrophe.
+- Streaming formats: CSV (text/csv) and XLSX
+  (application/vnd.openxmlformats-officedocument.spreadsheetml.sheet).
 - Scoping: Date range, department (patients with appointments/encounters), and search query.
-- Audit logging: Single PATIENT_EXPORTED audit event with actor, reason, scope, fields, and row count.
+- Audit logging: Single PATIENT_EXPORTED audit event with actor, reason, scope, fields, and row
+  count.
 """
 
 import io
-from datetime import date, timedelta
 from typing import Any
 
 import openpyxl
-import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from kalyan_api import clock
 from kalyan_api.models import (
-    Appointment,
-    AppointmentStatus,
     AuditLog,
     ClinicalEncounter,
     Department,

@@ -1,4 +1,5 @@
-"""Specialty clinical templates and print templates registry endpoints (DWS-05, D-19-10..13, D-20-04)."""
+"""Specialty clinical templates and print templates registry endpoints (DWS-05, D-19-10..13,
+D-20-04)."""
 
 from datetime import UTC, datetime
 
@@ -246,9 +247,7 @@ def get_print_template(
 ) -> PrintTemplateRead:
     """Retrieve print template configuration for a document type."""
     ensure_print_templates_seeded(session, principal.user_id)
-    template = session.scalar(
-        select(PrintTemplate).where(PrintTemplate.document_type == doc_type)
-    )
+    template = session.scalar(select(PrintTemplate).where(PrintTemplate.document_type == doc_type))
     if not template:
         raise ApiError(
             status_code=404,
@@ -272,9 +271,7 @@ def update_print_template(
 ) -> PrintTemplateRead:
     """Update print template header/footer text with optimistic concurrency check."""
     ensure_print_templates_seeded(session, principal.user_id)
-    template = session.scalar(
-        select(PrintTemplate).where(PrintTemplate.document_type == doc_type)
-    )
+    template = session.scalar(select(PrintTemplate).where(PrintTemplate.document_type == doc_type))
     if not template:
         raise ApiError(
             status_code=404,
@@ -317,4 +314,3 @@ def update_print_template(
     )
 
     return PrintTemplateRead.model_validate(template)
-

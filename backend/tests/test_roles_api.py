@@ -83,7 +83,8 @@ def test_catalogue_is_not_editable(
 def test_admin_grants_include_phase20_data_governance_permissions(
     login_client: Callable[..., TestClient], admin_user: User
 ) -> None:
-    """D-20-01: Admin role includes patient:correct, patient:import, patient:export; lacks patient:update."""
+    """D-20-01: Admin role includes patient:correct, patient:import, patient:export; lacks
+    patient:update."""
     body = login_client(admin_user).get(PATH).json()
     admin_grants = set(body["grants"]["ADMIN"])
     assert Permission.PATIENT_CORRECT.value in admin_grants

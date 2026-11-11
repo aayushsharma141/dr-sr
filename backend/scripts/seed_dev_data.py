@@ -1,10 +1,12 @@
-"""Seed development database with doctors, users, patients, and sample appointments for browser verification."""
+"""Seed development database with doctors, users, patients, and sample appointments for browser
+verification."""
 
 from datetime import UTC, datetime
+
 from kalyan_api.clock import ist_now, ist_today
 from kalyan_api.config import get_settings
 from kalyan_api.core.security import build_hasher, hash_password
-from kalyan_api.db.session import build_engine, SessionLocal
+from kalyan_api.db.session import SessionLocal, build_engine
 from kalyan_api.models import (
     Appointment,
     AppointmentStatus,
@@ -33,7 +35,6 @@ def seed_all():
     session.commit()
 
     physio_dept = session.query(Department).filter_by(code="PHYSIOTHERAPY").first()
-    ophth_dept = session.query(Department).filter_by(code="OPHTHALMOLOGY").first()
 
     # 1. Doctors
     print("Checking / seeding doctors...")
@@ -79,6 +80,7 @@ def seed_all():
         session.flush()
 
     from kalyan_api.models import SystemSetup
+
     system_setup = session.query(SystemSetup).filter_by(id=1).first()
     if not system_setup:
         system_setup = SystemSetup(
@@ -184,7 +186,11 @@ def seed_all():
     # 4. Appointments
     print("Checking / seeding appointments for today:", today)
     # Appt 1: Ramesh Kumar with Dr. Anil (ARRIVED, waiting in queue)
-    a1 = session.query(Appointment).filter_by(doctor_id=doc_anil.id, appointment_date=today, token_number=1).first()
+    a1 = (
+        session.query(Appointment)
+        .filter_by(doctor_id=doc_anil.id, appointment_date=today, token_number=1)
+        .first()
+    )
     if not a1:
         a1 = Appointment(
             patient_id=p1.id,
@@ -199,7 +205,11 @@ def seed_all():
         session.flush()
 
     # Appt 2: Sunita Devi with Dr. Anil (IN_CONSULTATION, active draft)
-    a2 = session.query(Appointment).filter_by(doctor_id=doc_anil.id, appointment_date=today, token_number=2).first()
+    a2 = (
+        session.query(Appointment)
+        .filter_by(doctor_id=doc_anil.id, appointment_date=today, token_number=2)
+        .first()
+    )
     if not a2:
         a2 = Appointment(
             patient_id=p2.id,
@@ -219,8 +229,14 @@ def seed_all():
             doctor_id=doc_anil.id,
             appointment_id=a2.id,
             department_id=physio_dept.id if physio_dept else None,
-            symptoms="Persistent lower back pain radiating to left calf for 2 weeks. Aggravated by prolonged sitting.",
-            clinical_notes="SLR positive at 45 degrees left leg. Tenderness over L4-L5 interspinous ligament.\nAdvised cold pack application and lumbar traction.",
+            symptoms=(
+                "Persistent lower back pain radiating to left calf for 2 weeks. Aggravated by "
+                "prolonged sitting."
+            ),
+            clinical_notes=(
+                "SLR positive at 45 degrees left leg. Tenderness over L4-L5 interspinous "
+                "ligament.\nAdvised cold pack application and lumbar traction."
+            ),
             diagnosis="L4-L5 Lumbar Disc Bulge with Radiculopathy",
             is_finalised=False,
             created_by_user_id=dr_anil_user.id,
@@ -263,7 +279,11 @@ def seed_all():
             session.flush()
 
     # Appt 3: Manoj Verma with Dr. Bharati (ARRIVED, waiting in eye queue)
-    a3 = session.query(Appointment).filter_by(doctor_id=doc_bharati.id, appointment_date=today, token_number=1).first()
+    a3 = (
+        session.query(Appointment)
+        .filter_by(doctor_id=doc_bharati.id, appointment_date=today, token_number=1)
+        .first()
+    )
     if not a3:
         a3 = Appointment(
             patient_id=p3.id,
@@ -279,9 +299,9 @@ def seed_all():
 
     session.commit()
     print("Seed complete successfully!")
-    print(f"Doctor accounts: dr.anil / Password123!, dr.bharati / Password123!")
-    print(f"Reception account: reception / Password123!")
-    print(f"Admin account: admin / Password123!")
+    print("Doctor accounts: dr.anil / Password123!, dr.bharati / Password123!")
+    print("Reception account: reception / Password123!")
+    print("Admin account: admin / Password123!")
 
 
 if __name__ == "__main__":

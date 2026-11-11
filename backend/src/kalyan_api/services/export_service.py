@@ -1,7 +1,9 @@
-"""Patient dataset querying, formula sanitization, and streaming CSV/XLSX generator (D-20-15 to D-20-20).
+"""Patient dataset querying, formula sanitization, and streaming CSV/XLSX generator (D-20-15 to
+D-20-20).
 
 Invariants:
-- STRIDE T-20-16: Formula injection is neutralized by prepending ' to cell values starting with =, +, -, or @.
+- STRIDE T-20-16: Formula injection is neutralized by prepending ' to cell values starting with =,
+  +, -, or @.
 - STRIDE T-20-18 / D-20-20: Streams generated directly in memory; zero server disk writing.
 - D-20-17: Audited dataset extract with actor, reason, scope, fields, and row count.
 - D-20-19: Department filtering targets patients with appointments/encounters in that department.
@@ -324,7 +326,8 @@ def query_export_rows(
                 row[field] = "; ".join(rx_strs)
             elif field == "treatment_plans":
                 row[field] = "; ".join(
-                    f"{p.plan_name} ({p.status}, {p.completed_sessions}/{p.total_sessions} sessions)"
+                    f"{p.plan_name} ({p.status}, {p.completed_sessions}/{p.total_sessions} "
+                    "sessions)"
                     for p in plans
                 )
             elif field == "sessions":
@@ -332,7 +335,8 @@ def query_export_rows(
                 for p in plans:
                     for s in p.sessions:
                         sess_strs.append(
-                            f"S#{s.session_number} ({s.session_date}): VAS {s.vas_score} - {s.clinical_notes}"
+                            f"S#{s.session_number} ({s.session_date}): VAS {s.vas_score} - "
+                            f"{s.clinical_notes}"
                         )
                 row[field] = "; ".join(sess_strs)
             else:
@@ -386,4 +390,3 @@ def generate_xlsx_stream(
 
     while chunk := bio.read(chunk_size):
         yield chunk
-

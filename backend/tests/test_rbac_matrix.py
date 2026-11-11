@@ -535,18 +535,31 @@ def test_rbac_matrix_cell(
             db_session.flush()
 
             if "template-response" in row.path:
-                from kalyan_api.models import ClinicalTemplate, ClinicalTemplateResponse, ClinicalTemplateVersion
+                from kalyan_api.models import (
+                    ClinicalTemplate,
+                    ClinicalTemplateResponse,
+                    ClinicalTemplateVersion,
+                )
+
                 dept = db_session.scalar(select(Department).where(Department.code == "GENERAL"))
                 if not dept:
                     dept = Department(code="GENERAL", name_en="General Medicine")
                     db_session.add(dept)
                     db_session.flush()
-                tmpl = db_session.scalar(select(ClinicalTemplate).where(ClinicalTemplate.code == "PHYSIO"))
+                tmpl = db_session.scalar(
+                    select(ClinicalTemplate).where(ClinicalTemplate.code == "PHYSIO")
+                )
                 if not tmpl:
-                    tmpl = ClinicalTemplate(department_id=dept.id, code="PHYSIO", name_en="Physio Template")
+                    tmpl = ClinicalTemplate(
+                        department_id=dept.id, code="PHYSIO", name_en="Physio Template"
+                    )
                     db_session.add(tmpl)
                     db_session.flush()
-                ver = db_session.scalar(select(ClinicalTemplateVersion).where(ClinicalTemplateVersion.template_id == tmpl.id))
+                ver = db_session.scalar(
+                    select(ClinicalTemplateVersion).where(
+                        ClinicalTemplateVersion.template_id == tmpl.id
+                    )
+                )
                 if not ver:
                     ver = ClinicalTemplateVersion(
                         template_id=tmpl.id,
@@ -557,20 +570,28 @@ def test_rbac_matrix_cell(
                     db_session.add(ver)
                     db_session.flush()
                 if row.method == "GET":
-                    resp_obj = ClinicalTemplateResponse(encounter_id=enc.id, template_version_id=ver.id, response_data={"findings": "Normal"})
+                    resp_obj = ClinicalTemplateResponse(
+                        encounter_id=enc.id,
+                        template_version_id=ver.id,
+                        response_data={"findings": "Normal"},
+                    )
                     db_session.add(resp_obj)
                     db_session.flush()
                 enc.template_version_id = ver.id
 
             if "vitals" in row.path:
                 from kalyan_api.models import VitalObservation
+
                 if row.method == "GET":
-                    v = VitalObservation(encounter_id=enc.id, patient_id=pat.id, height_cm=170.0, weight_kg=70.0)
+                    v = VitalObservation(
+                        encounter_id=enc.id, patient_id=pat.id, height_cm=170.0, weight_kg=70.0
+                    )
                     db_session.add(v)
                     db_session.flush()
 
             if "follow-up" in row.path and row.method == "GET":
                 from kalyan_api.models import FollowUpRecommendation
+
                 rec = FollowUpRecommendation(
                     encounter_id=enc.id,
                     patient_id=pat.id,
@@ -584,7 +605,9 @@ def test_rbac_matrix_cell(
                 db_session.flush()
 
             target_entity = enc
-            resolved_path = row.path.replace("{id}", str(enc.id)).replace("{encounter_id}", str(enc.id))
+            resolved_path = row.path.replace("{id}", str(enc.id)).replace(
+                "{encounter_id}", str(enc.id)
+            )
         else:
             target_entity = type("TargetEnc", (), {"patient_id": pat.id, "appointment_id": None})()
 
@@ -632,6 +655,7 @@ def test_rbac_matrix_cell(
         db_session.flush()
 
         from kalyan_api.models import FollowUpRecommendation
+
         rec = FollowUpRecommendation(
             encounter_id=enc.id,
             patient_id=pat.id,
@@ -649,13 +673,16 @@ def test_rbac_matrix_cell(
     elif "/api/templates" in row.path:
         from kalyan_api.models import ClinicalTemplate, ClinicalTemplateVersion
         from kalyan_api.routers.templates import ensure_specialty_templates_seeded
+
         ensure_specialty_templates_seeded(db_session)
-        tmpl = db_session.scalar(select(ClinicalTemplate).where(ClinicalTemplate.code == "PHYSIOTHERAPY"))
-        version = db_session.scalar(select(ClinicalTemplateVersion).where(ClinicalTemplateVersion.template_id == tmpl.id))
-        resolved_path = (
-            row.path
-            .replace("{department_id}", str(tmpl.department_id))
-            .replace("{version_id}", str(version.id))
+        tmpl = db_session.scalar(
+            select(ClinicalTemplate).where(ClinicalTemplate.code == "PHYSIOTHERAPY")
+        )
+        version = db_session.scalar(
+            select(ClinicalTemplateVersion).where(ClinicalTemplateVersion.template_id == tmpl.id)
+        )
+        resolved_path = row.path.replace("{department_id}", str(tmpl.department_id)).replace(
+            "{version_id}", str(version.id)
         )
         target_entity = None
 

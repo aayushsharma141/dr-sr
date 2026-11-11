@@ -179,7 +179,9 @@ def match_header_to_field(header_name: str) -> str | None:
 def inspect_file(file_bytes: bytes, filename: str) -> dict[str, Any]:
     """Inspect CSV or XLSX spreadsheet: detect encoding, delimiter, headers, and preview rows."""
     if len(file_bytes) > MAX_FILE_BYTES:
-        raise ImportServiceError(f"File size exceeds maximum allowed 10 MB limit ({len(file_bytes)} bytes)")
+        raise ImportServiceError(
+            f"File size exceeds maximum allowed 10 MB limit ({len(file_bytes)} bytes)"
+        )
 
     lower_name = filename.lower()
     is_xlsx = lower_name.endswith(".xlsx") or lower_name.endswith(".xls")
@@ -199,7 +201,9 @@ def inspect_file(file_bytes: bytes, filename: str) -> dict[str, Any]:
         try:
             text_content = file_bytes.decode(encoding)
         except Exception as e:
-            raise ImportServiceError(f"Could not decode CSV with detected encoding {encoding}: {e}") from e
+            raise ImportServiceError(
+                f"Could not decode CSV with detected encoding {encoding}: {e}"
+            ) from e
 
         sample_lines = "\n".join(text_content.splitlines()[:10])
         delimiter = sniff_csv_delimiter(sample_lines)
@@ -236,7 +240,10 @@ def inspect_file(file_bytes: bytes, filename: str) -> dict[str, Any]:
             if not first_row:
                 raise ImportServiceError("Spreadsheet file contains no rows.")
 
-            headers = [str(c).strip() if c is not None else f"Column_{i+1}" for i, c in enumerate(first_row)]
+            headers = [
+                str(c).strip() if c is not None else f"Column_{i + 1}"
+                for i, c in enumerate(first_row)
+            ]
             all_data: list[list[Any]] = []
             for row_vals in row_iter:
                 if any(v is not None and str(v).strip() != "" for v in row_vals):
@@ -313,7 +320,9 @@ def parse_all_rows(file_bytes: bytes, filename: str) -> tuple[list[str], list[di
     if not first_row:
         return [], []
 
-    headers = [str(c).strip() if c is not None else f"Column_{i+1}" for i, c in enumerate(first_row)]
+    headers = [
+        str(c).strip() if c is not None else f"Column_{i + 1}" for i, c in enumerate(first_row)
+    ]
     parsed_rows = []
     for row_vals in row_iter:
         if not any(v is not None and str(v).strip() != "" for v in row_vals):
@@ -412,7 +421,8 @@ def parse_age_and_dob(raw_age: str, raw_dob: str) -> tuple[int | None, date | No
         dob_str = raw_dob.strip()
         for fmt in ("%Y-%m-%d", "%d/%m/%Y", "%d-%m-%Y", "%Y/%m/%d"):
             try:
-                parsed_dob = datetime.strptime(dob_str, fmt).date()
+                # Date of birth only: no time of day, so no time zone applies.
+                parsed_dob = datetime.strptime(dob_str, fmt).date()  # noqa: DTZ007
                 break
             except ValueError:
                 continue
@@ -427,8 +437,10 @@ def parse_age_and_dob(raw_age: str, raw_dob: str) -> tuple[int | None, date | No
 
     if parsed_age is None and parsed_dob is not None:
         today = clock.ist_today()
-        calculated_age = today.year - parsed_dob.year - (
-            (today.month, today.day) < (parsed_dob.month, parsed_dob.day)
+        calculated_age = (
+            today.year
+            - parsed_dob.year
+            - ((today.month, today.day) < (parsed_dob.month, parsed_dob.day))
         )
         if 0 <= calculated_age <= 150:
             parsed_age = calculated_age
@@ -438,7 +450,9 @@ def parse_age_and_dob(raw_age: str, raw_dob: str) -> tuple[int | None, date | No
 
 def validate_batch(session: Session, batch_id: str) -> dict[str, Any]:
     """Validate all rows in batch against hospital invariants and flag duplicate candidates."""
-    batch = session.scalar(select(PatientImportBatch).where(PatientImportBatch.batch_id == batch_id))
+    batch = session.scalar(
+        select(PatientImportBatch).where(PatientImportBatch.batch_id == batch_id)
+    )
     if not batch:
         raise BatchNotFoundError(f"Import batch {batch_id} not found")
 
@@ -556,7 +570,9 @@ def validate_batch(session: Session, batch_id: str) -> dict[str, Any]:
             # Default resolution: SKIP per D-20-13 and UI-SPEC
             row.duplicate_resolution = "SKIP"
             row.validation_errors = {
-                "duplicate_reason": f"Matches existing patient {cand_match.urn} ({cand_match.full_name})"
+                "duplicate_reason": (
+                    f"Matches existing patient {cand_match.urn} ({cand_match.full_name})"
+                )
             }
             duplicate_count += 1
         else:
@@ -737,8 +753,11 @@ def sanitize_formula(val: Any) -> str:
 
 
 def export_error_records_csv(session: Session, batch_id: str) -> str:
-    """Generate CSV string containing invalid and skipped rows with reasons for offline correction."""
-    batch = session.scalar(select(PatientImportBatch).where(PatientImportBatch.batch_id == batch_id))
+    """Generate CSV string containing invalid and skipped rows with reasons for offline
+    correction."""
+    batch = session.scalar(
+        select(PatientImportBatch).where(PatientImportBatch.batch_id == batch_id)
+    )
     if not batch:
         raise BatchNotFoundError(f"Import batch {batch_id} not found")
 

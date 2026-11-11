@@ -94,8 +94,10 @@ def upgrade() -> None:
             name="ck_follow_up_recommendations_status",
         ),
         sa.CheckConstraint(
-            "(status != 'CLOSED' AND closed_reason IS NULL AND closed_by_user_id IS NULL AND closed_at IS NULL) "
-            "OR (status = 'CLOSED' AND closed_reason IS NOT NULL AND length(trim(closed_reason)) >= 3 AND closed_by_user_id IS NOT NULL AND closed_at IS NOT NULL)",
+            "(status != 'CLOSED' AND closed_reason IS NULL AND closed_by_user_id IS NULL AND "
+            "closed_at IS NULL) "
+            "OR (status = 'CLOSED' AND closed_reason IS NOT NULL AND length(trim(closed_reason)) "
+            ">= 3 AND closed_by_user_id IS NOT NULL AND closed_at IS NOT NULL)",
             name="ck_follow_up_recommendations_closure",
         ),
     )
@@ -116,5 +118,7 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    op.execute("REVOKE SELECT, INSERT, UPDATE, DELETE ON follow_up_recommendations FROM kalyan_app;")
+    op.execute(
+        "REVOKE SELECT, INSERT, UPDATE, DELETE ON follow_up_recommendations FROM kalyan_app;"
+    )
     op.drop_table("follow_up_recommendations")

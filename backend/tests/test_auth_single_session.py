@@ -1,8 +1,8 @@
-"""Automated tests for single active session enforcement, 409 rejection, and audited takeover (DWS-10, T-19-03)."""
+"""Automated tests for single active session enforcement, 409 rejection, and audited takeover
+(DWS-10, T-19-03)."""
 
 from datetime import timedelta
 
-import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -17,7 +17,8 @@ from tests.conftest import TEST_PASSWORD, make_user
 def test_second_login_returns_409_session_in_use(
     make_client, admin_user: User, db_session: Session
 ) -> None:
-    """When an active session exists for a user, a new login attempt without takeover returns HTTP 409 session_in_use."""
+    """When an active session exists for a user, a new login attempt without takeover returns HTTP
+    409 session_in_use."""
     client1 = make_client("192.168.1.101")
     client2 = make_client("192.168.1.102")
 
@@ -47,7 +48,8 @@ def test_second_login_returns_409_session_in_use(
 def test_session_takeover_revokes_prior_and_logs_audit(
     make_client, admin_user: User, db_session: Session
 ) -> None:
-    """When login is called with takeover=True, previous session is revoked, SESSION_TAKEOVER is audited, and new login succeeds."""
+    """When login is called with takeover=True, previous session is revoked, SESSION_TAKEOVER is
+    audited, and new login succeeds."""
     client1 = make_client("192.168.1.101")
     client2 = make_client("192.168.1.102")
 
@@ -122,7 +124,8 @@ def test_expired_or_idle_session_does_not_block_login(
 def test_same_client_login_rotates_own_session_without_409(
     client: TestClient, admin_user: User
 ) -> None:
-    """When the same client (with existing cookie) logs in again, it rotates without 409 conflict."""
+    """When the same client (with existing cookie) logs in again, it rotates without 409
+    conflict."""
     resp1 = client.post(
         "/api/auth/login",
         json={"username": admin_user.username, "password": TEST_PASSWORD},

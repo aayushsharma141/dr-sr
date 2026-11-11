@@ -770,7 +770,10 @@ def _reception_alerts(session: Session, today: date, now_utc: datetime) -> list[
             OverviewAlertOut(
                 code="booked_unattended",
                 severity="info",
-                message=f"{unturned_count} booked patient(s) scheduled for today have not yet checked in.",
+                message=(
+                    f"{unturned_count} booked patient(s) scheduled for today have not yet checked "
+                    "in."
+                ),
             )
         )
 
@@ -782,7 +785,10 @@ def _reception_alerts(session: Session, today: date, now_utc: datetime) -> list[
             OverviewAlertOut(
                 code="pending_dues",
                 severity="warning",
-                message=f"{len(pending_dues)} visit(s) have outstanding balances requiring payment follow-up.",
+                message=(
+                    f"{len(pending_dues)} visit(s) have outstanding balances requiring payment "
+                    "follow-up."
+                ),
             )
         )
 
