@@ -37,7 +37,12 @@ export const PatientTimeline: React.FC<PatientTimelineProps> = ({
     : timeline
 
   if (isLoading) {
-    return <div className="p-6 text-center text-sm text-slate-500">Loading patient history...</div>
+    return (
+      <div className="rounded-xl border border-slate-200 bg-slate-50 p-6 text-center text-sm text-slate-500">
+        <div className="h-6 w-6 rounded-md bg-slate-300 mx-auto animate-bounce" />
+        <p className="mt-4">Loading patient history...</p>
+      </div>
+    )
   }
 
   if (error) {
@@ -46,9 +51,9 @@ export const PatientTimeline: React.FC<PatientTimelineProps> = ({
 
   if (!visibleTimeline || visibleTimeline.length === 0) {
     return (
-      <div className="rounded-xl border border-dashed border-slate-300 p-8 text-center text-sm text-slate-500">
-        No recorded history found for this patient yet.
-      </div>
+      <div className="rounded-xl border border-dashed border-slate-300 p-8 text-center text-sm text-slate-500 flex flex-col items-center gap-3" >
+        <div className="h-12 w-12 rounded-full bg-slate-100 flex items-center justify-center text-2xl opacity-50">
+          <svg className="h-6 w-6 text-slate-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round">            <circle cx="9" cy="21" r="1" />            <circle cx="20" cy="10" r="1" />            <circle cx="9" cy="3" r="1" />          </svg>        </div>        <p className="text-sm font-medium text-slate-600">No recorded history found for this patient yet.</p>      </div>
     )
   }
 
@@ -64,7 +69,7 @@ export const PatientTimeline: React.FC<PatientTimelineProps> = ({
       </div>
 
       <div className="relative border-l-2 border-slate-200 pl-6 space-y-6">
-        {visibleTimeline.map((item: TimelineItemOut) => {
+        {visibleTimeline.map((item: TimelineItemOut, index) => {
           const icon = eventTypeIcons[item.event_type] || '📌'
           const badgeClass =
             badgeColorClasses[item.badge_variant || 'default'] || badgeColorClasses.default
@@ -73,8 +78,10 @@ export const PatientTimeline: React.FC<PatientTimelineProps> = ({
             timeStyle: 'short',
           })
 
+          const rowDelay = index * 50
+
           return (
-            <div key={item.id} className="relative group">
+            <div key={item.id} className="relative group" style={{ transitionDelay: `${rowDelay}ms` }}>
               {/* Dot / Icon */}
               <div className="absolute -left-[35px] top-0 flex h-7 w-7 items-center justify-center rounded-full border-2 border-white bg-slate-100 text-sm shadow-xs">
                 {icon}
@@ -93,11 +100,11 @@ export const PatientTimeline: React.FC<PatientTimelineProps> = ({
                       </span>
                     )}
                   </div>
-                  <span className="text-xs text-slate-600 font-medium">{formattedDate}</span>
+                  <span className="text-xs font-medium text-slate-700 font-medium">{formattedDate}</span>
                 </div>
 
                 {item.subtitle && (
-                  <p className="mt-1 text-xs font-medium text-slate-600">
+                  <p className="mt-1 text-xs font-medium text-slate-700">
                     {item.subtitle}
                   </p>
                 )}

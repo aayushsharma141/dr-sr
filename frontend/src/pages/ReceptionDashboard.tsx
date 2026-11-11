@@ -63,6 +63,7 @@ export function ReceptionDashboard({ overview: initialOverview }: ReceptionDashb
   const [onlyDelayed, setOnlyDelayed] = useState(false)
   const [lastUpdated, setLastUpdated] = useState<Date>(new Date())
   const [isRefreshing, setIsRefreshing] = useState(false)
+  const [isInitialLoad, setIsInitialLoad] = useState(true)
 
   // Modals state
   const [cancellingAppt, setCancellingAppt] = useState<Appointment | null>(null)
@@ -73,6 +74,7 @@ export function ReceptionDashboard({ overview: initialOverview }: ReceptionDashb
   // Track last refresh time
   useEffect(() => {
     if (appointmentsData) {
+      setIsInitialLoad(false)
       setLastUpdated(new Date())
     }
   }, [appointmentsData])
@@ -281,7 +283,7 @@ export function ReceptionDashboard({ overview: initialOverview }: ReceptionDashb
             setStatusFilter('ALL')
             setOnlyDelayed(false)
           }}
-          className="text-left bg-white p-4 rounded-xl border border-neutral-200 hover:border-neutral-400 transition-all shadow-2xs hover:shadow-xs group cursor-pointer"
+          className="text-left bg-white p-4 rounded-xl border border-neutral-200 hover:border-neutral-400 transition-all hover:translate-y-1.5 shadow-2xs hover:shadow-xs group cursor-pointer"
         >
           <div className="flex items-center justify-between">
             <span className="text-xs font-semibold text-neutral-500 uppercase tracking-wider">Registrations</span>
@@ -302,7 +304,7 @@ export function ReceptionDashboard({ overview: initialOverview }: ReceptionDashb
             setStatusFilter('ARRIVED')
             setOnlyDelayed(false)
           }}
-          className={`text-left p-4 rounded-xl border transition-all shadow-2xs hover:shadow-xs group cursor-pointer ${statusFilter === 'ARRIVED' && !onlyDelayed
+          className={`text-left p-4 rounded-xl border transition-all hover:translate-y-1.5 shadow-2xs hover:shadow-xs group cursor-pointer ${statusFilter === 'ARRIVED' && !onlyDelayed
               ? 'bg-amber-50/80 border-amber-300 ring-2 ring-amber-400/20'
               : 'bg-white border-neutral-200 hover:border-amber-300'
             }`}
@@ -326,7 +328,7 @@ export function ReceptionDashboard({ overview: initialOverview }: ReceptionDashb
             setStatusFilter('IN_CONSULTATION')
             setOnlyDelayed(false)
           }}
-          className={`text-left p-4 rounded-xl border transition-all shadow-2xs hover:shadow-xs group cursor-pointer ${statusFilter === 'IN_CONSULTATION'
+          className={`text-left p-4 rounded-xl border transition-all hover:translate-y-1.5 shadow-2xs hover:shadow-xs group cursor-pointer ${statusFilter === 'IN_CONSULTATION'
               ? 'bg-consult-50/80 border-consult-300 ring-2 ring-consult-400/20'
               : 'bg-white border-neutral-200 hover:border-consult-300'
             }`}
@@ -350,7 +352,7 @@ export function ReceptionDashboard({ overview: initialOverview }: ReceptionDashb
             setStatusFilter('DONE')
             setOnlyDelayed(false)
           }}
-          className={`text-left p-4 rounded-xl border transition-all shadow-2xs hover:shadow-xs group cursor-pointer ${statusFilter === 'DONE'
+          className={`text-left p-4 rounded-xl border transition-all hover:translate-y-1.5 shadow-2xs hover:shadow-xs group cursor-pointer ${statusFilter === 'DONE'
               ? 'bg-emerald-50/80 border-emerald-300 ring-2 ring-emerald-400/20'
               : 'bg-white border-neutral-200 hover:border-emerald-300'
             }`}
@@ -371,7 +373,7 @@ export function ReceptionDashboard({ overview: initialOverview }: ReceptionDashb
         <button
           type="button"
           onClick={() => navigate('/reception/billing?tab=dues')}
-          className="text-left bg-white p-4 rounded-xl border border-neutral-200 hover:border-rose-300 transition-all shadow-2xs hover:shadow-xs group cursor-pointer"
+          className="text-left bg-white p-4 rounded-xl border border-neutral-200 hover:border-rose-300 transition-all hover:translate-y-1.5 shadow-2xs hover:shadow-xs group cursor-pointer"
         >
           <div className="flex items-center justify-between">
             <span className="text-xs font-semibold text-neutral-500 uppercase tracking-wider">Dues Pending</span>
@@ -389,7 +391,7 @@ export function ReceptionDashboard({ overview: initialOverview }: ReceptionDashb
         <button
           type="button"
           onClick={() => navigate('/reception/billing?tab=ledger')}
-          className="text-left bg-white p-4 rounded-xl border border-neutral-200 hover:border-teal-300 transition-all shadow-2xs hover:shadow-xs group cursor-pointer"
+          className="text-left bg-white p-4 rounded-xl border border-neutral-200 hover:border-teal-300 transition-all hover:translate-y-1.5 shadow-2xs hover:shadow-xs group cursor-pointer"
         >
           <div className="flex items-center justify-between">
             <span className="text-xs font-semibold text-neutral-500 uppercase tracking-wider">Collection</span>
@@ -604,7 +606,13 @@ export function ReceptionDashboard({ overview: initialOverview }: ReceptionDashb
                 </tr>
               </thead>
               <tbody className="divide-y divide-neutral-200 text-xs">
-                {queueLoading && allAppointments.length === 0 ? (
+                {isInitialLoad ? (
+                  <tr>
+                    <td colSpan={6} className="py-10 text-center text-neutral-500">
+                      Loading patient history with bounce animation...
+                    </td>
+                  </tr>
+                ) : queueLoading && allAppointments.length === 0 ? (
                   <tr>
                     <td colSpan={6} className="py-10 text-center text-neutral-500">
                       Loading live OPD queue...
@@ -624,12 +632,14 @@ export function ReceptionDashboard({ overview: initialOverview }: ReceptionDashb
                     </td>
                   </tr>
                 ) : (
-                  filteredQueue.map((appt) => {
+                  filteredQueue.map((appt, index) => {
                     const elapsed = getElapsedMinutes(appt.status_updated_at || appt.check_in_at || appt.created_at)
                     const isDelayed = appt.status === 'ARRIVED' && elapsed >= 30
 
+                    const rowDelay = index * 50
+
                     return (
-                      <tr key={appt.id} className="hover:bg-neutral-50/80 transition-colors">
+                      <tr key={appt.id} className="hover:bg-neutral-50/80 transition-colors" style={{ transitionDelay: `${rowDelay}ms` }}>
                         {/* Token # */}
                         <td className="py-3.5 px-4 text-center">
                           <span className="inline-block px-2.5 py-1 rounded-md text-sm font-black bg-neutral-900 text-white font-mono shadow-2xs">
@@ -928,7 +938,7 @@ export function ReceptionDashboard({ overview: initialOverview }: ReceptionDashb
                       <div key={pt.hour} className="flex-1 flex flex-col items-center gap-1 group relative">
                         <div
                           style={{ height: `${heightPercent}%` }}
-                          className={`w-full rounded-t transition-all ${pt.amount_paise > 0 ? 'bg-teal-600 group-hover:bg-teal-700' : 'bg-neutral-200'
+                          className={`w-full rounded-t transition:height 500ms ease-out ${pt.amount_paise > 0 ? 'bg-teal-600 group-hover:bg-teal-700' : 'bg-neutral-200'
                             }`}
                         />
                         <span className="text-xs text-neutral-500 font-mono">
