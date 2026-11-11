@@ -56,7 +56,10 @@ SECURITY_HEADERS = {
     "X-Frame-Options": "DENY",
     "Referrer-Policy": "no-referrer",
     "Content-Security-Policy": (
-        "default-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'"
+        # img-src allows blob: so locally generated previews (webcam snapshot, chosen
+        # file) render before upload; the objects never leave the browser.
+        "default-src 'self'; img-src 'self' blob:; frame-ancestors 'none'; "
+        "base-uri 'none'; form-action 'self'"
     ),
 }
 

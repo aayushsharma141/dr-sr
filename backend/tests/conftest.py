@@ -21,7 +21,7 @@ from kalyan_api.models import Department, Doctor, User
 
 
 @pytest.fixture(scope="session")
-def test_settings() -> Settings:
+def test_settings(tmp_path_factory: pytest.TempPathFactory) -> Settings:
     """Provide Settings configured specifically for the test suite."""
     test_db = os.environ.get("KALYAN_TEST_DB_NAME", "kalyan_test")
     if not test_db.endswith("_test"):
@@ -30,6 +30,15 @@ def test_settings() -> Settings:
             "Database name must end with '_test'.",
             returncode=2,
         )
+
+    # Several tests unlink every file in photos_dir/assets_dir. Point all file
+    # storage at a throwaway directory so the suite can never touch the live
+    # server's backend/var (uploaded logos, patient photos, backups).
+    storage_root = tmp_path_factory.mktemp("kalyan_storage")
+    os.environ["KALYAN_PHOTOS_DIR"] = str(storage_root / "photos")
+    os.environ["KALYAN_ASSETS_DIR"] = str(storage_root / "assets")
+    os.environ["KALYAN_BACKUP_DIR"] = str(storage_root / "backups")
+    os.environ["KALYAN_SETUP_CODE_PATH"] = str(storage_root / "setup-code.txt")
 
     # Base settings with lightweight Argon2 parameters for test execution speed
     settings = Settings(

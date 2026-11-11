@@ -233,8 +233,21 @@ def test_response_security_headers_and_request_id(client: TestClient) -> None:
     assert response.headers["x-content-type-options"] == "nosniff"
     assert response.headers["x-frame-options"] == "DENY"
     assert response.headers["referrer-policy"] == "no-referrer"
-    assert "default-src 'self'" in response.headers["content-security-policy"]
+    csp = response.headers["content-security-policy"]
+    assert "default-src 'self'" in csp
+    # Webcam snapshot / chosen-file previews are blob: URLs; without this they render broken.
+    assert "img-src 'self' blob:" in csp
     assert response.headers["cache-control"] == "no-store"
+
+
+def test_suite_storage_never_points_at_live_var(test_settings) -> None:
+    """Tests that unlink photos/assets must never reach the live server's backend/var."""
+    from kalyan_api.config import BACKEND_DIR, get_settings
+
+    live_var = (BACKEND_DIR / "var").resolve()
+    for cfg in (test_settings, get_settings()):
+        for path in (cfg.photos_dir, cfg.assets_dir, cfg.backup_dir):
+            assert not path.resolve().is_relative_to(live_var), path
 
 
 def test_documentation_endpoints_disabled_offline(client: TestClient) -> None:
