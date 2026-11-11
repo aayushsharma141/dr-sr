@@ -65,9 +65,9 @@
     }
   ],
   "next": {
-    "command": "/gsd-progress",
-    "label": "Review project progress",
-    "reason": "Phase 21 complete; build is 100% green"
+    "command": "/gsd-complete-milestone",
+    "label": "Complete milestone v3.0",
+    "reason": "Release blockers and P1 clinical UX gaps remediated; full test suites green"
   },
-  "updated_at": "2026-11-09T10:21:00.000Z"
+  "updated_at": "2026-11-11T21:55:00.000Z"
 }
