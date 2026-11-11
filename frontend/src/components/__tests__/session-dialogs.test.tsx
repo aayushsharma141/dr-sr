@@ -13,6 +13,7 @@ vi.mock('../../api/queries', () => ({
   useLogTreatmentSession: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useAddSessionAddendum: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useBookAppointment: () => ({ mutateAsync: vi.fn(), isPending: false }),
+  useUpdateAppointmentStatus: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useDepartments: () => ({ data: [] }),
   useDepartmentDoctors: () => ({ data: [] }),
   usePatients: () => ({ data: [patient], isPending: false }),
@@ -72,5 +73,13 @@ describe('appointment booking dialog', () => {
     await user.keyboard('{Enter}')
 
     expect(screen.getByRole('button', { name: 'Change' })).toBeInTheDocument()
+  })
+
+  it('renders walk-in check-in checkbox by default for today', () => {
+    vi.useFakeTimers({ toFake: ['Date'], now: new Date('2026-11-05T19:30:00Z') })
+    render(<AppointmentBookingModal isOpen onClose={vi.fn()} />)
+    const checkinCheckbox = screen.getByLabelText(/Walk-in arrival: Check In immediately/i)
+    expect(checkinCheckbox).toBeInTheDocument()
+    expect(checkinCheckbox).toBeChecked()
   })
 })
