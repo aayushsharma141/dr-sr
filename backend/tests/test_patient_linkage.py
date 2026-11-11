@@ -11,7 +11,9 @@ D-04 and the timeline router.
 
 from datetime import UTC, date, datetime
 
-from sqlalchemy import func, select
+import pytest
+from sqlalchemy import delete, func, select, update
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from kalyan_api.models import (
@@ -165,6 +167,227 @@ def test_prescription_rejects_encounter_of_another_patient(
         )
         == 0
     )
+
+
+def _encounter_for(client, patient: Patient, appt: Appointment) -> int:
+    resp = client.post(
+        "/api/encounters",
+        json={
+            "patient_id": patient.id,
+            "appointment_id": appt.id,
+            "symptoms": "Shoulder pain",
+            "clinical_notes": "Synthetic note",
+            "diagnosis": "Frozen shoulder",
+        },
+    )
+    assert resp.status_code == 201, resp.text
+    return resp.json()["id"]
+
+
+def _plan_payload(patient_id: int, encounter_id: int) -> dict:
+    return {
+        "patient_id": patient_id,
+        "encounter_id": encounter_id,
+        "plan_name": "Shoulder rehab package",
+        "condition_diagnosis": "Frozen shoulder",
+        "total_sessions": 10,
+        "agreed_price_paise": 300000,
+    }
+
+
+def test_treatment_plan_rejects_encounter_of_another_patient(
+    login_client, doctor_a_user, admin_user, db_session
+):
+    """A plan for patient B cannot be linked to patient A's encounter (BR-001, SEC-01)."""
+    patient_a = _patient(db_session, "A4")
+    patient_b = _patient(db_session, "B4")
+    appt_a = _appointment(db_session, patient_a, doctor_a_user.doctor_id, admin_user)
+    db_session.commit()
+
+    client = login_client(doctor_a_user)
+    encounter_id = _encounter_for(client, patient_a, appt_a)
+
+    resp = client.post("/api/treatment-plans", json=_plan_payload(patient_b.id, encounter_id))
+    assert resp.status_code == 404, resp.text
+    assert resp.json()["code"] == "encounter_not_found"
+
+    db_session.expire_all()
+    assert db_session.scalar(select(func.count(TreatmentPlan.id))) == 0
+    assert (
+        db_session.scalar(
+            select(func.count(AuditLog.id)).where(AuditLog.action == "TREATMENT_PLAN_CREATED")
+        )
+        == 0
+    )
+
+
+def test_treatment_plan_accepts_matching_patient_and_encounter(
+    login_client, doctor_a_user, admin_user, db_session
+):
+    """Control: a plan for the encounter's own patient is still created."""
+    patient = _patient(db_session, "A5")
+    appt = _appointment(db_session, patient, doctor_a_user.doctor_id, admin_user)
+    db_session.commit()
+
+    client = login_client(doctor_a_user)
+    encounter_id = _encounter_for(client, patient, appt)
+
+    resp = client.post("/api/treatment-plans", json=_plan_payload(patient.id, encounter_id))
+    assert resp.status_code == 201, resp.text
+    body = resp.json()
+    assert body["patient_id"] == patient.id
+    assert body["encounter_id"] == encounter_id
+
+
+# ------------------------------------------- SEC-03: database-level enforcement
+# The API checks above can be bypassed by direct SQL or a future code path, so
+# PostgreSQL itself must refuse a link between rows of two different patients.
+
+
+def _db_encounter(
+    db_session: Session,
+    patient: Patient,
+    doctor_id: int,
+    user: User,
+    appointment_id: int | None = None,
+) -> ClinicalEncounter:
+    encounter = ClinicalEncounter(
+        patient_id=patient.id,
+        doctor_id=doctor_id,
+        appointment_id=appointment_id,
+        symptoms="Synthetic symptoms",
+        clinical_notes="Synthetic note",
+        diagnosis="Synthetic diagnosis",
+        created_by_user_id=user.id,
+    )
+    db_session.add(encounter)
+    db_session.flush()
+    return encounter
+
+
+def test_db_rejects_encounter_linked_to_another_patients_appointment(
+    doctor_a_user, admin_user, db_session
+):
+    patient_a = _patient(db_session, "D1")
+    patient_b = _patient(db_session, "D2")
+    appt_a = _appointment(db_session, patient_a, doctor_a_user.doctor_id, admin_user)
+
+    with pytest.raises(IntegrityError) as exc_info, db_session.begin_nested():
+        _db_encounter(db_session, patient_b, doctor_a_user.doctor_id, admin_user, appt_a.id)
+    assert "fk_clinical_encounters_appointment_patient" in str(exc_info.value)
+
+
+def test_db_rejects_prescription_linked_to_another_patients_encounter(
+    doctor_a_user, admin_user, db_session
+):
+    patient_a = _patient(db_session, "D3")
+    patient_b = _patient(db_session, "D4")
+    encounter_a = _db_encounter(db_session, patient_a, doctor_a_user.doctor_id, admin_user)
+
+    with pytest.raises(IntegrityError) as exc_info, db_session.begin_nested():
+        db_session.add(
+            Prescription(
+                patient_id=patient_b.id,
+                doctor_id=doctor_a_user.doctor_id,
+                encounter_id=encounter_a.id,
+                diagnosis="Synthetic diagnosis",
+            )
+        )
+        db_session.flush()
+    assert "fk_prescriptions_encounter_patient" in str(exc_info.value)
+
+
+def test_db_rejects_treatment_plan_linked_to_another_patients_encounter(
+    doctor_a_user, admin_user, db_session
+):
+    patient_a = _patient(db_session, "D5")
+    patient_b = _patient(db_session, "D6")
+    encounter_a = _db_encounter(db_session, patient_a, doctor_a_user.doctor_id, admin_user)
+
+    with pytest.raises(IntegrityError) as exc_info, db_session.begin_nested():
+        db_session.add(
+            TreatmentPlan(
+                patient_id=patient_b.id,
+                doctor_id=doctor_a_user.doctor_id,
+                encounter_id=encounter_a.id,
+                plan_name="Synthetic package",
+                condition_diagnosis="Synthetic diagnosis",
+                total_sessions=5,
+                agreed_price_paise=100000,
+                status="ACTIVE",
+            )
+        )
+        db_session.flush()
+    assert "fk_treatment_plans_encounter_patient" in str(exc_info.value)
+
+
+def test_db_blocks_moving_a_linked_encounter_to_another_patient(
+    doctor_a_user, admin_user, db_session
+):
+    """An existing link cannot be broken later by re-pointing the child's patient."""
+    patient_a = _patient(db_session, "D7")
+    patient_b = _patient(db_session, "D8")
+    appt_a = _appointment(db_session, patient_a, doctor_a_user.doctor_id, admin_user)
+    encounter = _db_encounter(db_session, patient_a, doctor_a_user.doctor_id, admin_user, appt_a.id)
+
+    with pytest.raises(IntegrityError), db_session.begin_nested():
+        db_session.execute(
+            update(ClinicalEncounter)
+            .where(ClinicalEncounter.id == encounter.id)
+            .values(patient_id=patient_b.id)
+        )
+
+
+def test_db_accepts_same_patient_links_and_unlinked_rows(doctor_a_user, admin_user, db_session):
+    """Control: matching links and rows with no link are unaffected."""
+    patient = _patient(db_session, "D9")
+    appt = _appointment(db_session, patient, doctor_a_user.doctor_id, admin_user)
+    linked = _db_encounter(db_session, patient, doctor_a_user.doctor_id, admin_user, appt.id)
+    unlinked = _db_encounter(db_session, patient, doctor_a_user.doctor_id, admin_user)
+    db_session.add(
+        TreatmentPlan(
+            patient_id=patient.id,
+            doctor_id=doctor_a_user.doctor_id,
+            encounter_id=linked.id,
+            plan_name="Synthetic package",
+            condition_diagnosis="Synthetic diagnosis",
+            total_sessions=5,
+            agreed_price_paise=100000,
+            status="ACTIVE",
+        )
+    )
+    db_session.add(
+        TreatmentPlan(
+            patient_id=patient.id,
+            doctor_id=doctor_a_user.doctor_id,
+            plan_name="Unlinked package",
+            condition_diagnosis="Synthetic diagnosis",
+            total_sessions=5,
+            agreed_price_paise=100000,
+            status="ACTIVE",
+        )
+    )
+    db_session.flush()
+    assert linked.appointment_id == appt.id
+    assert unlinked.appointment_id is None
+
+
+def test_deleting_an_appointment_still_only_unlinks_the_encounter(
+    doctor_a_user, admin_user, db_session
+):
+    """Delete behaviour is unchanged: the link is cleared, the note keeps its patient."""
+    patient = _patient(db_session, "DA")
+    appt = _appointment(db_session, patient, doctor_a_user.doctor_id, admin_user)
+    encounter = _db_encounter(db_session, patient, doctor_a_user.doctor_id, admin_user, appt.id)
+    encounter_id = encounter.id
+
+    db_session.execute(delete(Appointment).where(Appointment.id == appt.id))
+    db_session.expire_all()
+
+    refreshed = db_session.get(ClinicalEncounter, encounter_id)
+    assert refreshed is not None
+    assert refreshed.appointment_id is None
+    assert refreshed.patient_id == patient.id
 
 
 # ---------------------------------------------------------------- BR-002

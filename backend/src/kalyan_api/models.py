@@ -21,6 +21,7 @@ from sqlalchemy import (
     Date,
     DateTime,
     ForeignKey,
+    ForeignKeyConstraint,
     Identity,
     Index,
     Integer,
@@ -604,6 +605,8 @@ class Appointment(Base):
             "token_number",
             name="uq_appointments_doctor_date_token",
         ),
+        # Target of fk_clinical_encounters_appointment_patient (BR-001, SEC-03).
+        UniqueConstraint("id", "patient_id", name="uq_appointments_id_patient"),
         Index("ix_appointments_doctor_date_status", "doctor_id", "appointment_date", "status"),
         Index("ix_appointments_patient_date", "patient_id", "appointment_date"),
     )
@@ -669,6 +672,16 @@ class ClinicalEncounter(Base):
             unique=True,
             postgresql_where=text("appointment_id IS NOT NULL"),
         ),
+        # Target of the prescription and treatment-plan patient-link constraints (SEC-03).
+        UniqueConstraint("id", "patient_id", name="uq_clinical_encounters_id_patient"),
+        # BR-001, SEC-03: a linked appointment must belong to the same patient. Deleting the
+        # appointment clears only the link, as the single-column foreign key always did.
+        ForeignKeyConstraint(
+            ["appointment_id", "patient_id"],
+            ["appointments.id", "appointments.patient_id"],
+            name="fk_clinical_encounters_appointment_patient",
+            ondelete="SET NULL (appointment_id)",
+        ),
     )
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
@@ -723,7 +736,7 @@ class ClinicalEncounter(Base):
     patient = relationship("Patient", lazy="joined")
     doctor = relationship("Doctor", lazy="joined")
     department = relationship("Department", lazy="select")
-    appointment = relationship("Appointment", lazy="select")
+    appointment = relationship("Appointment", foreign_keys=[appointment_id], lazy="select")
     addenda = relationship(
         "ClinicalAddendum",
         back_populates="encounter",
@@ -792,6 +805,13 @@ class TreatmentPlan(Base):
         Index("ix_treatment_plans_patient_id", "patient_id"),
         Index("ix_treatment_plans_doctor_id", "doctor_id"),
         Index("ix_treatment_plans_status", "status"),
+        # BR-001, SEC-03: a linked encounter must belong to the same patient.
+        ForeignKeyConstraint(
+            ["encounter_id", "patient_id"],
+            ["clinical_encounters.id", "clinical_encounters.patient_id"],
+            name="fk_treatment_plans_encounter_patient",
+            ondelete="SET NULL (encounter_id)",
+        ),
         CheckConstraint(
             "total_sessions >= 1 AND total_sessions <= 200",
             name="ck_treatment_plans_total_sessions",
@@ -851,7 +871,7 @@ class TreatmentPlan(Base):
 
     patient = relationship("Patient", lazy="joined")
     doctor = relationship("Doctor", lazy="joined")
-    encounter = relationship("ClinicalEncounter", lazy="select")
+    encounter = relationship("ClinicalEncounter", foreign_keys=[encounter_id], lazy="select")
     sessions = relationship(
         "TreatmentSession",
         back_populates="treatment_plan",
@@ -955,6 +975,13 @@ class Prescription(Base):
         Index("ix_prescriptions_patient_id", "patient_id"),
         Index("ix_prescriptions_doctor_id", "doctor_id"),
         Index("ix_prescriptions_encounter_id", "encounter_id"),
+        # BR-001, SEC-03: a linked encounter must belong to the same patient.
+        ForeignKeyConstraint(
+            ["encounter_id", "patient_id"],
+            ["clinical_encounters.id", "clinical_encounters.patient_id"],
+            name="fk_prescriptions_encounter_patient",
+            ondelete="SET NULL (encounter_id)",
+        ),
         CheckConstraint("length(trim(diagnosis)) >= 2", name="ck_prescriptions_diagnosis"),
         CheckConstraint(
             "status IN ('DRAFT', 'AUTHORISED', 'CANCELLED')", name="ck_prescriptions_status"
@@ -1019,7 +1046,7 @@ class Prescription(Base):
 
     patient = relationship("Patient", lazy="joined")
     doctor = relationship("Doctor", lazy="joined")
-    encounter = relationship("ClinicalEncounter", lazy="select")
+    encounter = relationship("ClinicalEncounter", foreign_keys=[encounter_id], lazy="select")
     cancelled_by_user = relationship("User", foreign_keys=[cancelled_by_user_id], lazy="joined")
     items = relationship(
         "PrescriptionItem",
