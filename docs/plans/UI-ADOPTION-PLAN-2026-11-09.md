@@ -131,6 +131,47 @@ K-50 ─► K-51 ─► K-52 ─► K-53
 
 K-32 (Patient Records pagination) is the only screen task that needs neither a decision nor backend work. It can be done first.
 
+## 6a. Owner decisions, 2026-11-10 (binding for the work below)
+
+**Fees and visits**
+- **Consultation fee** (per doctor, e.g. ₹500): editable by Admin on the Doctors page **and** by each doctor on their own settings page.
+- **First visit:** the patient pays the consultation fee.
+- **Later visits (revisits):** either pay the per-day revisit charge (e.g. ₹300), or buy a **prepaid plan** that covers several days for one payment.
+- **Plans** (e.g. "Essential: 10 days at ₹3,000"): a named bundle of revisit days sold for one payment. Plans are managed with full **create, read, update and deactivate** (CRUD) by Admin.
+- All fee values are editable with CRUD. Nothing is hard-coded.
+
+**Numbering**
+- **Patient URN:** `KH-YY-P-MM-00001` (see open question N1). Synthetic data only, so no migration of existing numbers.
+- **Receipt:** `KH-RCP-26-27-000001`, reset each Indian financial year (1 April to 31 March). Accepted.
+- **Invoice:** `KH-INV-26-27-000001`, reset each financial year. Accepted. This needs a real invoice table (SC-2), so the plan includes one.
+- **Doctor token:** cabin letter plus a two-digit serial, e.g. `A-01`, `B-03`, `C-02`. Each doctor has a cabin code, editable by Admin. The serial resets each day per doctor and is never reused (ADR-26 still holds). The number is the same for reception and the doctor.
+
+**New tasks**
+
+| ID | Task | Depends on |
+|---|---|---|
+| K-60 | Doctor fee and cabin code: editable on the Doctors page (Admin) and on each doctor's own settings page (Doctor). One source for consultation fee; retire the duplicate fee catalogue on the check-in screen or map it to the doctor's fee. | K-02 |
+| K-61 | Revisit fee per doctor, and a visit-day rule: first visit charges consultation fee, later visit-days charge revisit fee unless covered by an active plan. | K-60, K-23 |
+| K-62 | Plans with CRUD: name, number of days, price, doctor (or all doctors), active flag, validity. Plan purchase creates a charge that is paid in one go and tracks the days used. | K-61, K-63 |
+| K-63 | Invoice table and invoice numbers `KH-INV-FY-000001`. Each visit charge (consultation, revisit, plan) becomes an invoice line; one invoice takes several payments. Replaces the read-only bill view (D2) because the owner now needs real invoices. | K-00 |
+| K-64 | Receipt numbers `KH-RCP-FY-000001`, reset per financial year, one receipt per payment. Reprints still show DUPLICATE. | K-63 |
+| K-65 | URN generator `KH-YY-P-MM-00001`, replacing `KH-YYYY-XXXX`. Concurrency-safe sequence. | none |
+| K-66 | Token display `A-01`, using the doctor's cabin code and a per-doctor daily serial. Shown on the queue, appointment and print screens. | K-60 |
+| K-67 | Check-in charge (closes BR-018): the banner's promise becomes true. Check-in creates the consultation or revisit charge, or uses an active plan day, as K-61 defines. | K-61, K-63 |
+
+Each of these needs its own tests (CRUD, RBAC, concurrency for numbers) and a rebuild on `:8000`.
+
+**Answers received (2026-11-10)**
+- **N1 URN:** `P` = **Patient**. The sequence restart (monthly or yearly) is **not yet confirmed**; see open item O1.
+- **Q1 Revisit fee:** **optional, editable, set per doctor.** A doctor with no revisit fee set has no per-day revisit charge.
+- **Q2 Plan days:** **10 days = 10 visit-days used.** Whether a plan expires is **not yet answered**; see open item O2.
+- **Q3 Plan scope:** a plan is **valid with any doctor**. Each department defines its own plans, using one **standard plan format** (same fields for every department, values set by that department).
+- **Q4 Follow-up validity:** **no fixed free window.** The free window is a field on each plan, so the plan form gets an input for it.
+
+**Resolved (2026-11-10)**
+- **O1 URN restart:** the `00001` sequence restarts **each year**, not monthly. Implication: the sequence is unique per year (`KH-YY-P-`), and the `MM` part records the month of registration. K-65 may start.
+- **O2 Plan expiry:** **no global rule.** Expiry is an optional input on the plan creation form, set per plan (blank = no expiry). K-62 may start.
+
 ## 7. Risks
 
 - **Look drift.** Every screen change is checked against the approved screenshot (K-51). Do not restyle while reworking a flow.
