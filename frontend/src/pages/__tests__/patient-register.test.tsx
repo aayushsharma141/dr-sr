@@ -353,4 +353,17 @@ describe('Registration desk: no second submit and no silent step failures (BR-00
     window.dispatchEvent(dirty)
     expect(dirty.defaultPrevented).toBe(true)
   })
+
+  it('opens photo selection popup with webcam and upload options when receptionist clicks photo box', async () => {
+    stubRegistrationApi({ photoFails: false })
+    const user = userEvent.setup()
+    renderPage()
+
+    const photoBox = screen.getByTitle('Click to capture or upload patient photo')
+    await user.click(photoBox)
+
+    expect(screen.getByRole('heading', { name: 'Add Patient Photo' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /capture with webcam/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /upload from computer/i })).toBeInTheDocument()
+  })
 })

@@ -56,6 +56,7 @@ export {
   IconStethoscope,
   IconTicket,
   IconTrash,
+  IconUpload,
   IconUser,
   IconUserCheck,
   IconUserPlus,

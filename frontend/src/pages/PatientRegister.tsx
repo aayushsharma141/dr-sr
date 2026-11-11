@@ -14,6 +14,7 @@ import { ApiError } from '../api/client'
 import { AppShell } from '../components/AppShell'
 import { QueueTicketPreview } from '../components/QueueTicketPreview'
 import { UnsavedChangesGuard } from '../components/UnsavedChangesGuard'
+import { PatientPhotoModal } from '../components/PatientPhotoModal'
 import {
   IconCamera,
   IconCalendar,
@@ -68,6 +69,7 @@ export function PatientRegister() {
   // Photo state
   const [photoFile, setPhotoFile] = useState<File | null>(null)
   const [photoPreview, setPhotoPreview] = useState<string | null>(null)
+  const [isPhotoModalOpen, setIsPhotoModalOpen] = useState(false)
 
   // Options & Flags
   const [saveAndAddAnother, setSaveAndAddAnother] = useState(false)
@@ -195,13 +197,17 @@ export function PatientRegister() {
   const handlePhotoSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (file) {
-      setPhotoFile(file)
-      const reader = new FileReader()
-      reader.onloadend = () => {
-        setPhotoPreview(reader.result as string)
-      }
-      reader.readAsDataURL(file)
+      handlePhotoConfirmed(file)
     }
+  }
+
+  const handlePhotoConfirmed = (file: File) => {
+    setPhotoFile(file)
+    const reader = new FileReader()
+    reader.onloadend = () => {
+      setPhotoPreview(reader.result as string)
+    }
+    reader.readAsDataURL(file)
   }
 
   const handleRemovePhoto = () => {
@@ -656,13 +662,13 @@ export function PatientRegister() {
                       className="hidden"
                     />
                     <div
-                      onClick={() => fileInputRef.current?.click()}
+                      onClick={() => setIsPhotoModalOpen(true)}
                       className="group relative flex h-36 w-36 cursor-pointer flex-col items-center justify-center overflow-hidden rounded-xl border-2 border-dashed border-slate-300 bg-slate-50/60 p-2 text-center transition-colors hover:border-emerald-600 hover:bg-emerald-50/30"
                       role="button"
                       tabIndex={0}
                       onKeyDown={(e) => {
                         if (e.key === 'Enter' || e.key === ' ') {
-                          fileInputRef.current?.click()
+                          setIsPhotoModalOpen(true)
                         }
                       }}
                       title="Click to capture or upload patient photo"
@@ -683,14 +689,24 @@ export function PatientRegister() {
                       )}
                     </div>
                     {photoPreview && (
-                      <button
-                        type="button"
-                        onClick={handleRemovePhoto}
-                        className="inline-flex items-center gap-1 text-xs font-semibold text-red-600 hover:underline cursor-pointer"
-                      >
-                        <IconTrash className="h-3 w-3" />
-                        Remove
-                      </button>
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setIsPhotoModalOpen(true)}
+                          className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-700 hover:underline cursor-pointer"
+                        >
+                          Change
+                        </button>
+                        <span className="text-slate-500">•</span>
+                        <button
+                          type="button"
+                          onClick={handleRemovePhoto}
+                          className="inline-flex items-center gap-1 text-xs font-semibold text-red-600 hover:underline cursor-pointer"
+                        >
+                          <IconTrash className="h-3 w-3" />
+                          Remove
+                        </button>
+                      </div>
                     )}
                   </div>
 
@@ -1141,6 +1157,13 @@ export function PatientRegister() {
           </div>
         </form>
       </div>
+
+      <PatientPhotoModal
+        open={isPhotoModalOpen}
+        onClose={() => setIsPhotoModalOpen(false)}
+        onPhotoSelected={handlePhotoConfirmed}
+        currentPreview={photoPreview}
+      />
     </AppShell>
   )
 }
