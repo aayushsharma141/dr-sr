@@ -330,13 +330,21 @@ DUMP_HEADER_LINES = 40
 
 
 def runtime_grant_sql(app_user: str) -> str:
-    """SQL that gives the runtime role exactly the rights RUNTIME_TABLE_GRANTS lists."""
-    statements = [
-        f'GRANT {", ".join(privileges)} ON public."{table}" TO "{app_user}";'
-        for table, privileges in RUNTIME_TABLE_GRANTS.items()
-    ]
+    """SQL granting the runtime role the rights in RUNTIME_TABLE_GRANTS, for tables that exist.
+
+    An archive taken before a table was added does not contain it. A GRANT on a missing table
+    fails, and with --single-transaction that rolls the whole restore back, so each grant is
+    skipped when its table is absent from the restored schema.
+    """
+    statements = []
+    for table, privileges in RUNTIME_TABLE_GRANTS.items():
+        grant = f'GRANT {", ".join(privileges)} ON public."{table}" TO "{app_user}";'
+        statements.append(
+            f"DO $grant$ BEGIN IF to_regclass('public.{table}') IS NOT NULL THEN {grant} "
+            "END IF; END $grant$;"
+        )
     statements.append(f'GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO "{app_user}";')
-    return "\n".join(statements)
+    return "\n".join(statements) + "\n"
 
 
 def _copy_dump_keeping_lock_timeout(sql_file: Path, destination: Path) -> None:
