@@ -95,7 +95,6 @@ export const PendingDuesPage: React.FC = () => {
                       </td>
                       <td className="px-4 py-3">
                         <div className="font-medium text-slate-900">{due.plan_name}</div>
-                        <div className="text-xs text-slate-500">{due.condition_diagnosis || '—'}</div>
                       </td>
                       <td className="px-4 py-3 text-right font-medium text-slate-900">
                         ₹{(due.agreed_price_paise / 100).toLocaleString('en-IN', { minimumFractionDigits: 2 })}

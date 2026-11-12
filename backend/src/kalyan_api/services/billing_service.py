@@ -40,7 +40,7 @@ def compute_pending_dues(session: Session) -> list[PendingDueOut]:
                     patient_urn=plan.patient.urn if plan.patient else "",
                     patient_name=plan.patient.full_name if plan.patient else "",
                     plan_name=plan.plan_name,
-                    condition_diagnosis=plan.condition_diagnosis,
+                    condition_diagnosis=None,  # D-04/FB-05: clinical diagnosis hidden from billing dues
                     agreed_price_paise=plan.agreed_price_paise,
                     paid_paise=paid_paise,
                     balance_paise=balance_paise,

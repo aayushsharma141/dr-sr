@@ -790,7 +790,6 @@ export function ReceptionBillingPage() {
                         </td>
                         <td className="py-3 px-3">
                           <div className="font-bold text-slate-900">{due.plan_name}</div>
-                          <div className="text-xs text-slate-500">{due.condition_diagnosis || '—'}</div>
                         </td>
                         <td className="py-3 px-3 text-right font-mono font-medium text-slate-800">
                           {formatPaise(due.agreed_price_paise)}

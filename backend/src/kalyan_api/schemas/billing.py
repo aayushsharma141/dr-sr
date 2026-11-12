@@ -86,7 +86,7 @@ class PendingDueOut(BaseModel):
     patient_urn: str
     patient_name: str
     plan_name: str
-    condition_diagnosis: str
+    condition_diagnosis: str | None = None
     agreed_price_paise: int
     paid_paise: int
     balance_paise: int
