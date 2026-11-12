@@ -70,7 +70,7 @@ export function PatientsDirectory() {
       <div className="mx-auto w-full max-w-[1600px] space-y-6">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
-            <h1 className="text-2xl font-bold text-neutral-900 tracking-tight">
+            <h1 className="text-xl font-bold text-neutral-900 tracking-tight">
               Patient Records
             </h1>
             <p className="text-sm text-neutral-500">

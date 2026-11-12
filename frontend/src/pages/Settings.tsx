@@ -7,6 +7,7 @@ import { InlineAlert } from '../components/InlineAlert'
 import { Modal } from '../components/Modal'
 import { UnsavedChangesGuard } from '../components/UnsavedChangesGuard'
 import { HospitalAssetManager } from '../components/admin/HospitalAssetManager'
+import { AdminPageHeader } from '../components/admin/AdminPageHeader'
 import type { ClinicSettingsOut, ClinicSettingsUpdate, ReceiptCycleConfirmationExtra } from '../api/types'
 
 type ReceiptCycle = ClinicSettingsOut['receipt_sequence_cycle']
@@ -215,16 +216,6 @@ function Section({ id, title, description, wide = false, children }: SectionProp
     </section>
   )
 }
-
-const SECTION_LINKS = [
-  { href: '#settings-section-identity-region', label: 'Identity' },
-  { href: '#settings-section-contact-region', label: 'Contact' },
-  { href: '#settings-section-billing-region', label: 'Receipts' },
-  { href: '#settings-section-consultation-region', label: 'Consultation' },
-  { href: '#settings-section-printing-region', label: 'Printing' },
-  { href: '#hospital-crest', label: 'Crest & logo' },
-  { href: '#asset-library', label: 'Asset library' },
-] as const
 
 interface PendingCycleChange {
   payload: ClinicSettingsUpdate
@@ -650,25 +641,7 @@ export function Settings() {
     <AppShell name={me?.full_name ?? 'Admin'} role={me?.role ?? 'ADMIN'}>
       <UnsavedChangesGuard dirty={dirty} />
       <div className="mx-auto w-full max-w-[1600px] space-y-6">
-        <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
-          <div>
-            <h1 className="text-2xl font-bold tracking-tight text-slate-900">Hospital Settings</h1>
-            <p className="mt-1 text-sm text-slate-600">
-              Hospital identity, crest and logo, contact details, receipt numbering, print text and consultation rules.
-            </p>
-          </div>
-          <nav aria-label="Hospital settings sections" className="flex flex-wrap gap-2">
-            {SECTION_LINKS.map((link) => (
-              <a
-                key={link.href}
-                href={link.href}
-                className="inline-flex min-h-9 items-center rounded-full border border-slate-300 bg-white px-3 text-sm font-medium text-slate-700 hover:border-brand-700 hover:text-brand-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-700"
-              >
-                {link.label}
-              </a>
-            ))}
-          </nav>
-        </div>
+        <AdminPageHeader title="Hospital Settings" />
 
         {isConflict && <ConflictBanner onReload={handleReload} isReloading={isReloading} />}
 

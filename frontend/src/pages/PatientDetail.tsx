@@ -130,7 +130,7 @@ export function PatientDetail() {
             >
               &larr; Back to Patient Records
             </Link>
-            <h1 className="text-2xl font-bold text-neutral-900 tracking-tight mt-1">
+            <h1 className="text-xl font-bold text-neutral-900 tracking-tight mt-1">
               {patient ? patient.full_name : 'Patient Record'}
             </h1>
           </div>

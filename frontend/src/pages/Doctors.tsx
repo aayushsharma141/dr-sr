@@ -419,13 +419,13 @@ export function Doctors() {
 
   return (
     <AppShell name={me?.full_name ?? 'Admin'} role={me?.role ?? 'ADMIN'}>
-      <div className="mx-auto w-full max-w-[1600px] space-y-8">
+      <div className="mx-auto w-full max-w-[1600px] space-y-6">
         {/* Doctors Section */}
-        <h1 className="text-2xl font-bold tracking-tight text-slate-900">Doctors &amp; Fees</h1>
+        <h1 className="text-xl font-bold tracking-tight text-slate-900">Doctors &amp; Fees</h1>
         <section aria-labelledby="doctors-heading" className="space-y-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
-              <h2 id="doctors-heading" className="text-2xl font-bold text-neutral-900 tracking-tight">
+              <h2 id="doctors-heading" className="text-lg font-semibold text-neutral-900">
                 Doctor Profiles
               </h2>
               <p className="text-sm text-neutral-600">Manage doctor credentials, qualifications, and default fees</p>
@@ -498,7 +498,7 @@ export function Doctors() {
         <section aria-labelledby="fees-heading" className="space-y-4 pt-6 border-t border-neutral-200">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
-              <h2 id="fees-heading" className="text-2xl font-bold text-neutral-900 tracking-tight">
+              <h2 id="fees-heading" className="text-lg font-semibold text-neutral-900">
                 Consultation Fee Schedules
               </h2>
               <p className="text-sm text-neutral-600">Configure standard fee rates used across departments and billing</p>

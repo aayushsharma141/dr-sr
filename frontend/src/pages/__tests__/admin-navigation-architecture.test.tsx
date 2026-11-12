@@ -231,34 +231,49 @@ describe('Administration Dashboard & Single Sidebar Layout', () => {
     const primaryNav = screen.getByRole('navigation', { name: 'Primary navigation' })
 
     // Top link
-    expect(within(primaryNav).getByRole('link', { name: /Management Overview/ })).toHaveAttribute('href', '/admin')
+    expect(within(primaryNav).getByRole('link', { name: /Overview/ })).toHaveAttribute('href', '/admin')
 
     // Five section headers
-    expect(within(primaryNav).getByText('Hospital Configuration')).toBeInTheDocument()
-    expect(within(primaryNav).getByText('Patient & Data Management')).toBeInTheDocument()
-    expect(within(primaryNav).getByText('Billing & Finance')).toBeInTheDocument()
-    expect(within(primaryNav).getByText('Users, Security & Governance')).toBeInTheDocument()
-    expect(within(primaryNav).getByText('System & Maintenance')).toBeInTheDocument()
+    expect(within(primaryNav).getByText('Setup')).toBeInTheDocument()
+    expect(within(primaryNav).getByText('Patients')).toBeInTheDocument()
+    expect(within(primaryNav).getByText('Finance')).toBeInTheDocument()
+    expect(within(primaryNav).getByText('Users & Access')).toBeInTheDocument()
+    expect(within(primaryNav).getByText('System')).toBeInTheDocument()
 
     // Sidebar items match canonical routes
-    expect(within(primaryNav).getByRole('link', { name: /Hospital Settings/ })).toHaveAttribute('href', '/admin/settings')
+    expect(within(primaryNav).getByRole('link', { name: /Settings/ })).toHaveAttribute('href', '/admin/settings')
     expect(within(primaryNav).queryByRole('link', { name: /Hospital Identity & Logo/ })).toBeNull()
-    expect(within(primaryNav).getByRole('link', { name: /Print Templates/ })).toHaveAttribute('href', '/admin/templates')
+    expect(within(primaryNav).getByRole('link', { name: /Templates/ })).toHaveAttribute('href', '/admin/templates')
     expect(within(primaryNav).getByRole('link', { name: /Doctors & Fees/ })).toHaveAttribute('href', '/admin/doctors')
 
-    expect(within(primaryNav).getByRole('link', { name: /Patient Demographic Correction/ })).toHaveAttribute('href', '/admin/patients/correct')
+    expect(within(primaryNav).getByRole('link', { name: /Corrections/ })).toHaveAttribute('href', '/admin/patients/correct')
     expect(within(primaryNav).queryByRole('link', { name: /Import Centre|Export Centre/ })).toBeNull()
 
-    expect(within(primaryNav).getByRole('link', { name: /Billing & Reversals/ })).toHaveAttribute('href', '/admin/billing')
-    expect(within(primaryNav).getByRole('link', { name: /Pending Dues/ })).toHaveAttribute('href', '/reception/dues')
+    expect(within(primaryNav).getByRole('link', { name: /Receipts/ })).toHaveAttribute('href', '/admin/billing')
+    expect(within(primaryNav).getByRole('link', { name: /Dues/ })).toHaveAttribute('href', '/reception/dues')
 
-    expect(within(primaryNav).getByRole('link', { name: /User Accounts/ })).toHaveAttribute('href', '/admin/users')
-    expect(within(primaryNav).getByRole('link', { name: /Roles & Permissions/ })).toHaveAttribute('href', '/admin/roles')
-    expect(within(primaryNav).getByRole('link', { name: /Security & Sessions/ })).toHaveAttribute('href', '/admin/security')
+    expect(within(primaryNav).getByRole('link', { name: /Users/ })).toHaveAttribute('href', '/admin/users')
+    expect(within(primaryNav).getByRole('link', { name: /Roles/ })).toHaveAttribute('href', '/admin/roles')
+    expect(within(primaryNav).getByRole('link', { name: /Sessions/ })).toHaveAttribute('href', '/admin/security')
     expect(within(primaryNav).getByRole('link', { name: /Audit Trail/ })).toHaveAttribute('href', '/admin/audit')
 
-    expect(within(primaryNav).getByRole('link', { name: /Backup & Restore/ })).toHaveAttribute('href', '/admin/backups')
-    expect(within(primaryNav).getByRole('link', { name: /Data Integrity/ })).toHaveAttribute('href', '/admin/integrity')
-    expect(within(primaryNav).getByRole('link', { name: /System Health/ })).toHaveAttribute('href', '/admin/system')
+    expect(within(primaryNav).getByRole('link', { name: /Backups/ })).toHaveAttribute('href', '/admin/backups')
+    expect(within(primaryNav).getByRole('link', { name: /Integrity/ })).toHaveAttribute('href', '/admin/integrity')
+    expect(within(primaryNav).getByRole('link', { name: /Health/ })).toHaveAttribute('href', '/admin/system')
+  })
+
+  it('renders executive quick actions toolbar with direct operational shortcuts', () => {
+    renderAreaHome()
+
+    const quickActions = screen.getByRole('region', { name: 'Executive Quick Actions' })
+    expect(quickActions).toBeInTheDocument()
+
+    // 6 Direct action links within the Quick Actions section
+    expect(within(quickActions).getByRole('link', { name: /Patient Directory/ })).toHaveAttribute('href', '/reception/patients')
+    expect(within(quickActions).getByRole('link', { name: /Pending Dues/ })).toHaveAttribute('href', '/reception/dues')
+    expect(within(quickActions).getByRole('link', { name: /Receipts & Reversals/ })).toHaveAttribute('href', '/admin/billing')
+    expect(within(quickActions).getByRole('link', { name: /Data Integrity/ })).toHaveAttribute('href', '/admin/integrity')
+    expect(within(quickActions).getByRole('link', { name: /Backup & Restore/ })).toHaveAttribute('href', '/admin/backups')
+    expect(within(quickActions).getByRole('link', { name: /Audit Trail/ })).toHaveAttribute('href', '/admin/audit')
   })
 })

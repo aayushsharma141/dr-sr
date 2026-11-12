@@ -278,7 +278,7 @@ export function AppointmentsReception() {
   return (
     <AppShell name={me?.full_name || 'Staff'} role={me?.role || 'RECEPTION'}>
       <div className="space-y-6">
-        <h1 className="text-2xl font-bold tracking-tight text-slate-900">Appointments</h1>
+        <h1 className="text-xl font-bold tracking-tight text-slate-900">Appointments</h1>
         <div role="tablist" aria-label="Appointment workspace" className="flex flex-wrap gap-2 border-b border-slate-200 pb-2">
           <button
             type="button"

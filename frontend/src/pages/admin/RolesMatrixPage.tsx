@@ -77,12 +77,13 @@ export function RolesMatrixPage() {
               ))}
             </dl>
 
-            <div className="max-h-[70vh] overflow-auto rounded-lg border border-neutral-200 bg-white shadow-xs">
+            {/* No inner scroll box: the page content area is the only scroller, and the header row sticks to its top. */}
+            <div className="overflow-clip rounded-lg border border-neutral-200 bg-white shadow-xs">
               <table className="w-full border-collapse text-left text-sm text-neutral-800">
                 <caption className="sr-only">
                   Permission matrix: rows are permissions, columns are roles. Read only.
                 </caption>
-                <thead className="sticky top-0 z-10 bg-neutral-50 text-neutral-800">
+                <thead className="sticky -top-4 z-10 bg-neutral-50 text-neutral-800">
                   <tr className="border-b border-neutral-200">
                     <th scope="col" className="px-4 py-3 font-semibold">Permission</th>
                     {data.roles.map((r) => (

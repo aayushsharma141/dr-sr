@@ -5,11 +5,11 @@
  */
 
 export const ADMIN_MODULE_GROUPS = [
-  { id: 'hospital-config', label: 'Hospital Configuration' },
-  { id: 'patient-data', label: 'Patient & Data Management' },
-  { id: 'billing-finance', label: 'Billing & Finance' },
-  { id: 'users-security', label: 'Users, Security & Governance' },
-  { id: 'system-maintenance', label: 'System & Maintenance' },
+  { id: 'hospital-config', label: 'Hospital Configuration', navLabel: 'Setup' },
+  { id: 'patient-data', label: 'Patient & Data Management', navLabel: 'Patients' },
+  { id: 'billing-finance', label: 'Billing & Finance', navLabel: 'Finance' },
+  { id: 'users-security', label: 'Users, Security & Governance', navLabel: 'Users & Access' },
+  { id: 'system-maintenance', label: 'System & Maintenance', navLabel: 'System' },
 ] as const
 
 export type AdminSectionGroupId = (typeof ADMIN_MODULE_GROUPS)[number]['id']
@@ -24,6 +24,8 @@ export interface AdminModuleAction {
 export interface AdminModule {
   id: string
   title: string
+  /** Short label for the sidebar; the full title stays in tooltips, page headers and breadcrumbs. */
+  navLabel?: string
   description: string
   group: AdminModuleGroup
   canonicalPath?: string
@@ -39,6 +41,7 @@ export interface AdminModule {
 export interface AdminModuleGroupInfo {
   id: AdminSectionGroupId
   label: string
+  navLabel: string
 }
 
 export const ADMIN_MODULES: readonly AdminModule[] = [
@@ -46,6 +49,7 @@ export const ADMIN_MODULES: readonly AdminModule[] = [
   {
     id: 'overview',
     title: 'Management Overview',
+    navLabel: 'Overview',
     description: 'Hospital performance, financial summary and operational governance',
     group: 'overview',
     canonicalPath: '/admin',
@@ -58,6 +62,7 @@ export const ADMIN_MODULES: readonly AdminModule[] = [
   {
     id: 'hospital-settings',
     title: 'Hospital Settings',
+    navLabel: 'Settings',
     description: 'Hospital identity, crest and logo, contact details, receipt numbering, print text and consultation rules',
     group: 'hospital-config',
     canonicalPath: '/admin/settings',
@@ -69,6 +74,7 @@ export const ADMIN_MODULES: readonly AdminModule[] = [
   {
     id: 'print-templates',
     title: 'Print Templates',
+    navLabel: 'Templates',
     description: 'Bilingual header and footer templates for prescriptions, receipts, cards and summaries',
     group: 'hospital-config',
     canonicalPath: '/admin/templates',
@@ -80,6 +86,7 @@ export const ADMIN_MODULES: readonly AdminModule[] = [
   {
     id: 'doctors-fees',
     title: 'Doctors & Fees',
+    navLabel: 'Doctors & Fees',
     description: 'Doctor profiles, medical registration details and consultation fee schedules',
     group: 'hospital-config',
     canonicalPath: '/admin/doctors',
@@ -93,6 +100,7 @@ export const ADMIN_MODULES: readonly AdminModule[] = [
   {
     id: 'patient-correct',
     title: 'Patient Demographic Correction',
+    navLabel: 'Corrections',
     description: 'Audited administrative correction of patient demographics with mandatory justification',
     group: 'patient-data',
     canonicalPath: '/admin/patients/correct',
@@ -105,18 +113,20 @@ export const ADMIN_MODULES: readonly AdminModule[] = [
   // --- 3. Billing & Finance ---
   {
     id: 'billing-reversals',
-    title: 'Billing & Reversals',
+    title: 'Receipts & Reversals',
+    navLabel: 'Receipts',
     description: 'Receipt numbering, financial adjustments and payment reversals with mandatory justification',
     group: 'billing-finance',
     canonicalPath: '/admin/billing',
     requiredPermission: 'billing:read',
     displayOrder: 6,
     status: 'available',
-    actions: [{ label: 'Billing & reversals', path: '/admin/billing' }],
+    actions: [{ label: 'Receipts & reversals', path: '/admin/billing' }],
   },
   {
     id: 'pending-dues',
     title: 'Pending Dues',
+    navLabel: 'Dues',
     description: 'Outstanding patient treatment package receivables and instalment tracking',
     group: 'billing-finance',
     canonicalPath: '/reception/dues',
@@ -130,6 +140,7 @@ export const ADMIN_MODULES: readonly AdminModule[] = [
   {
     id: 'user-accounts',
     title: 'User Accounts',
+    navLabel: 'Users',
     description: 'Staff accounts, credential resets and status management',
     group: 'users-security',
     canonicalPath: '/admin/users',
@@ -141,6 +152,7 @@ export const ADMIN_MODULES: readonly AdminModule[] = [
   {
     id: 'roles-matrix',
     title: 'Roles & Permissions',
+    navLabel: 'Roles',
     description: 'Role-based access control matrix and permission catalogue inspection',
     group: 'users-security',
     canonicalPath: '/admin/roles',
@@ -152,6 +164,7 @@ export const ADMIN_MODULES: readonly AdminModule[] = [
   {
     id: 'security-sessions',
     title: 'Security & Sessions',
+    navLabel: 'Sessions',
     description: 'Active login sessions, session termination and security policy monitoring',
     group: 'users-security',
     canonicalPath: '/admin/security',
@@ -163,6 +176,7 @@ export const ADMIN_MODULES: readonly AdminModule[] = [
   {
     id: 'audit-trail',
     title: 'Audit Trail',
+    navLabel: 'Audit Trail',
     description: 'Search the immutable cryptographic audit trail of security and administrative operations',
     group: 'users-security',
     canonicalPath: '/admin/audit',
@@ -176,6 +190,7 @@ export const ADMIN_MODULES: readonly AdminModule[] = [
   {
     id: 'backups-restore',
     title: 'Backup & Restore',
+    navLabel: 'Backups',
     description: 'Automated database backups, disaster recovery, spreadsheet import and dataset export',
     group: 'system-maintenance',
     canonicalPath: '/admin/backups',
@@ -191,6 +206,7 @@ export const ADMIN_MODULES: readonly AdminModule[] = [
   {
     id: 'data-integrity',
     title: 'Data Integrity',
+    navLabel: 'Integrity',
     description: 'Database foreign key integrity checks, sequence verification and orphan audits',
     group: 'system-maintenance',
     canonicalPath: '/admin/integrity',
@@ -202,6 +218,7 @@ export const ADMIN_MODULES: readonly AdminModule[] = [
   {
     id: 'system-health',
     title: 'System Health',
+    navLabel: 'Health',
     description: 'Server runtime revision, database connectivity, disk storage and system telemetry',
     group: 'system-maintenance',
     canonicalPath: '/admin/system',

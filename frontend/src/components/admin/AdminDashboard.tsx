@@ -20,6 +20,7 @@ import {
   IconReceipt,
   IconRupee,
   IconServer,
+  IconShieldCheck,
   IconStethoscope,
   IconTrendingDown,
   IconTrendingUp,
@@ -228,6 +229,48 @@ function KeyFigure({
 
 /** Area chart drawn to one scale; each point carries its value for hover and screen readers. */
 function CollectionsChart({ rows }: { rows: { month: string; paise: number }[] }) {
+  const allZero = rows.every((r) => r.paise === 0)
+
+  if (allZero) {
+    return (
+      <div className="flex flex-col items-center justify-center rounded-lg border border-dashed border-slate-200 bg-slate-50/70 p-5 text-center">
+        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-200/70 text-slate-600 mb-2">
+          <IconReceipt size={20} aria-hidden="true" />
+        </div>
+        <p className="text-sm font-semibold text-slate-800">No Payment Collections Recorded</p>
+        <p className="mt-1 max-w-sm text-xs text-slate-600 leading-relaxed">
+          No transactions were captured across these six months. Revenue will graph here automatically as consultations and service fees are billed.
+        </p>
+        <div className="mt-3 flex flex-wrap items-center justify-center gap-2">
+          <Link
+            to="/admin/billing"
+            className="inline-flex items-center gap-1 rounded-md bg-[#5D0B26] px-3 py-1.5 text-xs font-semibold text-white shadow-2xs hover:bg-[#7D0E33] transition-colors"
+          >
+            <IconReceipt size={14} aria-hidden="true" />
+            View Receipts & Reversals
+          </Link>
+          <Link
+            to="/reception/dues"
+            className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors"
+          >
+            <IconWallet size={14} aria-hidden="true" />
+            Check Pending Dues
+          </Link>
+        </div>
+        <div className="mt-3.5 flex flex-wrap justify-center gap-1.5 border-t border-slate-200/80 pt-2.5">
+          {rows.map((r) => (
+            <span
+              key={r.month}
+              className="rounded border border-slate-200 bg-white px-2 py-0.5 text-xs font-medium text-slate-600 tabular-nums"
+            >
+              {r.month}: ₹0
+            </span>
+          ))}
+        </div>
+      </div>
+    )
+  }
+
   const W = 400
   const H = 220
   const left = 48
@@ -239,7 +282,6 @@ function CollectionsChart({ rows }: { rows: { month: string; paise: number }[] }
   const y = (v: number) => bottom - (v / yTop) * (bottom - top)
   const line = rows.map((r, i) => `${i === 0 ? 'M' : 'L'} ${x(i)} ${y(r.paise)}`).join(' ')
   const area = `${line} L ${x(rows.length - 1)} ${bottom} L ${x(0)} ${bottom} Z`
-  const allZero = rows.every((r) => r.paise === 0)
 
   return (
     <figure>
@@ -259,7 +301,7 @@ function CollectionsChart({ rows }: { rows: { month: string; paise: number }[] }
           <g key={t}>
             <line x1={left} x2={right} y1={y(t)} y2={y(t)} stroke="var(--color-slate-200)" strokeDasharray="3 3" />
             <text x={left - 6} y={y(t) + 4} textAnchor="end" fontSize="12" fill="var(--color-slate-600)">
-              {allZero ? (t === 0 ? '₹0' : '') : shortRupees(t)}
+              {shortRupees(t)}
             </text>
           </g>
         ))}
@@ -296,7 +338,7 @@ function CollectionsChart({ rows }: { rows: { month: string; paise: number }[] }
         ))}
       </svg>
       <figcaption className="mt-2 text-xs text-slate-600">
-        {allZero ? 'No payments recorded in these six months.' : 'Collected after reversals, by month the payment was taken.'}
+        Collected after reversals, by month the payment was taken.
       </figcaption>
     </figure>
   )
@@ -311,6 +353,29 @@ const SLICE_COLORS = [
 ]
 
 function DepartmentDonut({ rows, totalPaise }: { rows: DepartmentCollection[]; totalPaise: number }) {
+  if (rows.length === 0 || totalPaise === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center rounded-lg border border-dashed border-slate-200 bg-slate-50/70 p-5 text-center">
+        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-200/70 text-slate-600 mb-2">
+          <IconChartDonut size={20} aria-hidden="true" />
+        </div>
+        <p className="text-sm font-semibold text-slate-800">No Department Revenue Yet</p>
+        <p className="mt-1 max-w-sm text-xs text-slate-600 leading-relaxed">
+          The split by department appears once payments are taken this month.
+        </p>
+        <div className="mt-3">
+          <Link
+            to="/admin/doctors"
+            className="inline-flex items-center gap-1 text-xs font-semibold text-brand-700 hover:underline"
+          >
+            <IconStethoscope size={14} aria-hidden="true" />
+            Manage Doctors & Fees →
+          </Link>
+        </div>
+      </div>
+    )
+  }
+
   const R = 36
   const C = 2 * Math.PI * R
   let offset = 0
@@ -322,11 +387,7 @@ function DepartmentDonut({ rows, totalPaise }: { rows: DepartmentCollection[]; t
   return (
     <div className="flex flex-col items-center gap-5 sm:flex-row">
       <div className="relative h-40 w-40 shrink-0">
-        <svg viewBox="0 0 100 100" className="h-full w-full -rotate-90" role="img" aria-label={
-          rows.length === 0
-            ? 'No payments this month'
-            : `Collected by department: ${rows.map((d) => `${d.name} ${d.percentage}%`).join(', ')}`
-        }>
+        <svg viewBox="0 0 100 100" className="h-full w-full -rotate-90" role="img" aria-label={`Collected by department: ${rows.map((d) => `${d.name} ${d.percentage}%`).join(', ')}`}>
           <circle cx="50" cy="50" r={R} fill="none" stroke="var(--color-slate-100)" strokeWidth="16" />
           {colored.map((d, i) => {
             const len = (d.percentage / 100) * C
@@ -356,21 +417,17 @@ function DepartmentDonut({ rows, totalPaise }: { rows: DepartmentCollection[]; t
           <span className="text-xs text-slate-600">This month</span>
         </div>
       </div>
-      {rows.length === 0 ? (
-        <p className="text-sm text-slate-700">No payments this month yet.</p>
-      ) : (
-        <ul className="w-full min-w-0 flex-1 space-y-2 text-sm">
-          {colored.map((d) => (
-            <li key={d.department_id ?? 'none'} className="flex items-center justify-between gap-3">
-              <span className="flex min-w-0 items-center gap-2">
-                <span className="h-2.5 w-2.5 shrink-0 rounded-sm" style={{ backgroundColor: d.color }} aria-hidden="true" />
-                <span className={`truncate ${d.department_id === null ? 'text-slate-600' : 'text-slate-800'}`}>{d.name}</span>
-              </span>
-              <span className="shrink-0 font-semibold tabular-nums text-slate-900">{d.percentage}%</span>
-            </li>
-          ))}
-        </ul>
-      )}
+      <ul className="w-full min-w-0 flex-1 space-y-2 text-sm">
+        {colored.map((d) => (
+          <li key={d.department_id ?? 'none'} className="flex items-center justify-between gap-3">
+            <span className="flex min-w-0 items-center gap-2">
+              <span className="h-2.5 w-2.5 shrink-0 rounded-sm" style={{ backgroundColor: d.color }} aria-hidden="true" />
+              <span className={`truncate ${d.department_id === null ? 'text-slate-600' : 'text-slate-800'}`}>{d.name}</span>
+            </span>
+            <span className="shrink-0 font-semibold tabular-nums text-slate-900">{d.percentage}%</span>
+          </li>
+        ))}
+      </ul>
     </div>
   )
 }
@@ -400,7 +457,11 @@ function MonthBars({ rows, label }: { rows: { month: string; value: number }[]; 
 interface AttentionItem {
   key: string
   tone: 'error' | 'warning'
+  title: string
   message: string
+  risk: string
+  actionLabel: string
+  timeLabel?: string
   to?: string
 }
 
@@ -408,34 +469,107 @@ interface AttentionItem {
 const ALERT_TARGETS: Record<string, string> = {
   no_backup_yet: '/admin/backups',
   last_backup_failed: '/admin/backups',
-  backup_overdue: '/admin/backups',
+  scheduled_backup_overdue: '/admin/backups',
   accounts_locked: '/admin/users',
   integrity_issues: '/admin/integrity',
 }
 
+const ALERT_METADATA: Record<
+  string,
+  { title: string; risk: string; actionLabel: string; defaultTo: string }
+> = {
+  integrity_issues: {
+    title: 'Database Integrity Check Needed',
+    risk: 'Potential data inconsistency or orphaned records in central database.',
+    actionLabel: 'Run Integrity Check',
+    defaultTo: '/admin/integrity',
+  },
+  failed_logins: {
+    title: 'Failed Sign-In Attempts',
+    risk: 'Wrong usernames or passwords were entered. Check the audit trail for unauthorized access attempts.',
+    actionLabel: 'Inspect Audit Trail',
+    defaultTo: '/admin/audit',
+  },
+  accounts_locked: {
+    title: 'Staff Accounts Locked',
+    risk: 'Staff members are locked out of their workstation terminals.',
+    actionLabel: 'Manage User Accounts',
+    defaultTo: '/admin/users',
+  },
+  locked_accounts: {
+    title: 'Staff Accounts Locked',
+    risk: 'Staff members are locked out of their workstation terminals.',
+    actionLabel: 'Manage User Accounts',
+    defaultTo: '/admin/users',
+  },
+  scheduled_backup_overdue: {
+    title: 'Scheduled Backup Overdue',
+    risk: 'Automated backup task did not execute. Central database at risk.',
+    actionLabel: 'Open Backup Manager',
+    defaultTo: '/admin/backups',
+  },
+  last_backup_failed: {
+    title: 'Most Recent Backup Failed',
+    risk: 'Backup attempt encountered an error. Database archive incomplete.',
+    actionLabel: 'Investigate Backup',
+    defaultTo: '/admin/backups',
+  },
+  no_backup_yet: {
+    title: 'No System Backup Archive',
+    risk: 'No backup file exists in the directory. Create initial archive now.',
+    actionLabel: 'Create Initial Backup',
+    defaultTo: '/admin/backups',
+  },
+}
+
 function attentionItems(overview: Partial<AdminOverview>): AttentionItem[] {
-  const items: AttentionItem[] = (overview.alerts ?? []).map((a: OverviewAlertOut) => ({
-    key: a.code,
-    tone: a.severity === 'error' ? 'error' : 'warning',
-    message: a.message,
-    to: ALERT_TARGETS[a.code],
-  }))
+  const items: AttentionItem[] = (overview.alerts ?? []).map((a: OverviewAlertOut) => {
+    const meta = ALERT_METADATA[a.code]
+    let timeLabel: string | undefined
+    if (a.code === 'integrity_issues' && overview.last_integrity_check?.occurred_at) {
+      timeLabel = age(overview.last_integrity_check.occurred_at)
+    } else if (a.code === 'last_backup_failed' && overview.last_backup_failure_at) {
+      timeLabel = age(overview.last_backup_failure_at)
+    } else if (a.code === 'scheduled_backup_overdue' && overview.last_backup?.created_at) {
+      timeLabel = `Last backup ${age(overview.last_backup.created_at)}`
+    }
+    return {
+      key: a.code,
+      tone: a.severity === 'error' ? 'error' : 'warning',
+      title: meta?.title ?? sentence(a.code),
+      message: a.message,
+      risk: meta?.risk ?? 'Requires review by hospital administrator.',
+      actionLabel: meta?.actionLabel ?? 'View Details',
+      timeLabel,
+      to: ALERT_TARGETS[a.code] ?? meta?.defaultTo,
+    }
+  })
   const codes = new Set(items.map((i) => i.key))
   const failed = overview.failed_logins_24h ?? 0
   if (failed > 0) {
+    const meta = ALERT_METADATA.failed_logins
     items.push({
       key: 'failed_logins',
       tone: 'warning',
+      title: meta.title,
       message: `${failed} failed sign-in attempt${failed === 1 ? '' : 's'} in the last 24 hours.`,
+      risk: meta.risk,
+      actionLabel: meta.actionLabel,
+      timeLabel: 'Last 24 hours',
       to: '/admin/audit',
     })
   }
   const locked = overview.locked_accounts ?? 0
   if (locked > 0 && !codes.has('accounts_locked')) {
+    const meta = ALERT_METADATA.accounts_locked
     items.push({
       key: 'locked_accounts',
       tone: 'warning',
+      title: meta.title,
       message: `${locked} staff account${locked === 1 ? ' is' : 's are'} locked.`,
+      risk: meta.risk,
+      actionLabel: meta.actionLabel,
+      timeLabel: 'Active lockout',
       to: '/admin/users',
     })
   }
@@ -466,35 +600,47 @@ function NeedsAttention({ overview, className }: { overview: Partial<AdminOvervi
           Nothing needs your attention right now.
         </p>
       ) : (
-        <ul className="-my-2 divide-y divide-slate-100">
+        <ul className="space-y-3">
           {items.map((item, itemIndex) => {
-            const body = (
-              <>
-                <span className="min-w-0">
-                  <span className={`mr-1.5 rounded px-1.5 py-0.5 text-xs font-semibold ${item.tone === 'error' ? 'bg-red-100 text-red-900' : 'bg-amber-100 text-amber-900'}`}>
-                    {item.tone === 'error' ? 'Problem' : 'Check'}
-                  </span>
-                  <span className="text-slate-800">{item.message}</span>
-                </span>
-                {item.to && <IconChevronRight size={18} className="shrink-0 text-slate-500" aria-hidden="true" />}
-              </>
-            )
             return (
-              <li key={item.key}>
-                {item.to ? (
-                  <Link
-                    to={item.to}
-                    className="admin-fade-up flex items-center justify-between gap-2 rounded py-3 text-sm transition-colors hover:bg-slate-50/70 hover:text-brand-700 focus-visible:outline-2 focus-visible:outline-brand-700"
-                    style={{ animationDelay: `${itemIndex * 60}ms` }}
-                  >
-                    {body}
-                  </Link>
-                ) : (
-                  <div
-                    className="admin-fade-up flex items-center justify-between gap-2 rounded py-3 text-sm transition-colors hover:bg-slate-50/70"
-                    style={{ animationDelay: `${itemIndex * 60}ms` }}
-                  >
-                    {body}
+              <li
+                key={item.key}
+                className={`admin-fade-up rounded-xl border p-4 transition-all duration-200 ${
+                  item.tone === 'error'
+                    ? 'border-red-200 bg-red-50/40 hover:bg-red-50/70'
+                    : 'border-amber-200 bg-amber-50/40 hover:bg-amber-50/70'
+                }`}
+                style={{ animationDelay: `${itemIndex * 60}ms` }}
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span
+                      className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-xs font-bold ${
+                        item.tone === 'error'
+                          ? 'bg-red-100 text-red-900 border border-red-200'
+                          : 'bg-amber-100 text-amber-900 border border-amber-200'
+                      }`}
+                    >
+                      <IconAlertTriangle size={14} aria-hidden="true" />
+                      {item.tone === 'error' ? 'Problem' : 'Check'}
+                    </span>
+                    <span className="text-xs font-bold text-slate-900">{item.title}</span>
+                  </div>
+                  {item.timeLabel && (
+                    <span className="text-xs text-slate-600 tabular-nums shrink-0">{item.timeLabel}</span>
+                  )}
+                </div>
+                <p className="mt-2 text-sm text-slate-800">{item.message}</p>
+                <p className="mt-1 text-xs text-slate-600 leading-relaxed">{item.risk}</p>
+                {item.to && (
+                  <div className="mt-3 flex justify-end">
+                    <Link
+                      to={item.to}
+                      className="inline-flex items-center gap-1 text-xs font-bold text-brand-700 hover:text-brand-900 hover:underline"
+                    >
+                      {item.actionLabel}
+                      <IconChevronRight size={14} aria-hidden="true" />
+                    </Link>
                   </div>
                 )}
               </li>
@@ -718,6 +864,81 @@ function RecentAdminActions({ actions }: { actions: RecentAdminActionOut[] | und
 
 // ------------------------------------------------------------------------------------- page
 
+function ExecutiveQuickActions() {
+  const actions = [
+    {
+      label: 'Patient Directory',
+      sub: 'Search & view records',
+      to: '/reception/patients',
+      icon: <IconUsers size={20} className="text-brand-700" />,
+    },
+    {
+      label: 'Pending Dues',
+      sub: 'Track balances & follow up',
+      to: '/reception/dues',
+      icon: <IconWallet size={20} className="text-amber-800" />,
+    },
+    {
+      label: 'Receipts & Reversals',
+      sub: 'Daily collection ledger',
+      to: '/admin/billing',
+      icon: <IconReceipt size={20} className="text-emerald-800" />,
+    },
+    {
+      label: 'Data Integrity',
+      sub: 'Central database check',
+      to: '/admin/integrity',
+      icon: <IconShieldCheck size={20} className="text-sky-800" />,
+    },
+    {
+      label: 'Backup & Restore',
+      sub: 'Manage database snapshots',
+      to: '/admin/backups',
+      icon: <IconServer size={20} className="text-slate-700" />,
+    },
+    {
+      label: 'Audit Trail',
+      sub: 'Access logs & security',
+      to: '/admin/audit',
+      icon: <IconHistory size={20} className="text-purple-800" />,
+    },
+  ]
+
+  return (
+    <section aria-labelledby="admin-quick-actions" className={`${CARD} p-4`}>
+      <div className="flex items-center justify-between border-b border-slate-100 pb-2.5">
+        <div className="flex items-center gap-2">
+          <span className="h-2 w-2 rounded-full bg-brand-700" aria-hidden="true" />
+          <h2 id="admin-quick-actions" className="text-xs font-bold uppercase tracking-wider text-slate-700">
+            Executive Quick Actions
+          </h2>
+        </div>
+        <span className="text-xs text-slate-600">Immediate operational workflows</span>
+      </div>
+      <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+        {actions.map((act) => (
+          <Link
+            key={act.to}
+            to={act.to}
+            className="group flex flex-col justify-between rounded-lg border border-slate-200/90 bg-slate-50/50 p-3 transition-all duration-200 hover:-translate-y-0.5 hover:border-brand-300 hover:bg-white hover:shadow-sm focus-visible:outline-2 focus-visible:outline-brand-700"
+          >
+            <div className="flex items-center justify-between">
+              <div className="flex h-8 w-8 items-center justify-center rounded-md bg-white border border-slate-200 shadow-2xs group-hover:scale-105 transition-transform">
+                {act.icon}
+              </div>
+              <IconChevronRight size={14} className="text-slate-500 group-hover:text-brand-700 transition-colors" />
+            </div>
+            <div className="mt-2.5">
+              <p className="text-xs font-bold text-slate-900 group-hover:text-brand-700 transition-colors">{act.label}</p>
+              <p className="mt-0.5 text-xs text-slate-600 line-clamp-1">{act.sub}</p>
+            </div>
+          </Link>
+        ))}
+      </div>
+    </section>
+  )
+}
+
 export function AdminDashboard({ overview }: { overview: Partial<AdminOverview> }) {
   const monthly = useManagementOverview()
   // An older server sends a different shape; treat it as unavailable rather than guess.
@@ -728,13 +949,20 @@ export function AdminDashboard({ overview }: { overview: Partial<AdminOverview> 
 
   return (
     <div className="space-y-6 pb-12">
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">Administration Dashboard</h1>
-          <p className="mt-1 text-sm text-slate-600">{businessDateLabel(overview.business_date)}</p>
-        </div>
-        {month && <p className="text-sm text-slate-600">Month figures: {month.current_month_label}, compared with {month.previous_month_label}</p>}
+      {/* Title on the left; business date and month comparison on the same row, to the right. */}
+      <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-1">
+        <h1 className="text-xl font-bold tracking-tight text-slate-900">Administration Dashboard</h1>
+        <p className="text-sm text-slate-600">
+          {businessDateLabel(overview.business_date)}
+          {month && (
+            <>
+              {' · '}Month figures compare {month.current_month_label} with {month.previous_month_label}
+            </>
+          )}
+        </p>
       </div>
+
+      <ExecutiveQuickActions />
 
       <section aria-labelledby="admin-key-figures">
         <h2 id="admin-key-figures" className="sr-only">
@@ -748,7 +976,18 @@ export function AdminDashboard({ overview }: { overview: Partial<AdminOverview> 
             icon={<IconRupee size={22} aria-hidden="true" />}
             tone="green"
           >
-            {month && <Delta value={month.collections_paise} unit="₹" />}
+            {month && (
+              <div className="space-y-1">
+                <Delta value={month.collections_paise} unit="₹" />
+                {month.collections_paise.current === 0 && (
+                  <p className="text-xs text-slate-600">
+                    <Link to="/admin/billing" className="font-semibold text-brand-700 hover:underline">
+                      View Billing Ledger →
+                    </Link>
+                  </p>
+                )}
+              </div>
+            )}
           </KeyFigure>
           <KeyFigure
             index={1}
@@ -758,13 +997,18 @@ export function AdminDashboard({ overview }: { overview: Partial<AdminOverview> 
             tone="maroon"
           >
             {cash && (
-              <p className="text-slate-700">
-                {Object.entries(cash.by_method)
-                  .filter(([, p]) => p > 0)
-                  .map(([m, p]) => `${METHOD_WORDS[m] ?? sentence(m)} ${rupees(p)}`)
-                  .join(', ') || `${cash.payments_count} payments`}
-                {cash.reversals_count > 0 && `; ${rupees(cash.reversed_paise)} reversed`}
-              </p>
+              <div className="space-y-1">
+                <p className="text-slate-700">
+                  {Object.entries(cash.by_method)
+                    .filter(([, p]) => p > 0)
+                    .map(([m, p]) => `${METHOD_WORDS[m] ?? sentence(m)} ${rupees(p)}`)
+                    .join(', ') || `${cash.payments_count} payments`}
+                  {cash.reversals_count > 0 && `; ${rupees(cash.reversed_paise)} reversed`}
+                </p>
+                {cash.gross_paise === 0 && (
+                  <p className="text-xs text-slate-600">No collections recorded today</p>
+                )}
+              </div>
             )}
           </KeyFigure>
           <KeyFigure
@@ -774,7 +1018,14 @@ export function AdminDashboard({ overview }: { overview: Partial<AdminOverview> 
             icon={<IconUserPlus size={22} aria-hidden="true" />}
             tone="blue"
           >
-            {month && <Delta value={month.new_patients} />}
+            {month && (
+              <div className="space-y-1">
+                <Delta value={month.new_patients} />
+                <p className="text-xs text-slate-600">
+                  <span className="font-semibold text-slate-700">{count(month.returning_patients_this_month)}</span> returning patients
+                </p>
+              </div>
+            )}
           </KeyFigure>
           <KeyFigure
             index={3}
@@ -783,9 +1034,18 @@ export function AdminDashboard({ overview }: { overview: Partial<AdminOverview> 
             icon={<IconWallet size={22} aria-hidden="true" />}
             tone="amber"
           >
-            <Link to="/reception/dues" className={LINK}>
-              Open Pending Dues
-            </Link>
+            <div className="flex items-center justify-between">
+              <span className="text-xs text-slate-600">
+                {typeof overview.outstanding_dues_paise !== 'number'
+                  ? 'Dues not reported by server'
+                  : overview.outstanding_dues_paise === 0
+                    ? 'All accounts settled'
+                    : 'Requires follow-up'}
+              </span>
+              <Link to="/reception/dues" className={LINK}>
+                Open Pending Dues
+              </Link>
+            </div>
           </KeyFigure>
         </div>
       </section>
@@ -795,7 +1055,7 @@ export function AdminDashboard({ overview }: { overview: Partial<AdminOverview> 
           id="admin-collections"
           title="Collected per month"
           icon={<IconChartLine size={20} aria-hidden="true" />}
-          className="lg:col-span-5"
+          className="lg:col-span-4"
         >
           {month ? (
             <CollectionsChart rows={month.collection_trend.map((m) => ({ month: m.month, paise: m.collected_paise }))} />
@@ -812,13 +1072,15 @@ export function AdminDashboard({ overview }: { overview: Partial<AdminOverview> 
           {month ? (
             <>
               <DepartmentDonut rows={month.department_collections} totalPaise={month.collections_paise.current} />
-              <p className="mt-4 text-xs text-slate-600">Payments count against the department of the appointment they were taken for.</p>
+              {month.collections_paise.current > 0 && (
+                <p className="mt-4 text-xs text-slate-600">Payments count against the department of the appointment they were taken for.</p>
+              )}
             </>
           ) : (
             <p className="text-sm text-slate-700">{monthNote}</p>
           )}
         </Panel>
-        <NeedsAttention overview={overview} className="lg:col-span-3" />
+        <NeedsAttention overview={overview} className="lg:col-span-4" />
       </div>
 
       <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 xl:grid-cols-4">

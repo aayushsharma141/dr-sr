@@ -51,7 +51,7 @@ describe('Data Integrity sidebar count', () => {
         </MemoryRouter>
       </QueryClientProvider>,
     )
-    const links = screen.getAllByRole('link', { name: /^Data Integrity/ })
-    expect(links[0]).toHaveAccessibleName('Data Integrity, 1 problem')
+    const links = screen.getAllByRole('link', { name: /^Integrity/ })
+    expect(links[0]).toHaveAccessibleName('Integrity, 1 problem')
   })
 })

@@ -183,7 +183,7 @@ export function TokenGenerationPage() {
               <IconTicket className="h-6 w-6" />
             </div>
             <div>
-              <h1 className="text-2xl font-bold tracking-tight text-slate-900">
+              <h1 className="text-xl font-bold tracking-tight text-slate-900">
                 Token Desk
               </h1>
               <p className="text-xs text-slate-500">
