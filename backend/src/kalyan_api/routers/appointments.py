@@ -85,8 +85,8 @@ def book_appointment(
     settings=Depends(get_current_settings),
 ) -> AppointmentRead:
     """Book a per-doctor daily appointment with atomic token generation (APT-01)."""
-    # 1. Validate active patient exists
-    patient = session.get(Patient, payload.patient_id)
+    # 1. Validate active patient exists and lock row to serialize concurrent bookings (FB-03)
+    patient = session.get(Patient, payload.patient_id, with_for_update=True)
     if not patient or not patient.is_active:
         raise ApiError(
             status_code=404,

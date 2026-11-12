@@ -377,8 +377,8 @@ def book_follow_up(
 
     appt_date = payload.appointment_date or rec.recommended_date
 
-    # Same booking rules as POST /appointments (BR-012; ADR-23, ADR-24, ADR-25).
-    patient = rec.patient
+    # Same booking rules as POST /appointments (BR-012; ADR-23, ADR-24, ADR-25, FB-03).
+    patient = session.get(Patient, rec.patient_id, with_for_update=True)
     if not patient or not patient.is_active:
         raise ApiError(
             status_code=404, code="patient_not_found", message="Patient not found or inactive."
