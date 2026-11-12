@@ -37,6 +37,8 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
   const [notes, setNotes] = useState<string>('')
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [checkingBalance, setCheckingBalance] = useState(false)
+  // Starts from the balance the page loaded; replaced by the fresh figure read just before submit.
+  const [remainingBalancePaise, setRemainingBalancePaise] = useState<number | null>(maxAmountPaise ?? null)
 
   const recordPayment = useRecordPayment()
 
@@ -77,7 +79,15 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
 
     // The server enforces this too; catching it here avoids a round trip and a confusing rejection.
     const remainingRupees = remainingPaise != null ? remainingPaise / 100 : null
+    if (remainingPaise != null) {
+      // Show the figure the rejection was based on, not the stale one the dialog opened with.
+      setRemainingBalancePaise(remainingPaise)
+    }
     if (remainingRupees !== null && parsedRupees > remainingRupees) {
+      // Put the correct figure in the field so reception does not have to retype it.
+      if (remainingRupees > 0) {
+        setAmountRupees(remainingRupees.toString())
+      }
       setErrorMessage(
         `Amount cannot exceed the remaining package balance of ₹${remainingRupees.toLocaleString('en-IN', {
           minimumFractionDigits: 2,
@@ -130,6 +140,18 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
             <span>Package Agreed Price:</span>
             <span className="font-medium">₹{agreedPriceRupees?.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
           </div>
+          {remainingBalancePaise !== null && (
+            <div className="mt-1 flex justify-between text-xs">
+              <span>Remaining Balance:</span>
+              <span className="font-semibold" data-testid="remaining-balance">
+                ₹
+                {(remainingBalancePaise / 100).toLocaleString('en-IN', {
+                  minimumFractionDigits: 2,
+                  maximumFractionDigits: 2,
+                })}
+              </span>
+            </div>
+          )}
         </div>
       )}
 

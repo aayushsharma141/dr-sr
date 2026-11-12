@@ -99,6 +99,10 @@ describe('PaymentModal', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent(
       'Amount cannot exceed the remaining package balance of ₹1,000.00.',
     )
+    // The dialog now shows the refreshed balance, not the stale ₹4,000 passed in,
+    // and the amount field is corrected so reception does not retype it.
+    expect(screen.getByTestId('remaining-balance')).toHaveTextContent('₹1,000.00')
+    expect(screen.getByLabelText(/Amount/i)).toHaveValue(1000)
     expect(mocks.apiFetch).toHaveBeenCalledWith('/billing/pending-dues')
     expect(mockMutateAsync).not.toHaveBeenCalled()
   })
