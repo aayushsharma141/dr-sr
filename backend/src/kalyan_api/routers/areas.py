@@ -33,7 +33,7 @@ from kalyan_api.models import (
 from kalyan_api.routers.system import measure_volume
 from kalyan_api.services import billing_service
 from kalyan_api.services.audit_service import AuditAction, Outcome
-from kalyan_api.services.backup_schedule_service import is_overdue
+from kalyan_api.services.backup_schedule_service import is_overdue, schedule_is_enabled
 from kalyan_api.services.backup_service import latest_backup_info
 
 router = APIRouter(tags=["areas"])
@@ -341,8 +341,20 @@ def _build_alerts(
     locked_accounts: int,
     last_integrity: LastIntegrityCheckOut | None,
     schedule_overdue: bool,
+    schedule_enabled: bool = True,
 ) -> list[OverviewAlertOut]:
     alerts: list[OverviewAlertOut] = []
+    if not schedule_enabled:
+        alerts.append(
+            OverviewAlertOut(
+                code="backup_schedule_disabled",
+                severity="warning",
+                message=(
+                    "Scheduled backups are turned off. Only manual backups protect this data; "
+                    "turn the schedule on in Backup & Restore."
+                ),
+            )
+        )
     if schedule_overdue:
         alerts.append(
             OverviewAlertOut(
@@ -562,6 +574,7 @@ def get_admin_overview(
             locked_accounts,
             last_integrity,
             is_overdue(session, clock.utcnow()),
+            schedule_is_enabled(session),
         ),
     )
 

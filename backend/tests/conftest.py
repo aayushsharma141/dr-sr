@@ -14,6 +14,7 @@ from sqlalchemy.orm import Session
 from kalyan_api.config import Settings
 from kalyan_api.core.security import build_hasher, hash_password
 from kalyan_api.core.setup_code import issue_setup_code
+from kalyan_api.db.guards import require_test_database
 from kalyan_api.db.migrate import upgrade_head
 from kalyan_api.db.session import build_engine, get_session
 from kalyan_api.main import create_app
@@ -68,6 +69,8 @@ def configure_test_environment(test_settings: Settings) -> None:
 @pytest.fixture(scope="session")
 def migrated_db(test_settings: Settings) -> dict[str, int]:
     """Wipe public schema, run alembic migrations from head, and assert zero seed rows."""
+    # Refuses to wipe anything that is not clearly a test database.
+    require_test_database(test_settings, "wipe the test schema")
     owner_engine = create_engine(test_settings.owner_url, isolation_level="AUTOCOMMIT")
     with owner_engine.connect() as conn:
         conn.execute(text("DROP SCHEMA IF EXISTS public CASCADE"))

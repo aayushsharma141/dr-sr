@@ -90,6 +90,12 @@ def _last_scheduled_start(session: Session) -> datetime | None:
     )
 
 
+def schedule_is_enabled(session: Session) -> bool:
+    """True when a saved schedule is switched on; false with no row or schedule disabled."""
+    config = session.get(BackupSettings, SINGLETON_ID)
+    return bool(config.schedule_enabled) if config is not None else False
+
+
 def is_overdue(session: Session, now: datetime) -> bool:
     """True when an enabled schedule missed a slot, e.g. the Windows task is not registered."""
     config = session.get(BackupSettings, SINGLETON_ID)

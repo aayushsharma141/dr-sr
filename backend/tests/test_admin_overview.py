@@ -461,3 +461,38 @@ def test_management_overview_counts_real_collections_and_reversals(
     assert after["new_patients"]["current"] - before["new_patients"]["current"] == 1
     unlinked = {d["name"]: d["collected_paise"] for d in after["department_collections"]}
     assert unlinked.get("Not linked to a department", 0) >= 35000
+
+
+def test_admin_overview_warns_when_scheduled_backups_are_disabled(
+    login_client: Any,
+    admin_user: User,
+    overview_settings: Settings,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A switched-off backup schedule is surfaced instead of failing silently."""
+    monkeypatch.setattr(areas, "schedule_is_enabled", lambda _session: False)
+    admin_c = login_client(admin_user)
+
+    res = admin_c.get(OVERVIEW)
+    assert res.status_code == 200
+    alerts = res.json()["alerts"]
+    codes = [a["code"] for a in alerts]
+    assert "backup_schedule_disabled" in codes
+    alert = next(a for a in alerts if a["code"] == "backup_schedule_disabled")
+    assert alert["severity"] == "warning"
+    assert "Scheduled backups are turned off" in alert["message"]
+
+
+def test_admin_overview_has_no_disabled_alert_when_schedule_is_enabled(
+    login_client: Any,
+    admin_user: User,
+    overview_settings: Settings,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(areas, "schedule_is_enabled", lambda _session: True)
+    admin_c = login_client(admin_user)
+
+    res = admin_c.get(OVERVIEW)
+    assert res.status_code == 200
+    codes = [a["code"] for a in res.json()["alerts"]]
+    assert "backup_schedule_disabled" not in codes
