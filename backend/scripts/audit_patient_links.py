@@ -27,6 +27,8 @@ CHECKS: list[tuple[str, str, str, str]] = [
     ("treatment session -> plan", "treatment_sessions", "treatment_plan_id", "treatment_plans"),
     ("payment -> treatment plan", "payments", "treatment_plan_id", "treatment_plans"),
     ("payment -> appointment", "payments", "appointment_id", "appointments"),
+    ("vitals -> encounter", "vital_observations", "encounter_id", "clinical_encounters"),
+    ("follow-up -> encounter", "follow_up_recommendations", "encounter_id", "clinical_encounters"),
 ]
 
 

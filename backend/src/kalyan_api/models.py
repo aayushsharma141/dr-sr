@@ -754,12 +754,14 @@ class ClinicalEncounter(Base):
         back_populates="encounter",
         uselist=False,
         cascade="all, delete-orphan",
+        foreign_keys="VitalObservation.encounter_id",
     )
     follow_up_recommendation = relationship(
         "FollowUpRecommendation",
         back_populates="encounter",
         uselist=False,
         cascade="all, delete-orphan",
+        foreign_keys="FollowUpRecommendation.encounter_id",
     )
 
 
@@ -805,6 +807,8 @@ class TreatmentPlan(Base):
         Index("ix_treatment_plans_patient_id", "patient_id"),
         Index("ix_treatment_plans_doctor_id", "doctor_id"),
         Index("ix_treatment_plans_status", "status"),
+        # Target of the payment and treatment-session patient-link constraints (FB-04, SEC-03).
+        UniqueConstraint("id", "patient_id", name="uq_treatment_plans_id_patient"),
         # BR-001, SEC-03: a linked encounter must belong to the same patient.
         ForeignKeyConstraint(
             ["encounter_id", "patient_id"],
@@ -877,6 +881,7 @@ class TreatmentPlan(Base):
         back_populates="treatment_plan",
         cascade="all, delete-orphan",
         order_by="TreatmentSession.session_number",
+        foreign_keys="TreatmentSession.treatment_plan_id",
     )
 
 
@@ -894,6 +899,13 @@ class TreatmentSession(Base):
         CheckConstraint("vas_score >= 0 AND vas_score <= 10", name="ck_treatment_sessions_vas"),
         CheckConstraint("session_number >= 1", name="ck_treatment_sessions_number"),
         CheckConstraint("length(trim(clinical_notes)) >= 2", name="ck_treatment_sessions_notes"),
+        # FB-04 / SEC-03: treatment session must belong to the treatment plan's patient
+        ForeignKeyConstraint(
+            ["treatment_plan_id", "patient_id"],
+            ["treatment_plans.id", "treatment_plans.patient_id"],
+            name="fk_treatment_sessions_plan_patient",
+            ondelete="RESTRICT",
+        ),
     )
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
@@ -925,7 +937,9 @@ class TreatmentSession(Base):
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
 
-    treatment_plan = relationship("TreatmentPlan", back_populates="sessions")
+    treatment_plan = relationship(
+        "TreatmentPlan", back_populates="sessions", foreign_keys=[treatment_plan_id]
+    )
     patient = relationship("Patient", lazy="joined")
     doctor = relationship("Doctor", lazy="joined")
     created_by_user = relationship("User", lazy="joined")
@@ -1133,6 +1147,19 @@ class Payment(Base):
             "reversed_by_user_id IS NOT NULL AND reversed_at IS NOT NULL)",
             name="ck_payments_reversal_integrity",
         ),
+        # FB-04 / SEC-03: payments must belong to the treatment plan / appointment's patient
+        ForeignKeyConstraint(
+            ["treatment_plan_id", "patient_id"],
+            ["treatment_plans.id", "treatment_plans.patient_id"],
+            name="fk_payments_treatment_plan_patient",
+            ondelete="SET NULL (treatment_plan_id)",
+        ),
+        ForeignKeyConstraint(
+            ["appointment_id", "patient_id"],
+            ["appointments.id", "appointments.patient_id"],
+            name="fk_payments_appointment_patient",
+            ondelete="SET NULL (appointment_id)",
+        ),
     )
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
@@ -1169,8 +1196,8 @@ class Payment(Base):
     )
 
     patient = relationship("Patient", lazy="joined")
-    treatment_plan = relationship("TreatmentPlan", lazy="joined")
-    appointment = relationship("Appointment", lazy="select")
+    treatment_plan = relationship("TreatmentPlan", foreign_keys=[treatment_plan_id], lazy="joined")
+    appointment = relationship("Appointment", foreign_keys=[appointment_id], lazy="select")
     created_by_user = relationship("User", foreign_keys=[created_by_user_id], lazy="joined")
     reversed_by_user = relationship("User", foreign_keys=[reversed_by_user_id], lazy="joined")
 
@@ -1309,6 +1336,13 @@ class VitalObservation(Base):
             "spo2_percent IS NULL OR (spo2_percent >= 40 AND spo2_percent <= 100)",
             name="ck_vital_observations_spo2_percent",
         ),
+        # FB-04 / SEC-03: vitals must belong to the encounter's patient
+        ForeignKeyConstraint(
+            ["encounter_id", "patient_id"],
+            ["clinical_encounters.id", "clinical_encounters.patient_id"],
+            name="fk_vital_observations_encounter_patient",
+            ondelete="CASCADE",
+        ),
     )
 
     id: Mapped[int] = mapped_column(BigInteger, Identity(always=False), primary_key=True)
@@ -1338,7 +1372,7 @@ class VitalObservation(Base):
     )
 
     encounter: Mapped["ClinicalEncounter"] = relationship(
-        "ClinicalEncounter", back_populates="vitals"
+        "ClinicalEncounter", back_populates="vitals", foreign_keys=[encounter_id]
     )
     patient: Mapped["Patient"] = relationship("Patient")
 
@@ -1369,6 +1403,13 @@ class FollowUpRecommendation(Base):
             "OR (status = 'CLOSED' AND closed_reason IS NOT NULL AND length(trim(closed_reason)) "
             ">= 3 AND closed_by_user_id IS NOT NULL AND closed_at IS NOT NULL)",
             name="ck_follow_up_recommendations_closure",
+        ),
+        # FB-04 / SEC-03: follow-up recommendation must belong to the encounter's patient
+        ForeignKeyConstraint(
+            ["encounter_id", "patient_id"],
+            ["clinical_encounters.id", "clinical_encounters.patient_id"],
+            name="fk_follow_up_recommendations_encounter_patient",
+            ondelete="CASCADE",
         ),
     )
 
@@ -1414,7 +1455,9 @@ class FollowUpRecommendation(Base):
 
     __mapper_args__ = {"version_id_col": version_id}
 
-    encounter = relationship("ClinicalEncounter", back_populates="follow_up_recommendation")
+    encounter = relationship(
+        "ClinicalEncounter", back_populates="follow_up_recommendation", foreign_keys=[encounter_id]
+    )
     patient = relationship("Patient", lazy="joined")
     doctor = relationship("Doctor", foreign_keys=[doctor_id], lazy="joined")
     recommended_doctor = relationship("Doctor", foreign_keys=[recommended_doctor_id], lazy="joined")

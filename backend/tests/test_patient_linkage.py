@@ -21,11 +21,14 @@ from kalyan_api.models import (
     AppointmentStatus,
     AuditLog,
     ClinicalEncounter,
+    FollowUpRecommendation,
     Patient,
+    Payment,
     Prescription,
     TreatmentPlan,
     TreatmentSession,
     User,
+    VitalObservation,
 )
 
 
@@ -388,6 +391,140 @@ def test_deleting_an_appointment_still_only_unlinks_the_encounter(
     assert refreshed is not None
     assert refreshed.appointment_id is None
     assert refreshed.patient_id == patient.id
+
+
+# ---------------------------------------------------------------- FB-04
+def test_db_rejects_payment_linked_to_another_patients_treatment_plan(
+    doctor_a_user, admin_user, db_session
+):
+    """FB-04: Payment cannot be linked to another patient's treatment plan."""
+    patient_a = _patient(db_session, "F1")
+    patient_b = _patient(db_session, "F2")
+    plan_a = TreatmentPlan(
+        patient_id=patient_a.id,
+        doctor_id=doctor_a_user.doctor_id,
+        plan_name="Package A",
+        condition_diagnosis="Diagnosis A",
+        total_sessions=10,
+        agreed_price_paise=500000,
+        status="ACTIVE",
+    )
+    db_session.add(plan_a)
+    db_session.flush()
+
+    with pytest.raises(IntegrityError) as exc_info, db_session.begin_nested():
+        db_session.add(
+            Payment(
+                receipt_number="RCP-FB04-001",
+                patient_id=patient_b.id,
+                treatment_plan_id=plan_a.id,
+                amount_paise=100000,
+                payment_method="CASH",
+                created_by_user_id=admin_user.id,
+            )
+        )
+        db_session.flush()
+    assert "fk_payments_treatment_plan_patient" in str(exc_info.value)
+
+
+def test_db_rejects_payment_linked_to_another_patients_appointment(
+    doctor_a_user, admin_user, db_session
+):
+    """FB-04: Payment cannot be linked to another patient's appointment."""
+    patient_a = _patient(db_session, "F3")
+    patient_b = _patient(db_session, "F4")
+    appt_a = _appointment(db_session, patient_a, doctor_a_user.doctor_id, admin_user)
+
+    with pytest.raises(IntegrityError) as exc_info, db_session.begin_nested():
+        db_session.add(
+            Payment(
+                receipt_number="RCP-FB04-002",
+                patient_id=patient_b.id,
+                appointment_id=appt_a.id,
+                amount_paise=40000,
+                payment_method="CASH",
+                created_by_user_id=admin_user.id,
+            )
+        )
+        db_session.flush()
+    assert "fk_payments_appointment_patient" in str(exc_info.value)
+
+
+def test_db_rejects_treatment_session_linked_to_another_patients_treatment_plan(
+    doctor_a_user, db_session
+):
+    """FB-04: TreatmentSession cannot be linked to another patient's treatment plan."""
+    patient_a = _patient(db_session, "F5")
+    patient_b = _patient(db_session, "F6")
+    plan_a = TreatmentPlan(
+        patient_id=patient_a.id,
+        doctor_id=doctor_a_user.doctor_id,
+        plan_name="Package A",
+        condition_diagnosis="Diagnosis A",
+        total_sessions=10,
+        agreed_price_paise=500000,
+        status="ACTIVE",
+    )
+    db_session.add(plan_a)
+    db_session.flush()
+
+    with pytest.raises(IntegrityError) as exc_info, db_session.begin_nested():
+        db_session.add(
+            TreatmentSession(
+                treatment_plan_id=plan_a.id,
+                patient_id=patient_b.id,
+                doctor_id=doctor_a_user.doctor_id,
+                session_number=1,
+                vas_score=5,
+                clinical_notes="Session notes",
+                created_by_user_id=doctor_a_user.id,
+            )
+        )
+        db_session.flush()
+    assert "fk_treatment_sessions_plan_patient" in str(exc_info.value)
+
+
+def test_db_rejects_vital_observation_linked_to_another_patients_encounter(
+    doctor_a_user, admin_user, db_session
+):
+    """FB-04: VitalObservation cannot be linked to another patient's encounter."""
+    patient_a = _patient(db_session, "F7")
+    patient_b = _patient(db_session, "F8")
+    encounter_a = _db_encounter(db_session, patient_a, doctor_a_user.doctor_id, admin_user)
+
+    with pytest.raises(IntegrityError) as exc_info, db_session.begin_nested():
+        db_session.add(
+            VitalObservation(
+                encounter_id=encounter_a.id,
+                patient_id=patient_b.id,
+                pulse_bpm=72,
+            )
+        )
+        db_session.flush()
+    assert "fk_vital_observations_encounter_patient" in str(exc_info.value)
+
+
+def test_db_rejects_follow_up_recommendation_linked_to_another_patients_encounter(
+    doctor_a_user, admin_user, db_session
+):
+    """FB-04: FollowUpRecommendation cannot be linked to another patient's encounter."""
+    patient_a = _patient(db_session, "F9")
+    patient_b = _patient(db_session, "FA")
+    encounter_a = _db_encounter(db_session, patient_a, doctor_a_user.doctor_id, admin_user)
+
+    with pytest.raises(IntegrityError) as exc_info, db_session.begin_nested():
+        db_session.add(
+            FollowUpRecommendation(
+                encounter_id=encounter_a.id,
+                patient_id=patient_b.id,
+                doctor_id=doctor_a_user.doctor_id,
+                recommended_doctor_id=doctor_a_user.doctor_id,
+                recommended_date=date(2026, 3, 15),
+                status="PENDING",
+            )
+        )
+        db_session.flush()
+    assert "fk_follow_up_recommendations_encounter_patient" in str(exc_info.value)
 
 
 # ---------------------------------------------------------------- BR-002
