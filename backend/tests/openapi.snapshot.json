@@ -3298,6 +3298,19 @@
             "minLength": 2,
             "title": "Symptoms",
             "type": "string"
+          },
+          "version_id": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Optimistic locking version ID (FB-01)",
+            "title": "Version Id"
           }
         },
         "required": [
@@ -5352,8 +5365,15 @@
             "type": "integer"
           },
           "condition_diagnosis": {
-            "title": "Condition Diagnosis",
-            "type": "string"
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Condition Diagnosis"
           },
           "paid_paise": {
             "title": "Paid Paise",
@@ -5390,7 +5410,6 @@
           "patient_urn",
           "patient_name",
           "plan_name",
-          "condition_diagnosis",
           "agreed_price_paise",
           "paid_paise",
           "balance_paise",
