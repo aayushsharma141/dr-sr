@@ -145,9 +145,20 @@ def record_payment(
                 ),
             )
 
-    # 3. If appointment linked, verify and block consultation fee overpayments (BR-004)
+    # 3. If appointment linked, verify and block consultation fee overpayments (BR-004, FB-02)
     if payload.appointment_id is not None:
-        appt = session.get(Appointment, payload.appointment_id)
+        appt_stmt = (
+            select(Appointment)
+            .where(Appointment.id == payload.appointment_id)
+            .options(
+                lazyload(Appointment.patient),
+                lazyload(Appointment.doctor),
+                lazyload(Appointment.department),
+                lazyload(Appointment.created_by_user),
+            )
+            .with_for_update()
+        )
+        appt = session.execute(appt_stmt).scalar_one_or_none()
         if not appt or appt.patient_id != payload.patient_id:
             raise ApiError(
                 status_code=404,
