@@ -7,6 +7,9 @@ import '../../test/dialog-shim'
 import { PaymentModal } from '../PaymentModal'
 
 const mockMutateAsync = vi.fn()
+const mocks = vi.hoisted(() => ({ apiFetch: vi.fn() }))
+
+vi.mock('../../api/client', () => ({ apiFetch: mocks.apiFetch }))
 
 vi.mock('../../api/queries', () => ({
   useRecordPayment: () => ({
@@ -76,6 +79,61 @@ describe('PaymentModal', () => {
       expect(onSuccess).toHaveBeenCalled()
       expect(onClose).toHaveBeenCalled()
     })
+  })
+
+  it('re-reads the package balance and blocks an amount that now exceeds it', async () => {
+    mockMutateAsync.mockClear()
+    mocks.apiFetch.mockResolvedValueOnce([{ treatment_plan_id: 1, balance_paise: 100000 }])
+    renderComponent({
+      maxAmountPaise: 400000,
+      treatmentPlan: {
+        id: 1,
+        plan_name: 'Knee Rehab',
+        agreed_price_paise: 600000,
+      } as never,
+    })
+
+    fireEvent.change(screen.getByLabelText(/Amount/i), { target: { value: '4000' } })
+    fireEvent.click(screen.getByRole('button', { name: /Collect & Issue Receipt/i }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Amount cannot exceed the remaining package balance of ₹1,000.00.',
+    )
+    expect(mocks.apiFetch).toHaveBeenCalledWith('/billing/pending-dues')
+    expect(mockMutateAsync).not.toHaveBeenCalled()
+  })
+
+  it('submits when the refreshed balance still covers the amount', async () => {
+    mockMutateAsync.mockClear()
+    mockMutateAsync.mockResolvedValueOnce({ id: 9, receipt_number: 'RCP-TEST-0009' })
+    mocks.apiFetch.mockResolvedValueOnce([{ treatment_plan_id: 1, balance_paise: 400000 }])
+    renderComponent({
+      maxAmountPaise: 200000,
+      treatmentPlan: {
+        id: 1,
+        plan_name: 'Knee Rehab',
+        agreed_price_paise: 600000,
+      } as never,
+    })
+
+    fireEvent.change(screen.getByLabelText(/Amount/i), { target: { value: '4000' } })
+    fireEvent.click(screen.getByRole('button', { name: /Collect & Issue Receipt/i }))
+
+    await waitFor(() => expect(mockMutateAsync).toHaveBeenCalledTimes(1))
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+  })
+
+  it('rejects an amount above the remaining package balance before calling the API', async () => {
+    mockMutateAsync.mockClear()
+    renderComponent({ maxAmountPaise: 400000 })
+
+    fireEvent.change(screen.getByLabelText(/Amount/i), { target: { value: '5000' } })
+    fireEvent.submit(screen.getByRole('dialog').querySelector('form')!)
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Amount cannot exceed the remaining package balance of ₹4,000.00.',
+    )
+    expect(mockMutateAsync).not.toHaveBeenCalled()
   })
 
   it('rejects zero or negative amount input', async () => {

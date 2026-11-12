@@ -1,5 +1,6 @@
 import React, { useState } from 'react'
-import type { PaymentCreate, PaymentMethod, PaymentOut, TreatmentPlanOut } from '../api/types'
+import type { PaymentCreate, PaymentMethod, PaymentOut, PendingDueOut, TreatmentPlanOut } from '../api/types'
+import { apiFetch } from '../api/client'
 import { useRecordPayment } from '../api/queries'
 import { Modal } from './Modal'
 import { PAYMENT_RECORDED_EVENT } from './ReceiptHost'
@@ -13,6 +14,8 @@ interface PaymentModalProps {
   treatmentPlan?: TreatmentPlanOut | null
   appointmentId?: number | null
   defaultAmountPaise?: number
+  /** Remaining balance on the linked treatment package, when known. Caps the amount locally. */
+  maxAmountPaise?: number
   onSuccess?: (payment: PaymentOut) => void
 }
 
@@ -25,6 +28,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
   treatmentPlan,
   appointmentId,
   defaultAmountPaise,
+  maxAmountPaise,
   onSuccess,
 }) => {
   const initialRupees = defaultAmountPaise ? (defaultAmountPaise / 100).toString() : ''
@@ -32,6 +36,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('CASH')
   const [notes, setNotes] = useState<string>('')
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
+  const [checkingBalance, setCheckingBalance] = useState(false)
 
   const recordPayment = useRecordPayment()
 
@@ -50,6 +55,35 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
     const parsedRupees = parseFloat(amountRupees)
     if (isNaN(parsedRupees) || parsedRupees <= 0) {
       setErrorMessage('Please enter a valid payment amount greater than zero.')
+      return
+    }
+
+    // Re-read the package balance before submitting: another workstation may have collected part of it
+    // since this dialog opened. If the refresh fails, fall back to the balance passed in and let the
+    // server remain the authority.
+    let remainingPaise = maxAmountPaise ?? null
+    if (treatmentPlan && maxAmountPaise != null) {
+      setCheckingBalance(true)
+      try {
+        // Direct read so the check never uses a cached ledger; the server stays authoritative.
+        const dues = await apiFetch<PendingDueOut[]>('/billing/pending-dues')
+        remainingPaise = dues.find((d) => d.treatment_plan_id === treatmentPlan.id)?.balance_paise ?? 0
+      } catch {
+        remainingPaise = maxAmountPaise
+      } finally {
+        setCheckingBalance(false)
+      }
+    }
+
+    // The server enforces this too; catching it here avoids a round trip and a confusing rejection.
+    const remainingRupees = remainingPaise != null ? remainingPaise / 100 : null
+    if (remainingRupees !== null && parsedRupees > remainingRupees) {
+      setErrorMessage(
+        `Amount cannot exceed the remaining package balance of ₹${remainingRupees.toLocaleString('en-IN', {
+          minimumFractionDigits: 2,
+          maximumFractionDigits: 2,
+        })}.`,
+      )
       return
     }
 
@@ -86,7 +120,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
       onClose={onClose}
       title="Record Payment"
       description={`${patientName} (${patientUrn})`}
-      busy={recordPayment.isPending}
+      busy={recordPayment.isPending || checkingBalance}
       className="max-w-md"
     >
       {treatmentPlan && (
@@ -175,10 +209,14 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
           </button>
           <button
             type="submit"
-            disabled={recordPayment.isPending}
+            disabled={recordPayment.isPending || checkingBalance}
             className="rounded-lg bg-blue-700 px-4 py-2 text-sm font-medium text-white shadow hover:bg-blue-800 disabled:opacity-50"
           >
-            {recordPayment.isPending ? 'Processing...' : 'Collect & Issue Receipt'}
+            {checkingBalance
+              ? 'Checking balance...'
+              : recordPayment.isPending
+                ? 'Processing...'
+                : 'Collect & Issue Receipt'}
           </button>
         </div>
       </form>

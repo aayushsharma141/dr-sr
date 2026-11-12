@@ -3,7 +3,9 @@ import { Modal } from './Modal'
 import { useClinicSettings } from '../api/queries'
 import {
   LetterheadBanner,
+  LetterheadContactLine,
   LetterheadDoctors,
+  LetterheadHeaderNote,
   LetterheadFooter,
   PatientStrip,
   PRINT_INK,
@@ -62,7 +64,8 @@ export function PrescriptionPrint({ prescription, onClose }: PrescriptionPrintPr
         className="printable-sheet mx-auto mt-4 w-[198mm] max-w-full bg-white p-3 text-slate-900 print:mt-0 print:w-full print:p-0 print:shadow-none"
         data-testid="prescription-sheet"
       >
-        <LetterheadBanner clinicName={clinicNameEn} />
+        <LetterheadBanner clinicName={clinicNameEn} clinicNameHi={settings?.name_hi} />
+        <LetterheadHeaderNote settings={settings} />
         <LetterheadDoctors />
         <PatientStrip
           values={{
@@ -184,6 +187,7 @@ export function PrescriptionPrint({ prescription, onClose }: PrescriptionPrintPr
 
         <div className="mt-3 break-inside-avoid">
           <LetterheadFooter addresses={addresses} />
+        <LetterheadContactLine settings={settings} />
         </div>
       </div>
     </Modal>

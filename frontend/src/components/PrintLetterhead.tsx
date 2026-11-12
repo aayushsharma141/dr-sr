@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import type { ClinicSettingsOut } from '../api/types'
 
 /**
  * Shared letterhead for A4 hospital documents, matching the approved SAMPLE.pdf:
@@ -50,7 +51,14 @@ const DOCTORS = [
   },
 ]
 
-export function LetterheadBanner({ clinicName }: { clinicName: string }) {
+export function LetterheadBanner({
+  clinicName,
+  clinicNameHi,
+}: {
+  clinicName: string
+  /** Hindi hospital name from settings; printed under the English name when set. */
+  clinicNameHi?: string | null
+}) {
   return (
     <div
       data-testid="letterhead-banner"
@@ -69,6 +77,11 @@ export function LetterheadBanner({ clinicName }: { clinicName: string }) {
         <h1 className="text-[36px] font-extrabold uppercase leading-none tracking-[0.12em]">
           {clinicName}
         </h1>
+        {clinicNameHi && (
+          <p lang="hi" data-testid="letterhead-name-hi" className="mt-1 text-[16px] font-bold leading-none">
+            {clinicNameHi}
+          </p>
+        )}
         <p className="mt-1.5 font-serif text-[13px] font-bold uppercase tracking-[0.32em]">
           Physiotherapy Department
         </p>
@@ -171,5 +184,42 @@ export function LetterheadFooter({ addresses }: { addresses?: string[] }) {
         <p key={line}>{line}</p>
       ))}
     </div>
+  )
+}
+
+/** Admin-editable print header (English and Hindi). Renders nothing when both are blank. */
+export function LetterheadHeaderNote({ settings }: { settings?: ClinicSettingsOut | null }) {
+  const en = settings?.print_header_en
+  const hi = settings?.print_header_hi
+  if (!en && !hi) return null
+  return (
+    <div
+      data-testid="print-header"
+      className="mt-1 text-center text-[11px] font-semibold leading-snug text-slate-800"
+    >
+      {en && <p className="whitespace-pre-line">{en}</p>}
+      {hi && (
+        <p lang="hi" className="whitespace-pre-line">
+          {hi}
+        </p>
+      )}
+    </div>
+  )
+}
+
+/** Trust name, phone and email from hospital setup. Renders nothing when all are blank. */
+export function LetterheadContactLine({ settings }: { settings?: ClinicSettingsOut | null }) {
+  const trust = [settings?.trust_name_en, settings?.trust_name_hi].filter(Boolean).join(' · ')
+  const contact = [
+    settings?.phone ? `Phone: ${settings.phone}` : '',
+    settings?.email ? `Email: ${settings.email}` : '',
+  ]
+    .filter(Boolean)
+    .join(' · ')
+  if (!trust && !contact) return null
+  return (
+    <p data-testid="card-contact-line" className="mt-1 text-center text-[10px] font-semibold text-slate-700">
+      {[trust, contact].filter(Boolean).join(' · ')}
+    </p>
   )
 }

@@ -1,5 +1,6 @@
-import { render, screen } from '@testing-library/react'
-import { describe, expect, it } from 'vitest'
+import { render, screen, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
+import { describe, expect, it, vi } from 'vitest'
 import { RegistrationCard } from '../RegistrationCard'
 import type { ClinicSettingsOut, PatientOut } from '../../api/types'
 
@@ -53,8 +54,10 @@ describe('RegistrationCard Component', () => {
 
     expect(screen.getByText('Kalyan Hospital & Research Centre')).toBeInTheDocument()
     expect(screen.getByText(/physiotherapy department/i)).toBeInTheDocument()
-    expect(screen.getByText('Dr. Madan Mohan Dwivedi')).toBeInTheDocument()
-    expect(screen.getByText('Dr. Chandan Kr. Dwivedi')).toBeInTheDocument()
+    const consulting = screen.getByRole('group', { name: 'Consulting doctor' })
+    expect(within(consulting).getByText(/Dr\. Madan Mohan Dwivedi/)).toBeInTheDocument()
+    expect(within(consulting).getByText(/Dr\. Chandan Kr\. Dwivedi/)).toBeInTheDocument()
+    expect(screen.getAllByText('Dr. Madan Mohan Dwivedi').length).toBeGreaterThan(0) // letterhead
     expect(screen.getByAltText('Caduceus emblem')).toBeInTheDocument()
     expect(screen.getByText('KH-2026-0001')).toBeInTheDocument()
     expect(screen.getByText('RECORD #KH-2026-0001')).toBeInTheDocument()
@@ -112,6 +115,75 @@ describe('RegistrationCard Component', () => {
 
     expect(screen.getByText('Kalyan Hospital')).toBeInTheDocument()
     expect(screen.getByTestId('letterhead-footer')).toHaveTextContent('नवादा थाना')
+  })
+
+  it('offers only the essential controls, named for screen readers', async () => {
+    const user = userEvent.setup()
+    const onBack = vi.fn()
+    const printSpy = vi.spyOn(window, 'print').mockImplementation(() => {})
+    render(<RegistrationCard patient={mockPatient} settings={mockSettings} onBack={onBack} />)
+
+    const actions = screen.getByRole('group', { name: 'Card actions' })
+    expect(within(actions).getAllByRole('button')).toHaveLength(2)
+
+    await user.click(screen.getByRole('button', { name: 'Back to patient record' }))
+    expect(onBack).toHaveBeenCalledTimes(1)
+
+    await user.click(screen.getByRole('button', { name: 'Print card (A4)' }))
+    expect(printSpy).toHaveBeenCalledTimes(1)
+    printSpy.mockRestore()
+  })
+
+  it('prints every hospital-setup field the admin can edit for the card', () => {
+    render(<RegistrationCard patient={mockPatient} settings={mockSettings} />)
+
+    expect(screen.getByTestId('letterhead-name-hi')).toHaveTextContent('कल्याण अस्पताल एवं शोध केंद्र')
+    const header = screen.getByTestId('print-header')
+    expect(header).toHaveTextContent('Header EN')
+    expect(header).toHaveTextContent('Header HI')
+    const contact = screen.getByTestId('card-contact-line')
+    expect(contact).toHaveTextContent('Sri Vashishtha Kalyan Trust')
+    expect(contact).toHaveTextContent('Phone: 06182-234567')
+    expect(contact).toHaveTextContent('Email: support@kalyanhospital.org')
+    expect(screen.getByTestId('letterhead-footer')).toHaveTextContent('Station Road, Ara')
+    expect(screen.getByText(/Valid for 15 days/)).toBeInTheDocument()
+  })
+
+  it('shows no header block or contact line when those settings are blank', () => {
+    const settings = {
+      ...mockSettings,
+      name_hi: '',
+      print_header_en: null,
+      print_header_hi: null,
+      phone: '',
+      email: null,
+      trust_name_en: '',
+      trust_name_hi: null,
+    }
+    render(<RegistrationCard patient={mockPatient} settings={settings} />)
+
+    expect(screen.queryByTestId('print-header')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('card-contact-line')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('letterhead-name-hi')).not.toBeInTheDocument()
+  })
+
+  it('hides the Back control when no return action is given', () => {
+    render(<RegistrationCard patient={mockPatient} settings={mockSettings} />)
+
+    expect(screen.queryByRole('button', { name: 'Back to patient record' })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Print card (A4)' })).toBeInTheDocument()
+  })
+
+  it('exposes each field as a label with its value, and marks empty fields as blank', () => {
+    render(<RegistrationCard patient={{ ...mockPatient, emergency_contact: '' }} settings={mockSettings} />)
+
+    const name = screen.getByText('2. Patient Name:')
+    expect(name.tagName).toBe('DT')
+    expect(name.nextElementSibling?.tagName).toBe('DD')
+    expect(name.nextElementSibling).toHaveTextContent('Aarav Kumar')
+
+    const emergency = screen.getByText('Emergency Contact:').nextElementSibling as HTMLElement
+    expect(emergency).toHaveTextContent('Blank, to be filled in by hand')
   })
 
   it('shows the stored photo when the patient has one', () => {

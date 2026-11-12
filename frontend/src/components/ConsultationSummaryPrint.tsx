@@ -3,7 +3,9 @@ import { Modal } from './Modal'
 import { useClinicSettings } from '../api/queries'
 import {
   LetterheadBanner,
+  LetterheadContactLine,
   LetterheadDoctors,
+  LetterheadHeaderNote,
   LetterheadFooter,
   PatientStrip,
   PRINT_INK,
@@ -133,7 +135,8 @@ export function ConsultationSummaryPrint({
         className="printable-sheet mx-auto w-[198mm] max-w-full bg-white p-3 text-slate-900 print:mt-0 print:w-full print:p-0 print:shadow-none"
         data-testid="consultation-summary-sheet"
       >
-        <LetterheadBanner clinicName={clinicNameEn} />
+        <LetterheadBanner clinicName={clinicNameEn} clinicNameHi={settings?.name_hi} />
+        <LetterheadHeaderNote settings={settings} />
         <LetterheadDoctors />
         
         {/* Patient identity strip */}
@@ -269,6 +272,7 @@ export function ConsultationSummaryPrint({
         </div>
 
         <LetterheadFooter addresses={addresses} />
+        <LetterheadContactLine settings={settings} />
       </div>
     </Modal>
   )

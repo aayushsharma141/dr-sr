@@ -106,11 +106,8 @@ describe('PendingDuesPage', () => {
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
   })
 
-  it('shows the server rejection when a payment exceeds the remaining balance', async () => {
+  it('blocks an amount above the remaining balance without calling the API', async () => {
     mocks.recordMutate.mockReset()
-    mocks.recordMutate.mockRejectedValueOnce(
-      new Error('Payment of ₹5,000.00 exceeds remaining balance of ₹4,000.00.'),
-    )
 
     render(
       <QueryClientProvider client={queryClient}>
@@ -125,9 +122,30 @@ describe('PendingDuesPage', () => {
     fireEvent.click(screen.getByRole('button', { name: /Collect & Issue Receipt/i }))
 
     expect(await screen.findByRole('alert')).toHaveTextContent(
-      'Payment of ₹5,000.00 exceeds remaining balance of ₹4,000.00.',
+      'Amount cannot exceed the remaining package balance of ₹4,000.00.',
     )
+    expect(mocks.recordMutate).not.toHaveBeenCalled()
     // The dialog stays open so reception can correct the amount.
+    expect(screen.getByRole('dialog')).toBeInTheDocument()
+  })
+
+  it('shows a server rejection for an amount inside the balance', async () => {
+    mocks.recordMutate.mockReset()
+    mocks.recordMutate.mockRejectedValueOnce(new Error('Payment could not be saved. Please retry.'))
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter>
+          <PendingDuesPage />
+        </MemoryRouter>
+      </QueryClientProvider>
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: /Collect Payment/i }))
+    fireEvent.change(screen.getByLabelText(/Amount/i), { target: { value: '3000' } })
+    fireEvent.click(screen.getByRole('button', { name: /Collect & Issue Receipt/i }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Payment could not be saved. Please retry.')
     expect(screen.getByRole('dialog')).toBeInTheDocument()
   })
 })

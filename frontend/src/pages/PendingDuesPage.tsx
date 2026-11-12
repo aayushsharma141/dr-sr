@@ -160,6 +160,7 @@ export const PendingDuesPage: React.FC = () => {
               updated_at: '',
             }}
             defaultAmountPaise={selectedDue.balance_paise}
+            maxAmountPaise={selectedDue.balance_paise}
           />
         )}
       </div>

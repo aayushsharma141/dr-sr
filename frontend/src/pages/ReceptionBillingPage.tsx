@@ -863,6 +863,7 @@ export function ReceptionBillingPage() {
               updated_at: '',
             }}
             defaultAmountPaise={dueToCollect.balance_paise}
+            maxAmountPaise={dueToCollect.balance_paise}
             onSuccess={(p) => {
               setRecordedPayment(p)
               setDueToCollect(null)

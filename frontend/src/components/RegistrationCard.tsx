@@ -2,7 +2,9 @@ import type { ReactNode } from 'react'
 import type { PatientOut, ClinicSettingsOut } from '../api/types'
 import {
   LetterheadBanner,
+  LetterheadContactLine,
   LetterheadDoctors,
+  LetterheadHeaderNote,
   LetterheadFooter,
   PatientStrip,
   PRINT_INK,
@@ -11,10 +13,14 @@ import {
 interface RegistrationCardProps {
   patient: PatientOut
   settings?: ClinicSettingsOut | null
-  onClose?: () => void
+  /** Returns to the patient record. Shown as the "Back" control when provided. */
+  onBack?: () => void
 }
 
-/** A labelled line. Filled from the record when known, otherwise a dotted line to write on. */
+/**
+ * A labelled line. Filled from the record when known, otherwise a dotted line to write on.
+ * Rendered as a description list so screen readers announce each label with its value.
+ */
 function FieldLine({
   label,
   children,
@@ -24,17 +30,19 @@ function FieldLine({
   children?: ReactNode
   alert?: boolean
 }) {
+  const blank = children === undefined || children === null || children === ''
   return (
-    <div className="flex items-end gap-2 text-[13px]">
-      <span className="shrink-0 font-bold text-slate-600">{label}</span>
-      <span
+    <dl className="flex items-end gap-2 text-[13px]">
+      <dt className="shrink-0 font-bold text-slate-600">{label}</dt>
+      <dd
         className={`min-h-[18px] flex-1 border-b border-dotted border-slate-600 px-1 font-semibold ${
           alert ? 'text-red-800' : 'text-slate-900'
         }`}
       >
         {children}
-      </span>
-    </div>
+        {blank && <span className="sr-only">Blank, to be filled in by hand</span>}
+      </dd>
+    </dl>
   )
 }
 
@@ -42,7 +50,7 @@ function genderLabel(gender: string): string {
   return gender === 'M' ? 'Male' : gender === 'F' ? 'Female' : 'Other'
 }
 
-export function RegistrationCard({ patient, settings, onClose }: RegistrationCardProps) {
+export function RegistrationCard({ patient, settings, onBack }: RegistrationCardProps) {
   const clinicNameEn = settings?.name_en || 'Kalyan Hospital'
   const clinicNameHi = settings?.name_hi
   const printFooterEn = settings?.print_footer_en
@@ -60,39 +68,45 @@ export function RegistrationCard({ patient, settings, onClose }: RegistrationCar
   const registeredOn = new Date(patient.created_at).toLocaleDateString('en-IN')
 
   return (
-    <div className="mx-auto max-w-[210mm] rounded-lg border border-neutral-300 bg-white p-4 shadow-sm print:max-w-none print:rounded-none print:border-none print:p-0 print:shadow-none">
-      {/* On-screen action controls - hidden when printing */}
-      <div className="mb-4 flex items-center justify-between border-b border-neutral-200 pb-3 print:hidden">
+    <section
+      aria-labelledby="registration-card-title"
+      className="mx-auto max-w-[210mm] rounded-lg border border-neutral-300 bg-white p-4 shadow-sm print:max-w-none print:rounded-none print:border-none print:p-0 print:shadow-none"
+    >
+      {/* Essential on-screen controls - hidden when printing */}
+      <header className="mb-4 flex flex-wrap items-center justify-between gap-3 border-b border-neutral-200 pb-3 print:hidden">
         <div>
-          <h3 className="text-lg font-bold text-neutral-900">Patient Registration Card Preview</h3>
-          <p className="text-xs text-neutral-500">Standard A4 patient registration record</p>
+          <h1 id="registration-card-title" className="text-lg font-bold text-neutral-900">
+            Patient Registration Card Preview
+          </h1>
+          <p className="text-sm text-neutral-600">Standard A4 patient registration record</p>
         </div>
-        <div className="flex items-center gap-3">
-          {onClose && (
+        <div role="group" aria-label="Card actions" className="flex flex-wrap items-center gap-3">
+          {onBack && (
             <button
               type="button"
-              onClick={onClose}
-              className="cursor-pointer rounded border border-neutral-300 px-4 py-2 text-sm font-medium text-neutral-700 hover:bg-neutral-50"
+              onClick={onBack}
+              className="min-h-11 cursor-pointer rounded border border-neutral-400 bg-white px-4 py-2 text-sm font-medium text-neutral-800 hover:bg-neutral-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-900"
             >
-              Close
+              Back to patient record
             </button>
           )}
           <button
             type="button"
             onClick={() => window.print()}
-            className="cursor-pointer rounded bg-red-900 px-5 py-2 text-sm font-medium text-white shadow-xs hover:bg-red-800"
+            className="min-h-11 cursor-pointer rounded bg-red-900 px-5 py-2 text-sm font-semibold text-white shadow-xs hover:bg-red-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-900"
           >
-            Print Card (A4)
+            Print card (A4)
           </button>
         </div>
-      </div>
+      </header>
 
       {/* Printable A4 sheet */}
       <div
         className="registration-card-sheet mx-auto w-[198mm] max-w-full font-sans text-slate-900 print:w-full"
         data-testid="registration-sheet"
       >
-        <LetterheadBanner clinicName={clinicNameEn} />
+        <LetterheadBanner clinicName={clinicNameEn} clinicNameHi={clinicNameHi} />
+        <LetterheadHeaderNote settings={settings} />
         <LetterheadDoctors />
         <PatientStrip
           values={{
@@ -155,10 +169,15 @@ export function RegistrationCard({ patient, settings, onClose }: RegistrationCar
         </div>
 
         <div className="mt-2.5 space-y-2.5">
-          <div className="flex items-center gap-3 text-[13px]">
+          <div className="flex items-center gap-3 text-[13px]" role="group" aria-label="Consulting doctor">
             <span className="font-bold text-slate-600">Consulting Doctor:</span>
-            <span>☐ Dr. Madan Mohan Dwivedi</span>
-            <span>☐ Dr. Chandan Kr. Dwivedi</span>
+            <span>
+              <span aria-hidden="true">☐ </span>Dr. Madan Mohan Dwivedi
+              <span className="sr-only"> (tick one)</span>
+            </span>
+            <span>
+              <span aria-hidden="true">☐ </span>Dr. Chandan Kr. Dwivedi
+            </span>
           </div>
           <div className="grid grid-cols-2 gap-4">
             <FieldLine label="7. Patient In (Date & Time):" />
@@ -190,11 +209,11 @@ export function RegistrationCard({ patient, settings, onClose }: RegistrationCar
         <div className="mt-12 grid grid-cols-2 gap-16 px-6 text-center text-[11px]">
           <div className="border-t border-black pt-1">
             <p className="font-bold">Patient / Attendant Signature</p>
-            <p className="text-[10px] text-slate-500">मरीज / परिचारक के हस्ताक्षर</p>
+            <p lang="hi" className="text-[10px] text-slate-500">मरीज / परिचारक के हस्ताक्षर</p>
           </div>
           <div className="border-t border-black pt-1">
             <p className="font-bold">Authorized Signatory / Receptionist</p>
-            <p className="text-[10px] text-slate-500">
+            <p lang="hi" className="text-[10px] text-slate-500">
               अधिकृत हस्ताक्षरकर्ता{clinicNameHi ? ` (${clinicNameHi})` : ''}
             </p>
           </div>
@@ -202,6 +221,7 @@ export function RegistrationCard({ patient, settings, onClose }: RegistrationCar
 
         <div className="mt-3">
           <LetterheadFooter addresses={addresses} />
+          <LetterheadContactLine settings={settings} />
           <p className="mt-1 text-center text-[9px] text-slate-500">
             {[printFooterEn, printFooterHi].filter(Boolean).join(' · ')}
             {printFooterEn || printFooterHi ? ' · ' : ''}
@@ -210,6 +230,6 @@ export function RegistrationCard({ patient, settings, onClose }: RegistrationCar
           </p>
         </div>
       </div>
-    </div>
+    </section>
   )
 }
