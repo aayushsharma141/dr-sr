@@ -419,6 +419,10 @@ def finalise_encounter(
     )
 
     if not enc.is_finalised:
+        # Require matching version if provided in finalise payload (FB-01)
+        if payload is not None and payload.version_id is not None:
+            require_version(enc, payload.version_id, label="encounter")
+
         # If payload is provided, update encounter fields before finalising
         if payload is not None:
             if payload.symptoms is not None:

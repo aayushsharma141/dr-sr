@@ -13,7 +13,7 @@ import { AppointmentBookingModal } from '../components/AppointmentBookingModal'
 import { ConsultationSummaryPrint } from '../components/ConsultationSummaryPrint'
 import { QuickPhraseBar } from '../components/QuickPhraseBar'
 import { asSpecialty, useBookedAppointment, useMyDepartments } from '../api/specialty'
-import { isVersionConflict } from '../api/client'
+import { ApiError, isVersionConflict } from '../api/client'
 import { UnsavedChangesGuard } from '../components/UnsavedChangesGuard'
 import {
   IconStethoscope,
@@ -284,6 +284,9 @@ function EncounterWorkspace() {
     } catch (err: unknown) {
       if (isVersionConflict(err)) {
         setConflictError('Encounter was modified concurrently by another session.')
+      } else if (err instanceof ApiError) {
+        setAutoSaveStatus('IDLE')
+        setConflictError(err.message || 'Auto-save failed on server validation.')
       } else {
         setAutoSaveStatus('OFFLINE_ERROR')
       }
@@ -424,6 +427,10 @@ function EncounterWorkspace() {
   // Finalisation Handler
   const handleFinaliseConsultation = async () => {
     setFinaliseError(null)
+    if (autoSaveTimerRef.current) {
+      clearTimeout(autoSaveTimerRef.current)
+      autoSaveTimerRef.current = null
+    }
     if (!symptoms.trim() || symptoms.trim().length < 2) {
       setFinaliseError('Chief Complaint is required (minimum 2 characters).')
       setShowFinaliseConfirm(false)
@@ -439,6 +446,7 @@ function EncounterWorkspace() {
 
     try {
       let targetId = encounterId
+      let currentVersion = versionId
       if (encounterId === 0) {
         const created = await createMutation.mutateAsync({
           patient_id: effectivePatientId,
@@ -449,9 +457,18 @@ function EncounterWorkspace() {
           diagnosis,
         })
         targetId = created.id
+        currentVersion = created.version_id
       }
 
-      const res = await finaliseMutation.mutateAsync(targetId)
+      const res = await finaliseMutation.mutateAsync({
+        id: targetId,
+        body: {
+          symptoms,
+          diagnosis,
+          clinical_notes: clinicalNotes,
+          version_id: currentVersion,
+        },
+      })
       setIsFinalised(true)
       isDirtyRef.current = false
       setUnsavedEdits(false)

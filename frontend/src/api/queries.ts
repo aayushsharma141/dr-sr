@@ -905,10 +905,26 @@ export function useUpdateEncounter() {
 export function useFinaliseEncounter() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (id: number) =>
-      apiFetch<EncounterRead>(`/encounters/${id}/finalise`, {
+    mutationFn: (
+      param:
+        | number
+        | {
+            id: number
+            body?: {
+              symptoms?: string
+              diagnosis?: string
+              clinical_notes?: string | null
+              version_id?: number
+            }
+          }
+    ) => {
+      const id = typeof param === 'number' ? param : param.id
+      const body = typeof param === 'number' ? undefined : param.body
+      return apiFetch<EncounterRead>(`/encounters/${id}/finalise`, {
         method: 'POST',
-      }),
+        body: body ? JSON.stringify(body) : undefined,
+      })
+    },
     onSuccess: (data) => {
       qc.setQueryData(['encounter', data.id], data)
       qc.invalidateQueries({ queryKey: ['patient-encounters', data.patient_id] })

@@ -65,6 +65,9 @@ class EncounterFinaliseRequest(BaseModel):
         ..., min_length=2, max_length=5000, description="Diagnosis (min 2 characters)"
     )
     clinical_notes: str | None = Field(default=None, max_length=10000)
+    version_id: int | None = Field(
+        default=None, gt=0, description="Optimistic locking version ID (FB-01)"
+    )
 
 
 class EncounterRead(BaseModel):

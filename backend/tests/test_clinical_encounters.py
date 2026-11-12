@@ -200,3 +200,55 @@ def test_doctor_silo_cross_isolation(login_client, doctor_a_user, doctor_b_user,
         json={"diagnosis": "Cross-doctor tampering attempt", "version_id": 1},
     )
     assert b_patch.status_code == 404
+
+
+def test_finalise_encounter_optimistic_locking(login_client, doctor_a_user, db_session):
+    """FB-01: Finalise encounter with stale version_id returns 409 version_conflict."""
+    patient = Patient(
+        urn="KH-2026-6609",
+        full_name="Optimistic Finalise Patient",
+        guardian_name="Guardian",
+        gender="F",
+        age_years=40,
+        mobile="9876543409",
+        address="Ara",
+    )
+    db_session.add(patient)
+    db_session.flush()
+
+    doctor_client = login_client(doctor_a_user)
+    create_resp = doctor_client.post(
+        "/api/encounters",
+        json={
+            "patient_id": patient.id,
+            "symptoms": "Knee pain",
+            "clinical_notes": "Mild swelling",
+            "diagnosis": "Knee OA",
+        },
+    )
+    assert create_resp.status_code == 201
+    enc_id = create_resp.json()["id"]
+
+    # Finalise with stale version_id 999 -> 409
+    stale_resp = doctor_client.post(
+        f"/api/encounters/{enc_id}/finalise",
+        json={
+            "symptoms": "Updated symptoms",
+            "diagnosis": "Updated diagnosis",
+            "version_id": 999,
+        },
+    )
+    assert stale_resp.status_code == 409
+    assert stale_resp.json()["code"] == "version_conflict"
+
+    # Finalise with correct version_id 1 -> 200
+    ok_resp = doctor_client.post(
+        f"/api/encounters/{enc_id}/finalise",
+        json={
+            "symptoms": "Updated symptoms",
+            "diagnosis": "Updated diagnosis",
+            "version_id": 1,
+        },
+    )
+    assert ok_resp.status_code == 200
+    assert ok_resp.json()["is_finalised"] is True
