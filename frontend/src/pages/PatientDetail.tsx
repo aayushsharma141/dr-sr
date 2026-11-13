@@ -1,11 +1,9 @@
-import { useState } from 'react'
-import { Link, useParams } from 'react-router'
+import { useEffect, useState } from 'react'
+import { Link, useLocation, useNavigate, useParams } from 'react-router'
 import { useAuditLogs, usePatient, useMe } from '../api/queries'
 import { AppShell } from '../components/AppShell'
-import { PatientEditModal } from '../components/PatientEditModal'
 import { PatientTimeline } from '../components/PatientTimeline'
 import { PaymentHistory } from '../components/PaymentHistory'
-import type { PatientOut } from '../api/types'
 
 type PatientDetailTab = 'profile' | 'visits' | 'clinical' | 'therapy' | 'billing' | 'audit'
 
@@ -91,13 +89,24 @@ export function PatientDetail() {
   const patientId = Number(id)
 
   const { data: me } = useMe()
-  const { data: patient, isPending, isError, error, refetch } = usePatient(
+  const { data: patient, isPending, isError, error } = usePatient(
     isNaN(patientId) ? null : patientId,
   )
 
-  const [isEditModalOpen, setIsEditModalOpen] = useState(false)
-  const [successBanner, setSuccessBanner] = useState<string | null>(null)
+  // Editing happens in the registration form, which returns here with a notice to show.
+  const location = useLocation()
+  const navigate = useNavigate()
+  const [successBanner, setSuccessBanner] = useState<string | null>(
+    () => (location.state as { notice?: string } | null)?.notice ?? null,
+  )
   const [activeTab, setActiveTab] = useState<PatientDetailTab>('profile')
+
+  // The notice is shown once; drop it from the history entry so a reload does not repeat it.
+  useEffect(() => {
+    if ((location.state as { notice?: string } | null)?.notice) {
+      navigate(location.pathname, { replace: true, state: null })
+    }
+  }, [location.state, location.pathname, navigate])
 
   if (isNaN(patientId) || patientId <= 0) {
     return (
@@ -110,12 +119,6 @@ export function PatientDetail() {
         </div>
       </AppShell>
     )
-  }
-
-  const handleEditSuccess = (_updated: PatientOut) => {
-    setIsEditModalOpen(false)
-    setSuccessBanner(`Patient details updated successfully.`)
-    refetch()
   }
 
   return (
@@ -136,14 +139,14 @@ export function PatientDetail() {
           </div>
           {patient && (
             <div className="flex items-center gap-3">
-              {(me?.role === 'ADMIN' || me?.role === 'RECEPTION') && (
-                <button
-                  type="button"
-                  onClick={() => setIsEditModalOpen(true)}
-                  className="px-4 py-2 bg-neutral-100 hover:bg-neutral-200 text-neutral-800 rounded text-sm font-medium focus-visible:outline-2 focus-visible:outline-neutral-500 min-h-[44px] cursor-pointer"
+              {/* Reception owns editing (the API grants patient:update to RECEPTION only). */}
+              {me?.role === 'RECEPTION' && (
+                <Link
+                  to={`/reception/patients/${patient.id}/edit`}
+                  className="px-4 py-2 bg-neutral-100 hover:bg-neutral-200 text-neutral-800 rounded text-sm font-medium focus-visible:outline-2 focus-visible:outline-neutral-500 min-h-[44px] inline-flex items-center justify-center cursor-pointer"
                 >
-                  Edit Demographics
-                </button>
+                  Edit Patient Details
+                </Link>
               )}
               <Link
                 to={`/reception/patients/${patient.id}/print`}
@@ -424,16 +427,6 @@ export function PatientDetail() {
       </div>
 
       {patient && <PaymentHistory patientId={patient.id} />}
-
-      {/* Demographic Edit Modal */}
-      {patient && (
-        <PatientEditModal
-          patient={patient}
-          isOpen={isEditModalOpen}
-          onClose={() => setIsEditModalOpen(false)}
-          onSuccess={handleEditSuccess}
-        />
-      )}
     </AppShell>
   )
 }

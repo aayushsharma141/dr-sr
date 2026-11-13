@@ -3,8 +3,6 @@ import { Link, useNavigate } from 'react-router'
 import { usePatients, usePatientCount, useMe } from '../api/queries'
 import { AppShell } from '../components/AppShell'
 import { TableSkeleton } from '../components/AdminSkeleton'
-import { PatientEditModal } from '../components/PatientEditModal'
-import type { PatientOut } from '../api/types'
 
 // Rows shown per page. The list endpoint returns a plain array with no total,
 // so each page asks for one extra row to learn whether a next page exists.
@@ -16,9 +14,6 @@ export function PatientsDirectory() {
 
   const [searchInput, setSearchInput] = useState('')
   const [debouncedQuery, setDebouncedQuery] = useState('')
-  const [selectedPatientForEdit, setSelectedPatientForEdit] = useState<PatientOut | null>(null)
-  const [isEditModalOpen, setIsEditModalOpen] = useState(false)
-  const [successBanner, setSuccessBanner] = useState<string | null>(null)
   const [page, setPage] = useState(0)
 
   useEffect(() => {
@@ -37,7 +32,6 @@ export function PatientsDirectory() {
     isPending,
     isError,
     error,
-    refetch,
   } = usePatients(debouncedQuery, PATIENTS_PAGE_SIZE + 1, page * PATIENTS_PAGE_SIZE)
 
   const { data: countData } = usePatientCount(debouncedQuery)
@@ -49,18 +43,6 @@ export function PatientsDirectory() {
   const firstRowNumber = page * PATIENTS_PAGE_SIZE + 1
   const lastRowNumber = page * PATIENTS_PAGE_SIZE + patients.length
   const totalPages = total !== undefined ? Math.max(1, Math.ceil(total / PATIENTS_PAGE_SIZE)) : undefined
-
-  const handleEditClick = (patient: PatientOut) => {
-    setSelectedPatientForEdit(patient)
-    setIsEditModalOpen(true)
-  }
-
-  const handleEditSuccess = (updated: PatientOut) => {
-    setIsEditModalOpen(false)
-    setSelectedPatientForEdit(null)
-    setSuccessBanner(`Patient ${updated.full_name} (${updated.urn}) updated successfully.`)
-    refetch()
-  }
 
   return (
     <AppShell
@@ -86,23 +68,6 @@ export function PatientsDirectory() {
             </Link>
           )}
         </div>
-
-        {successBanner && (
-          <div
-            role="status"
-            className="p-4 bg-emerald-50 border border-emerald-300 rounded text-emerald-900 text-sm flex items-center justify-between"
-          >
-            <span>{successBanner}</span>
-            <button
-              type="button"
-              onClick={() => setSuccessBanner(null)}
-              className="text-emerald-700 hover:text-emerald-950 font-bold ml-4"
-              aria-label="Dismiss message"
-            >
-              &times;
-            </button>
-          </div>
-        )}
 
         {/* Search Controls */}
         <div className="bg-white p-4 rounded-lg border border-neutral-200 shadow-xs">
@@ -253,14 +218,14 @@ export function PatientsDirectory() {
                         >
                           View Card
                         </button>
-                        {me?.role !== 'DOCTOR' && (
-                          <button
-                            type="button"
-                            onClick={() => handleEditClick(p)}
-                            className="px-2.5 py-1.5 text-xs font-medium text-neutral-700 bg-neutral-100 hover:bg-neutral-200 rounded focus-visible:outline-2 focus-visible:outline-neutral-500 cursor-pointer min-h-[36px]"
+                        {/* Opens the registration form pre-filled; RECEPTION only, as on the API. */}
+                        {me?.role === 'RECEPTION' && (
+                          <Link
+                            to={`/reception/patients/${p.id}/edit`}
+                            className="inline-flex items-center px-2.5 py-1.5 text-xs font-medium text-neutral-700 bg-neutral-100 hover:bg-neutral-200 rounded focus-visible:outline-2 focus-visible:outline-neutral-500 cursor-pointer min-h-[36px]"
                           >
                             Edit
-                          </button>
+                          </Link>
                         )}
                       </td>
                     </tr>
@@ -302,19 +267,6 @@ export function PatientsDirectory() {
           </div>
         )}
       </div>
-
-      {/* Demographic Edit Modal */}
-      {selectedPatientForEdit && (
-        <PatientEditModal
-          patient={selectedPatientForEdit}
-          isOpen={isEditModalOpen}
-          onClose={() => {
-            setIsEditModalOpen(false)
-            setSelectedPatientForEdit(null)
-          }}
-          onSuccess={handleEditSuccess}
-        />
-      )}
     </AppShell>
   )
 }

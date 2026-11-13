@@ -59,6 +59,15 @@ describe('AppShell clinical navigation hierarchy', () => {
     expect(within(primaryNav).queryByRole('link', { name: 'User & Authority' })).not.toBeInTheDocument()
   })
 
+  it('keeps Patient Records active and names the page Edit Patient while a patient is edited', () => {
+    renderShell('RECEPTION', '/reception/patients/101/edit')
+
+    const primaryNav = screen.getByRole('navigation', { name: 'Primary navigation' })
+    expect(within(primaryNav).getByRole('link', { name: 'Patient Records' })).toHaveAttribute('aria-current', 'page')
+    expect(within(primaryNav).getByRole('link', { name: 'Patient Registration' })).not.toHaveAttribute('aria-current')
+    expect(document.title).toBe('Edit Patient – Kalyan Hospital')
+  })
+
   it('shows doctor clinical workflows and activates the follow-up deep link', () => {
     renderShell('DOCTOR', '/reception/appointments?tab=followup')
 

@@ -229,6 +229,16 @@ export const router = createBrowserRouter([
             },
           },
           {
+            // The registration form, pre-filled, for changing an existing patient (PATCH /patients/{id}).
+            path: '/reception/patients/:id/edit',
+            lazy: async () => {
+              const { PatientRegister } = await import('./pages/PatientRegister')
+              return {
+                Component: PatientRegister,
+              }
+            },
+          },
+          {
             path: '/reception/tokens',
             lazy: async () => {
               const { TokenGenerationPage } = await import('./pages/TokenGenerationPage')

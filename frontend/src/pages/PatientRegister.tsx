@@ -1,7 +1,9 @@
 import { useState, type FormEvent, type ReactNode, useEffect, useRef, useMemo } from 'react'
-import { Link, useNavigate } from 'react-router'
+import { Link, useNavigate, useParams } from 'react-router'
 import {
   useRegisterPatient,
+  useUpdatePatient,
+  usePatient,
   useUploadPatientPhoto,
   useCheckDuplicate,
   useMe,
@@ -10,8 +12,9 @@ import {
   useBookAppointment,
   useUpdateAppointmentStatus,
 } from '../api/queries'
-import { ApiError } from '../api/client'
+import { ApiError, apiFetch } from '../api/client'
 import { AppShell } from '../components/AppShell'
+import { ConflictBanner } from '../components/ConflictBanner'
 import { QueueTicketPreview } from '../components/QueueTicketPreview'
 import { UnsavedChangesGuard } from '../components/UnsavedChangesGuard'
 import { PatientPhotoModal } from '../components/PatientPhotoModal'
@@ -34,7 +37,7 @@ import {
   IconUserPlus,
   IconWalk,
 } from '../components/icons'
-import type { PatientCreate, PatientOut, DepartmentDoctorOut } from '../api/types'
+import type { PatientCreate, PatientOut, PatientUpdate, DepartmentDoctorOut } from '../api/types'
 import { istToday } from '../format'
 
 /** Shared field styling: one control height, one brand focus treatment, across both columns. */
@@ -72,13 +75,29 @@ function SectionHeader({
   )
 }
 
+/** Photo URL the server streams to authenticated sessions (same origin, so the CSP allows it). */
+const existingPhotoUrl = (p: PatientOut) => (p.photo_path ? `/api/patients/${p.id}/photo` : null)
+
+/**
+ * One form for both jobs. At /reception/patients/new it registers a patient; at
+ * /reception/patients/:id/edit the same form opens pre-filled for the existing patient and
+ * saves with PATCH /patients/{id} (optimistic version check). The URN never changes, and
+ * visit / token booking belongs to registration only.
+ */
 export function PatientRegister() {
   const { data: me } = useMe()
   const navigate = useNavigate()
+  const { id: editIdParam } = useParams<{ id: string }>()
+  const isEditMode = editIdParam !== undefined
+  const editId = isEditMode ? Number(editIdParam) : null
+  const validEditId = editId !== null && Number.isInteger(editId) && editId > 0
+  const patientQuery = usePatient(isEditMode && validEditId ? editId : null)
+  const recordPath = `/reception/patients/${editId}`
   const fileInputRef = useRef<HTMLInputElement>(null)
   const nameInputRef = useRef<HTMLInputElement>(null)
 
   const registerMutation = useRegisterPatient()
+  const updateMutation = useUpdatePatient()
   const uploadPhotoMutation = useUploadPatientPhoto()
   const bookAppointmentMutation = useBookAppointment()
   const updateStatusMutation = useUpdateAppointmentStatus()
@@ -128,14 +147,39 @@ export function PatientRegister() {
   const [photoRetrying, setPhotoRetrying] = useState(false)
   const [photoSavedNotice, setPhotoSavedNotice] = useState<string | null>(null)
   const [checkedIn, setCheckedIn] = useState(false)
+  // Edit mode: the record as last loaded (its version_id guards the save), and save state.
+  const [baseline, setBaseline] = useState<PatientOut | null>(null)
+  const [isConflict, setIsConflict] = useState(false)
+  const [isReloading, setIsReloading] = useState(false)
+  const [editSaved, setEditSaved] = useState(false)
+  const prefilledIdRef = useRef<number | null>(null)
   // Blocks a second submit while one is in flight (double-click, Enter key repeat).
   const submittingRef = useRef(false)
   // Set just before a deliberate post-registration navigation.
   const skipUnsavedGuardRef = useRef(false)
 
-  // Anything typed into the form means leaving now would lose work.
-  const isDirty = useMemo(
-    () =>
+  // Anything typed into the form means leaving now would lose work. When editing, only a
+  // change from the loaded record counts.
+  const isDirty = useMemo(() => {
+    if (isEditMode) {
+      if (!baseline) return false
+      return Boolean(
+        photoFile ||
+          fullName.trim() !== baseline.full_name ||
+          guardianName.trim() !== baseline.guardian_name ||
+          gender !== baseline.gender ||
+          dob !== (baseline.dob ?? '') ||
+          ageYears !== baseline.age_years ||
+          mobile.trim() !== baseline.mobile ||
+          address.trim() !== baseline.address ||
+          district.trim() !== baseline.district ||
+          state.trim() !== baseline.state ||
+          emergencyContact.trim() !== (baseline.emergency_contact ?? '') ||
+          allergies.trim() !== baseline.allergies ||
+          notes.trim() !== (baseline.notes ?? ''),
+      )
+    }
+    return (
       Boolean(
         fullName.trim() ||
           guardianName.trim() ||
@@ -154,27 +198,29 @@ export function PatientRegister() {
           visitType !== 'walk-in' ||
           reasonForVisit.trim() ||
           photoFile,
-      ),
-    [
-      fullName,
-      guardianName,
-      gender,
-      dob,
-      ageYears,
-      mobile,
-      address,
-      district,
-      state,
-      emergencyContact,
-      allergies,
-      notes,
-      selectedDepartmentId,
-      selectedDoctorId,
-      visitType,
-      reasonForVisit,
-      photoFile,
-    ],
-  )
+      )
+    )
+  }, [
+    isEditMode,
+    baseline,
+    fullName,
+    guardianName,
+    gender,
+    dob,
+    ageYears,
+    mobile,
+    address,
+    district,
+    state,
+    emergencyContact,
+    allergies,
+    notes,
+    selectedDepartmentId,
+    selectedDoctorId,
+    visitType,
+    reasonForVisit,
+    photoFile,
+  ])
 
   // Queries for departments & doctors
   const { data: departments } = useDepartments()
@@ -204,13 +250,14 @@ export function PatientRegister() {
     return () => clearTimeout(handler)
   }, [fullName, mobile])
 
+  // The duplicate check is for new registrations: while editing it would match the patient itself.
   const { data: duplicateData, isFetching: duplicateChecking } = useCheckDuplicate(
     debouncedName,
     debouncedMobile,
-    debouncedName.length >= 2 && debouncedMobile.length >= 10,
+    !isEditMode && debouncedName.length >= 2 && debouncedMobile.length >= 10,
   )
 
-  const isDuplicateDetected = Boolean(duplicateData?.has_duplicate)
+  const isDuplicateDetected = !isEditMode && Boolean(duplicateData?.has_duplicate)
 
   // Auto-calculate age from DOB if supplied
   const handleDobChange = (value: string) => {
@@ -244,14 +291,44 @@ export function PatientRegister() {
    * (img-src 'self' blob:) blocks data: images, which left the photo frame empty after a
    * capture or upload even though the file was held for saving.
    */
-  const showPhotoPreview = (file: File | null) => {
+  const showPhotoPreview = (file: File | null, serverPhotoUrl: string | null = null) => {
     if (photoPreviewUrlRef.current) {
       URL.revokeObjectURL(photoPreviewUrlRef.current)
     }
-    const url = file ? URL.createObjectURL(file) : null
-    photoPreviewUrlRef.current = url
-    setPhotoPreview(url)
+    const blobUrl = file ? URL.createObjectURL(file) : null
+    photoPreviewUrlRef.current = blobUrl
+    // With no new file, an edited patient's saved photo (streamed by the server) stays shown.
+    setPhotoPreview(blobUrl ?? serverPhotoUrl)
   }
+
+  /** Load a patient record into the form: the starting point of an edit, and "Reload latest". */
+  const fillFromPatient = (p: PatientOut) => {
+    setFullName(p.full_name)
+    setGuardianName(p.guardian_name)
+    setGender(p.gender)
+    setDob(p.dob ?? '')
+    setAgeYears(p.age_years)
+    setMobile(p.mobile)
+    setAddress(p.address)
+    setDistrict(p.district)
+    setState(p.state)
+    setEmergencyContact(p.emergency_contact ?? '')
+    setAllergies(p.allergies)
+    setNotes(p.notes ?? '')
+    setBaseline(p)
+    // A photo chosen in this session is kept; otherwise show the one on file.
+    if (!photoFile) showPhotoPreview(null, existingPhotoUrl(p))
+  }
+
+  // Edit mode: fill the form once, when the patient first arrives. Later background
+  // refetches must not overwrite what the receptionist is typing.
+  useEffect(() => {
+    const loaded = patientQuery.data
+    if (!isEditMode || !loaded || prefilledIdRef.current === loaded.id) return
+    prefilledIdRef.current = loaded.id
+    fillFromPatient(loaded)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isEditMode, patientQuery.data])
 
   // Release the preview's object URL when leaving the page.
   useEffect(
@@ -270,7 +347,8 @@ export function PatientRegister() {
 
   const handleRemovePhoto = () => {
     setPhotoFile(null)
-    showPhotoPreview(null)
+    // Editing: dropping a newly chosen photo goes back to the one already on file.
+    showPhotoPreview(null, baseline ? existingPhotoUrl(baseline) : null)
     if (fileInputRef.current) {
       fileInputRef.current.value = ''
     }
@@ -311,6 +389,12 @@ export function PatientRegister() {
   const errorText = (err: unknown) =>
     err instanceof Error && err.message ? err.message : 'unknown error'
 
+  /** Editing is done: back to the patient's record, which shows the notice. */
+  const finishEdit = (notice: string) => {
+    skipUnsavedGuardRef.current = true
+    navigate(recordPath, { state: { notice } })
+  }
+
   const handleRetryPhoto = async () => {
     if (!photoFailure || !photoFile) return
     setPhotoRetrying(true)
@@ -318,6 +402,10 @@ export function PatientRegister() {
     try {
       await uploadPhotoMutation.mutateAsync({ id: photoFailure.patientId, file: photoFile })
       setPhotoFailure(null)
+      if (isEditMode) {
+        finishEdit('Patient details and photo updated successfully.')
+        return
+      }
       setPhotoSavedNotice('Photo uploaded and saved to the patient record.')
     } catch (retryErr) {
       setPhotoFailure({ ...photoFailure, message: errorText(retryErr) })
@@ -326,10 +414,85 @@ export function PatientRegister() {
     }
   }
 
+  /** "Reload latest" after a version conflict: replace the form with the server's current record. */
+  const handleReloadLatest = async () => {
+    if (editId === null) return
+    setIsReloading(true)
+    try {
+      const fresh = await apiFetch<PatientOut>(`/patients/${editId}`)
+      fillFromPatient(fresh)
+      setIsConflict(false)
+      setFormError(null)
+    } catch {
+      setFormError('Failed to reload latest patient data.')
+    } finally {
+      setIsReloading(false)
+    }
+  }
+
+  /** Save the edited patient with PATCH /patients/{id}; the photo, if changed, goes after it. */
+  const handleEditSubmit = async () => {
+    if (!baseline) return
+    if (baseline.dob && !dob.trim()) {
+      // The API treats a missing date as "leave unchanged", so a cleared date would silently not save.
+      setFormError('A recorded date of birth cannot be removed. Enter the correct date instead.')
+      return
+    }
+
+    const body: PatientUpdate = {
+      version_id: baseline.version_id,
+      full_name: fullName.trim(),
+      guardian_name: guardianName.trim() || 'Self / Not specified',
+      gender,
+      dob: dob.trim() || null,
+      age_years: Number(ageYears),
+      mobile: mobile.trim(),
+      address: address.trim(),
+      district: district.trim() || 'Bhojpur',
+      state: state.trim() || 'Bihar',
+      // '' clears these on the server; null would leave the old value in place.
+      emergency_contact: emergencyContact.trim(),
+      allergies: allergies.trim() || 'None reported',
+      notes: notes.trim(),
+    }
+
+    submittingRef.current = true
+    setIsConflict(false)
+    try {
+      const updated = await updateMutation.mutateAsync({ id: baseline.id, body })
+      // The version moved on with this save; keep it so a later save is not a false conflict.
+      setBaseline(updated)
+      if (photoFile) {
+        try {
+          await uploadPhotoMutation.mutateAsync({ id: updated.id, file: photoFile })
+        } catch (photoErr) {
+          setEditSaved(true)
+          setPhotoFailure({
+            patientId: updated.id,
+            fileName: photoFile.name,
+            message: errorText(photoErr),
+          })
+          return
+        }
+      }
+      finishEdit('Patient details updated successfully.')
+    } catch (err: unknown) {
+      if (err instanceof ApiError && (err.status === 409 || err.code === 'version_conflict')) {
+        setIsConflict(true)
+      } else if (err instanceof Error && err.message) {
+        setFormError(err.message)
+      } else {
+        setFormError('Failed to save changes. Please try again.')
+      }
+    } finally {
+      submittingRef.current = false
+    }
+  }
+
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault()
     // A registered patient stays on screen until "Register Another" is used; never create a second one.
-    if (submittingRef.current || createdPatient) return
+    if (submittingRef.current || createdPatient || editSaved) return
     setFormError(null)
     setQuickSuccessNotice(null)
     setRegistrationWarnings([])
@@ -339,6 +502,11 @@ export function PatientRegister() {
 
     if (ageYears === '' || ageYears < 0) {
       setFormError('Please enter a valid age in years.')
+      return
+    }
+
+    if (isEditMode) {
+      await handleEditSubmit()
       return
     }
 
@@ -454,6 +622,32 @@ export function PatientRegister() {
     }
   }
 
+  // Editing: wait for the record before showing the form (it opens pre-filled, never empty).
+  if (isEditMode && (!validEditId || !baseline)) {
+    return (
+      <AppShell name={me?.full_name || 'Reception Staff'} role={me?.role || 'RECEPTION'}>
+        <div className="w-full space-y-4 pb-2">
+          {!validEditId ? (
+            <div role="alert" className="rounded-xl border border-red-200 bg-red-50 p-5 text-sm font-medium text-red-900">
+              Invalid patient ID.
+            </div>
+          ) : patientQuery.isError ? (
+            <div role="alert" className="rounded-xl border border-red-200 bg-red-50 p-5 text-sm font-medium text-red-900">
+              Failed to load patient: {patientQuery.error.message}
+            </div>
+          ) : (
+            <div role="status" className="rounded-xl border border-slate-200 bg-white p-10 text-center text-sm text-slate-500">
+              Loading patient record…
+            </div>
+          )}
+          <Link to="/reception/patients" className="inline-block text-sm font-medium text-[#8E1C3D] hover:underline">
+            &larr; Back to Patient Records
+          </Link>
+        </div>
+      </AppShell>
+    )
+  }
+
   return (
     <AppShell name={me?.full_name || 'Reception Staff'} role={me?.role || 'RECEPTION'}>
       <UnsavedChangesGuard dirty={isDirty && !createdPatient} bypassRef={skipUnsavedGuardRef} />
@@ -463,28 +657,53 @@ export function PatientRegister() {
         <header className="flex flex-col gap-3 border-b border-slate-200 pb-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-start gap-3">
             <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-[#E4C8D1] bg-[#FBF5F7] text-[#8E1C3D]">
-              <IconUserPlus className="h-6 w-6" stroke={1.8} />
+              {isEditMode ? (
+                <IconUser className="h-6 w-6" stroke={1.8} />
+              ) : (
+                <IconUserPlus className="h-6 w-6" stroke={1.8} />
+              )}
             </span>
             <div className="min-w-0">
               <h1 className="text-xl font-bold tracking-tight text-slate-900">
-                Patient Registration
+                {isEditMode ? 'Edit Patient Details' : 'Patient Registration'}
               </h1>
               <p className="text-xs text-slate-500">
-                Register the patient, allocate the Universal Record Number (URN) and issue the doctor
-                queue token.{' '}
+                {isEditMode ? (
+                  <>
+                    Update the saved details of{' '}
+                    <span className="font-semibold text-slate-700">{baseline?.full_name}</span> · URN{' '}
+                    <span className="font-mono font-semibold text-[#5D0B26]">{baseline?.urn}</span>. The
+                    URN does not change.{' '}
+                  </>
+                ) : (
+                  <>
+                    Register the patient, allocate the Universal Record Number (URN) and issue the
+                    doctor queue token.{' '}
+                  </>
+                )}
                 <span className="font-semibold text-[#8E1C3D]">Fields marked * are required.</span>
               </p>
             </div>
           </div>
 
           <div className="flex shrink-0 items-center gap-2.5">
-            <Link
-              to="/reception/tokens"
-              className="inline-flex min-h-10 items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3.5 text-xs font-semibold text-slate-700 shadow-2xs transition-colors hover:border-[#8E1C3D] hover:text-[#5D0B26]"
-            >
-              <IconTicket className="h-4 w-4 text-[#8E1C3D]" />
-              Visit &amp; Token Desk
-            </Link>
+            {isEditMode ? (
+              <Link
+                to={recordPath}
+                className="inline-flex min-h-10 items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3.5 text-xs font-semibold text-slate-700 shadow-2xs transition-colors hover:border-[#8E1C3D] hover:text-[#5D0B26]"
+              >
+                <IconUser className="h-4 w-4 text-[#8E1C3D]" />
+                Patient File
+              </Link>
+            ) : (
+              <Link
+                to="/reception/tokens"
+                className="inline-flex min-h-10 items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3.5 text-xs font-semibold text-slate-700 shadow-2xs transition-colors hover:border-[#8E1C3D] hover:text-[#5D0B26]"
+              >
+                <IconTicket className="h-4 w-4 text-[#8E1C3D]" />
+                Visit &amp; Token Desk
+              </Link>
+            )}
             <Link
               to="/reception/patients"
               className="inline-flex min-h-10 items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3.5 text-xs font-semibold text-slate-700 shadow-2xs transition-colors hover:border-[#8E1C3D] hover:text-[#5D0B26]"
@@ -494,6 +713,10 @@ export function PatientRegister() {
             </Link>
           </div>
         </header>
+
+        {isConflict && (
+          <ConflictBanner onReload={() => void handleReloadLatest()} isReloading={isReloading} />
+        )}
 
         {/* Steps that did not complete after the patient was saved */}
         {registrationWarnings.length > 0 && (
@@ -537,7 +760,13 @@ export function PatientRegister() {
               </button>
               <button
                 type="button"
-                onClick={() => setPhotoFailure(null)}
+                onClick={() => {
+                  if (isEditMode) {
+                    finishEdit('Patient details updated. The new photo was not saved.')
+                    return
+                  }
+                  setPhotoFailure(null)
+                }}
                 className="inline-flex min-h-11 items-center rounded-lg border border-amber-400 bg-white px-4 text-sm font-semibold text-amber-950 hover:bg-amber-100 cursor-pointer"
               >
                 Continue without photo
@@ -709,7 +938,7 @@ export function PatientRegister() {
             {/* ========================================================= */}
             {/* LEFT: identity, contact and clinical flags (8 of 12)      */}
             {/* ========================================================= */}
-            <div className="space-y-5 xl:col-span-8">
+            <div className={`space-y-5 ${isEditMode ? 'xl:col-span-12' : 'xl:col-span-8'}`}>
               {/* SECTION 1: Patient identity */}
               <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xs">
                 <SectionHeader
@@ -751,6 +980,10 @@ export function PatientRegister() {
                           src={photoPreview}
                           alt="Patient preview"
                           className="h-full w-full rounded-lg object-cover"
+                          onError={() => {
+                            // The photo on file could not be streamed (file missing): show the empty frame.
+                            if (!photoFile) setPhotoPreview(null)
+                          }}
                         />
                       ) : (
                         <>
@@ -773,15 +1006,21 @@ export function PatientRegister() {
                         >
                           Change
                         </button>
-                        <span className="text-slate-400">•</span>
-                        <button
-                          type="button"
-                          onClick={handleRemovePhoto}
-                          className="inline-flex items-center gap-1 text-xs font-semibold text-red-600 hover:underline cursor-pointer"
-                        >
-                          <IconTrash className="h-3 w-3" />
-                          Remove
-                        </button>
+                        {/* The saved photo cannot be deleted here, only replaced; so while editing
+                            Remove only appears for a photo chosen in this session. */}
+                        {(!isEditMode || photoFile) && (
+                          <>
+                            <span className="text-slate-400">•</span>
+                            <button
+                              type="button"
+                              onClick={handleRemovePhoto}
+                              className="inline-flex items-center gap-1 text-xs font-semibold text-red-600 hover:underline cursor-pointer"
+                            >
+                              <IconTrash className="h-3 w-3" />
+                              {isEditMode ? 'Discard new photo' : 'Remove'}
+                            </button>
+                          </>
+                        )}
                       </div>
                     )}
                   </div>
@@ -918,6 +1157,26 @@ export function PatientRegister() {
                             />
                             Female
                           </label>
+                          {/* Registration offers Male / Female only; a record already saved as Other keeps it. */}
+                          {baseline?.gender === 'O' && (
+                            <label
+                              className={`flex min-h-9 flex-1 cursor-pointer items-center justify-center gap-1.5 rounded-md text-xs font-bold transition-colors ${
+                                gender === 'O'
+                                  ? 'border border-[#C39A35] bg-white text-[#5D0B26] shadow-2xs'
+                                  : 'border border-transparent text-slate-600 hover:text-[#5D0B26]'
+                              }`}
+                            >
+                              <input
+                                type="radio"
+                                name="gender"
+                                value="O"
+                                checked={gender === 'O'}
+                                onChange={() => setGender('O')}
+                                className="h-4 w-4 shrink-0 accent-[#8E1C3D] focus:ring-[#8E1C3D]"
+                              />
+                              Other
+                            </label>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -1052,6 +1311,8 @@ export function PatientRegister() {
             {/* ========================================================= */}
             {/* RIGHT: visit allocation and live token preview (4 of 12)  */}
             {/* ========================================================= */}
+            {/* Editing an existing patient changes details only: no visit or token is booked. */}
+            {!isEditMode && (
             <div className="space-y-5 xl:col-span-4">
               {/* SECTION 4: Visit & queue */}
               <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xs">
@@ -1201,42 +1462,67 @@ export function PatientRegister() {
                 </div>
               </section>
             </div>
+            )}
           </div>
 
           {/* Bottom action bar */}
           <div className="flex flex-col justify-between gap-3 rounded-2xl border border-slate-200 border-l-4 border-l-[#C39A35] bg-white p-4 shadow-xs sm:flex-row sm:items-center sm:gap-4">
-            <label className="flex cursor-pointer select-none items-center gap-2.5 text-sm font-semibold text-slate-800">
-              <input
-                type="checkbox"
-                checked={saveAndAddAnother}
-                onChange={(e) => setSaveAndAddAnother(e.target.checked)}
-                className="h-4 w-4 rounded border-slate-300 accent-[#8E1C3D] focus:ring-[#8E1C3D]"
-              />
-              Save and add another
-            </label>
+            {isEditMode ? (
+              <p className="text-xs text-slate-600">
+                Changes are saved to the patient record and shown on the registration card.
+              </p>
+            ) : (
+              <label className="flex cursor-pointer select-none items-center gap-2.5 text-sm font-semibold text-slate-800">
+                <input
+                  type="checkbox"
+                  checked={saveAndAddAnother}
+                  onChange={(e) => setSaveAndAddAnother(e.target.checked)}
+                  className="h-4 w-4 rounded border-slate-300 accent-[#8E1C3D] focus:ring-[#8E1C3D]"
+                />
+                Save and add another
+              </label>
+            )}
 
             <div className="flex w-full items-center gap-3 sm:w-auto">
-              <button
-                type="button"
-                onClick={handleClear}
-                className="inline-flex min-h-11 items-center gap-1.5 rounded-xl border border-slate-300 bg-white px-4 text-sm font-bold text-slate-700 transition-colors hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#8E1C3D] cursor-pointer"
-              >
-                <IconRefresh className="h-4 w-4 text-slate-500" />
-                Clear
-              </button>
+              {isEditMode ? (
+                <button
+                  type="button"
+                  onClick={() => navigate(recordPath)}
+                  className="inline-flex min-h-11 items-center gap-1.5 rounded-xl border border-slate-300 bg-white px-4 text-sm font-bold text-slate-700 transition-colors hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#8E1C3D] cursor-pointer"
+                >
+                  Cancel
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={handleClear}
+                  className="inline-flex min-h-11 items-center gap-1.5 rounded-xl border border-slate-300 bg-white px-4 text-sm font-bold text-slate-700 transition-colors hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#8E1C3D] cursor-pointer"
+                >
+                  <IconRefresh className="h-4 w-4 text-slate-500" />
+                  Clear
+                </button>
+              )}
 
               <button
                 type="submit"
-                aria-label="Register Patient"
+                aria-label={isEditMode ? 'Save Changes' : 'Register Patient'}
                 disabled={
-                  registerMutation.isPending ||
-                  !!createdPatient ||
-                  (isDuplicateDetected && !confirmDifferentPatient)
+                  isEditMode
+                    ? updateMutation.isPending || editSaved || isConflict
+                    : registerMutation.isPending ||
+                      !!createdPatient ||
+                      (isDuplicateDetected && !confirmDifferentPatient)
                 }
                 className="inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-xl bg-[#8E1C3D] px-6 text-sm font-bold text-white shadow-xs transition-colors hover:bg-[#5D0B26] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#5D0B26] disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer sm:flex-none"
               >
                 <IconDeviceFloppy className="h-4 w-4" />
-                {registerMutation.isPending ? 'Saving...' : 'Save Registration'}
+                {isEditMode
+                  ? updateMutation.isPending
+                    ? 'Saving...'
+                    : 'Save Changes'
+                  : registerMutation.isPending
+                    ? 'Saving...'
+                    : 'Save Registration'}
               </button>
             </div>
           </div>

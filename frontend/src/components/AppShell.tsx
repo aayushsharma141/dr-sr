@@ -336,7 +336,7 @@ function isNavigationItemActive(
   if (item.key === 'patient-records') {
     return (
       pathname === '/reception/patients' ||
-      /^\/reception\/patients\/\d+(?:\/print)?$/.test(pathname)
+      /^\/reception\/patients\/\d+(?:\/print|\/edit)?$/.test(pathname)
     )
   }
 
@@ -522,6 +522,9 @@ function breadcrumbsFor(pathname: string, role: Role): Crumb[] {
   } else if (/^\/reception\/patients\/\d+\/print$/.test(pathname)) {
     crumbs.push({ label: 'Patient Records', href: '/reception/patients' })
     crumbs.push({ label: 'Registration Card' })
+  } else if (/^\/reception\/patients\/\d+\/edit$/.test(pathname)) {
+    crumbs.push({ label: 'Patient Records', href: '/reception/patients' })
+    crumbs.push({ label: 'Edit Patient' })
   } else if (pathname === '/reception/appointments') {
     crumbs.push({ label: 'Appointments' })
   } else if (pathname === '/reception/billing') {
