@@ -18,6 +18,9 @@ from kalyan_api.db.session import SessionDep
 from kalyan_api.schemas.sessions import RevokeSessionRequest, RevokeUserSessionsOut
 from kalyan_api.schemas.users import (
     ActionRequest,
+    BulkDeleteEntryOut,
+    BulkDeleteUsersOut,
+    BulkDeleteUsersRequest,
     DeleteUserOut,
     DeleteUserRequest,
     LoginHistoryEntry,
@@ -128,6 +131,65 @@ def deactivate_existing_user(
     ctx = build_audit_context(request, principal)
     user = user_service.deactivate_user(session, ctx, id, payload.version_id, reason=payload.reason)
     return UserOut.from_user(user, now=clock.utcnow())
+
+
+@router.post(
+    "/bulk-delete",
+    response_model=BulkDeleteUsersOut,
+    dependencies=[Depends(require(Permission.USER_DELETE))],
+)
+def bulk_delete_existing_users(
+    request: Request,
+    payload: BulkDeleteUsersRequest,
+    session: SessionDep,
+    principal: Principal = Depends(current_principal),
+    settings: Settings = Depends(get_effective_settings),
+) -> BulkDeleteUsersOut | JSONResponse:
+    """Delete several deactivated, never-used accounts under one super admin password."""
+    ctx = build_audit_context(request, principal)
+    result = user_service.bulk_delete_users(
+        session,
+        ctx,
+        settings,
+        [
+            user_service.BulkDeleteItem(user_id=item.id, version_id=item.version_id)
+            for item in payload.items
+        ],
+        payload.super_admin_password,
+        reason=payload.reason,
+    )
+    if result.status == "throttled":
+        return JSONResponse(
+            status_code=429,
+            content={
+                "code": "delete_throttled",
+                "message": "Too many incorrect super admin passwords. Try again in 15 minutes.",
+            },
+        )
+    if result.status != "done":
+        return JSONResponse(
+            status_code=403,
+            content={
+                "code": "super_admin_password_incorrect",
+                "message": "The super admin password is not correct.",
+            },
+        )
+    entries = [
+        BulkDeleteEntryOut(
+            id=e.user_id,
+            username=e.username,
+            deleted=e.deleted,
+            code=e.code,
+            message=e.message,
+        )
+        for e in result.entries
+    ]
+    deleted_count = sum(1 for e in entries if e.deleted)
+    return BulkDeleteUsersOut(
+        deleted_count=deleted_count,
+        skipped_count=len(entries) - deleted_count,
+        results=entries,
+    )
 
 
 @router.post(

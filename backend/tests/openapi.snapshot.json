@@ -1560,6 +1560,151 @@
         "title": "Body_upload_asset_api_admin_assets_post",
         "type": "object"
       },
+      "BulkDeleteEntryOut": {
+        "additionalProperties": false,
+        "description": "Outcome for one account of a bulk delete.",
+        "properties": {
+          "code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Code"
+          },
+          "deleted": {
+            "title": "Deleted",
+            "type": "boolean"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message"
+          },
+          "username": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Username"
+          }
+        },
+        "required": [
+          "id",
+          "username",
+          "deleted",
+          "code",
+          "message"
+        ],
+        "title": "BulkDeleteEntryOut",
+        "type": "object"
+      },
+      "BulkDeleteItemIn": {
+        "additionalProperties": false,
+        "description": "One account in a bulk delete, with the version the administrator last saw.",
+        "properties": {
+          "id": {
+            "minimum": 1.0,
+            "title": "Id",
+            "type": "integer"
+          },
+          "version_id": {
+            "minimum": 1.0,
+            "title": "Version Id",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "version_id"
+        ],
+        "title": "BulkDeleteItemIn",
+        "type": "object"
+      },
+      "BulkDeleteUsersOut": {
+        "additionalProperties": false,
+        "description": "Per-account results of a bulk delete.",
+        "properties": {
+          "deleted_count": {
+            "title": "Deleted Count",
+            "type": "integer"
+          },
+          "results": {
+            "items": {
+              "$ref": "#/components/schemas/BulkDeleteEntryOut"
+            },
+            "title": "Results",
+            "type": "array"
+          },
+          "skipped_count": {
+            "title": "Skipped Count",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "deleted_count",
+          "skipped_count",
+          "results"
+        ],
+        "title": "BulkDeleteUsersOut",
+        "type": "object"
+      },
+      "BulkDeleteUsersRequest": {
+        "additionalProperties": false,
+        "description": "Payload for deleting several accounts under one super admin password check.",
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/BulkDeleteItemIn"
+            },
+            "maxItems": 100,
+            "minItems": 1,
+            "title": "Items",
+            "type": "array"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "super_admin_password": {
+            "maxLength": 256,
+            "minLength": 1,
+            "title": "Super Admin Password",
+            "type": "string"
+          }
+        },
+        "required": [
+          "items",
+          "super_admin_password"
+        ],
+        "title": "BulkDeleteUsersRequest",
+        "type": "object"
+      },
       "ChangePasswordRequest": {
         "additionalProperties": false,
         "description": "Payload for user password change.",
@@ -14072,6 +14217,48 @@
           }
         },
         "summary": "Create New User",
+        "tags": [
+          "users"
+        ]
+      }
+    },
+    "/api/users/bulk-delete": {
+      "post": {
+        "description": "Delete several deactivated, never-used accounts under one super admin password.",
+        "operationId": "bulk_delete_existing_users_api_users_bulk_delete_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BulkDeleteUsersRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BulkDeleteUsersOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Bulk Delete Existing Users",
         "tags": [
           "users"
         ]

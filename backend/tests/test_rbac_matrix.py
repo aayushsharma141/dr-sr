@@ -758,6 +758,22 @@ def test_rbac_matrix_cell(
         target_entity = tmpl
         resolved_path = row.path.replace("{doc_type}", "prescription")
 
+    elif row.path == "/api/users/bulk-delete":
+        make_user(
+            db_session,
+            test_settings,
+            "ADMIN",
+            f"mat_super_{uuid.uuid4().hex[:6]}",
+            is_super_admin=True,
+        )
+        target_entity = make_user(
+            db_session,
+            test_settings,
+            "RECEPTION",
+            f"mat_tgt_{uuid.uuid4().hex[:6]}",
+            is_active=False,
+        )
+
     elif "{id}" in row.path:
         # reactivate and delete both need an already-deactivated target
         is_active = "reactivate" not in row.path and not row.path.endswith("/delete")

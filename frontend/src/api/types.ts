@@ -266,6 +266,28 @@ export interface DeleteUserRequest extends ActionRequest {
   super_admin_password: string
 }
 
+export interface BulkDeleteUsersRequest {
+  items: { id: number; version_id: number }[]
+  reason?: string | null
+  /** Password of the super admin account; checked once for the whole batch, never stored. */
+  super_admin_password: string
+}
+
+export interface BulkDeleteEntry {
+  id: number
+  username: string | null
+  deleted: boolean
+  /** Why an account was skipped (null when deleted). */
+  code: string | null
+  message: string | null
+}
+
+export interface BulkDeleteUsersOut {
+  deleted_count: number
+  skipped_count: number
+  results: BulkDeleteEntry[]
+}
+
 export interface DeleteUserOut {
   id: number
   username: string
@@ -559,6 +581,7 @@ export interface DepartmentDoctorOut {
   name_en: string
   name_hi: string | null
   qualification: string | null
+  cabin_code?: string | null
   default_fee_paise: number
 }
 

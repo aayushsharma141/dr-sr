@@ -95,6 +95,8 @@ import type {
 } from './types'
 import type {
   ActionRequest,
+  BulkDeleteUsersOut,
+  BulkDeleteUsersRequest,
   DeleteUserOut,
   DeleteUserRequest,
   AreaOverview,
@@ -316,6 +318,25 @@ export function useDeleteUser() {
     },
     onSuccess: (deleted) => {
       qc.removeQueries({ queryKey: ['users', deleted.id] })
+      qc.invalidateQueries({ queryKey: ['users'] })
+      invalidateAdminSummaries(qc)
+    },
+  })
+}
+
+export function useBulkDeleteUsers() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (payload: BulkDeleteUsersRequest): Promise<BulkDeleteUsersOut> => {
+      return await apiFetch<BulkDeleteUsersOut>('/users/bulk-delete', {
+        method: 'POST',
+        body: payload,
+      })
+    },
+    onSuccess: (out) => {
+      for (const entry of out.results) {
+        if (entry.deleted) qc.removeQueries({ queryKey: ['users', entry.id] })
+      }
       qc.invalidateQueries({ queryKey: ['users'] })
       invalidateAdminSummaries(qc)
     },

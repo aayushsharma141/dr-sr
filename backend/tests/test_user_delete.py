@@ -252,3 +252,173 @@ def test_direct_sql_delete_of_users_is_still_denied_to_the_app_role(app_engine: 
             assert "permission denied" in str(exc).lower()
         else:
             raise AssertionError("kalyan_app must not hold table-level DELETE on users")
+
+
+# --------------------------------------------------------------------------------------
+# Bulk delete: one super admin password, per-account results
+# --------------------------------------------------------------------------------------
+
+
+def _bulk(client: Any, targets: list[User], password: str, reason: str | None = None) -> Any:
+    return client.post(
+        "/api/users/bulk-delete",
+        json={
+            "items": [{"id": t.id, "version_id": t.version_id} for t in targets],
+            "super_admin_password": password,
+            "reason": reason,
+        },
+    )
+
+
+def test_bulk_delete_removes_unused_accounts_with_one_password_and_audits_each(
+    db_session: Session, login_client: Any, test_settings: Settings
+) -> None:
+    actor, _super, first = _users(db_session, test_settings, "bulk1")
+    second = make_user(db_session, test_settings, "RECEPTION", "bulk_second", is_active=False)
+    third = make_user(db_session, test_settings, "RECEPTION", "bulk_third", is_active=False)
+    client = login_client(actor)
+
+    res = _bulk(client, [first, second, third], SUPER_PASSWORD, reason="clean-up")
+
+    assert res.status_code == 200
+    body = res.json()
+    assert body["deleted_count"] == 3
+    assert body["skipped_count"] == 0
+    assert [r["deleted"] for r in body["results"]] == [True, True, True]
+    for user in (first, second, third):
+        assert not _exists(db_session, user.id)
+        audit = db_session.scalar(
+            select(AuditLog).where(
+                AuditLog.action == "USER_DELETED", AuditLog.entity_id == str(user.id)
+            )
+        )
+        assert audit is not None
+        assert audit.actor_user_id == actor.id
+        assert audit.reason == "clean-up"
+
+
+def test_bulk_delete_skips_accounts_that_cannot_be_deleted_and_continues(
+    db_session: Session, login_client: Any, test_settings: Settings
+) -> None:
+    actor, super_admin, good = _users(db_session, test_settings, "bulk2")
+    active = make_user(db_session, test_settings, "RECEPTION", "bulk_active")
+    used = make_user(db_session, test_settings, "RECEPTION", "bulk_used")
+    login_client(used)  # sign-in writes an audit row that references this user
+    client = login_client(actor)
+    db_session.expire_all()
+    used = db_session.get(User, used.id)
+    assert (
+        client.post(
+            f"/api/users/{used.id}/deactivate", json={"version_id": used.version_id}
+        ).status_code
+        == 200
+    )
+    db_session.expire_all()
+    used = db_session.get(User, used.id)
+    good_after = make_user(db_session, test_settings, "RECEPTION", "bulk_good2", is_active=False)
+    super_admin = db_session.get(User, super_admin.id)
+
+    res = _bulk(client, [active, used, super_admin, actor, good, good_after], SUPER_PASSWORD)
+
+    assert res.status_code == 200
+    by_id = {r["id"]: r for r in res.json()["results"]}
+    assert by_id[active.id]["code"] == "user_still_active"
+    assert by_id[used.id]["code"] == "user_has_history"
+    assert by_id[super_admin.id]["code"] == "super_admin_protected"
+    assert by_id[actor.id]["code"] == "self_action_forbidden"
+    assert by_id[good.id]["deleted"] is True
+    assert by_id[good_after.id]["deleted"] is True  # a refusal earlier did not stop the rest
+    assert res.json()["deleted_count"] == 2
+    assert res.json()["skipped_count"] == 4
+    assert _exists(db_session, used.id)
+    assert _exists(db_session, active.id)
+    assert not _exists(db_session, good.id)
+
+
+def test_bulk_delete_skips_unknown_and_stale_accounts(
+    db_session: Session, login_client: Any, test_settings: Settings
+) -> None:
+    actor, _super, target = _users(db_session, test_settings, "bulk3")
+    client = login_client(actor)
+
+    res = client.post(
+        "/api/users/bulk-delete",
+        json={
+            "items": [
+                {"id": 999_999_999, "version_id": 1},
+                {"id": target.id, "version_id": target.version_id + 7},
+            ],
+            "super_admin_password": SUPER_PASSWORD,
+        },
+    )
+
+    assert res.status_code == 200
+    codes = [r["code"] for r in res.json()["results"]]
+    assert codes == ["not_found", "version_conflict"]
+    assert _exists(db_session, target.id)
+
+
+def test_bulk_delete_wrong_password_deletes_nothing_and_is_audited_once(
+    db_session: Session, login_client: Any, test_settings: Settings
+) -> None:
+    actor, _super, first = _users(db_session, test_settings, "bulk4")
+    second = make_user(db_session, test_settings, "RECEPTION", "bulk_w2", is_active=False)
+    client = login_client(actor)
+
+    res = _bulk(client, [first, second], TEST_PASSWORD)
+
+    assert res.status_code == 403
+    assert res.json()["code"] == "super_admin_password_incorrect"
+    assert _exists(db_session, first.id) and _exists(db_session, second.id)
+    denied = db_session.scalar(
+        select(func.count(AuditLog.id)).where(
+            AuditLog.action == "USER_DELETE_DENIED", AuditLog.actor_user_id == actor.id
+        )
+    )
+    assert denied == 1
+
+
+def test_bulk_delete_wrong_passwords_are_throttled(
+    db_session: Session, login_client: Any, test_settings: Settings
+) -> None:
+    actor, _super, target = _users(db_session, test_settings, "bulk5")
+    client = login_client(actor)
+
+    for _ in range(5):
+        assert _bulk(client, [target], "wrong-password").status_code == 403
+
+    res = _bulk(client, [target], SUPER_PASSWORD)
+    assert res.status_code == 429
+    assert res.json()["code"] == "delete_throttled"
+    assert _exists(db_session, target.id)
+
+
+def test_bulk_delete_is_admin_only_and_validates_the_request(
+    db_session: Session,
+    login_client: Any,
+    test_settings: Settings,
+    reception_user: User,
+) -> None:
+    actor, _super, target = _users(db_session, test_settings, "bulk6")
+
+    forbidden = _bulk(login_client(reception_user), [target], SUPER_PASSWORD)
+    assert forbidden.status_code == 403
+    assert forbidden.json().get("code") != "super_admin_password_incorrect"
+
+    client = login_client(actor)
+    empty = client.post(
+        "/api/users/bulk-delete", json={"items": [], "super_admin_password": SUPER_PASSWORD}
+    )
+    assert empty.status_code == 422
+    duplicate = client.post(
+        "/api/users/bulk-delete",
+        json={
+            "items": [
+                {"id": target.id, "version_id": target.version_id},
+                {"id": target.id, "version_id": target.version_id},
+            ],
+            "super_admin_password": SUPER_PASSWORD,
+        },
+    )
+    assert duplicate.status_code == 422
+    assert _exists(db_session, target.id)

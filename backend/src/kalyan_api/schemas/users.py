@@ -80,6 +80,55 @@ class DeleteUserOut(BaseModel):
     deleted: bool
 
 
+class BulkDeleteItemIn(BaseModel):
+    """One account in a bulk delete, with the version the administrator last saw."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    id: int = Field(ge=1)
+    version_id: int = Field(ge=1)
+
+
+class BulkDeleteUsersRequest(BaseModel):
+    """Payload for deleting several accounts under one super admin password check."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    items: list[BulkDeleteItemIn] = Field(min_length=1, max_length=100)
+    reason: OptionalReason = None
+    super_admin_password: str = Field(min_length=1, max_length=256, repr=False)
+
+    @model_validator(mode="after")
+    def validate_unique_ids(self) -> "BulkDeleteUsersRequest":
+        """Reject a request that lists the same account twice."""
+        ids = [item.id for item in self.items]
+        if len(ids) != len(set(ids)):
+            raise ValueError("Each account may be listed only once")
+        return self
+
+
+class BulkDeleteEntryOut(BaseModel):
+    """Outcome for one account of a bulk delete."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    id: int
+    username: str | None
+    deleted: bool
+    code: str | None
+    message: str | None
+
+
+class BulkDeleteUsersOut(BaseModel):
+    """Per-account results of a bulk delete."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    deleted_count: int
+    skipped_count: int
+    results: list[BulkDeleteEntryOut]
+
+
 class UserUpdate(BaseModel):
     """Payload for modifying an existing user account with optimistic concurrency."""
 

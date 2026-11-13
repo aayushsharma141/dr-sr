@@ -34,6 +34,7 @@ const inactiveAdminSelfLike = user({ id: 13, username: 'me.admin', role: 'ADMIN'
 
 const mocks = vi.hoisted(() => ({
   deleteMutate: vi.fn(),
+  bulkMutate: vi.fn(),
   users: [] as UserOut[],
 }))
 
@@ -48,6 +49,7 @@ vi.mock('../../api/queries', () => ({
   useCreateUser: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useDeactivateUser: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useDeleteUser: () => ({ mutateAsync: mocks.deleteMutate, isPending: false }),
+  useBulkDeleteUsers: () => ({ mutateAsync: mocks.bulkMutate, isPending: false }),
   useReactivateUser: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useResetUserPassword: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useUpdateUser: () => ({ mutateAsync: vi.fn(), isPending: false }),
@@ -133,5 +135,89 @@ describe('Users page: delete account needs the super admin password', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Delete account' }))
 
     expect(await screen.findByRole('alert')).toHaveTextContent('Keep it deactivated instead.')
+  })
+})
+
+describe('Users page: bulk delete with one super admin password', () => {
+  const second = user({ id: 14, username: 'second.reception', version_id: 2 })
+
+  beforeEach(() => {
+    mocks.bulkMutate.mockReset()
+    mocks.users = [inactive, second, active, superAdmin, me]
+  })
+
+  it('offers a checkbox only for accounts that can be deleted and counts the selection', () => {
+    renderUsers()
+
+    expect(screen.getByRole('checkbox', { name: 'Select unused.reception' })).toBeInTheDocument()
+    expect(screen.getByRole('checkbox', { name: 'Select second.reception' })).toBeInTheDocument()
+    expect(screen.queryByRole('checkbox', { name: 'Select active.reception' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('checkbox', { name: 'Select root.admin' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('checkbox', { name: 'Select me.admin' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('region', { name: 'Bulk actions' })).not.toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Select all deletable accounts shown' }))
+    expect(screen.getByRole('region', { name: 'Bulk actions' })).toHaveTextContent('2 accounts selected')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Clear selection' }))
+    expect(screen.queryByRole('region', { name: 'Bulk actions' })).not.toBeInTheDocument()
+  })
+
+  it('sends every selected account with one password and shows which were skipped', async () => {
+    mocks.bulkMutate.mockResolvedValueOnce({
+      deleted_count: 1,
+      skipped_count: 1,
+      results: [
+        { id: 10, username: 'unused.reception', deleted: true, code: null, message: null },
+        {
+          id: 14,
+          username: 'second.reception',
+          deleted: false,
+          code: 'user_has_history',
+          message: 'This account has recorded activity and cannot be deleted. Keep it deactivated instead.',
+        },
+      ],
+    })
+    renderUsers()
+
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Select all deletable accounts shown' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Delete selected' }))
+
+    const confirm = screen.getByRole('button', { name: 'Delete 2 accounts' })
+    expect(confirm).toBeDisabled()
+    fireEvent.change(screen.getByLabelText('Super admin password'), { target: { value: 'Sup3r-Secret!' } })
+    fireEvent.click(confirm)
+
+    await waitFor(() => expect(mocks.bulkMutate).toHaveBeenCalledTimes(1))
+    expect(mocks.bulkMutate).toHaveBeenCalledWith({
+      items: [
+        { id: 10, version_id: 4 },
+        { id: 14, version_id: 2 },
+      ],
+      reason: null,
+      super_admin_password: 'Sup3r-Secret!',
+    })
+    expect(await screen.findByText(/Deleted 1 account\. Skipped 1\./)).toBeInTheDocument()
+    expect(screen.getByText(/Keep it deactivated instead\./)).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Done' }))
+    expect(await screen.findByText('Deleted 1 account, skipped 1.')).toBeInTheDocument()
+  })
+
+  it('keeps the dialog open on a wrong password, shows the error and clears the field', async () => {
+    mocks.bulkMutate.mockRejectedValueOnce(
+      new ApiError(403, 'super_admin_password_incorrect', 'The super admin password is not correct.'),
+    )
+    renderUsers()
+
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Select unused.reception' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Delete selected' }))
+    const field = screen.getByLabelText('Super admin password') as HTMLInputElement
+    fireEvent.change(field, { target: { value: 'wrong' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Delete 1 account' }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('The super admin password is not correct.')
+    expect(field.value).toBe('')
+    expect(screen.getByRole('button', { name: 'Delete 1 account' })).toBeInTheDocument()
   })
 })

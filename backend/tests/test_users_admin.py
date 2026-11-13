@@ -473,12 +473,12 @@ def test_users_deleted_only_through_guarded_function(
         if method == "DELETE" and path.startswith("/api/users")
     ]
     assert delete_routes == [], f"Found unexpected DELETE route(s) on users: {delete_routes}"
-    guarded = [
+    guarded = sorted(
         path
         for method, path, _ in walk_routes(app)
-        if method == "POST" and path.startswith("/api/users") and path.endswith("/delete")
-    ]
-    assert guarded == ["/api/users/{id}/delete"]
+        if method == "POST" and path.startswith("/api/users") and path.endswith("delete")
+    )
+    assert guarded == ["/api/users/bulk-delete", "/api/users/{id}/delete"]
 
 
 def test_admin_reset_password_lifecycle(

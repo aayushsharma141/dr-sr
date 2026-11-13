@@ -103,6 +103,15 @@ def _delete_user_payload(target: User | None = None) -> dict[str, Any]:
     return {"version_id": ver, "super_admin_password": TEST_PASSWORD}
 
 
+def _bulk_delete_users_payload(target: User | None = None) -> dict[str, Any]:
+    """Bulk delete request; the runner provisions a super admin (password TEST_PASSWORD)."""
+    ver = target.version_id if target else 1
+    return {
+        "items": [{"id": target.id if target else 1, "version_id": ver}],
+        "super_admin_password": TEST_PASSWORD,
+    }
+
+
 def _setup_admin_payload(_target: User | None = None) -> dict[str, Any]:
     return {
         "setup_code": "ANYCODE123",
@@ -750,6 +759,18 @@ MATRIX: list[MatrixRow] = [
         method="POST",
         path="/api/users/{id}/reset-password",
         body_factory=_action_user_payload,
+        expected={
+            "anonymous": 401,
+            "admin": 200,
+            "reception": 403,
+            "doctor_a": 403,
+            "doctor_b": 403,
+        },
+    ),
+    MatrixRow(
+        method="POST",
+        path="/api/users/bulk-delete",
+        body_factory=_bulk_delete_users_payload,
         expected={
             "anonymous": 401,
             "admin": 200,

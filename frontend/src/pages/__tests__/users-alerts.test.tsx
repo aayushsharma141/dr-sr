@@ -38,6 +38,7 @@ vi.mock('../../api/queries', () => ({
   useCreateUser: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useDeactivateUser: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useDeleteUser: () => ({ mutateAsync: vi.fn(), isPending: false }),
+  useBulkDeleteUsers: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useReactivateUser: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useResetUserPassword: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useUpdateUser: () => ({ mutateAsync: vi.fn(), isPending: false }),
