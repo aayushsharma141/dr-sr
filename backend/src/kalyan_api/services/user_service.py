@@ -1,6 +1,8 @@
 """User management business logic, password provisioning, and optimistic concurrency."""
 
 import secrets
+from dataclasses import dataclass
+from datetime import timedelta
 
 from sqlalchemy import and_, func, or_, select, update
 from sqlalchemy.exc import IntegrityError
@@ -11,11 +13,11 @@ from kalyan_api.config import Settings
 from kalyan_api.core.errors import ApiError, require_version
 from kalyan_api.core.password_policy import PasswordPolicyError, validate_password_policy
 from kalyan_api.core.permissions import Role
-from kalyan_api.core.security import build_hasher, hash_password
+from kalyan_api.core.security import build_hasher, hash_password, verify_password
 from kalyan_api.models import AuditLog, AuthSession, Doctor, User
 from kalyan_api.schemas.users import UserCreate, UserUpdate
 from kalyan_api.services import audit_service
-from kalyan_api.services.audit_service import AuditAction, AuditContext
+from kalyan_api.services.audit_service import AuditAction, AuditContext, Outcome
 
 # Unambiguous alphabet excluding easily confused characters (0, O, 1, l, I)
 UNAMBIGUOUS_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$%^&*"
@@ -174,6 +176,14 @@ def update_user(
                 message="Role changes involving DOCTOR are not permitted",
             )
 
+        # Guard 3a: A super admin must stay an administrator (DB CHECK would also refuse it)
+        if user.is_super_admin and target_role != Role.ADMIN.value:
+            raise ApiError(
+                status_code=409,
+                code="super_admin_protected",
+                message="The super admin account must remain an administrator",
+            )
+
         # Guard 3: Prevent demoting the last active administrator
         if user.role == Role.ADMIN.value and target_role != Role.ADMIN.value:
             if user.is_active:
@@ -259,6 +269,19 @@ def deactivate_user(
                 message="Cannot deactivate the last active administrator",
             )
 
+    if user.is_super_admin:
+        other_super_admins = session.scalar(
+            select(func.count(User.id)).where(
+                User.is_super_admin.is_(True), User.is_active.is_(True), User.id != user.id
+            )
+        )
+        if not other_super_admins:
+            raise ApiError(
+                status_code=409,
+                code="last_super_admin",
+                message="Cannot deactivate the only active super admin account",
+            )
+
     user.is_active = False
 
     # Revoke all active sessions for this user
@@ -283,6 +306,126 @@ def deactivate_user(
     )
 
     return user
+
+
+DELETE_FAILURE_LIMIT = 5
+DELETE_FAILURE_WINDOW_MINUTES = 15
+
+
+@dataclass(frozen=True)
+class DeleteResult:
+    """Outcome of a delete attempt: "deleted", "bad_password" or "throttled"."""
+
+    status: str
+    user: User | None = None
+
+
+def delete_user(
+    session: Session,
+    ctx: AuditContext,
+    settings: Settings,
+    user_id: int,
+    version_id: int,
+    super_admin_password: str,
+    reason: str | None = None,
+) -> DeleteResult:
+    """Delete an unused, deactivated account once the super admin's password is confirmed.
+
+    A wrong password is audited and returned (not raised) so the audit row is committed.
+    The deletion itself goes through the database function delete_unreferenced_user, which
+    fails for any account referenced by audit, financial or clinical records.
+    """
+    user = get_user(session, user_id)
+    if not user:
+        raise ApiError(status_code=404, code="not_found", message=f"User #{user_id} not found")
+
+    require_version(user, version_id, "user")
+
+    if user.id == ctx.actor_user_id:
+        raise ApiError(
+            status_code=409,
+            code="self_action_forbidden",
+            message="Administrators cannot delete their own account",
+        )
+    if user.is_super_admin:
+        raise ApiError(
+            status_code=409,
+            code="super_admin_protected",
+            message="Super admin accounts cannot be deleted",
+        )
+    if user.is_active:
+        raise ApiError(
+            status_code=409,
+            code="user_still_active",
+            message="Deactivate the account before deleting it",
+        )
+
+    now = clock.utcnow()
+    recent_denials = session.scalar(
+        select(func.count(AuditLog.id)).where(
+            AuditLog.action == AuditAction.USER_DELETE_DENIED.value,
+            AuditLog.actor_user_id == ctx.actor_user_id,
+            AuditLog.occurred_at >= now - timedelta(minutes=DELETE_FAILURE_WINDOW_MINUTES),
+        )
+    )
+    if (recent_denials or 0) >= DELETE_FAILURE_LIMIT:
+        return DeleteResult(status="throttled")
+
+    super_admins = session.scalars(
+        select(User).where(User.is_super_admin.is_(True), User.is_active.is_(True))
+    ).all()
+    if not super_admins:
+        raise ApiError(
+            status_code=409,
+            code="no_super_admin",
+            message="No active super admin account exists to authorise this deletion",
+        )
+
+    hasher = build_hasher(settings)
+    confirmed = False
+    for super_admin in super_admins:
+        if verify_password(hasher, super_admin_password, super_admin.password_hash):
+            confirmed = True
+
+    if not confirmed:
+        audit_service.record(
+            session,
+            ctx,
+            AuditAction.USER_DELETE_DENIED,
+            "USER",
+            user.id,
+            reason="Super admin password was not accepted",
+            outcome=Outcome.DENIED,
+        )
+        return DeleteResult(status="bad_password")
+
+    snapshot = {"username": user.username, "role": user.role, "is_active": user.is_active}
+    try:
+        with session.begin_nested():
+            deleted = session.scalar(select(func.delete_unreferenced_user(user.id)))
+    except IntegrityError as exc:
+        raise ApiError(
+            status_code=409,
+            code="user_has_history",
+            message=(
+                "This account has recorded activity and cannot be deleted. "
+                "Keep it deactivated instead."
+            ),
+        ) from exc
+    if not deleted:
+        raise ApiError(status_code=404, code="not_found", message=f"User #{user_id} not found")
+
+    session.expunge(user)
+    audit_service.record(
+        session,
+        ctx,
+        AuditAction.USER_DELETED,
+        "USER",
+        user_id,
+        before=snapshot,
+        reason=reason,
+    )
+    return DeleteResult(status="deleted", user=user)
 
 
 def reactivate_user(

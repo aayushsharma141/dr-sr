@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import {
   useCreateUser,
   useDeactivateUser,
+  useDeleteUser,
   useLoginHistory,
   useMe,
   useReactivateUser,
@@ -135,7 +136,7 @@ function errorMessage(err: unknown, fallback: string): string {
 // Account action dialog configuration
 // ---------------------------------------------------------------------------
 
-type ActionType = 'deactivate' | 'reactivate' | 'reset-password' | 'unlock' | 'revoke-sessions'
+type ActionType = 'deactivate' | 'reactivate' | 'reset-password' | 'unlock' | 'revoke-sessions' | 'delete'
 type StatusFilter = 'all' | 'active' | 'inactive' | 'locked'
 
 const ACTION_COPY: Record<
@@ -173,6 +174,14 @@ const ACTION_COPY: Record<
     destructive: false,
     failed: 'Could not unlock this account. Try again.',
     body: 'Clears the failed sign-in count and the lockout so the user can sign in again straight away.',
+  },
+  delete: {
+    title: 'Delete account',
+    confirm: 'Delete account',
+    busy: 'Deleting...',
+    destructive: true,
+    failed: 'Could not delete this account. Try again.',
+    body: 'Permanently removes this account. It only works for an account that has never been used: if it has signed in or has any recorded activity, it must stay deactivated instead. This cannot be undone. Enter the super admin password to confirm.',
   },
   'revoke-sessions': {
     title: 'Sign out everywhere',
@@ -315,6 +324,7 @@ export function Users() {
   const [historyUser, setHistoryUser] = useState<UserOut | null>(null)
   const [confirmAction, setConfirmAction] = useState<{ type: ActionType; user: UserOut } | null>(null)
   const [actionReason, setActionReason] = useState('')
+  const [superAdminPassword, setSuperAdminPassword] = useState('')
   const [tempPasswordNotice, setTempPasswordNotice] = useState<{
     username: string
     password: string
@@ -346,8 +356,10 @@ export function Users() {
   const resetPasswordMutation = useResetUserPassword()
   const unlockMutation = useUnlockUser()
   const revokeSessionsMutation = useRevokeUserSessions()
+  const deleteMutation = useDeleteUser()
 
   const actionBusy =
+    deleteMutation.isPending ||
     deactivateMutation.isPending ||
     reactivateMutation.isPending ||
     resetPasswordMutation.isPending ||
@@ -390,6 +402,7 @@ export function Users() {
   const openAction = (type: ActionType, user: UserOut) => {
     setActionError(null)
     setActionReason('')
+    setSuperAdminPassword('')
     setConfirmAction({ type, user })
   }
 
@@ -397,6 +410,7 @@ export function Users() {
     setConfirmAction(null)
     setActionError(null)
     setActionReason('')
+    setSuperAdminPassword('')
   }
 
   const handleCreateSubmit = async (e: FormEvent) => {
@@ -482,6 +496,12 @@ export function Users() {
       } else if (type === 'unlock') {
         await unlockMutation.mutateAsync({ id: user.id, payload })
         setSuccessNotice(`Account unlocked: ${user.username}`)
+      } else if (type === 'delete') {
+        await deleteMutation.mutateAsync({
+          id: user.id,
+          payload: { ...payload, super_admin_password: superAdminPassword },
+        })
+        setSuccessNotice(`Account deleted: ${user.username}`)
       } else {
         const res = await revokeSessionsMutation.mutateAsync({ id: user.id, payload: { reason } })
         const count = res.revoked_count
@@ -492,9 +512,12 @@ export function Users() {
       }
       setConfirmAction(null)
       setActionReason('')
+      setSuperAdminPassword('')
       refetchUsers()
     } catch (err: unknown) {
       setActionError(errorMessage(err, ACTION_COPY[type].failed))
+      // A rejected password is never kept in the field for another try.
+      if (type === 'delete') setSuperAdminPassword('')
     }
   }
 
@@ -581,7 +604,14 @@ export function Users() {
                           <div className="font-mono text-neutral-700">{u.username}</div>
                         </td>
                         <td className="px-4 py-3">
-                          <div>{ROLE_LABEL[u.role]}</div>
+                          <div>
+                            {ROLE_LABEL[u.role]}
+                            {u.is_super_admin && (
+                              <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded border text-sm font-medium bg-[#FFF8E7] text-[#5D0B26] border-[#8E1C3D]">
+                                Super admin
+                              </span>
+                            )}
+                          </div>
                           {u.doctor_id !== null && (
                             <div className="text-neutral-600">Doctor profile #{u.doctor_id}</div>
                           )}
@@ -683,6 +713,16 @@ export function Users() {
                                   Reactivate
                                 </button>
                               ))}
+                            {!self && !u.is_active && !u.is_super_admin && (
+                              <button
+                                type="button"
+                                onClick={() => openAction('delete', u)}
+                                aria-label={`Delete ${u.username}`}
+                                className={`${BTN_ROW} border-red-800 bg-white text-red-800 hover:bg-red-50`}
+                              >
+                                Delete
+                              </button>
+                            )}
                           </div>
                         </td>
                       </tr>
@@ -861,6 +901,27 @@ export function Users() {
                 </InlineAlert>
               )}
 
+              {confirmAction.type === 'delete' && (
+                <div>
+                  <label htmlFor="super-admin-password" className="block text-sm font-medium text-neutral-800 mb-1">
+                    Super admin password
+                  </label>
+                  <input
+                    id="super-admin-password"
+                    type="password"
+                    autoComplete="off"
+                    required
+                    value={superAdminPassword}
+                    onChange={(e) => setSuperAdminPassword(e.target.value)}
+                    aria-describedby="super-admin-password-help"
+                    className={INPUT}
+                  />
+                  <p id="super-admin-password-help" className="mt-1 text-sm text-neutral-600">
+                    The password of the super admin account, not your own. It is checked once and never stored.
+                  </p>
+                </div>
+              )}
+
               <div>
                 <label htmlFor="action-reason" className="block text-sm font-medium text-neutral-800 mb-1">
                   Reason (optional)
@@ -888,7 +949,7 @@ export function Users() {
                 <button
                   type="button"
                   onClick={handleConfirmAction}
-                  disabled={actionBusy}
+                  disabled={actionBusy || (confirmAction.type === 'delete' && superAdminPassword === '')}
                   className={ACTION_COPY[confirmAction.type].destructive ? BTN_DANGER : BTN_PRIMARY}
                 >
                   {actionBusy ? ACTION_COPY[confirmAction.type].busy : ACTION_COPY[confirmAction.type].confirm}

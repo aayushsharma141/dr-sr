@@ -226,6 +226,7 @@ def make_user(
     must_change: bool = False,
     is_active: bool = True,
     doctor_name: str | None = None,
+    is_super_admin: bool = False,
 ) -> User:
     """Helper creating user record (and linked Doctor stub if role is DOCTOR)."""
     hasher = build_hasher(settings)
@@ -253,6 +254,7 @@ def make_user(
         password_hash=pw_hash,
         must_change_password=must_change,
         is_active=is_active,
+        is_super_admin=is_super_admin,
     )
     session.add(user)
     session.flush()

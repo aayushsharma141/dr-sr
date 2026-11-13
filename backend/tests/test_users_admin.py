@@ -454,11 +454,11 @@ def test_deactivate_guards(
     assert react_active_res.json()["code"] == "state_unchanged"
 
 
-def test_users_never_deleted_database_permission_denied(
+def test_users_deleted_only_through_guarded_function(
     app: FastAPI,
     app_engine: Engine,
 ) -> None:
-    """Users cannot be deleted: raw DB DELETE fails with permission denied; no DELETE route."""
+    """The app role has no table-level DELETE on users; only the guarded endpoint deletes."""
     # 1. kalyan_app role executing DELETE FROM users raises permission denied
     with app_engine.connect() as conn:
         with pytest.raises(Exception) as exc_info:
@@ -466,13 +466,19 @@ def test_users_never_deleted_database_permission_denied(
         err_msg = str(exc_info.value).lower()
         assert "permission denied" in err_msg
 
-    # 2. walk_routes finds no DELETE route under /api/users
+    # 2. No HTTP DELETE verb under /api/users; deletion is POST /api/users/{id}/delete only
     delete_routes = [
         (method, path)
         for method, path, _ in walk_routes(app)
         if method == "DELETE" and path.startswith("/api/users")
     ]
-    assert delete_routes == [], f"Found forbidden DELETE route(s) on users: {delete_routes}"
+    assert delete_routes == [], f"Found unexpected DELETE route(s) on users: {delete_routes}"
+    guarded = [
+        path
+        for method, path, _ in walk_routes(app)
+        if method == "POST" and path.startswith("/api/users") and path.endswith("/delete")
+    ]
+    assert guarded == ["/api/users/{id}/delete"]
 
 
 def test_admin_reset_password_lifecycle(

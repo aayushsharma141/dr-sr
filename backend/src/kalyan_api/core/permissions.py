@@ -29,6 +29,7 @@ class Permission(StrEnum):
     USER_DEACTIVATE = "user:deactivate"
     USER_RESET_PASSWORD = "user:reset_password"  # noqa: S105
     USER_UNLOCK = "user:unlock"
+    USER_DELETE = "user:delete"
     DASHBOARD_ADMIN = "dashboard:admin"
     DASHBOARD_RECEPTION = "dashboard:reception"
     DASHBOARD_DOCTOR = "dashboard:doctor"
@@ -98,6 +99,7 @@ ROLE_PERMISSIONS: dict[Role, frozenset[Permission]] = {
             Permission.USER_DEACTIVATE,
             Permission.USER_RESET_PASSWORD,
             Permission.USER_UNLOCK,
+            Permission.USER_DELETE,
             Permission.DASHBOARD_ADMIN,
             Permission.SETTINGS_READ,
             Permission.SETTINGS_WRITE,

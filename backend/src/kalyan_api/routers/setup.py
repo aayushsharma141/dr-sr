@@ -197,6 +197,8 @@ def setup_first_admin(
                 must_change_password=False,
                 audit_action=None,
             )
+            # The setup administrator is the super admin who authorises user deletion.
+            user.is_super_admin = True
 
             setup_entry = SystemSetup(
                 id=1,

@@ -226,6 +226,8 @@ export interface UserOut {
   role: Role
   doctor_id: number | null
   is_active: boolean
+  /** The administrator whose password authorises deleting user accounts. */
+  is_super_admin: boolean
   must_change_password: boolean
   is_locked: boolean
   /** Non-null only while the lock is in effect. */
@@ -257,6 +259,17 @@ export interface ActionRequest {
   version_id: number
   /** Optional justification (max 500 chars; blank becomes null) stored on the audit row. */
   reason?: string | null
+}
+
+export interface DeleteUserRequest extends ActionRequest {
+  /** Password of the super admin account; never stored or logged. */
+  super_admin_password: string
+}
+
+export interface DeleteUserOut {
+  id: number
+  username: string
+  deleted: boolean
 }
 
 export const ADMIN_REASON_MAX_LENGTH = 500

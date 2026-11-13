@@ -72,6 +72,12 @@ def test_valid_code_creates_exactly_one_admin(
     assert setup_row is not None
     assert setup_row.admin_user_id == created_id
 
+    # The setup administrator becomes the super admin who authorises user deletion
+    db_session.expire_all()
+    created_admin = db_session.get(User, created_id)
+    assert created_admin is not None
+    assert created_admin.is_super_admin is True
+
     # Exactly one ADMIN_BOOTSTRAPPED audit row
     audit_row = db_session.scalar(select(AuditLog).where(AuditLog.action == "ADMIN_BOOTSTRAPPED"))
     assert audit_row is not None

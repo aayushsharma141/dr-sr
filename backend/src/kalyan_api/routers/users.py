@@ -18,6 +18,8 @@ from kalyan_api.db.session import SessionDep
 from kalyan_api.schemas.sessions import RevokeSessionRequest, RevokeUserSessionsOut
 from kalyan_api.schemas.users import (
     ActionRequest,
+    DeleteUserOut,
+    DeleteUserRequest,
     LoginHistoryEntry,
     UserCreate,
     UserCreatedOut,
@@ -126,6 +128,49 @@ def deactivate_existing_user(
     ctx = build_audit_context(request, principal)
     user = user_service.deactivate_user(session, ctx, id, payload.version_id, reason=payload.reason)
     return UserOut.from_user(user, now=clock.utcnow())
+
+
+@router.post(
+    "/{id}/delete",
+    response_model=DeleteUserOut,
+    dependencies=[Depends(require(Permission.USER_DELETE))],
+)
+def delete_existing_user(
+    id: int,
+    request: Request,
+    payload: DeleteUserRequest,
+    session: SessionDep,
+    principal: Principal = Depends(current_principal),
+    settings: Settings = Depends(get_effective_settings),
+) -> DeleteUserOut | JSONResponse:
+    """Permanently delete a deactivated, never-used account; needs the super admin password."""
+    ctx = build_audit_context(request, principal)
+    result = user_service.delete_user(
+        session,
+        ctx,
+        settings,
+        id,
+        payload.version_id,
+        payload.super_admin_password,
+        reason=payload.reason,
+    )
+    if result.status == "throttled":
+        return JSONResponse(
+            status_code=429,
+            content={
+                "code": "delete_throttled",
+                "message": "Too many incorrect super admin passwords. Try again in 15 minutes.",
+            },
+        )
+    if result.status == "bad_password" or result.user is None:
+        return JSONResponse(
+            status_code=403,
+            content={
+                "code": "super_admin_password_incorrect",
+                "message": "The super admin password is not correct.",
+            },
+        )
+    return DeleteUserOut(id=id, username=result.user.username, deleted=True)
 
 
 @router.post(

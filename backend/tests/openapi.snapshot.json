@@ -2145,6 +2145,66 @@
         "title": "CommitBatchResponse",
         "type": "object"
       },
+      "DeleteUserOut": {
+        "additionalProperties": false,
+        "description": "Confirmation that an unused account was permanently deleted.",
+        "properties": {
+          "deleted": {
+            "title": "Deleted",
+            "type": "boolean"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "username": {
+            "title": "Username",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "username",
+          "deleted"
+        ],
+        "title": "DeleteUserOut",
+        "type": "object"
+      },
+      "DeleteUserRequest": {
+        "additionalProperties": false,
+        "description": "Payload for deleting an unused account; authorised by the super admin's password.",
+        "properties": {
+          "reason": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "super_admin_password": {
+            "maxLength": 256,
+            "minLength": 1,
+            "title": "Super Admin Password",
+            "type": "string"
+          },
+          "version_id": {
+            "minimum": 1.0,
+            "title": "Version Id",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "version_id",
+          "super_admin_password"
+        ],
+        "title": "DeleteUserRequest",
+        "type": "object"
+      },
       "DepartmentCollection": {
         "additionalProperties": false,
         "description": "Money collected this month against appointments booked in a department.\n\ndepartment_id is null for payments with no appointment or an appointment booked before\ndepartments were recorded; they are counted, never spread across departments.",
@@ -7930,6 +7990,10 @@
             "title": "Is Locked",
             "type": "boolean"
           },
+          "is_super_admin": {
+            "title": "Is Super Admin",
+            "type": "boolean"
+          },
           "last_login_at": {
             "anyOf": [
               {
@@ -7994,6 +8058,7 @@
           "role",
           "doctor_id",
           "is_active",
+          "is_super_admin",
           "must_change_password",
           "is_locked",
           "locked_until",
@@ -8040,6 +8105,10 @@
           },
           "is_locked": {
             "title": "Is Locked",
+            "type": "boolean"
+          },
+          "is_super_admin": {
+            "title": "Is Super Admin",
             "type": "boolean"
           },
           "last_login_at": {
@@ -8102,6 +8171,7 @@
           "role",
           "doctor_id",
           "is_active",
+          "is_super_admin",
           "must_change_password",
           "is_locked",
           "locked_until",
@@ -14149,6 +14219,59 @@
           }
         },
         "summary": "Deactivate Existing User",
+        "tags": [
+          "users"
+        ]
+      }
+    },
+    "/api/users/{id}/delete": {
+      "post": {
+        "description": "Permanently delete a deactivated, never-used account; needs the super admin password.",
+        "operationId": "delete_existing_user_api_users__id__delete_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "title": "Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeleteUserRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeleteUserOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Existing User",
         "tags": [
           "users"
         ]

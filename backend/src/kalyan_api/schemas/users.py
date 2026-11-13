@@ -60,6 +60,26 @@ class ActionRequest(BaseModel):
     reason: OptionalReason = None
 
 
+class DeleteUserRequest(BaseModel):
+    """Payload for deleting an unused account; authorised by the super admin's password."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    version_id: int = Field(ge=1)
+    reason: OptionalReason = None
+    super_admin_password: str = Field(min_length=1, max_length=256, repr=False)
+
+
+class DeleteUserOut(BaseModel):
+    """Confirmation that an unused account was permanently deleted."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    id: int
+    username: str
+    deleted: bool
+
+
 class UserUpdate(BaseModel):
     """Payload for modifying an existing user account with optimistic concurrency."""
 
@@ -88,6 +108,7 @@ class UserOut(BaseModel):
     role: str
     doctor_id: int | None
     is_active: bool
+    is_super_admin: bool
     must_change_password: bool
     is_locked: bool
     locked_until: datetime | None
@@ -108,6 +129,7 @@ class UserOut(BaseModel):
             role=user.role,
             doctor_id=user.doctor_id,
             is_active=user.is_active,
+            is_super_admin=user.is_super_admin,
             must_change_password=user.must_change_password,
             is_locked=is_locked,
             locked_until=user.locked_until if is_locked else None,

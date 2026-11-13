@@ -759,7 +759,17 @@ def test_rbac_matrix_cell(
         resolved_path = row.path.replace("{doc_type}", "prescription")
 
     elif "{id}" in row.path:
-        is_active = "reactivate" not in row.path
+        # reactivate and delete both need an already-deactivated target
+        is_active = "reactivate" not in row.path and not row.path.endswith("/delete")
+        if row.path.endswith("/delete"):
+            # The matrix delete row authorises with a super admin whose password is TEST_PASSWORD
+            make_user(
+                db_session,
+                test_settings,
+                "ADMIN",
+                f"mat_super_{uuid.uuid4().hex[:6]}",
+                is_super_admin=True,
+            )
         target_user = make_user(
             db_session,
             test_settings,

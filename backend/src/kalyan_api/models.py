@@ -173,6 +173,10 @@ class User(Base):
             "((role = 'DOCTOR') = (doctor_id IS NOT NULL))",
             name="users_doctor_role_requires_id",
         ),
+        CheckConstraint(
+            "(NOT is_super_admin) OR role = 'ADMIN'",
+            name="super_admin_is_admin",
+        ),
     )
 
     id: Mapped[int] = mapped_column(BigInteger, Identity(always=False), primary_key=True)
@@ -191,6 +195,9 @@ class User(Base):
     )
     is_active: Mapped[bool] = mapped_column(
         Boolean, default=True, server_default="true", nullable=False
+    )
+    is_super_admin: Mapped[bool] = mapped_column(
+        Boolean, default=False, server_default="false", nullable=False
     )
     failed_login_count: Mapped[int] = mapped_column(
         Integer, default=0, server_default="0", nullable=False

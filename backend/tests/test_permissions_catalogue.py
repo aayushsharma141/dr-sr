@@ -94,6 +94,7 @@ def test_golden_role_permissions_snapshot() -> None:
                 Permission.USER_DEACTIVATE,
                 Permission.USER_RESET_PASSWORD,
                 Permission.USER_UNLOCK,
+                Permission.USER_DELETE,
                 Permission.DASHBOARD_ADMIN,
                 Permission.SETTINGS_READ,
                 Permission.SETTINGS_WRITE,

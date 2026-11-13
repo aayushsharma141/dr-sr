@@ -11,6 +11,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
 
+from conftest import TEST_PASSWORD
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
@@ -94,6 +95,12 @@ def _action_user_payload(target: User | None = None) -> dict[str, Any]:
     return {
         "version_id": ver,
     }
+
+
+def _delete_user_payload(target: User | None = None) -> dict[str, Any]:
+    """Delete request; the runner provisions a super admin whose password is TEST_PASSWORD."""
+    ver = target.version_id if target else 1
+    return {"version_id": ver, "super_admin_password": TEST_PASSWORD}
 
 
 def _setup_admin_payload(_target: User | None = None) -> dict[str, Any]:
@@ -743,6 +750,18 @@ MATRIX: list[MatrixRow] = [
         method="POST",
         path="/api/users/{id}/reset-password",
         body_factory=_action_user_payload,
+        expected={
+            "anonymous": 401,
+            "admin": 200,
+            "reception": 403,
+            "doctor_a": 403,
+            "doctor_b": 403,
+        },
+    ),
+    MatrixRow(
+        method="POST",
+        path="/api/users/{id}/delete",
+        body_factory=_delete_user_payload,
         expected={
             "anonymous": 401,
             "admin": 200,

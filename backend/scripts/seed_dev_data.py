@@ -75,6 +75,7 @@ def seed_all():
             password_hash=default_pw_hash,
             must_change_password=False,
             is_active=True,
+            is_super_admin=True,
         )
         session.add(admin_user)
         session.flush()

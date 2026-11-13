@@ -95,6 +95,8 @@ import type {
 } from './types'
 import type {
   ActionRequest,
+  DeleteUserOut,
+  DeleteUserRequest,
   AreaOverview,
   ManagementOverview,
   Me,
@@ -292,6 +294,29 @@ export function useDeactivateUser() {
       qc.invalidateQueries({ queryKey: ['users'] })
       // A deactivated owner's sessions stop counting as active.
       qc.invalidateQueries({ queryKey: ['sessions'] })
+      invalidateAdminSummaries(qc)
+    },
+  })
+}
+
+export function useDeleteUser() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({
+      id,
+      payload,
+    }: {
+      id: number
+      payload: DeleteUserRequest
+    }): Promise<DeleteUserOut> => {
+      return await apiFetch<DeleteUserOut>(`/users/${id}/delete`, {
+        method: 'POST',
+        body: payload,
+      })
+    },
+    onSuccess: (deleted) => {
+      qc.removeQueries({ queryKey: ['users', deleted.id] })
+      qc.invalidateQueries({ queryKey: ['users'] })
       invalidateAdminSummaries(qc)
     },
   })
