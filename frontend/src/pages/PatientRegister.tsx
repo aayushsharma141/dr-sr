@@ -1,4 +1,4 @@
-import { useState, type FormEvent, useEffect, useRef, useMemo } from 'react'
+import { useState, type FormEvent, type ReactNode, useEffect, useRef, useMemo } from 'react'
 import { Link, useNavigate } from 'react-router'
 import {
   useRegisterPatient,
@@ -16,12 +16,14 @@ import { QueueTicketPreview } from '../components/QueueTicketPreview'
 import { UnsavedChangesGuard } from '../components/UnsavedChangesGuard'
 import { PatientPhotoModal } from '../components/PatientPhotoModal'
 import {
+  IconAlertCircle,
+  IconAlertTriangle,
   IconCamera,
   IconCalendar,
   IconCheck,
   IconDeviceFloppy,
+  IconHeartRateMonitor,
   IconMapPin,
-  IconNotes,
   IconPhone,
   IconRefresh,
   IconStethoscope,
@@ -34,6 +36,41 @@ import {
 } from '../components/icons'
 import type { PatientCreate, PatientOut, DepartmentDoctorOut } from '../api/types'
 import { istToday } from '../format'
+
+/** Shared field styling: one control height, one brand focus treatment, across both columns. */
+const LABEL_CLASS =
+  'mb-1.5 block text-xs font-semibold uppercase tracking-wider text-slate-600'
+const INPUT_CLASS =
+  'min-h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm font-medium text-slate-900 shadow-2xs transition-colors placeholder:text-slate-400 hover:border-slate-400 focus:border-[#8E1C3D] focus:outline-none focus:ring-2 focus:ring-[#8E1C3D]/15'
+const INPUT_WITH_ICON_CLASS = `${INPUT_CLASS} pl-10`
+
+/** Numbered section heading: the form's only structural accent, in brand maroon and gold. */
+function SectionHeader({
+  index,
+  title,
+  hint,
+  icon,
+}: {
+  index: string
+  title: string
+  hint: string
+  icon: ReactNode
+}) {
+  return (
+    <div className="flex items-center gap-3 border-b border-slate-200 bg-[#FBF5F7] px-5 py-3">
+      <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#5D0B26] text-xs font-bold text-white">
+        {index}
+      </span>
+      <div className="min-w-0 flex-1">
+        <h2 className="flex items-center gap-2 text-sm font-bold text-[#5D0B26]">
+          <span className="text-[#8E1C3D]">{icon}</span>
+          {title}
+        </h2>
+        <p className="text-xs leading-snug text-slate-500">{hint}</p>
+      </div>
+    </div>
+  )
+}
 
 export function PatientRegister() {
   const { data: me } = useMe()
@@ -399,41 +436,43 @@ export function PatientRegister() {
   return (
     <AppShell name={me?.full_name || 'Reception Staff'} role={me?.role || 'RECEPTION'}>
       <UnsavedChangesGuard dirty={isDirty && !createdPatient} bypassRef={skipUnsavedGuardRef} />
-      {/* Full-width Widescreen Container: No max-w-5xl artificial constraints */}
-      <div className="w-full space-y-5">
-        {/* Top Header Bar filling desktop width */}
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between border-b border-slate-200/80 pb-4">
-          <div className="flex items-center gap-3">
-            <div className="flex h-11 w-11 items-center justify-center rounded-xl border border-emerald-200 bg-emerald-50 text-emerald-800 shadow-xs shrink-0">
-              <IconUserPlus className="h-6 w-6" />
-            </div>
-            <div>
+
+      <div className="w-full space-y-5 pb-2">
+        {/* Page header: brand maroon tile, page title, cross-links to the rest of the desk */}
+        <header className="flex flex-col gap-3 border-b border-slate-200 pb-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-start gap-3">
+            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-[#E4C8D1] bg-[#FBF5F7] text-[#8E1C3D]">
+              <IconUserPlus className="h-6 w-6" stroke={1.8} />
+            </span>
+            <div className="min-w-0">
               <h1 className="text-xl font-bold tracking-tight text-slate-900">
                 Patient Registration
               </h1>
               <p className="text-xs text-slate-500">
-                Register a new patient, allocate Universal Record Number (URN), and issue doctor queue token.
+                Register the patient, allocate the Universal Record Number (URN) and issue the doctor
+                queue token.{' '}
+                <span className="font-semibold text-[#8E1C3D]">Fields marked * are required.</span>
               </p>
             </div>
           </div>
 
-          <div className="flex items-center gap-2.5">
+          <div className="flex shrink-0 items-center gap-2.5">
             <Link
               to="/reception/tokens"
-              className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 shadow-2xs"
+              className="inline-flex min-h-10 items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3.5 text-xs font-semibold text-slate-700 shadow-2xs transition-colors hover:border-[#8E1C3D] hover:text-[#5D0B26]"
             >
-              <IconTicket className="h-4 w-4 text-emerald-800" />
+              <IconTicket className="h-4 w-4 text-[#8E1C3D]" />
               Visit &amp; Token Desk
             </Link>
             <Link
               to="/reception/patients"
-              className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 shadow-2xs"
+              className="inline-flex min-h-10 items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3.5 text-xs font-semibold text-slate-700 shadow-2xs transition-colors hover:border-[#8E1C3D] hover:text-[#5D0B26]"
             >
-              <IconUser className="h-4 w-4 text-slate-500" />
+              <IconUser className="h-4 w-4 text-[#8E1C3D]" />
               Patient Records
             </Link>
           </div>
-        </div>
+        </header>
 
         {/* Steps that did not complete after the patient was saved */}
         {registrationWarnings.length > 0 && (
@@ -441,7 +480,10 @@ export function PatientRegister() {
             role="alert"
             className="space-y-1 rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-950 shadow-xs"
           >
-            <p className="font-bold">Patient saved, but some steps did not complete:</p>
+            <p className="flex items-center gap-2 font-bold">
+              <IconAlertTriangle className="h-4 w-4 text-amber-700" />
+              Patient saved, but some steps did not complete:
+            </p>
             <ul className="list-disc pl-5">
               {registrationWarnings.map((warning, index) => (
                 <li key={index}>{warning}</li>
@@ -455,7 +497,10 @@ export function PatientRegister() {
             role="alert"
             className="space-y-3 rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-950 shadow-xs"
           >
-            <p className="font-bold">Patient saved, but the photo was not uploaded.</p>
+            <p className="flex items-center gap-2 font-bold">
+              <IconAlertTriangle className="h-4 w-4 text-amber-700" />
+              Patient saved, but the photo was not uploaded.
+            </p>
             <p>
               {photoFailure.fileName}: {photoFailure.message}
             </p>
@@ -523,9 +568,9 @@ export function PatientRegister() {
         {createdPatient && (
           <div
             role="status"
-            className="space-y-4 rounded-2xl border border-emerald-300 bg-emerald-50/80 p-6 shadow-sm text-emerald-950"
+            className="space-y-4 rounded-2xl border border-[#E4C8D1] bg-[#FBF5F7] p-6 shadow-sm"
           >
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <span
                   className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-bold ${photoFailure ? 'bg-amber-200/70 text-amber-900' : 'bg-emerald-200/70 text-emerald-900'}`}
@@ -539,40 +584,40 @@ export function PatientRegister() {
                 <p className="text-xs text-slate-600">
                   Allocated Universal Record Number (URN):
                 </p>
-                <div className="mt-1.5 inline-block rounded-lg border border-emerald-400 bg-white px-4 py-1.5 font-mono text-xl font-black text-emerald-900 shadow-2xs">
+                <div className="mt-1.5 inline-block rounded-lg border border-[#C39A35] bg-white px-4 py-1.5 font-mono text-xl font-black text-[#5D0B26] shadow-2xs">
                   {createdPatient.urn}
                 </div>
               </div>
 
               {allocatedToken != null && (
-                <div className="rounded-xl border border-emerald-300 bg-white p-4 text-center shadow-xs">
+                <div className="rounded-xl border border-[#E4C8D1] bg-white p-4 text-center shadow-xs">
                   <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
                     Allocated Queue Token
                   </span>
-                  <div className="font-mono text-3xl font-black text-emerald-800">
+                  <div className="font-mono text-3xl font-black text-[#8E1C3D]">
                     #{allocatedToken}
                   </div>
-                  <span className="mt-1 block rounded bg-emerald-100 px-2 py-0.5 text-xs font-bold text-emerald-800">
+                  <span className="mt-1 block rounded bg-[#FBF5F7] px-2 py-0.5 text-xs font-bold text-[#5D0B26]">
                     {checkedIn ? 'Checked In (Arrived)' : 'Booked'}
                   </span>
                 </div>
               )}
             </div>
 
-            <div className="flex flex-wrap items-center gap-3 pt-3 border-t border-emerald-200">
+            <div className="flex flex-wrap items-center gap-3 border-t border-[#E4C8D1] pt-3">
               <button
                 type="button"
                 onClick={() => {
                   skipUnsavedGuardRef.current = true
                   navigate(`/reception/patients/${createdPatient.id}`)
                 }}
-                className="inline-flex min-h-11 items-center justify-center rounded-lg bg-emerald-800 px-5 text-sm font-semibold text-white hover:bg-emerald-900 shadow-xs cursor-pointer"
+                className="inline-flex min-h-11 items-center justify-center rounded-lg bg-[#8E1C3D] px-5 text-sm font-semibold text-white shadow-xs transition-colors hover:bg-[#5D0B26] cursor-pointer"
               >
                 View Patient File &amp; Card
               </button>
               <Link
                 to={`/reception/patients/${createdPatient.id}/print`}
-                className="inline-flex min-h-11 items-center justify-center rounded-lg border border-emerald-400 bg-white px-4 text-sm font-semibold text-emerald-900 hover:bg-emerald-50 cursor-pointer"
+                className="inline-flex min-h-11 items-center justify-center rounded-lg border border-[#8E1C3D] bg-white px-4 text-sm font-semibold text-[#5D0B26] transition-colors hover:bg-[#FBF5F7] cursor-pointer"
               >
                 Print Registration Card
               </Link>
@@ -583,7 +628,7 @@ export function PatientRegister() {
                   setAllocatedToken(null)
                   handleClear()
                 }}
-                className="inline-flex min-h-11 items-center justify-center rounded-lg border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50 cursor-pointer"
+                className="inline-flex min-h-11 items-center justify-center rounded-lg border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-50 cursor-pointer"
               >
                 Register Another Patient
               </button>
@@ -598,23 +643,24 @@ export function PatientRegister() {
             className="space-y-3 rounded-xl border border-amber-300 bg-amber-50 p-5 text-amber-950 shadow-xs"
           >
             <div className="flex items-center gap-2 text-sm font-bold text-amber-900">
+              <IconAlertTriangle className="h-4 w-4 text-amber-700" />
               <span>Potential Duplicate Patient Detected</span>
             </div>
             <p className="text-xs text-amber-900">
               A patient matching <span className="font-semibold">{duplicateData.matching_patient.full_name}</span> with mobile{' '}
               <span className="font-semibold">{duplicateData.matching_patient.mobile}</span> is already in the system:
             </p>
-            <div className="rounded-lg border border-amber-200 bg-white/90 p-3 font-mono text-xs space-y-1">
+            <div className="space-y-1 rounded-lg border border-amber-200 bg-white/90 p-3 font-mono text-xs">
               <div><strong>URN:</strong> {duplicateData.matching_patient.urn}</div>
               <div><strong>Registered:</strong> {new Date(duplicateData.matching_patient.created_at).toLocaleDateString()}</div>
             </div>
-            <div className="flex items-center gap-2 pt-2 border-t border-amber-200">
+            <div className="flex items-center gap-2 border-t border-amber-200 pt-2">
               <input
                 id="confirm-different-checkbox"
                 type="checkbox"
                 checked={confirmDifferentPatient}
                 onChange={(e) => setConfirmDifferentPatient(e.target.checked)}
-                className="h-4 w-4 rounded border-amber-400 text-emerald-800 focus:ring-emerald-700"
+                className="h-4 w-4 rounded border-amber-400 accent-[#8E1C3D] focus:ring-[#8E1C3D]"
               />
               <label
                 htmlFor="confirm-different-checkbox"
@@ -630,29 +676,31 @@ export function PatientRegister() {
         {formError && (
           <div
             role="alert"
-            className="rounded-xl border border-red-300 bg-red-50 p-4 text-sm font-semibold text-red-900 shadow-xs"
+            className="flex items-start gap-2 rounded-xl border border-red-300 bg-red-50 p-4 text-sm font-semibold text-red-900 shadow-xs"
           >
-            {formError}
+            <IconAlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-red-700" />
+            <span>{formError}</span>
           </div>
         )}
 
-        {/* The Desktop Horizontal Multi-Column Form */}
         <form onSubmit={handleSubmit} className="space-y-5">
-          <div className="grid grid-cols-1 gap-6 lg:grid-cols-12 items-start">
+          <div className="grid grid-cols-1 items-start gap-5 xl:grid-cols-12">
             {/* ========================================================= */}
-            {/* LEFT COLUMN: Patient Identification & Demographics (7 cols) */}
+            {/* LEFT: identity, contact and clinical flags (8 of 12)      */}
             {/* ========================================================= */}
-            <div className="space-y-5 lg:col-span-7 xl:col-span-8">
-              {/* CARD 1: Core Patient Details */}
-              <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs sm:p-6">
-                <div className="mb-4 flex items-center gap-2 border-b border-slate-100 pb-3">
-                  <IconUser className="h-5 w-5 text-emerald-800" />
-                  <h2 className="text-base font-bold text-slate-900">Patient Details</h2>
-                </div>
+            <div className="space-y-5 xl:col-span-8">
+              {/* SECTION 1: Patient identity */}
+              <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xs">
+                <SectionHeader
+                  index="1"
+                  title="Patient Details"
+                  hint="Name, guardian, age and sex as printed on the registration card"
+                  icon={<IconUser className="h-4 w-4" />}
+                />
 
-                <div className="flex flex-col gap-6 md:flex-row md:items-start">
-                  {/* Photo Box */}
-                  <div className="flex flex-col items-center gap-2 shrink-0">
+                <div className="flex flex-col gap-6 p-5 sm:p-6 md:flex-row md:items-start">
+                  {/* Photo: portrait frame, gold ring once a photo is captured */}
+                  <div className="flex shrink-0 flex-col items-center gap-2">
                     <input
                       ref={fileInputRef}
                       type="file"
@@ -663,7 +711,11 @@ export function PatientRegister() {
                     />
                     <div
                       onClick={() => setIsPhotoModalOpen(true)}
-                      className="group relative flex h-36 w-36 cursor-pointer flex-col items-center justify-center overflow-hidden rounded-xl border-2 border-dashed border-slate-300 bg-slate-50/60 p-2 text-center transition-colors hover:border-emerald-600 hover:bg-emerald-50/30"
+                      className={`group relative flex h-40 w-32 cursor-pointer flex-col items-center justify-center overflow-hidden rounded-xl border-2 border-dashed p-2 text-center transition-colors ${
+                        photoPreview
+                          ? 'border-[#C39A35] bg-white ring-2 ring-[#C39A35]/25'
+                          : 'border-slate-300 bg-[#FBF5F7]/60 hover:border-[#8E1C3D] hover:bg-[#FBF5F7]'
+                      }`}
                       role="button"
                       tabIndex={0}
                       onKeyDown={(e) => {
@@ -681,9 +733,12 @@ export function PatientRegister() {
                         />
                       ) : (
                         <>
-                          <IconCamera className="h-8 w-8 text-slate-500 group-hover:text-emerald-700" />
-                          <span className="mt-1.5 text-xs font-semibold text-slate-600 group-hover:text-emerald-900">
+                          <IconCamera className="h-8 w-8 text-[#8E1C3D]" />
+                          <span className="mt-1.5 text-xs font-semibold text-slate-600 group-hover:text-[#5D0B26]">
                             Add Photo
+                          </span>
+                          <span className="mt-0.5 text-[10px] font-medium uppercase tracking-wider text-slate-400">
+                            Optional
                           </span>
                         </>
                       )}
@@ -693,11 +748,11 @@ export function PatientRegister() {
                         <button
                           type="button"
                           onClick={() => setIsPhotoModalOpen(true)}
-                          className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-700 hover:underline cursor-pointer"
+                          className="inline-flex items-center gap-1 text-xs font-semibold text-[#8E1C3D] hover:underline cursor-pointer"
                         >
                           Change
                         </button>
-                        <span className="text-slate-500">•</span>
+                        <span className="text-slate-400">•</span>
                         <button
                           type="button"
                           onClick={handleRemovePhoto}
@@ -710,15 +765,11 @@ export function PatientRegister() {
                     )}
                   </div>
 
-                  {/* Form Input Grid */}
+                  {/* Identity fields */}
                   <div className="flex-1 space-y-4">
-                    {/* Row 1: Name, Age, Sex */}
                     <div className="grid grid-cols-1 gap-4 sm:grid-cols-12">
-                      <div className="sm:col-span-6">
-                        <label
-                          htmlFor="patient-full-name"
-                          className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1"
-                        >
+                      <div className="sm:col-span-12">
+                        <label htmlFor="patient-full-name" className={LABEL_CLASS}>
                           Patient Name *
                         </label>
                         <input
@@ -730,16 +781,68 @@ export function PatientRegister() {
                           value={fullName}
                           onChange={(e) => setFullName(e.target.value)}
                           placeholder="Enter full name"
-                          className="w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm font-medium text-slate-900 placeholder-slate-400 shadow-2xs focus:border-emerald-700 focus:outline-none focus:ring-1 focus:ring-emerald-700 min-h-[44px]"
+                          className={INPUT_CLASS}
+                        />
+                      </div>
+
+                      <div className="sm:col-span-6">
+                        <label htmlFor="patient-guardian-name" className={LABEL_CLASS}>
+                          Father / Guardian / Spouse *
+                        </label>
+                        <input
+                          id="patient-guardian-name"
+                          aria-label="Father / Guardian / Spouse Name *"
+                          type="text"
+                          value={guardianName}
+                          onChange={(e) => setGuardianName(e.target.value)}
+                          placeholder="Guardian name"
+                          className={INPUT_CLASS}
+                        />
+                      </div>
+
+                      <div className="sm:col-span-6">
+                        <label htmlFor="patient-mobile" className={LABEL_CLASS}>
+                          Mobile Number *
+                        </label>
+                        <div className="relative">
+                          <span className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-slate-500">
+                            <IconPhone className="h-4 w-4" />
+                          </span>
+                          <input
+                            id="patient-mobile"
+                            aria-label="Mobile Number *"
+                            type="tel"
+                            required
+                            value={mobile}
+                            onChange={(e) => setMobile(e.target.value)}
+                            placeholder="Enter mobile number"
+                            className={INPUT_WITH_ICON_CLASS}
+                          />
+                          {duplicateChecking && (
+                            <span className="absolute right-3 top-3.5 text-[10px] font-bold uppercase tracking-wider text-[#8E1C3D]">
+                              Checking…
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="sm:col-span-4">
+                        <label htmlFor="patient-dob" className={LABEL_CLASS}>
+                          Date of Birth
+                        </label>
+                        <input
+                          id="patient-dob"
+                          aria-label="Date of Birth (Optional)"
+                          type="date"
+                          value={dob}
+                          onChange={(e) => handleDobChange(e.target.value)}
+                          className={INPUT_CLASS}
                         />
                       </div>
 
                       <div className="sm:col-span-3">
-                        <label
-                          htmlFor="patient-age"
-                          className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1"
-                        >
-                          Age *
+                        <label htmlFor="patient-age" className={LABEL_CLASS}>
+                          Age (Years) *
                         </label>
                         <input
                           id="patient-age"
@@ -750,17 +853,22 @@ export function PatientRegister() {
                           required
                           value={ageYears}
                           onChange={(e) => setAgeYears(e.target.value === '' ? '' : Number(e.target.value))}
-                          placeholder="Years"
-                          className="w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm font-medium text-slate-900 placeholder-slate-400 shadow-2xs focus:border-emerald-700 focus:outline-none focus:ring-1 focus:ring-emerald-700 min-h-[44px]"
+                          placeholder="0"
+                          className={INPUT_CLASS}
                         />
                       </div>
 
-                      <div className="sm:col-span-3">
-                        <span className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
-                          Sex *
-                        </span>
-                        <div className="flex items-center gap-4 pt-2">
-                          <label className="flex items-center gap-2 cursor-pointer text-sm font-semibold text-slate-800">
+                      <div className="sm:col-span-5">
+                        <span className={LABEL_CLASS}>Sex *</span>
+                        {/* Segmented like Visit Type, so the two options never wrap in a narrow column. */}
+                        <div className="flex gap-1 rounded-lg border border-slate-300 bg-slate-100/70 p-1">
+                          <label
+                            className={`flex min-h-9 flex-1 cursor-pointer items-center justify-center gap-1.5 rounded-md text-xs font-bold transition-colors ${
+                              gender === 'M'
+                                ? 'border border-[#C39A35] bg-white text-[#5D0B26] shadow-2xs'
+                                : 'border border-transparent text-slate-600 hover:text-[#5D0B26]'
+                            }`}
+                          >
                             <input
                               type="radio"
                               name="gender"
@@ -768,373 +876,329 @@ export function PatientRegister() {
                               value="M"
                               checked={gender === 'M'}
                               onChange={() => setGender('M')}
-                              className="h-4 w-4 border-slate-300 text-emerald-800 focus:ring-emerald-700"
+                              className="h-4 w-4 shrink-0 accent-[#8E1C3D] focus:ring-[#8E1C3D]"
                             />
                             Male
                           </label>
-                          <label className="flex items-center gap-2 cursor-pointer text-sm font-semibold text-slate-800">
+                          <label
+                            className={`flex min-h-9 flex-1 cursor-pointer items-center justify-center gap-1.5 rounded-md text-xs font-bold transition-colors ${
+                              gender === 'F'
+                                ? 'border border-[#C39A35] bg-white text-[#5D0B26] shadow-2xs'
+                                : 'border border-transparent text-slate-600 hover:text-[#5D0B26]'
+                            }`}
+                          >
                             <input
                               type="radio"
                               name="gender"
                               value="F"
                               checked={gender === 'F'}
                               onChange={() => setGender('F')}
-                              className="h-4 w-4 border-slate-300 text-emerald-800 focus:ring-emerald-700"
+                              className="h-4 w-4 shrink-0 accent-[#8E1C3D] focus:ring-[#8E1C3D]"
                             />
                             Female
                           </label>
                         </div>
                       </div>
                     </div>
-
-                    {/* Row 2: Mobile Number & Address */}
-                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-12">
-                      <div className="sm:col-span-5">
-                        <label
-                          htmlFor="patient-mobile"
-                          className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1"
-                        >
-                          Mobile Number *
-                        </label>
-                        <div className="relative">
-                          <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5 text-slate-500">
-                            <IconPhone className="h-4 w-4" />
-                          </div>
-                          <input
-                            id="patient-mobile"
-                            aria-label="Mobile Number *"
-                            type="tel"
-                            required
-                            value={mobile}
-                            onChange={(e) => setMobile(e.target.value)}
-                            placeholder="Enter mobile number"
-                            className="w-full rounded-xl border border-slate-300 bg-white pl-10 pr-3.5 py-2.5 text-sm font-medium text-slate-900 placeholder:text-slate-400 shadow-2xs focus:border-emerald-700 focus:outline-none focus:ring-1 focus:ring-emerald-700 min-h-[44px]"
-                          />
-                          {duplicateChecking && (
-                            <span className="absolute right-3 top-3 text-xs font-semibold text-slate-500">
-                              Checking...
-                            </span>
-                          )}
-                        </div>
-                      </div>
-
-                      <div className="sm:col-span-7">
-                        <label
-                          htmlFor="patient-address"
-                          className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1"
-                        >
-                          Address
-                        </label>
-                        <div className="relative">
-                          <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5 text-slate-500">
-                            <IconMapPin className="h-4 w-4" />
-                          </div>
-                          <input
-                            id="patient-address"
-                            aria-label="Address (Village / Mohalla / Ward) *"
-                            type="text"
-                            required
-                            value={address}
-                            onChange={(e) => setAddress(e.target.value)}
-                            placeholder="Enter full address"
-                            className="w-full rounded-xl border border-slate-300 bg-white pl-10 pr-3.5 py-2.5 text-sm font-medium text-slate-900 placeholder:text-slate-400 shadow-2xs focus:border-emerald-700 focus:outline-none focus:ring-1 focus:ring-emerald-700 min-h-[44px]"
-                          />
-                        </div>
-                      </div>
-                    </div>
                   </div>
                 </div>
               </section>
 
-              {/* CARD 2: Additional Demographics (ABDM Invariants) in Desktop Grid */}
-              <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs sm:p-6">
-                <details open className="group">
-                  <summary className="flex items-center justify-between font-bold text-sm text-slate-900 cursor-pointer select-none">
-                    <span className="flex items-center gap-2 text-emerald-800">
-                      <IconNotes className="h-4 w-4" />
-                      Additional Demographics (Guardian, DOB, District, Allergies, Notes)
-                    </span>
-                    <span className="text-xs font-semibold text-slate-500 group-open:rotate-180 transition-transform">
-                      ▼
-                    </span>
-                  </summary>
+              {/* SECTION 2: Address & contact */}
+              <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xs">
+                <SectionHeader
+                  index="2"
+                  title="Address & Contact"
+                  hint="Where the patient lives and who to call in an emergency"
+                  icon={<IconMapPin className="h-4 w-4" />}
+                />
 
-                  <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4 border-t border-slate-100 pt-4">
-                    {/* Guardian */}
-                    <div>
-                      <label htmlFor="patient-guardian-name" className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
-                        Father / Guardian / Spouse Name *
-                      </label>
+                <div className="grid grid-cols-1 gap-4 p-5 sm:grid-cols-12 sm:p-6">
+                  <div className="sm:col-span-12">
+                    <label htmlFor="patient-address" className={LABEL_CLASS}>
+                      Address (Village / Mohalla / Ward) *
+                    </label>
+                    <div className="relative">
+                      <span className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-slate-500">
+                        <IconMapPin className="h-4 w-4" />
+                      </span>
                       <input
-                        id="patient-guardian-name"
-                        aria-label="Father / Guardian / Spouse Name *"
-                        type="text"
-                        value={guardianName}
-                        onChange={(e) => setGuardianName(e.target.value)}
-                        placeholder="Guardian name"
-                        className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-medium text-slate-900 placeholder-slate-400 shadow-2xs focus:border-emerald-700 focus:outline-none min-h-[38px]"
-                      />
-                    </div>
-
-                    {/* DOB */}
-                    <div>
-                      <label htmlFor="patient-dob" className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
-                        Date of Birth (Optional)
-                      </label>
-                      <input
-                        id="patient-dob"
-                        type="date"
-                        value={dob}
-                        onChange={(e) => handleDobChange(e.target.value)}
-                        className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-medium text-slate-900 shadow-2xs focus:border-emerald-700 focus:outline-none min-h-[38px]"
-                      />
-                    </div>
-
-                    {/* District */}
-                    <div>
-                      <label htmlFor="patient-district" className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
-                        District *
-                      </label>
-                      <input
-                        id="patient-district"
+                        id="patient-address"
+                        aria-label="Address (Village / Mohalla / Ward) *"
                         type="text"
                         required
-                        value={district}
-                        onChange={(e) => setDistrict(e.target.value)}
-                        className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-medium text-slate-900 shadow-2xs focus:border-emerald-700 focus:outline-none min-h-[38px]"
-                      />
-                    </div>
-
-                    {/* State */}
-                    <div>
-                      <label htmlFor="patient-state" className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
-                        State *
-                      </label>
-                      <input
-                        id="patient-state"
-                        type="text"
-                        required
-                        value={state}
-                        onChange={(e) => setState(e.target.value)}
-                        className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-medium text-slate-900 shadow-2xs focus:border-emerald-700 focus:outline-none min-h-[38px]"
-                      />
-                    </div>
-
-                    {/* Emergency Contact */}
-                    <div>
-                      <label htmlFor="patient-emergency" className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
-                        Emergency Contact (Optional)
-                      </label>
-                      <input
-                        id="patient-emergency"
-                        type="text"
-                        value={emergencyContact}
-                        onChange={(e) => setEmergencyContact(e.target.value)}
-                        placeholder="Relationship & phone"
-                        className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-medium text-slate-900 placeholder-slate-400 shadow-2xs focus:border-emerald-700 focus:outline-none min-h-[38px]"
-                      />
-                    </div>
-
-                    {/* Allergies */}
-                    <div>
-                      <label htmlFor="patient-allergies" className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
-                        Allergies *
-                      </label>
-                      <input
-                        id="patient-allergies"
-                        type="text"
-                        required
-                        value={allergies}
-                        onChange={(e) => setAllergies(e.target.value)}
-                        className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-medium text-slate-900 shadow-2xs focus:border-emerald-700 focus:outline-none min-h-[38px]"
-                      />
-                    </div>
-
-                    {/* Clinical Notes */}
-                    <div className="sm:col-span-2 xl:col-span-3">
-                      <label htmlFor="patient-notes" className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
-                        Clinical / Administrative Notes (Optional)
-                      </label>
-                      <textarea
-                        id="patient-notes"
-                        rows={2}
-                        value={notes}
-                        onChange={(e) => setNotes(e.target.value)}
-                        placeholder="Special remarks, past history, or reference"
-                        className="w-full rounded-xl border border-slate-300 bg-white p-3 text-xs font-medium text-slate-900 placeholder-slate-400 shadow-2xs focus:border-emerald-700 focus:outline-none"
+                        value={address}
+                        onChange={(e) => setAddress(e.target.value)}
+                        placeholder="House, street, village or mohalla"
+                        className={INPUT_WITH_ICON_CLASS}
                       />
                     </div>
                   </div>
-                </details>
+
+                  <div className="sm:col-span-4">
+                    <label htmlFor="patient-district" className={LABEL_CLASS}>
+                      District *
+                    </label>
+                    <input
+                      id="patient-district"
+                      aria-label="District *"
+                      type="text"
+                      required
+                      value={district}
+                      onChange={(e) => setDistrict(e.target.value)}
+                      className={INPUT_CLASS}
+                    />
+                  </div>
+
+                  <div className="sm:col-span-4">
+                    <label htmlFor="patient-state" className={LABEL_CLASS}>
+                      State *
+                    </label>
+                    <input
+                      id="patient-state"
+                      aria-label="State *"
+                      type="text"
+                      required
+                      value={state}
+                      onChange={(e) => setState(e.target.value)}
+                      className={INPUT_CLASS}
+                    />
+                  </div>
+
+                  <div className="sm:col-span-4">
+                    <label htmlFor="patient-emergency" className={LABEL_CLASS}>
+                      Emergency Contact
+                    </label>
+                    <input
+                      id="patient-emergency"
+                      aria-label="Emergency Contact (Optional)"
+                      type="text"
+                      value={emergencyContact}
+                      onChange={(e) => setEmergencyContact(e.target.value)}
+                      placeholder="Relationship & phone"
+                      className={INPUT_CLASS}
+                    />
+                  </div>
+                </div>
+              </section>
+
+              {/* SECTION 3: Alerts & notes */}
+              <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xs">
+                <SectionHeader
+                  index="3"
+                  title="Medical Alerts & Notes"
+                  hint="Known allergies and any administrative remark for the doctor"
+                  icon={<IconHeartRateMonitor className="h-4 w-4" />}
+                />
+
+                <div className="grid grid-cols-1 gap-4 p-5 sm:grid-cols-12 sm:p-6">
+                  <div className="sm:col-span-5">
+                    <label htmlFor="patient-allergies" className={LABEL_CLASS}>
+                      Allergies *
+                    </label>
+                    <input
+                      id="patient-allergies"
+                      aria-label="Allergies *"
+                      type="text"
+                      required
+                      value={allergies}
+                      onChange={(e) => setAllergies(e.target.value)}
+                      className={`${INPUT_CLASS} border-amber-300 focus:border-[#8E1C3D]`}
+                    />
+                    <p className="mt-1 text-[11px] text-slate-500">
+                      Write “None reported” when the patient reports no allergy.
+                    </p>
+                  </div>
+
+                  <div className="sm:col-span-7">
+                    <label htmlFor="patient-notes" className={LABEL_CLASS}>
+                      Clinical / Administrative Notes
+                    </label>
+                    <textarea
+                      id="patient-notes"
+                      aria-label="Clinical / Administrative Notes (Optional)"
+                      rows={3}
+                      value={notes}
+                      onChange={(e) => setNotes(e.target.value)}
+                      placeholder="Special remarks, past history, or reference"
+                      className="w-full rounded-lg border border-slate-300 bg-white p-3 text-sm font-medium text-slate-900 shadow-2xs transition-colors placeholder:text-slate-400 hover:border-slate-400 focus:border-[#8E1C3D] focus:outline-none focus:ring-2 focus:ring-[#8E1C3D]/15"
+                    />
+                  </div>
+                </div>
               </section>
             </div>
 
             {/* ========================================================= */}
-            {/* RIGHT COLUMN: Visit Allocation & Live Queue Desk (5 cols) */}
+            {/* RIGHT: visit allocation and live token preview (4 of 12)  */}
             {/* ========================================================= */}
-            <div className="space-y-5 lg:col-span-5 xl:col-span-4">
-              {/* CARD 3: Visit Details */}
-              <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs sm:p-6 space-y-4">
-                <div className="flex items-center gap-2 border-b border-slate-100 pb-3">
-                  <IconCalendar className="h-5 w-5 text-emerald-800" />
-                  <h2 className="text-base font-bold text-slate-900">Visit Details</h2>
-                </div>
+            <div className="space-y-5 xl:col-span-4">
+              {/* SECTION 4: Visit & queue */}
+              <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xs">
+                <SectionHeader
+                  index="4"
+                  title="Visit & Queue"
+                  hint="Optional — allocate today's token now"
+                  icon={<IconCalendar className="h-4 w-4" />}
+                />
 
-                {/* Department */}
-                <div>
-                  <label
-                    htmlFor="visit-department"
-                    className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1"
-                  >
-                    Department *
-                  </label>
-                  <div className="relative">
-                    <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5 text-slate-500">
-                      <IconStethoscope className="h-4 w-4" />
-                    </div>
-                    <select
-                      id="visit-department"
-                      value={selectedDepartmentId}
-                      onChange={(e) => {
-                        setSelectedDepartmentId(e.target.value ? Number(e.target.value) : '')
-                        setSelectedDoctorId('')
-                      }}
-                      className="w-full rounded-xl border border-slate-300 bg-white pl-10 pr-3.5 py-2.5 text-xs font-medium text-slate-900 shadow-2xs focus:border-emerald-700 focus:outline-none focus:ring-1 focus:ring-emerald-700 min-h-[44px]"
-                    >
-                      <option value="">Select department</option>
-                      {departments?.map((dept) => (
-                        <option key={dept.id} value={dept.id}>
-                          {dept.name_en}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-
-                {/* Doctor */}
-                <div>
-                  <label
-                    htmlFor="visit-doctor"
-                    className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1"
-                  >
-                    Doctor *
-                  </label>
-                  <div className="relative">
-                    <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5 text-slate-500">
-                      <IconUserCheck className="h-4 w-4" />
-                    </div>
-                    <select
-                      id="visit-doctor"
-                      value={selectedDoctorId}
-                      onChange={(e) => setSelectedDoctorId(e.target.value ? Number(e.target.value) : '')}
-                      disabled={!selectedDepartmentId}
-                      className="w-full rounded-xl border border-slate-300 bg-white pl-10 pr-3.5 py-2.5 text-xs font-medium text-slate-900 shadow-2xs focus:border-emerald-700 focus:outline-none focus:ring-1 focus:ring-emerald-700 min-h-[44px] disabled:bg-slate-100"
-                    >
-                      <option value="">Select doctor</option>
-                      {departmentDoctors?.map((doc: DepartmentDoctorOut) => (
-                        <option key={doc.id} value={doc.id}>
-                          {doc.name_en}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-
-                {/* Visit Type Segmented Toggle */}
-                <div>
-                  <span className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
-                    Visit Type
-                  </span>
-                  <div className="flex rounded-xl border border-slate-300 bg-slate-100/70 p-1 shadow-2xs">
-                    <button
-                      type="button"
-                      onClick={() => setVisitType('walk-in')}
-                      className={`flex flex-1 items-center justify-center gap-1.5 rounded-lg py-2 text-xs font-bold transition-all ${visitType === 'walk-in'
-                          ? 'border border-emerald-300 bg-white text-emerald-900 shadow-xs'
-                          : 'text-slate-600 hover:text-slate-900'
-                        }`}
-                    >
-                      <IconWalk className="h-4 w-4 text-emerald-700" />
-                      Walk-in
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setVisitType('appointment')}
-                      className={`flex flex-1 items-center justify-center gap-1.5 rounded-lg py-2 text-xs font-bold transition-all ${visitType === 'appointment'
-                          ? 'border border-emerald-300 bg-white text-emerald-900 shadow-xs'
-                          : 'text-slate-600 hover:text-slate-900'
-                        }`}
-                    >
-                      <IconCalendar className="h-4 w-4 text-slate-500" />
-                      Appointment
-                    </button>
-                  </div>
-                </div>
-
-                {/* Reason for Visit */}
-                <div>
-                  <label
-                    htmlFor="reason-for-visit"
-                    className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1"
-                  >
-                    Reason for Visit
-                  </label>
-                  <textarea
-                    id="reason-for-visit"
-                    rows={2}
-                    value={reasonForVisit}
-                    onChange={(e) => setReasonForVisit(e.target.value)}
-                    placeholder="Enter main complaint / reason for visit..."
-                    className="w-full rounded-xl border border-slate-300 bg-white p-3 text-xs font-medium text-slate-900 placeholder-slate-400 shadow-2xs focus:border-emerald-700 focus:outline-none focus:ring-1 focus:ring-emerald-700"
-                  />
-                </div>
-              </section>
-
-              {/* CARD 4: Live Queue Ticket Preview */}
-              <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs sm:p-6 space-y-4">
-                <div className="flex items-center gap-2 border-b border-slate-100 pb-3">
-                  <IconTicket className="h-5 w-5 text-emerald-800" />
+                <div className="space-y-4 p-5 sm:p-6">
                   <div>
-                    <h2 className="text-base font-bold text-slate-900">Token Desk</h2>
-                    <p className="text-xs text-slate-500">
-                      Live queue ticket preview generated upon saving.
+                    <label htmlFor="visit-department" className={LABEL_CLASS}>
+                      Department *
+                    </label>
+                    <div className="relative">
+                      <span className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-slate-500">
+                        <IconStethoscope className="h-4 w-4" />
+                      </span>
+                      <select
+                        id="visit-department"
+                        value={selectedDepartmentId}
+                        onChange={(e) => {
+                          setSelectedDepartmentId(e.target.value ? Number(e.target.value) : '')
+                          setSelectedDoctorId('')
+                        }}
+                        className={`${INPUT_WITH_ICON_CLASS} pr-8`}
+                      >
+                        <option value="">Select department</option>
+                        {departments?.map((dept) => (
+                          <option key={dept.id} value={dept.id}>
+                            {dept.name_en}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label htmlFor="visit-doctor" className={LABEL_CLASS}>
+                      Doctor *
+                    </label>
+                    <div className="relative">
+                      <span className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-slate-500">
+                        <IconUserCheck className="h-4 w-4" />
+                      </span>
+                      <select
+                        id="visit-doctor"
+                        value={selectedDoctorId}
+                        onChange={(e) => setSelectedDoctorId(e.target.value ? Number(e.target.value) : '')}
+                        disabled={!selectedDepartmentId}
+                        className={`${INPUT_WITH_ICON_CLASS} pr-8 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-500`}
+                      >
+                        <option value="">
+                          {selectedDepartmentId ? 'Select doctor' : 'Select a department first'}
+                        </option>
+                        {departmentDoctors?.map((doc: DepartmentDoctorOut) => (
+                          <option key={doc.id} value={doc.id}>
+                            {doc.name_en}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+
+                  <div>
+                    <span className={LABEL_CLASS}>Visit Type</span>
+                    <div className="flex gap-1 rounded-lg border border-slate-300 bg-slate-100/70 p-1">
+                      <button
+                        type="button"
+                        onClick={() => setVisitType('walk-in')}
+                        aria-pressed={visitType === 'walk-in'}
+                        className={`flex min-h-9 flex-1 items-center justify-center gap-1.5 rounded-md text-xs font-bold transition-colors ${
+                          visitType === 'walk-in'
+                            ? 'border border-[#C39A35] bg-white text-[#5D0B26] shadow-2xs'
+                            : 'border border-transparent text-slate-600 hover:text-[#5D0B26]'
+                        }`}
+                      >
+                        <IconWalk className="h-4 w-4" />
+                        Walk-in
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setVisitType('appointment')}
+                        aria-pressed={visitType === 'appointment'}
+                        className={`flex min-h-9 flex-1 items-center justify-center gap-1.5 rounded-md text-xs font-bold transition-colors ${
+                          visitType === 'appointment'
+                            ? 'border border-[#C39A35] bg-white text-[#5D0B26] shadow-2xs'
+                            : 'border border-transparent text-slate-600 hover:text-[#5D0B26]'
+                        }`}
+                      >
+                        <IconCalendar className="h-4 w-4" />
+                        Appointment
+                      </button>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label htmlFor="reason-for-visit" className={LABEL_CLASS}>
+                      Reason for Visit
+                    </label>
+                    <textarea
+                      id="reason-for-visit"
+                      rows={2}
+                      value={reasonForVisit}
+                      onChange={(e) => setReasonForVisit(e.target.value)}
+                      placeholder="Main complaint / reason for visit…"
+                      className="w-full rounded-lg border border-slate-300 bg-white p-3 text-sm font-medium text-slate-900 shadow-2xs transition-colors placeholder:text-slate-400 hover:border-slate-400 focus:border-[#8E1C3D] focus:outline-none focus:ring-2 focus:ring-[#8E1C3D]/15"
+                    />
+                  </div>
+
+                  {/* Live summary of what will be booked */}
+                  <div className="rounded-lg border-l-2 border-[#C39A35] bg-[#FBF5F7] px-3 py-2">
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                      Booking summary
+                    </p>
+                    <p className="truncate text-xs font-semibold text-[#5D0B26]">
+                      {selectedDepartment?.name_en || 'No department selected'}
+                    </p>
+                    <p className="truncate text-xs text-slate-600">
+                      {selectedDoctor?.name_en || 'No doctor selected'}
                     </p>
                   </div>
                 </div>
+              </section>
 
-                <QueueTicketPreview
-                  departmentName={selectedDepartment?.name_en || 'General OPD'}
-                  doctorName={selectedDoctor?.name_en || 'Select doctor'}
-                  tokenPrefix={tokenPrefix}
-                  tokenNumber={allocatedToken || (selectedDoctorId ? 'Auto' : '—')}
-                  patientName={fullName.trim() || 'New Patient'}
-                  patientUrn={createdPatient?.urn || 'URN on save'}
-                  waitingCount={0}
-                  nextToken={allocatedToken || 'Next'}
+              {/* SECTION 5: Token desk preview */}
+              <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xs">
+                <SectionHeader
+                  index="5"
+                  title="Token Desk"
+                  hint="Live ticket preview, printed on save"
+                  icon={<IconTicket className="h-4 w-4" />}
                 />
+
+                <div className="p-5 sm:p-6">
+                  <QueueTicketPreview
+                    departmentName={selectedDepartment?.name_en || 'General OPD'}
+                    doctorName={selectedDoctor?.name_en || 'Select doctor'}
+                    tokenPrefix={tokenPrefix}
+                    tokenNumber={allocatedToken || (selectedDoctorId ? 'Auto' : '—')}
+                    patientName={fullName.trim() || 'New Patient'}
+                    patientUrn={createdPatient?.urn || 'URN on save'}
+                    waitingCount={0}
+                    nextToken={allocatedToken || 'Next'}
+                  />
+                </div>
               </section>
             </div>
           </div>
 
-          {/* ========================================================= */}
-          {/* BOTTOM ACTION BAR: Full Width Desktop Dock               */}
-          {/* ========================================================= */}
-          <div className="w-full flex flex-col sm:flex-row items-center justify-between gap-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-xs">
-            <label className="flex items-center gap-2.5 text-sm font-semibold text-slate-800 cursor-pointer select-none">
+          {/* Bottom action bar */}
+          <div className="flex flex-col justify-between gap-3 rounded-2xl border border-slate-200 border-l-4 border-l-[#C39A35] bg-white p-4 shadow-xs sm:flex-row sm:items-center sm:gap-4">
+            <label className="flex cursor-pointer select-none items-center gap-2.5 text-sm font-semibold text-slate-800">
               <input
                 type="checkbox"
                 checked={saveAndAddAnother}
                 onChange={(e) => setSaveAndAddAnother(e.target.checked)}
-                className="h-4 w-4 rounded border-slate-300 text-emerald-800 focus:ring-emerald-700"
+                className="h-4 w-4 rounded border-slate-300 accent-[#8E1C3D] focus:ring-[#8E1C3D]"
               />
               Save and add another
             </label>
 
-            <div className="flex items-center gap-3">
+            <div className="flex w-full items-center gap-3 sm:w-auto">
               <button
                 type="button"
                 onClick={handleClear}
-                className="inline-flex min-h-11 items-center gap-1.5 rounded-xl border border-slate-300 bg-white px-4 text-sm font-bold text-slate-700 hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-slate-400 cursor-pointer"
+                className="inline-flex min-h-11 items-center gap-1.5 rounded-xl border border-slate-300 bg-white px-4 text-sm font-bold text-slate-700 transition-colors hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#8E1C3D] cursor-pointer"
               >
                 <IconRefresh className="h-4 w-4 text-slate-500" />
                 Clear
@@ -1148,7 +1212,7 @@ export function PatientRegister() {
                   !!createdPatient ||
                   (isDuplicateDetected && !confirmDifferentPatient)
                 }
-                className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-[#124832] px-6 text-sm font-bold text-white shadow-xs hover:bg-[#0D3822] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-800 disabled:opacity-50 cursor-pointer"
+                className="inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-xl bg-[#8E1C3D] px-6 text-sm font-bold text-white shadow-xs transition-colors hover:bg-[#5D0B26] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#5D0B26] disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer sm:flex-none"
               >
                 <IconDeviceFloppy className="h-4 w-4" />
                 {registerMutation.isPending ? 'Saving...' : 'Save Registration'}
