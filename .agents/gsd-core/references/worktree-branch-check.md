@@ -1,4 +1,4 @@
-﻿# Worktree branch check (spawn-time guard)
+# Worktree branch check (spawn-time guard)
 
 Canonical, fail-closed, **verify-only** guard embedded into every worktree sub-agent
 prompt at dispatch. This is the single source of truth for the `worktree_branch_check`

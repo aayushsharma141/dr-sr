@@ -1,5 +1,6 @@
 import { useNavigate } from 'react-router'
 import { AppShell } from '../components/AppShell'
+import { DoctorDashboardUnfinishedCard } from '../components/DoctorDashboardUnfinishedCard'
 import { useDoctorQueue, useMe } from '../api/queries'
 import type { DoctorQueueItem } from '../api/types'
 import { withDoctorTitle } from '../format'
@@ -20,9 +21,9 @@ export function DoctorDashboard() {
         {/* Welcome & Queue Header */}
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-6 rounded-lg border border-neutral-200 shadow-xs">
           <div>
-            <h2 className="text-xl font-bold text-neutral-900">
-              Doctor Consultation Queue
-            </h2>
+            <h1 className="text-xl font-bold text-neutral-900">
+              Doctor Dashboard
+            </h1>
             <p className="text-xs text-neutral-500 mt-1">
               Live waiting room for {doctorName ? withDoctorTitle(doctorName) : 'the doctor'} ({queue?.queue_date || 'Today'})
             </p>
@@ -38,6 +39,9 @@ export function DoctorDashboard() {
           </button>
         </div>
 
+        {/* Doctor Incomplete Drafts Card (D-19-24, DWS-02) */}
+        <DoctorDashboardUnfinishedCard />
+
         {isPending ? (
           <div className="bg-white p-12 text-center text-neutral-500 rounded-lg border">
             Loading today's consultation queue...
@@ -48,6 +52,22 @@ export function DoctorDashboard() {
           </div>
         ) : (
           <>
+            {/* Queue summary figures, derived from the loaded queue only */}
+            <div className="admin-stagger grid grid-cols-1 gap-3 sm:grid-cols-3" aria-label="Queue summary">
+              <div className="rounded-lg border border-amber-200 bg-amber-50/60 p-4 shadow-xs">
+                <p className="text-xs font-semibold uppercase tracking-wider text-amber-900">Waiting</p>
+                <p className="mt-1 text-2xl font-bold tabular-nums text-amber-950">{queue.waiting.length}</p>
+              </div>
+              <div className="rounded-lg border border-blue-200 bg-blue-50/60 p-4 shadow-xs">
+                <p className="text-xs font-semibold uppercase tracking-wider text-blue-900">Scheduled</p>
+                <p className="mt-1 text-2xl font-bold tabular-nums text-blue-950">{queue.booked.length}</p>
+              </div>
+              <div className="rounded-lg border border-emerald-200 bg-emerald-50/60 p-4 shadow-xs">
+                <p className="text-xs font-semibold uppercase tracking-wider text-emerald-900">Completed</p>
+                <p className="mt-1 text-2xl font-bold tabular-nums text-emerald-950">{queue.completed.length}</p>
+              </div>
+            </div>
+
             {/* Active / In-Consultation Patient Banner */}
             {queue.in_consultation.length > 0 && (
               <div className="bg-purple-50 border border-purple-200 rounded-lg p-6 shadow-xs space-y-3">
@@ -107,7 +127,7 @@ export function DoctorDashboard() {
                   Waiting room is currently empty.
                 </div>
               ) : (
-                <div className="divide-y divide-neutral-200">
+                <div className="admin-stagger divide-y divide-neutral-200">
                   {queue.waiting.map((item) => (
                     <div
                       key={item.id}
@@ -168,7 +188,7 @@ export function DoctorDashboard() {
                   No further booked appointments for today.
                 </div>
               ) : (
-                <div className="divide-y divide-neutral-100">
+                <div className="admin-stagger divide-y divide-neutral-100">
                   {queue.booked.map((item) => (
                     <div key={item.id} className="p-4 flex justify-between items-center text-sm text-neutral-600">
                       <div className="flex items-center gap-3">
@@ -193,7 +213,7 @@ export function DoctorDashboard() {
                     Completed Consultations ({queue.completed.length})
                   </h3>
                 </div>
-                <div className="divide-y divide-neutral-100">
+                <div className="admin-stagger divide-y divide-neutral-100">
                   {queue.completed.map((item) => (
                     <div key={item.id} className="p-4 flex justify-between items-center text-sm">
                       <div className="flex items-center gap-3">

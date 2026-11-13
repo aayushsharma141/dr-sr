@@ -175,6 +175,11 @@ def test_rbac_matrix_cell(
     elif row.path == "/api/patients/check-duplicate":
         resolved_path = "/api/patients/check-duplicate?name=Test&mobile=9876543210"
 
+    elif row.path == "/api/doctors/me/settings":
+        if current_user and current_user.doctor_id:
+            target_entity = db_session.get(Doctor, current_user.doctor_id)
+        resolved_path = row.path
+
     elif "/api/doctors/{id}" in row.path:
         doc = Doctor(name_en=f"Dr. Target {uuid.uuid4().hex[:6]}", default_fee_paise=30000)
         db_session.add(doc)
@@ -341,8 +346,21 @@ def test_rbac_matrix_cell(
                 patient_id=pat.id,
                 doctor_id=doc_a_id,
                 diagnosis="Matrix Diagnosis",
+                status="DRAFT",
             )
             db_session.add(rx)
+            db_session.flush()
+            from kalyan_api.models import PrescriptionItem
+
+            item = PrescriptionItem(
+                prescription_id=rx.id,
+                item_order=1,
+                medicine_name="Paracetamol 500mg",
+                dosage="1 tablet",
+                frequency="TDS",
+                duration_days=5,
+            )
+            db_session.add(item)
             db_session.flush()
             target_entity = rx
             resolved_path = row.path.replace("{id}", str(rx.id))
@@ -500,7 +518,7 @@ def test_rbac_matrix_cell(
         db_session.add(pat)
         db_session.flush()
 
-        if "{id}" in row.path:
+        if "{id}" in row.path or "{encounter_id}" in row.path:
             admin_u = make_user(db_session, test_settings, "ADMIN", f"adm_{uuid.uuid4().hex[:6]}")
             is_fin = "addenda" in row.path
             enc = ClinicalEncounter(
@@ -515,13 +533,259 @@ def test_rbac_matrix_cell(
             )
             db_session.add(enc)
             db_session.flush()
+
+            if "template-response" in row.path:
+                from kalyan_api.models import (
+                    ClinicalTemplate,
+                    ClinicalTemplateResponse,
+                    ClinicalTemplateVersion,
+                )
+
+                dept = db_session.scalar(select(Department).where(Department.code == "GENERAL"))
+                if not dept:
+                    dept = Department(code="GENERAL", name_en="General Medicine")
+                    db_session.add(dept)
+                    db_session.flush()
+                tmpl = db_session.scalar(
+                    select(ClinicalTemplate).where(ClinicalTemplate.code == "PHYSIO")
+                )
+                if not tmpl:
+                    tmpl = ClinicalTemplate(
+                        department_id=dept.id, code="PHYSIO", name_en="Physio Template"
+                    )
+                    db_session.add(tmpl)
+                    db_session.flush()
+                ver = db_session.scalar(
+                    select(ClinicalTemplateVersion).where(
+                        ClinicalTemplateVersion.template_id == tmpl.id
+                    )
+                )
+                if not ver:
+                    ver = ClinicalTemplateVersion(
+                        template_id=tmpl.id,
+                        version_number=1,
+                        schema_json={"fields": []},
+                        approved_by="admin",
+                    )
+                    db_session.add(ver)
+                    db_session.flush()
+                if row.method == "GET":
+                    resp_obj = ClinicalTemplateResponse(
+                        encounter_id=enc.id,
+                        template_version_id=ver.id,
+                        response_data={"findings": "Normal"},
+                    )
+                    db_session.add(resp_obj)
+                    db_session.flush()
+                enc.template_version_id = ver.id
+
+            if "vitals" in row.path:
+                from kalyan_api.models import VitalObservation
+
+                if row.method == "GET":
+                    v = VitalObservation(
+                        encounter_id=enc.id, patient_id=pat.id, height_cm=170.0, weight_kg=70.0
+                    )
+                    db_session.add(v)
+                    db_session.flush()
+
+            if "follow-up" in row.path and row.method == "GET":
+                from kalyan_api.models import FollowUpRecommendation
+
+                rec = FollowUpRecommendation(
+                    encounter_id=enc.id,
+                    patient_id=pat.id,
+                    doctor_id=doc_a_id,
+                    recommended_doctor_id=doc_a_id,
+                    recommended_date=datetime.now(UTC).date(),
+                    clinical_reason="Check progress",
+                    status="PENDING",
+                )
+                db_session.add(rec)
+                db_session.flush()
+
             target_entity = enc
-            resolved_path = row.path.replace("{id}", str(enc.id))
+            resolved_path = row.path.replace("{id}", str(enc.id)).replace(
+                "{encounter_id}", str(enc.id)
+            )
         else:
             target_entity = type("TargetEnc", (), {"patient_id": pat.id, "appointment_id": None})()
 
+    elif "/api/follow-ups" in row.path:
+        doc_a_user = db_session.scalar(select(User).where(User.username.like("mat_doc_a%")))
+        doc_a_id = doc_a_user.doctor_id if doc_a_user else None
+        if not doc_a_id:
+            doc = Doctor(name_en=f"Dr. FUp {uuid.uuid4().hex[:6]}")
+            # Follow-up booking needs the doctor in an active department (BR-012),
+            # exactly as ordinary booking does.
+            fup_dept = db_session.scalar(select(Department).where(Department.is_active.is_(True)))
+            if not fup_dept:
+                fup_dept = Department(name_en="Physiotherapy / General OPD", is_active=True)
+                db_session.add(fup_dept)
+                db_session.flush()
+            doc.departments.append(fup_dept)
+            db_session.add(doc)
+            db_session.flush()
+            doc_a_id = doc.id
+
+        pat = Patient(
+            urn=f"KH-2026-{uuid.uuid4().hex[:4]}",
+            full_name="Matrix Patient",
+            guardian_name="Guardian",
+            gender="M",
+            age_years=30,
+            mobile="9876543210",
+            address="Ara",
+            district="Bhojpur",
+            state="Bihar",
+        )
+        db_session.add(pat)
+        db_session.flush()
+
+        admin_u = make_user(db_session, test_settings, "ADMIN", f"adm_{uuid.uuid4().hex[:6]}")
+        enc = ClinicalEncounter(
+            patient_id=pat.id,
+            doctor_id=doc_a_id,
+            symptoms="Back pain",
+            clinical_notes="Notes",
+            diagnosis="Diagnosis",
+            created_by_user_id=admin_u.id,
+        )
+        db_session.add(enc)
+        db_session.flush()
+
+        from kalyan_api.models import FollowUpRecommendation
+
+        rec = FollowUpRecommendation(
+            encounter_id=enc.id,
+            patient_id=pat.id,
+            doctor_id=doc_a_id,
+            recommended_doctor_id=doc_a_id,
+            recommended_date=datetime.now(UTC).date(),
+            clinical_reason="Routine checkup",
+            status="PENDING",
+        )
+        db_session.add(rec)
+        db_session.flush()
+        target_entity = rec
+        resolved_path = row.path.replace("{id}", str(rec.id))
+
+    elif "/api/templates" in row.path:
+        from kalyan_api.models import ClinicalTemplate, ClinicalTemplateVersion
+        from kalyan_api.routers.templates import ensure_specialty_templates_seeded
+
+        ensure_specialty_templates_seeded(db_session)
+        tmpl = db_session.scalar(
+            select(ClinicalTemplate).where(ClinicalTemplate.code == "PHYSIOTHERAPY")
+        )
+        version = db_session.scalar(
+            select(ClinicalTemplateVersion).where(ClinicalTemplateVersion.template_id == tmpl.id)
+        )
+        resolved_path = row.path.replace("{department_id}", str(tmpl.department_id)).replace(
+            "{version_id}", str(version.id)
+        )
+        target_entity = None
+
+    elif "/api/admin/patients" in row.path:
+        pat = Patient(
+            urn=f"KH-2026-{uuid.uuid4().hex[:4]}",
+            full_name="Matrix Admin Patient",
+            guardian_name="Guardian",
+            gender="M",
+            age_years=30,
+            mobile="9876543210",
+            address="Ara",
+            district="Bhojpur",
+            state="Bihar",
+        )
+        db_session.add(pat)
+        db_session.flush()
+        target_entity = pat
+        if "{id}" in row.path:
+            resolved_path = row.path.replace("{id}", str(pat.id))
+        elif "search" in row.path:
+            resolved_path = "/api/admin/patients/search?q=Matrix"
+
+    elif "{asset_id}" in row.path:
+        from kalyan_api.models import HospitalAsset
+
+        admin_u = make_user(db_session, test_settings, "ADMIN", f"adm_{uuid.uuid4().hex[:6]}")
+        test_settings.assets_dir.mkdir(parents=True, exist_ok=True)
+        asset_fname = f"asset_{uuid.uuid4().hex[:6]}.png"
+        (test_settings.assets_dir / asset_fname).write_bytes(
+            b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01\x08\x06\x00\x00\x00\x1f\x15c4"
+        )
+        asset = HospitalAsset(
+            asset_type="LOGO",
+            filename=asset_fname,
+            original_filename="logo.png",
+            mime_type="image/png",
+            file_size_bytes=33,
+            is_active=True,
+            version=1,
+            uploaded_by_user_id=admin_u.id,
+        )
+        db_session.add(asset)
+        db_session.flush()
+        target_entity = asset
+        resolved_path = row.path.replace("{asset_id}", str(asset.id))
+
+    elif "{batch_id}" in row.path:
+        from kalyan_api.models import PatientImportBatch
+
+        admin_u = make_user(db_session, test_settings, "ADMIN", f"adm_{uuid.uuid4().hex[:6]}")
+        batch = PatientImportBatch(
+            batch_id=str(uuid.uuid4()),
+            filename="matrix_import.csv",
+            total_rows=1,
+            status="STAGED",
+            created_by_user_id=admin_u.id,
+        )
+        db_session.add(batch)
+        db_session.flush()
+        target_entity = batch
+        resolved_path = row.path.replace("{batch_id}", batch.batch_id)
+
+    elif "{doc_type}" in row.path:
+        from kalyan_api.models import PrintTemplate
+        from kalyan_api.routers.templates import ensure_print_templates_seeded
+
+        admin_u = make_user(db_session, test_settings, "ADMIN", f"adm_{uuid.uuid4().hex[:6]}")
+        ensure_print_templates_seeded(db_session, admin_u.id)
+        tmpl = db_session.scalar(
+            select(PrintTemplate).where(PrintTemplate.document_type == "prescription")
+        )
+        target_entity = tmpl
+        resolved_path = row.path.replace("{doc_type}", "prescription")
+
+    elif row.path == "/api/users/bulk-delete":
+        make_user(
+            db_session,
+            test_settings,
+            "ADMIN",
+            f"mat_super_{uuid.uuid4().hex[:6]}",
+            is_super_admin=True,
+        )
+        target_entity = make_user(
+            db_session,
+            test_settings,
+            "RECEPTION",
+            f"mat_tgt_{uuid.uuid4().hex[:6]}",
+            is_active=False,
+        )
+
     elif "{id}" in row.path:
-        is_active = "reactivate" not in row.path
+        # reactivate and delete both need an already-deactivated target
+        is_active = "reactivate" not in row.path and not row.path.endswith("/delete")
+        if row.path.endswith("/delete"):
+            # The matrix delete row authorises with a super admin whose password is TEST_PASSWORD
+            make_user(
+                db_session,
+                test_settings,
+                "ADMIN",
+                f"mat_super_{uuid.uuid4().hex[:6]}",
+                is_super_admin=True,
+            )
         target_user = make_user(
             db_session,
             test_settings,
@@ -550,6 +814,33 @@ def test_rbac_matrix_cell(
             row.method,
             resolved_path,
             files={"file": ("test.jpg", b"\xff\xd8\xff\xe0testjpeg", "image/jpeg")},
+        )
+    elif row.path == "/api/admin/assets" and row.method == "POST":
+        test_settings.assets_dir.mkdir(parents=True, exist_ok=True)
+        resp = client.request(
+            row.method,
+            resolved_path,
+            files={
+                "file": (
+                    "test.png",
+                    b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01\x08\x06\x00\x00\x00\x1f\x15c4",
+                    "image/png",
+                )
+            },
+            data={"asset_type": "LOGO"},
+        )
+    elif row.path == "/api/admin/imports/inspect" and row.method == "POST":
+        resp = client.request(
+            row.method,
+            resolved_path,
+            files={"file": ("test.csv", b"full_name,mobile\nA,9876543210\n", "text/csv")},
+        )
+    elif row.path == "/api/admin/imports" and row.method == "POST":
+        resp = client.request(
+            row.method,
+            resolved_path,
+            files={"file": ("test.csv", b"full_name,mobile\nA,9876543210\n", "text/csv")},
+            data={"column_mapping": "{}"},
         )
     else:
         resp = client.request(row.method, resolved_path, json=body)

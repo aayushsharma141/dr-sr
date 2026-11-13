@@ -72,6 +72,12 @@ def test_valid_code_creates_exactly_one_admin(
     assert setup_row is not None
     assert setup_row.admin_user_id == created_id
 
+    # The setup administrator becomes the super admin who authorises user deletion
+    db_session.expire_all()
+    created_admin = db_session.get(User, created_id)
+    assert created_admin is not None
+    assert created_admin.is_super_admin is True
+
     # Exactly one ADMIN_BOOTSTRAPPED audit row
     audit_row = db_session.scalar(select(AuditLog).where(AuditLog.action == "ADMIN_BOOTSTRAPPED"))
     assert audit_row is not None
@@ -130,6 +136,34 @@ def test_invalid_code_rejected(
     # Never log the submitted code
     assert "WRONGCODE999" not in str(reject_audit.reason)
     assert "WRONGCODE999" not in str(reject_audit.after_data)
+
+
+def test_expired_code_rejected(
+    app: FastAPI,
+    client: TestClient,
+    db_session: Session,
+    setup_code: str,
+) -> None:
+    """A setup code submitted after its TTL (60 mins) is rejected as invalid."""
+    # Fast forward the issued timestamp to 61 minutes ago
+    app.state.setup_code_issued_at = datetime.now(UTC) - timedelta(minutes=61)
+
+    payload = {
+        "setup_code": setup_code,
+        "username": "expired_admin",
+        "full_name": "Expired Admin",
+        "password": "ValidAdminPassword123!",
+    }
+
+    resp = client.post("/api/setup/admin", json=payload)
+    assert resp.status_code == 403
+    assert resp.json()["code"] == "setup_code_invalid"
+
+    # No user created
+    user_count = db_session.scalar(
+        select(func.count(User.id)).where(User.username == "expired_admin")
+    )
+    assert user_count == 0
 
 
 def test_failed_commit_does_not_consume_code(

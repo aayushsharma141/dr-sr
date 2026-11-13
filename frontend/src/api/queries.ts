@@ -5,9 +5,11 @@ import type {
   BackupArchiveListResponse,
   BackupCreateRequest,
   BackupVerifyResponse,
-  IntegrityReportOut,
+  HospitalAssetOut,
   LoginHistoryEntry,
   PasswordPolicyOut,
+  PrintTemplateOut,
+  PrintTemplateUpdatePayload,
   RestoreRequest,
   RestoreResultOut,
   RevokeSessionOut,
@@ -34,9 +36,18 @@ import type {
   EncounterRead,
   EncounterSummary,
   EncounterUpdate,
+  UnfinishedEncounter,
   PrescriptionCreate,
   PrescriptionOut,
   PrescriptionSummary,
+  PrescriptionUpdate,
+  VitalObservationInput,
+  VitalObservationResponse,
+  ClinicalTemplateRead,
+  TemplateResponseInput,
+  TemplateResponseRead,
+  FollowUpRecommendationCreate,
+  DoctorFollowUpResponse,
   TreatmentPlanCreate,
   TreatmentPlanOut,
   TreatmentPlanUpdate,
@@ -46,6 +57,7 @@ import type {
   TreatmentSessionOut,
 } from './types'
 import type {
+  AdminPatientDemographicCorrection,
   DuplicateCheckResponse,
   PatientCreate,
   PatientOut,
@@ -61,6 +73,7 @@ import type {
   DepartmentUpdate,
   DepartmentDoctorOut,
   DoctorDepartmentAssignment,
+  DoctorMeSettingsUpdate,
   DoctorUpdate,
   FeeCreate,
   FeeOut,
@@ -82,7 +95,12 @@ import type {
 } from './types'
 import type {
   ActionRequest,
+  BulkDeleteUsersOut,
+  BulkDeleteUsersRequest,
+  DeleteUserOut,
+  DeleteUserRequest,
   AreaOverview,
+  ManagementOverview,
   Me,
   SetupAdminRequest,
   UserCreate,
@@ -131,7 +149,7 @@ export function useMe() {
 export function useLogin() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: async (credentials: { username: string; password: string }): Promise<Me> => {
+    mutationFn: async (credentials: { username: string; password: string; takeover?: boolean }): Promise<Me> => {
       const res = await apiFetch<Me>('/auth/login', {
         method: 'POST',
         body: credentials,
@@ -184,6 +202,16 @@ export function useOverview<T extends AreaOverview = AreaOverview>(area: string)
     queryKey: ['overview', area],
     queryFn: async (): Promise<T> => {
       return await apiFetch<T>(`/${area}/overview`)
+    },
+    retry: false,
+  })
+}
+
+export function useManagementOverview() {
+  return useQuery({
+    queryKey: ['admin', 'management-overview'],
+    queryFn: async (): Promise<ManagementOverview> => {
+      return await apiFetch<ManagementOverview>('/admin/management-overview')
     },
     retry: false,
   })
@@ -268,6 +296,48 @@ export function useDeactivateUser() {
       qc.invalidateQueries({ queryKey: ['users'] })
       // A deactivated owner's sessions stop counting as active.
       qc.invalidateQueries({ queryKey: ['sessions'] })
+      invalidateAdminSummaries(qc)
+    },
+  })
+}
+
+export function useDeleteUser() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({
+      id,
+      payload,
+    }: {
+      id: number
+      payload: DeleteUserRequest
+    }): Promise<DeleteUserOut> => {
+      return await apiFetch<DeleteUserOut>(`/users/${id}/delete`, {
+        method: 'POST',
+        body: payload,
+      })
+    },
+    onSuccess: (deleted) => {
+      qc.removeQueries({ queryKey: ['users', deleted.id] })
+      qc.invalidateQueries({ queryKey: ['users'] })
+      invalidateAdminSummaries(qc)
+    },
+  })
+}
+
+export function useBulkDeleteUsers() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (payload: BulkDeleteUsersRequest): Promise<BulkDeleteUsersOut> => {
+      return await apiFetch<BulkDeleteUsersOut>('/users/bulk-delete', {
+        method: 'POST',
+        body: payload,
+      })
+    },
+    onSuccess: (out) => {
+      for (const entry of out.results) {
+        if (entry.deleted) qc.removeQueries({ queryKey: ['users', entry.id] })
+      }
+      qc.invalidateQueries({ queryKey: ['users'] })
       invalidateAdminSummaries(qc)
     },
   })
@@ -610,6 +680,21 @@ export function useUpdateDoctor() {
   })
 }
 
+export function useUpdateDoctorMeSettings() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (body: DoctorMeSettingsUpdate) =>
+      apiFetch<DoctorOut>('/doctors/me/settings', {
+        method: 'PATCH',
+        body,
+      }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['doctors'] })
+      qc.invalidateQueries({ queryKey: ['me'] })
+    },
+  })
+}
+
 /**
  * GET /fees. activeOnly=false sends include_inactive=true (all fees, ordered by id);
  * activeOnly=true returns active fees only.
@@ -686,6 +771,13 @@ export function usePatients(q: string = '', limit: number = 20, offset: number =
       apiFetch<PatientOut[]>(
         `/patients?q=${encodeURIComponent(q)}&limit=${limit}&offset=${offset}`,
       ),
+  })
+}
+
+export function usePatientCount(q: string = '') {
+  return useQuery({
+    queryKey: ['patients', 'count', { q }],
+    queryFn: () => apiFetch<{ total: number }>(`/patients/count?q=${encodeURIComponent(q)}`),
   })
 }
 
@@ -817,6 +909,13 @@ export function useEncounter(id: number) {
   })
 }
 
+export function useUnfinishedEncounters() {
+  return useQuery({
+    queryKey: ['unfinished-encounters'],
+    queryFn: () => apiFetch<UnfinishedEncounter[]>('/encounters/unfinished'),
+  })
+}
+
 export function useCreateEncounter() {
   const qc = useQueryClient()
   return useMutation({
@@ -829,6 +928,7 @@ export function useCreateEncounter() {
       qc.invalidateQueries({ queryKey: ['patient-encounters', data.patient_id] })
       qc.invalidateQueries({ queryKey: ['doctor-queue'] })
       qc.invalidateQueries({ queryKey: ['appointments'] })
+      qc.invalidateQueries({ queryKey: ['unfinished-encounters'] })
     },
   })
 }
@@ -851,15 +951,32 @@ export function useUpdateEncounter() {
 export function useFinaliseEncounter() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (id: number) =>
-      apiFetch<EncounterRead>(`/encounters/${id}/finalise`, {
+    mutationFn: (
+      param:
+        | number
+        | {
+            id: number
+            body?: {
+              symptoms?: string
+              diagnosis?: string
+              clinical_notes?: string | null
+              version_id?: number
+            }
+          }
+    ) => {
+      const id = typeof param === 'number' ? param : param.id
+      const body = typeof param === 'number' ? undefined : param.body
+      return apiFetch<EncounterRead>(`/encounters/${id}/finalise`, {
         method: 'POST',
-      }),
+        body: body ? JSON.stringify(body) : undefined,
+      })
+    },
     onSuccess: (data) => {
       qc.setQueryData(['encounter', data.id], data)
       qc.invalidateQueries({ queryKey: ['patient-encounters', data.patient_id] })
       qc.invalidateQueries({ queryKey: ['doctor-queue'] })
       qc.invalidateQueries({ queryKey: ['appointments'] })
+      qc.invalidateQueries({ queryKey: ['unfinished-encounters'] })
     },
   })
 }
@@ -874,6 +991,173 @@ export function useAddAddendum() {
       }),
     onSuccess: (_, variables) => {
       qc.invalidateQueries({ queryKey: ['encounter', variables.id] })
+    },
+  })
+}
+
+// Phase 19: Universal Consultation Workspace Hooks
+export function useSaveEncounterDraft(id: number) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (body: EncounterUpdate) =>
+      apiFetch<EncounterRead>(`/encounters/${id}`, {
+        method: 'PATCH',
+        body,
+      }),
+    onSuccess: (data) => {
+      qc.setQueryData(['encounter', data.id], data)
+      qc.invalidateQueries({ queryKey: ['patient-encounters', data.patient_id] })
+      qc.invalidateQueries({ queryKey: ['unfinished-encounters'] })
+    },
+  })
+}
+
+export function usePatientPriorEncounter(patientId: number, excludeEncounterId?: number) {
+  return useQuery({
+    queryKey: ['patient-prior-encounter', patientId, excludeEncounterId],
+    queryFn: async (): Promise<(EncounterRead & { vitals?: VitalObservationResponse | null }) | null> => {
+      const summaries = await apiFetch<EncounterSummary[]>(`/patients/${patientId}/encounters`)
+      const prior = summaries.find((s) => !excludeEncounterId || s.id !== excludeEncounterId)
+      if (!prior) return null
+      const full = await apiFetch<EncounterRead>(`/encounters/${prior.id}`)
+      let vitals: VitalObservationResponse | null = null
+      try {
+        vitals = await apiFetch<VitalObservationResponse>(`/encounters/${prior.id}/vitals`)
+      } catch {
+        vitals = null
+      }
+      return { ...full, vitals }
+    },
+    enabled: patientId > 0,
+  })
+}
+
+export function useEncounterVitals(encounterId: number) {
+  return useQuery({
+    queryKey: ['encounter-vitals', encounterId],
+    queryFn: () => apiFetch<VitalObservationResponse>(`/encounters/${encounterId}/vitals`),
+    enabled: encounterId > 0,
+    retry: false,
+  })
+}
+
+export function useSaveVitals(encounterId: number) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (body: VitalObservationInput) =>
+      apiFetch<VitalObservationResponse>(`/encounters/${encounterId}/vitals`, {
+        method: 'PUT',
+        body,
+      }),
+    onSuccess: (data) => {
+      qc.setQueryData(['encounter-vitals', encounterId], data)
+    },
+  })
+}
+
+export function useDepartmentTemplate(departmentId: number | null | undefined) {
+  return useQuery({
+    queryKey: ['department-template', departmentId],
+    queryFn: () => apiFetch<ClinicalTemplateRead>(`/templates/by-department/${departmentId}`),
+    enabled: !!departmentId && departmentId > 0,
+  })
+}
+
+export function useEncounterTemplateResponse(encounterId: number) {
+  return useQuery({
+    queryKey: ['encounter-template-response', encounterId],
+    queryFn: () => apiFetch<TemplateResponseRead>(`/encounters/${encounterId}/template-response`),
+    enabled: encounterId > 0,
+    retry: false,
+  })
+}
+
+export function useSaveEncounterTemplateResponse(encounterId: number) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (body: TemplateResponseInput) =>
+      apiFetch<TemplateResponseRead>(`/encounters/${encounterId}/template-response`, {
+        method: 'PUT',
+        body,
+      }),
+    onSuccess: (data) => {
+      qc.setQueryData(['encounter-template-response', encounterId], data)
+    },
+  })
+}
+
+export function useAuthorisePrescription() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (id: number) =>
+      apiFetch<PrescriptionOut>(`/prescriptions/${id}/authorise`, {
+        method: 'POST',
+      }),
+    onSuccess: (data) => {
+      qc.setQueryData(['prescription', data.id], data)
+      if (data.encounter_id) {
+        qc.invalidateQueries({ queryKey: ['encounter-prescription', data.encounter_id] })
+      }
+      qc.invalidateQueries({ queryKey: ['patient-prescriptions', data.patient_id] })
+    },
+  })
+}
+
+export function useCancelPrescription() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, reason }: { id: number; reason: string }) =>
+      apiFetch<PrescriptionOut>(`/prescriptions/${id}/cancel`, {
+        method: 'POST',
+        body: { reason },
+      }),
+    onSuccess: (data) => {
+      qc.setQueryData(['prescription', data.id], data)
+      if (data.encounter_id) {
+        qc.invalidateQueries({ queryKey: ['encounter-prescription', data.encounter_id] })
+      }
+      qc.invalidateQueries({ queryKey: ['patient-prescriptions', data.patient_id] })
+    },
+  })
+}
+
+export function useUpdatePrescription() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, body }: { id: number; body: PrescriptionUpdate }) =>
+      apiFetch<PrescriptionOut>(`/prescriptions/${id}`, {
+        method: 'PUT',
+        body,
+      }),
+    onSuccess: (data) => {
+      qc.setQueryData(['prescription', data.id], data)
+      if (data.encounter_id) {
+        qc.invalidateQueries({ queryKey: ['encounter-prescription', data.encounter_id] })
+      }
+      qc.invalidateQueries({ queryKey: ['patient-prescriptions', data.patient_id] })
+    },
+  })
+}
+
+export function useEncounterFollowUp(encounterId: number) {
+  return useQuery({
+    queryKey: ['encounter-follow-up', encounterId],
+    queryFn: () => apiFetch<DoctorFollowUpResponse>(`/encounters/${encounterId}/follow-up`),
+    enabled: encounterId > 0,
+    retry: false,
+  })
+}
+
+export function useCreateFollowUp(encounterId: number) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (body: FollowUpRecommendationCreate) =>
+      apiFetch<DoctorFollowUpResponse>(`/encounters/${encounterId}/follow-up`, {
+        method: 'POST',
+        body,
+      }),
+    onSuccess: (data) => {
+      qc.setQueryData(['encounter-follow-up', encounterId], data)
     },
   })
 }
@@ -1242,9 +1526,107 @@ export function useRestoreBackup() {
   })
 }
 
-export function useIntegrityCheck() {
+export function useHospitalAssets(params?: { asset_type?: string; is_active?: boolean }) {
   return useQuery({
-    queryKey: ['operations', 'integrity'],
-    queryFn: () => apiFetch<IntegrityReportOut>('/api/operations/integrity'),
+    queryKey: ['admin', 'assets', params],
+    queryFn: () => {
+      const query = new URLSearchParams()
+      if (params?.asset_type) query.set('asset_type', params.asset_type)
+      if (params?.is_active !== undefined) query.set('is_active', String(params.is_active))
+      const qs = query.toString() ? `?${query.toString()}` : ''
+      return apiFetch<HospitalAssetOut[]>(`/api/admin/assets${qs}`)
+    },
   })
 }
+
+export function useUploadAsset() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (formData: FormData) =>
+      apiFetch<HospitalAssetOut>('/api/admin/assets', {
+        method: 'POST',
+        body: formData,
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin', 'assets'] })
+    },
+  })
+}
+
+export function useDeactivateAsset() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (assetId: number) =>
+      apiFetch<HospitalAssetOut>(`/api/admin/assets/${assetId}/deactivate`, {
+        method: 'POST',
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin', 'assets'] })
+    },
+  })
+}
+
+export function usePrintTemplates() {
+  return useQuery({
+    queryKey: ['admin', 'templates'],
+    queryFn: () => apiFetch<PrintTemplateOut[]>('/api/admin/templates'),
+  })
+}
+
+export function usePrintTemplate(docType: string) {
+  return useQuery({
+    queryKey: ['admin', 'templates', docType],
+    queryFn: () => apiFetch<PrintTemplateOut>(`/api/admin/templates/${docType}`),
+    enabled: !!docType,
+  })
+}
+
+export function useUpdatePrintTemplate() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({
+      docType,
+      payload,
+    }: {
+      docType: string
+      payload: PrintTemplateUpdatePayload
+    }) =>
+      apiFetch<PrintTemplateOut>(`/api/admin/templates/${docType}`, {
+        method: 'PATCH',
+        body: JSON.stringify(payload),
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      }),
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['admin', 'templates'] })
+      queryClient.invalidateQueries({ queryKey: ['admin', 'templates', variables.docType] })
+    },
+  })
+}
+
+export function useAdminSearchPatients(q: string) {
+  return useQuery({
+    queryKey: ['admin', 'patients', 'search', q],
+    queryFn: () => apiFetch<PatientOut[]>(`/admin/patients/search?q=${encodeURIComponent(q)}`),
+    enabled: q.trim().length >= 1,
+  })
+}
+
+export function useCorrectPatientDemographics() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, payload }: { id: number; payload: AdminPatientDemographicCorrection }) =>
+      apiFetch<PatientOut>(`/admin/patients/${id}/demographics`, {
+        method: 'PATCH',
+        body: payload,
+      }),
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['admin', 'patients', 'search'] })
+      queryClient.invalidateQueries({ queryKey: ['patient', data.id] })
+    },
+  })
+}
+
+
+

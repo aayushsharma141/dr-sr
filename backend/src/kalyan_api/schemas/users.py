@@ -60,6 +60,75 @@ class ActionRequest(BaseModel):
     reason: OptionalReason = None
 
 
+class DeleteUserRequest(BaseModel):
+    """Payload for deleting an unused account; authorised by the super admin's password."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    version_id: int = Field(ge=1)
+    reason: OptionalReason = None
+    super_admin_password: str = Field(min_length=1, max_length=256, repr=False)
+
+
+class DeleteUserOut(BaseModel):
+    """Confirmation that an unused account was permanently deleted."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    id: int
+    username: str
+    deleted: bool
+
+
+class BulkDeleteItemIn(BaseModel):
+    """One account in a bulk delete, with the version the administrator last saw."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    id: int = Field(ge=1)
+    version_id: int = Field(ge=1)
+
+
+class BulkDeleteUsersRequest(BaseModel):
+    """Payload for deleting several accounts under one super admin password check."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    items: list[BulkDeleteItemIn] = Field(min_length=1, max_length=100)
+    reason: OptionalReason = None
+    super_admin_password: str = Field(min_length=1, max_length=256, repr=False)
+
+    @model_validator(mode="after")
+    def validate_unique_ids(self) -> "BulkDeleteUsersRequest":
+        """Reject a request that lists the same account twice."""
+        ids = [item.id for item in self.items]
+        if len(ids) != len(set(ids)):
+            raise ValueError("Each account may be listed only once")
+        return self
+
+
+class BulkDeleteEntryOut(BaseModel):
+    """Outcome for one account of a bulk delete."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    id: int
+    username: str | None
+    deleted: bool
+    code: str | None
+    message: str | None
+
+
+class BulkDeleteUsersOut(BaseModel):
+    """Per-account results of a bulk delete."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    deleted_count: int
+    skipped_count: int
+    results: list[BulkDeleteEntryOut]
+
+
 class UserUpdate(BaseModel):
     """Payload for modifying an existing user account with optimistic concurrency."""
 
@@ -88,6 +157,7 @@ class UserOut(BaseModel):
     role: str
     doctor_id: int | None
     is_active: bool
+    is_super_admin: bool
     must_change_password: bool
     is_locked: bool
     locked_until: datetime | None
@@ -108,6 +178,7 @@ class UserOut(BaseModel):
             role=user.role,
             doctor_id=user.doctor_id,
             is_active=user.is_active,
+            is_super_admin=user.is_super_admin,
             must_change_password=user.must_change_password,
             is_locked=is_locked,
             locked_until=user.locked_until if is_locked else None,

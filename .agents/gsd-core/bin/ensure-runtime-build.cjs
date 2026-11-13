@@ -1,4 +1,4 @@
-﻿'use strict';
+'use strict';
 
 /**
  * Self-healing runtime build (#2002).

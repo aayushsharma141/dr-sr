@@ -1,4 +1,4 @@
-﻿# Research Summary Template
+# Research Summary Template
 
 Template for `.planning/research/SUMMARY.md` — executive summary of project research with roadmap implications.
 

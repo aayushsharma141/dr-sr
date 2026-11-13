@@ -1,4 +1,4 @@
-﻿<step name="evolve_project_full_review">
+<step name="evolve_project_full_review">
 
 Full PROJECT.md evolution review at milestone completion.
 

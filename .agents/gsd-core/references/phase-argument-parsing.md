@@ -1,4 +1,4 @@
-﻿# Phase Argument Parsing
+# Phase Argument Parsing
 
 Parse and normalize phase arguments for commands that operate on phases.
 

@@ -1,4 +1,4 @@
-﻿## Auto Mode Detection
+## Auto Mode Detection
 
 Check if `--auto` flag is present in $ARGUMENTS.
 

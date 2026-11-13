@@ -148,16 +148,20 @@ def test_phase16_backup_restore_gate(tmp_path: Path) -> None:
         assert p_restored is not None
         assert p_restored.full_name == "Gate Verification Patient"
 
-    # Clean up any residual photos from backup extraction before integrity check
+    # Clean up any residual photos/assets from backup extraction before integrity check
     if sample_img.exists():
         sample_img.unlink()
     for extra_f in settings.photos_dir.glob("*"):
         if extra_f.is_file():
             extra_f.unlink()
+    if settings.assets_dir.exists():
+        for extra_f in settings.assets_dir.glob("*"):
+            if extra_f.is_file():
+                extra_f.unlink()
 
     # 5. Integrity Engine Invariant Audit
     with session_scope(settings) as session:
         report = run_integrity_audit(session=session, settings=settings)
-        assert report.total_checks == 6
+        assert report.total_checks == 7
         assert report.is_healthy is True
         assert report.failed_checks == 0

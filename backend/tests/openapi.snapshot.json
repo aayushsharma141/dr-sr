@@ -308,6 +308,109 @@
         "title": "AdminOverviewResponse",
         "type": "object"
       },
+      "AdminPatientDemographicCorrection": {
+        "additionalProperties": false,
+        "description": "Payload for administrative demographic correction with mandatory reason and concurrency check (D-20-02, D-20-03).",
+        "properties": {
+          "address": {
+            "maxLength": 1000,
+            "minLength": 2,
+            "title": "Address",
+            "type": "string"
+          },
+          "age_years": {
+            "maximum": 150.0,
+            "minimum": 0.0,
+            "title": "Age Years",
+            "type": "integer"
+          },
+          "district": {
+            "default": "Bhojpur",
+            "maxLength": 64,
+            "minLength": 2,
+            "title": "District",
+            "type": "string"
+          },
+          "dob": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dob"
+          },
+          "emergency_contact": {
+            "anyOf": [
+              {
+                "maxLength": 120,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Emergency Contact"
+          },
+          "full_name": {
+            "maxLength": 120,
+            "minLength": 2,
+            "title": "Full Name",
+            "type": "string"
+          },
+          "gender": {
+            "pattern": "^[MFO]$",
+            "title": "Gender",
+            "type": "string"
+          },
+          "guardian_name": {
+            "maxLength": 120,
+            "minLength": 2,
+            "title": "Guardian Name",
+            "type": "string"
+          },
+          "mobile": {
+            "pattern": "^[0-9]{10}$",
+            "title": "Mobile",
+            "type": "string"
+          },
+          "reason": {
+            "description": "Documented reason for correction",
+            "maxLength": 1000,
+            "minLength": 5,
+            "title": "Reason",
+            "type": "string"
+          },
+          "state": {
+            "default": "Bihar",
+            "maxLength": 64,
+            "minLength": 2,
+            "title": "State",
+            "type": "string"
+          },
+          "version_id": {
+            "description": "Expected version_id for optimistic locking",
+            "minimum": 1.0,
+            "title": "Version Id",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "reason",
+          "version_id",
+          "full_name",
+          "guardian_name",
+          "gender",
+          "age_years",
+          "mobile",
+          "address"
+        ],
+        "title": "AdminPatientDemographicCorrection",
+        "type": "object"
+      },
       "AppointmentCreate": {
         "description": "Payload to book an appointment (APT-01).",
         "properties": {
@@ -341,6 +444,19 @@
             ],
             "description": "Reception notes",
             "title": "Notes"
+          },
+          "override_reason": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Reason of at least 5 characters to override duplicate booking on the same date (BR-006)",
+            "title": "Override Reason"
           },
           "patient_id": {
             "description": "Target patient ID",
@@ -398,6 +514,18 @@
               }
             ],
             "title": "Cancellation Reason"
+          },
+          "check_in_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Check In At"
           },
           "created_at": {
             "format": "date-time",
@@ -552,6 +680,77 @@
           "version_id"
         ],
         "title": "AppointmentStatusUpdate",
+        "type": "object"
+      },
+      "AssetOut": {
+        "description": "Hospital asset response payload.",
+        "properties": {
+          "asset_type": {
+            "title": "Asset Type",
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "file_size_bytes": {
+            "title": "File Size Bytes",
+            "type": "integer"
+          },
+          "filename": {
+            "title": "Filename",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "is_active": {
+            "title": "Is Active",
+            "type": "boolean"
+          },
+          "mime_type": {
+            "title": "Mime Type",
+            "type": "string"
+          },
+          "original_filename": {
+            "title": "Original Filename",
+            "type": "string"
+          },
+          "uploaded_by_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Uploaded By Name"
+          },
+          "uploaded_by_user_id": {
+            "title": "Uploaded By User Id",
+            "type": "integer"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "asset_type",
+          "filename",
+          "original_filename",
+          "mime_type",
+          "file_size_bytes",
+          "is_active",
+          "version",
+          "uploaded_by_user_id",
+          "created_at"
+        ],
+        "title": "AssetOut",
         "type": "object"
       },
       "AuditLogListResponse": {
@@ -1173,6 +1372,96 @@
         "title": "BackupVerifyResponse",
         "type": "object"
       },
+      "BatchSummaryResponse": {
+        "description": "Metadata and row metrics for an import batch.",
+        "properties": {
+          "batch_id": {
+            "title": "Batch Id",
+            "type": "string"
+          },
+          "column_mapping": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Column Mapping"
+          },
+          "committed_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Committed At"
+          },
+          "committed_rows": {
+            "title": "Committed Rows",
+            "type": "integer"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "duplicate_rows": {
+            "title": "Duplicate Rows",
+            "type": "integer"
+          },
+          "filename": {
+            "title": "Filename",
+            "type": "string"
+          },
+          "invalid_rows": {
+            "title": "Invalid Rows",
+            "type": "integer"
+          },
+          "safety_backup_file": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Safety Backup File"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "total_rows": {
+            "title": "Total Rows",
+            "type": "integer"
+          },
+          "valid_rows": {
+            "title": "Valid Rows",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "batch_id",
+          "filename",
+          "total_rows",
+          "valid_rows",
+          "duplicate_rows",
+          "invalid_rows",
+          "committed_rows",
+          "status",
+          "created_at"
+        ],
+        "title": "BatchSummaryResponse",
+        "type": "object"
+      },
       "BillingConfigurationOut": {
         "additionalProperties": false,
         "description": "How billing works on this system today. Read-only: these are not editable settings.",
@@ -1217,6 +1506,203 @@
           "reversal_roles"
         ],
         "title": "BillingConfigurationOut",
+        "type": "object"
+      },
+      "Body_inspect_import_file_api_admin_imports_inspect_post": {
+        "properties": {
+          "file": {
+            "contentMediaType": "application/octet-stream",
+            "title": "File",
+            "type": "string"
+          }
+        },
+        "required": [
+          "file"
+        ],
+        "title": "Body_inspect_import_file_api_admin_imports_inspect_post",
+        "type": "object"
+      },
+      "Body_stage_import_batch_api_admin_imports_post": {
+        "properties": {
+          "column_mapping": {
+            "title": "Column Mapping",
+            "type": "string"
+          },
+          "file": {
+            "contentMediaType": "application/octet-stream",
+            "title": "File",
+            "type": "string"
+          }
+        },
+        "required": [
+          "file",
+          "column_mapping"
+        ],
+        "title": "Body_stage_import_batch_api_admin_imports_post",
+        "type": "object"
+      },
+      "Body_upload_asset_api_admin_assets_post": {
+        "properties": {
+          "asset_type": {
+            "title": "Asset Type",
+            "type": "string"
+          },
+          "file": {
+            "contentMediaType": "application/octet-stream",
+            "title": "File",
+            "type": "string"
+          }
+        },
+        "required": [
+          "file",
+          "asset_type"
+        ],
+        "title": "Body_upload_asset_api_admin_assets_post",
+        "type": "object"
+      },
+      "BulkDeleteEntryOut": {
+        "additionalProperties": false,
+        "description": "Outcome for one account of a bulk delete.",
+        "properties": {
+          "code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Code"
+          },
+          "deleted": {
+            "title": "Deleted",
+            "type": "boolean"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message"
+          },
+          "username": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Username"
+          }
+        },
+        "required": [
+          "id",
+          "username",
+          "deleted",
+          "code",
+          "message"
+        ],
+        "title": "BulkDeleteEntryOut",
+        "type": "object"
+      },
+      "BulkDeleteItemIn": {
+        "additionalProperties": false,
+        "description": "One account in a bulk delete, with the version the administrator last saw.",
+        "properties": {
+          "id": {
+            "minimum": 1.0,
+            "title": "Id",
+            "type": "integer"
+          },
+          "version_id": {
+            "minimum": 1.0,
+            "title": "Version Id",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "version_id"
+        ],
+        "title": "BulkDeleteItemIn",
+        "type": "object"
+      },
+      "BulkDeleteUsersOut": {
+        "additionalProperties": false,
+        "description": "Per-account results of a bulk delete.",
+        "properties": {
+          "deleted_count": {
+            "title": "Deleted Count",
+            "type": "integer"
+          },
+          "results": {
+            "items": {
+              "$ref": "#/components/schemas/BulkDeleteEntryOut"
+            },
+            "title": "Results",
+            "type": "array"
+          },
+          "skipped_count": {
+            "title": "Skipped Count",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "deleted_count",
+          "skipped_count",
+          "results"
+        ],
+        "title": "BulkDeleteUsersOut",
+        "type": "object"
+      },
+      "BulkDeleteUsersRequest": {
+        "additionalProperties": false,
+        "description": "Payload for deleting several accounts under one super admin password check.",
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/BulkDeleteItemIn"
+            },
+            "maxItems": 100,
+            "minItems": 1,
+            "title": "Items",
+            "type": "array"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "super_admin_password": {
+            "maxLength": 256,
+            "minLength": 1,
+            "title": "Super Admin Password",
+            "type": "string"
+          }
+        },
+        "required": [
+          "items",
+          "super_admin_password"
+        ],
+        "title": "BulkDeleteUsersRequest",
         "type": "object"
       },
       "ChangePasswordRequest": {
@@ -1576,6 +2062,138 @@
         "title": "ClinicSettingsUpdate",
         "type": "object"
       },
+      "ClinicalTemplateRead": {
+        "description": "Specialty clinical template with optional active version.",
+        "properties": {
+          "active_version": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ClinicalTemplateVersionRead"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "department_id": {
+            "title": "Department Id",
+            "type": "integer"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "is_active": {
+            "title": "Is Active",
+            "type": "boolean"
+          },
+          "name_en": {
+            "title": "Name En",
+            "type": "string"
+          },
+          "name_hi": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name Hi"
+          }
+        },
+        "required": [
+          "id",
+          "department_id",
+          "code",
+          "name_en",
+          "is_active",
+          "created_at"
+        ],
+        "title": "ClinicalTemplateRead",
+        "type": "object"
+      },
+      "ClinicalTemplateVersionRead": {
+        "description": "Schema version details.",
+        "properties": {
+          "approved_at": {
+            "format": "date-time",
+            "title": "Approved At",
+            "type": "string"
+          },
+          "approved_by": {
+            "title": "Approved By",
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "is_active": {
+            "title": "Is Active",
+            "type": "boolean"
+          },
+          "schema_json": {
+            "additionalProperties": true,
+            "title": "Schema Json",
+            "type": "object"
+          },
+          "template_id": {
+            "title": "Template Id",
+            "type": "integer"
+          },
+          "version_number": {
+            "title": "Version Number",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "template_id",
+          "version_number",
+          "schema_json",
+          "is_active",
+          "approved_by",
+          "approved_at",
+          "created_at"
+        ],
+        "title": "ClinicalTemplateVersionRead",
+        "type": "object"
+      },
+      "CollectionTrendMonth": {
+        "additionalProperties": false,
+        "properties": {
+          "collected_paise": {
+            "title": "Collected Paise",
+            "type": "integer"
+          },
+          "month": {
+            "title": "Month",
+            "type": "string"
+          }
+        },
+        "required": [
+          "month",
+          "collected_paise"
+        ],
+        "title": "CollectionTrendMonth",
+        "type": "object"
+      },
       "CollectionsTodayOut": {
         "additionalProperties": false,
         "description": "Today's ledger activity, reported without applying any netting rule.\n\n- payments_count / gross_paise / by_method: payments CREATED today (IST), including any\n  that were later reversed.\n- reversals_count / reversed_paise: payments REVERSED today (IST), whatever day they were\n  originally collected.",
@@ -1614,6 +2232,161 @@
         "title": "CollectionsTodayOut",
         "type": "object"
       },
+      "CommitBatchResponse": {
+        "additionalProperties": false,
+        "description": "Result of committing import batch.",
+        "properties": {
+          "batch_id": {
+            "title": "Batch Id",
+            "type": "string"
+          },
+          "committed_rows": {
+            "title": "Committed Rows",
+            "type": "integer"
+          },
+          "safety_backup_file": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Safety Backup File"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "urn_range_end": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Urn Range End"
+          },
+          "urn_range_start": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Urn Range Start"
+          }
+        },
+        "required": [
+          "batch_id",
+          "status",
+          "committed_rows"
+        ],
+        "title": "CommitBatchResponse",
+        "type": "object"
+      },
+      "DeleteUserOut": {
+        "additionalProperties": false,
+        "description": "Confirmation that an unused account was permanently deleted.",
+        "properties": {
+          "deleted": {
+            "title": "Deleted",
+            "type": "boolean"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "username": {
+            "title": "Username",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "username",
+          "deleted"
+        ],
+        "title": "DeleteUserOut",
+        "type": "object"
+      },
+      "DeleteUserRequest": {
+        "additionalProperties": false,
+        "description": "Payload for deleting an unused account; authorised by the super admin's password.",
+        "properties": {
+          "reason": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "super_admin_password": {
+            "maxLength": 256,
+            "minLength": 1,
+            "title": "Super Admin Password",
+            "type": "string"
+          },
+          "version_id": {
+            "minimum": 1.0,
+            "title": "Version Id",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "version_id",
+          "super_admin_password"
+        ],
+        "title": "DeleteUserRequest",
+        "type": "object"
+      },
+      "DepartmentCollection": {
+        "additionalProperties": false,
+        "description": "Money collected this month against appointments booked in a department.\n\ndepartment_id is null for payments with no appointment or an appointment booked before\ndepartments were recorded; they are counted, never spread across departments.",
+        "properties": {
+          "collected_paise": {
+            "title": "Collected Paise",
+            "type": "integer"
+          },
+          "department_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Department Id"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "percentage": {
+            "title": "Percentage",
+            "type": "number"
+          }
+        },
+        "required": [
+          "department_id",
+          "name",
+          "collected_paise",
+          "percentage"
+        ],
+        "title": "DepartmentCollection",
+        "type": "object"
+      },
       "DepartmentCreate": {
         "additionalProperties": false,
         "properties": {
@@ -1630,7 +2403,7 @@
             "title": "Description"
           },
           "name_en": {
-            "maxLength": 120,
+            "maxLength": 128,
             "minLength": 2,
             "title": "Name En",
             "type": "string"
@@ -1638,7 +2411,7 @@
           "name_hi": {
             "anyOf": [
               {
-                "maxLength": 120,
+                "maxLength": 128,
                 "type": "string"
               },
               {
@@ -1656,6 +2429,10 @@
       },
       "DepartmentOut": {
         "properties": {
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
           "created_at": {
             "format": "date-time",
             "title": "Created At",
@@ -1707,6 +2484,7 @@
         },
         "required": [
           "id",
+          "code",
           "name_en",
           "name_hi",
           "description",
@@ -1738,7 +2516,7 @@
             "type": "boolean"
           },
           "name_en": {
-            "maxLength": 120,
+            "maxLength": 128,
             "minLength": 2,
             "title": "Name En",
             "type": "string"
@@ -1746,7 +2524,7 @@
           "name_hi": {
             "anyOf": [
               {
-                "maxLength": 120,
+                "maxLength": 128,
                 "type": "string"
               },
               {
@@ -1773,6 +2551,17 @@
         "additionalProperties": false,
         "description": "Payload for creating a new doctor profile.",
         "properties": {
+          "cabin_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cabin Code"
+          },
           "default_fee_paise": {
             "default": 0,
             "minimum": 0.0,
@@ -1853,9 +2642,180 @@
         "title": "DoctorDepartmentAssignment",
         "type": "object"
       },
+      "DoctorFollowUpResponse": {
+        "description": "Full follow-up recommendation schema for doctor inspection (includes clinical reason).",
+        "properties": {
+          "booked_appointment_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Booked Appointment Id"
+          },
+          "clinical_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Clinical Reason"
+          },
+          "closed_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Closed At"
+          },
+          "closed_by_user_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Closed By User Id"
+          },
+          "closed_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Closed Reason"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "doctor_id": {
+            "title": "Doctor Id",
+            "type": "integer"
+          },
+          "doctor_name": {
+            "title": "Doctor Name",
+            "type": "string"
+          },
+          "encounter_id": {
+            "title": "Encounter Id",
+            "type": "integer"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "patient_id": {
+            "title": "Patient Id",
+            "type": "integer"
+          },
+          "patient_name": {
+            "title": "Patient Name",
+            "type": "string"
+          },
+          "patient_urn": {
+            "title": "Patient Urn",
+            "type": "string"
+          },
+          "recommended_date": {
+            "format": "date",
+            "title": "Recommended Date",
+            "type": "string"
+          },
+          "recommended_doctor_id": {
+            "title": "Recommended Doctor Id",
+            "type": "integer"
+          },
+          "recommended_doctor_name": {
+            "title": "Recommended Doctor Name",
+            "type": "string"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          },
+          "version_id": {
+            "title": "Version Id",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "encounter_id",
+          "patient_id",
+          "patient_name",
+          "patient_urn",
+          "doctor_id",
+          "doctor_name",
+          "recommended_doctor_id",
+          "recommended_doctor_name",
+          "recommended_date",
+          "status",
+          "version_id",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "DoctorFollowUpResponse",
+        "type": "object"
+      },
+      "DoctorMeSettingsUpdate": {
+        "additionalProperties": false,
+        "description": "Payload for a doctor updating their own consultation fee.",
+        "properties": {
+          "default_fee_paise": {
+            "minimum": 0.0,
+            "title": "Default Fee Paise",
+            "type": "integer"
+          },
+          "version_id": {
+            "minimum": 1.0,
+            "title": "Version Id",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "default_fee_paise",
+          "version_id"
+        ],
+        "title": "DoctorMeSettingsUpdate",
+        "type": "object"
+      },
       "DoctorOut": {
         "description": "Doctor profile entity response.",
         "properties": {
+          "cabin_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cabin Code"
+          },
           "created_at": {
             "format": "date-time",
             "title": "Created At",
@@ -2118,6 +3078,16 @@
             "title": "Appointments Today",
             "type": "integer"
           },
+          "arrived_waiting": {
+            "default": 0,
+            "title": "Arrived Waiting",
+            "type": "integer"
+          },
+          "department": {
+            "default": "Physiotherapy",
+            "title": "Department",
+            "type": "string"
+          },
           "doctor_id": {
             "title": "Doctor Id",
             "type": "integer"
@@ -2133,6 +3103,17 @@
           "name": {
             "title": "Name",
             "type": "string"
+          },
+          "next_token": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Token"
           },
           "waiting": {
             "title": "Waiting",
@@ -2154,6 +3135,17 @@
         "additionalProperties": false,
         "description": "Payload for updating a doctor profile with optimistic concurrency.",
         "properties": {
+          "cabin_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cabin Code"
+          },
           "default_fee_paise": {
             "minimum": 0.0,
             "title": "Default Fee Paise",
@@ -2220,6 +3212,66 @@
         "title": "DoctorUpdate",
         "type": "object"
       },
+      "DuplicateCandidatePatient": {
+        "description": "Demographics of existing patient candidate for side-by-side comparison.",
+        "properties": {
+          "address": {
+            "title": "Address",
+            "type": "string"
+          },
+          "age_years": {
+            "title": "Age Years",
+            "type": "integer"
+          },
+          "full_name": {
+            "title": "Full Name",
+            "type": "string"
+          },
+          "gender": {
+            "title": "Gender",
+            "type": "string"
+          },
+          "guardian_name": {
+            "title": "Guardian Name",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "legacy_urn": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Legacy Urn"
+          },
+          "mobile": {
+            "title": "Mobile",
+            "type": "string"
+          },
+          "urn": {
+            "title": "Urn",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "urn",
+          "full_name",
+          "guardian_name",
+          "gender",
+          "age_years",
+          "mobile",
+          "address"
+        ],
+        "title": "DuplicateCandidatePatient",
+        "type": "object"
+      },
       "DuplicateCheckResponse": {
         "description": "Duplicate search check response.",
         "properties": {
@@ -2244,8 +3296,124 @@
         "title": "DuplicateCheckResponse",
         "type": "object"
       },
+      "DuplicateListResponse": {
+        "additionalProperties": false,
+        "description": "List of duplicate candidate rows in a batch.",
+        "properties": {
+          "batch_id": {
+            "title": "Batch Id",
+            "type": "string"
+          },
+          "duplicates": {
+            "items": {
+              "$ref": "#/components/schemas/DuplicateRowItem"
+            },
+            "title": "Duplicates",
+            "type": "array"
+          }
+        },
+        "required": [
+          "batch_id",
+          "duplicates"
+        ],
+        "title": "DuplicateListResponse",
+        "type": "object"
+      },
+      "DuplicateResolutionItem": {
+        "additionalProperties": false,
+        "description": "Explicit decision for a single duplicate candidate row.",
+        "properties": {
+          "resolution": {
+            "enum": [
+              "SKIP",
+              "IMPORT_AS_NEW"
+            ],
+            "title": "Resolution",
+            "type": "string"
+          },
+          "row_id": {
+            "title": "Row Id",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "row_id",
+          "resolution"
+        ],
+        "title": "DuplicateResolutionItem",
+        "type": "object"
+      },
+      "DuplicateRowItem": {
+        "description": "A flagged duplicate row and its matched patient.",
+        "properties": {
+          "duplicate_patient": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DuplicateCandidatePatient"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "duplicate_patient_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Duplicate Patient Id"
+          },
+          "duplicate_resolution": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Duplicate Resolution"
+          },
+          "mapped_data": {
+            "additionalProperties": true,
+            "title": "Mapped Data",
+            "type": "object"
+          },
+          "row_id": {
+            "title": "Row Id",
+            "type": "integer"
+          },
+          "row_index": {
+            "title": "Row Index",
+            "type": "integer"
+          },
+          "validation_errors": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Validation Errors"
+          }
+        },
+        "required": [
+          "row_id",
+          "row_index",
+          "mapped_data"
+        ],
+        "title": "DuplicateRowItem",
+        "type": "object"
+      },
       "EncounterCreate": {
-        "description": "Payload to record a clinical encounter (CLN-01).",
+        "description": "Payload to record a clinical encounter (CLN-01, DWS-02 draft state).",
         "properties": {
           "appointment_id": {
             "anyOf": [
@@ -2261,16 +3429,29 @@
             "title": "Appointment Id"
           },
           "clinical_notes": {
+            "default": "",
             "description": "Examination and progress notes",
             "maxLength": 10000,
-            "minLength": 2,
             "title": "Clinical Notes",
             "type": "string"
           },
+          "department_id": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Optional department/specialty ID",
+            "title": "Department Id"
+          },
           "diagnosis": {
+            "default": "",
             "description": "Clinical diagnosis or impression",
             "maxLength": 5000,
-            "minLength": 2,
             "title": "Diagnosis",
             "type": "string"
           },
@@ -2281,20 +3462,67 @@
             "type": "integer"
           },
           "symptoms": {
+            "default": "",
             "description": "Chief complaints and symptoms",
             "maxLength": 5000,
-            "minLength": 2,
             "title": "Symptoms",
             "type": "string"
           }
         },
         "required": [
-          "patient_id",
-          "symptoms",
-          "clinical_notes",
-          "diagnosis"
+          "patient_id"
         ],
         "title": "EncounterCreate",
+        "type": "object"
+      },
+      "EncounterFinaliseRequest": {
+        "description": "Payload to finalise an encounter requiring mandatory fields (D-19-09).",
+        "properties": {
+          "clinical_notes": {
+            "anyOf": [
+              {
+                "maxLength": 10000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Clinical Notes"
+          },
+          "diagnosis": {
+            "description": "Diagnosis (min 2 characters)",
+            "maxLength": 5000,
+            "minLength": 2,
+            "title": "Diagnosis",
+            "type": "string"
+          },
+          "symptoms": {
+            "description": "Chief complaint (min 2 characters)",
+            "maxLength": 5000,
+            "minLength": 2,
+            "title": "Symptoms",
+            "type": "string"
+          },
+          "version_id": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Optimistic locking version ID (FB-01)",
+            "title": "Version Id"
+          }
+        },
+        "required": [
+          "symptoms",
+          "diagnosis"
+        ],
+        "title": "EncounterFinaliseRequest",
         "type": "object"
       },
       "EncounterRead": {
@@ -2326,6 +3554,17 @@
             "format": "date-time",
             "title": "Created At",
             "type": "string"
+          },
+          "department_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Department Id"
           },
           "diagnosis": {
             "title": "Diagnosis",
@@ -2364,9 +3603,31 @@
             "title": "Is Finalised",
             "type": "boolean"
           },
+          "patient_address": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Patient Address"
+          },
           "patient_id": {
             "title": "Patient Id",
             "type": "integer"
+          },
+          "patient_mobile": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Patient Mobile"
           },
           "patient_name": {
             "title": "Patient Name",
@@ -2478,7 +3739,6 @@
             "anyOf": [
               {
                 "maxLength": 10000,
-                "minLength": 2,
                 "type": "string"
               },
               {
@@ -2487,11 +3747,22 @@
             ],
             "title": "Clinical Notes"
           },
+          "department_id": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Department Id"
+          },
           "diagnosis": {
             "anyOf": [
               {
                 "maxLength": 5000,
-                "minLength": 2,
                 "type": "string"
               },
               {
@@ -2504,7 +3775,6 @@
             "anyOf": [
               {
                 "maxLength": 5000,
-                "minLength": 2,
                 "type": "string"
               },
               {
@@ -2526,9 +3796,63 @@
         "title": "EncounterUpdate",
         "type": "object"
       },
+      "ExportScope": {
+        "additionalProperties": false,
+        "description": "Filter criteria scoping patient records for export.",
+        "properties": {
+          "department_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Department Id"
+          },
+          "end_date": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "End Date"
+          },
+          "search_query": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Search Query"
+          },
+          "start_date": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Start Date"
+          }
+        },
+        "title": "ExportScope",
+        "type": "object"
+      },
       "FeeCreate": {
         "additionalProperties": false,
-        "description": "Payload for creating a consultation fee schedule.",
+        "description": "Payload for creating a consultation fee schedule entry.",
         "properties": {
           "fee_paise": {
             "minimum": 0.0,
@@ -2536,7 +3860,7 @@
             "type": "integer"
           },
           "name": {
-            "maxLength": 120,
+            "maxLength": 64,
             "minLength": 2,
             "title": "Name",
             "type": "string"
@@ -2552,11 +3876,6 @@
       "FeeOut": {
         "description": "Consultation fee schedule response.",
         "properties": {
-          "created_at": {
-            "format": "date-time",
-            "title": "Created At",
-            "type": "string"
-          },
           "fee_paise": {
             "title": "Fee Paise",
             "type": "integer"
@@ -2573,11 +3892,6 @@
             "title": "Name",
             "type": "string"
           },
-          "updated_at": {
-            "format": "date-time",
-            "title": "Updated At",
-            "type": "string"
-          },
           "version_id": {
             "title": "Version Id",
             "type": "integer"
@@ -2588,16 +3902,14 @@
           "name",
           "fee_paise",
           "is_active",
-          "version_id",
-          "created_at",
-          "updated_at"
+          "version_id"
         ],
         "title": "FeeOut",
         "type": "object"
       },
       "FeeUpdate": {
         "additionalProperties": false,
-        "description": "Payload for modifying a consultation fee schedule.",
+        "description": "Payload for updating a consultation fee with optimistic locking.",
         "properties": {
           "fee_paise": {
             "minimum": 0.0,
@@ -2610,7 +3922,7 @@
             "type": "boolean"
           },
           "name": {
-            "maxLength": 120,
+            "maxLength": 64,
             "minLength": 2,
             "title": "Name",
             "type": "string"
@@ -2629,6 +3941,127 @@
         "title": "FeeUpdate",
         "type": "object"
       },
+      "FollowUpBookRequest": {
+        "additionalProperties": false,
+        "description": "Schema for booking an appointment from a follow-up recommendation.",
+        "properties": {
+          "appointment_date": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Optional override date (defaults to recommendation date)",
+            "title": "Appointment Date"
+          },
+          "department_id": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Department to book into. Optional when it can be inferred: the original encounter's department if the doctor belongs to it, otherwise the doctor's only active department.",
+            "title": "Department Id"
+          },
+          "notes": {
+            "anyOf": [
+              {
+                "maxLength": 1000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Optional appointment notes",
+            "title": "Notes"
+          },
+          "override_reason": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Reason of at least 5 characters to override duplicate booking on the same date (BR-006)",
+            "title": "Override Reason"
+          }
+        },
+        "title": "FollowUpBookRequest",
+        "type": "object"
+      },
+      "FollowUpCloseRequest": {
+        "additionalProperties": false,
+        "description": "Schema for closing an unbooked follow-up recommendation.",
+        "properties": {
+          "reason": {
+            "description": "Reason for closure",
+            "maxLength": 1000,
+            "minLength": 3,
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "reason"
+        ],
+        "title": "FollowUpCloseRequest",
+        "type": "object"
+      },
+      "FollowUpRecommendationCreate": {
+        "additionalProperties": false,
+        "description": "Schema for doctor creating a follow-up recommendation.",
+        "properties": {
+          "clinical_reason": {
+            "anyOf": [
+              {
+                "maxLength": 1000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Clinical rationale (doctor-only, hidden from reception)",
+            "title": "Clinical Reason"
+          },
+          "recommended_date": {
+            "description": "Target follow-up date",
+            "format": "date",
+            "title": "Recommended Date",
+            "type": "string"
+          },
+          "recommended_doctor_id": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Target doctor ID (defaults to current doctor)",
+            "title": "Recommended Doctor Id"
+          }
+        },
+        "required": [
+          "recommended_date"
+        ],
+        "title": "FollowUpRecommendationCreate",
+        "type": "object"
+      },
       "HTTPValidationError": {
         "properties": {
           "detail": {
@@ -2642,9 +4075,119 @@
         "title": "HTTPValidationError",
         "type": "object"
       },
-      "IntegrityCheckItemOut": {
-        "description": "Status of an individual integrity check.\n\n``severity`` describes how a non-passing result is classified: ERROR findings make the\nreport unhealthy; WARNING findings are reported but do not.",
+      "HourlyCollectionOut": {
+        "additionalProperties": false,
+        "description": "Hourly bucket of payment collections for today (IST).",
         "properties": {
+          "amount_paise": {
+            "default": 0,
+            "title": "Amount Paise",
+            "type": "integer"
+          },
+          "count": {
+            "default": 0,
+            "title": "Count",
+            "type": "integer"
+          },
+          "hour": {
+            "title": "Hour",
+            "type": "string"
+          }
+        },
+        "required": [
+          "hour"
+        ],
+        "title": "HourlyCollectionOut",
+        "type": "object"
+      },
+      "InspectFileResponse": {
+        "additionalProperties": false,
+        "description": "Result of file inspection and encoding sniffing.",
+        "properties": {
+          "canonical_fields": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Canonical Fields",
+            "type": "array"
+          },
+          "delimiter": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Delimiter"
+          },
+          "encoding": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Encoding"
+          },
+          "file_type": {
+            "title": "File Type",
+            "type": "string"
+          },
+          "filename": {
+            "title": "Filename",
+            "type": "string"
+          },
+          "headers": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Headers",
+            "type": "array"
+          },
+          "sample_rows": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Sample Rows",
+            "type": "array"
+          },
+          "suggested_mapping": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Suggested Mapping",
+            "type": "object"
+          },
+          "total_rows": {
+            "title": "Total Rows",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "filename",
+          "file_type",
+          "total_rows",
+          "headers",
+          "sample_rows",
+          "suggested_mapping",
+          "canonical_fields"
+        ],
+        "title": "InspectFileResponse",
+        "type": "object"
+      },
+      "IntegrityCheckItemOut": {
+        "description": "Status of an individual integrity check.\n\n``code`` is a stable identifier for the check. ``severity`` is the worst severity among\nits findings: ERROR makes the report unhealthy; WARNING is a review item; CLEANUP is\nharmless clutter. Each finding in ``discrepancies`` carries its own ``issue`` and\n``severity``.",
+        "properties": {
+          "code": {
+            "default": "",
+            "title": "Code",
+            "type": "string"
+          },
           "details": {
             "title": "Details",
             "type": "string"
@@ -2669,7 +4212,8 @@
             "default": "ERROR",
             "enum": [
               "ERROR",
-              "WARNING"
+              "WARNING",
+              "CLEANUP"
             ],
             "title": "Severity",
             "type": "string"
@@ -2683,8 +4227,25 @@
         "title": "IntegrityCheckItemOut",
         "type": "object"
       },
+      "IntegrityHistoryOut": {
+        "description": "Most recent integrity runs, newest first.",
+        "properties": {
+          "runs": {
+            "items": {
+              "$ref": "#/components/schemas/IntegrityRunSummaryOut"
+            },
+            "title": "Runs",
+            "type": "array"
+          }
+        },
+        "required": [
+          "runs"
+        ],
+        "title": "IntegrityHistoryOut",
+        "type": "object"
+      },
       "IntegrityReportOut": {
-        "description": "System-wide clinical and financial integrity report.",
+        "description": "System-wide clinical and financial integrity report (one stored run).",
         "properties": {
           "checks": {
             "items": {
@@ -2692,6 +4253,16 @@
             },
             "title": "Checks",
             "type": "array"
+          },
+          "cleanup_checks": {
+            "default": 0,
+            "title": "Cleanup Checks",
+            "type": "integer"
+          },
+          "duration_ms": {
+            "default": 0,
+            "title": "Duration Ms",
+            "type": "integer"
           },
           "failed_checks": {
             "title": "Failed Checks",
@@ -2701,6 +4272,17 @@
             "title": "Generated At",
             "type": "string"
           },
+          "id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Id"
+          },
           "is_healthy": {
             "title": "Is Healthy",
             "type": "boolean"
@@ -2708,6 +4290,17 @@
           "passed_checks": {
             "title": "Passed Checks",
             "type": "integer"
+          },
+          "run_by_username": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Run By Username"
           },
           "total_checks": {
             "title": "Total Checks",
@@ -2728,6 +4321,66 @@
           "checks"
         ],
         "title": "IntegrityReportOut",
+        "type": "object"
+      },
+      "IntegrityRunSummaryOut": {
+        "description": "Counts from one past integrity run, for the history list.",
+        "properties": {
+          "cleanup_checks": {
+            "title": "Cleanup Checks",
+            "type": "integer"
+          },
+          "failed_checks": {
+            "title": "Failed Checks",
+            "type": "integer"
+          },
+          "generated_at": {
+            "title": "Generated At",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "is_healthy": {
+            "title": "Is Healthy",
+            "type": "boolean"
+          },
+          "passed_checks": {
+            "title": "Passed Checks",
+            "type": "integer"
+          },
+          "run_by_username": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Run By Username"
+          },
+          "total_checks": {
+            "title": "Total Checks",
+            "type": "integer"
+          },
+          "warning_checks": {
+            "title": "Warning Checks",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "generated_at",
+          "is_healthy",
+          "total_checks",
+          "passed_checks",
+          "failed_checks",
+          "warning_checks",
+          "cleanup_checks"
+        ],
+        "title": "IntegrityRunSummaryOut",
         "type": "object"
       },
       "LastBackupOut": {
@@ -2908,13 +4561,19 @@
       },
       "LoginRequest": {
         "additionalProperties": false,
-        "description": "Payload for user login authentication.",
+        "description": "Payload for user login authentication with optional single-session takeover.",
         "properties": {
           "password": {
             "maxLength": 1024,
             "minLength": 1,
             "title": "Password",
             "type": "string"
+          },
+          "takeover": {
+            "default": false,
+            "description": "Whether to revoke existing active session and take over",
+            "title": "Takeover",
+            "type": "boolean"
           },
           "username": {
             "maxLength": 64,
@@ -2928,6 +4587,73 @@
           "password"
         ],
         "title": "LoginRequest",
+        "type": "object"
+      },
+      "ManagementOverviewResponse": {
+        "additionalProperties": false,
+        "description": "Monthly figures for the administration dashboard, every one computed from records.\n\nThe hospital does not record expenses, so the response has no expense, surplus or\nutilisation figures; nothing in it is estimated or filled with sample values.",
+        "properties": {
+          "collection_trend": {
+            "items": {
+              "$ref": "#/components/schemas/CollectionTrendMonth"
+            },
+            "title": "Collection Trend",
+            "type": "array"
+          },
+          "collections_paise": {
+            "$ref": "#/components/schemas/MonthOverMonth"
+          },
+          "current_month_label": {
+            "title": "Current Month Label",
+            "type": "string"
+          },
+          "department_collections": {
+            "items": {
+              "$ref": "#/components/schemas/DepartmentCollection"
+            },
+            "title": "Department Collections",
+            "type": "array"
+          },
+          "new_patients": {
+            "$ref": "#/components/schemas/MonthOverMonth"
+          },
+          "patient_trend": {
+            "items": {
+              "$ref": "#/components/schemas/PatientTrendMonth"
+            },
+            "title": "Patient Trend",
+            "type": "array"
+          },
+          "previous_month_label": {
+            "title": "Previous Month Label",
+            "type": "string"
+          },
+          "returning_patients_this_month": {
+            "title": "Returning Patients This Month",
+            "type": "integer"
+          },
+          "reversed_this_month": {
+            "title": "Reversed This Month",
+            "type": "integer"
+          },
+          "reversed_this_month_paise": {
+            "title": "Reversed This Month Paise",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "current_month_label",
+          "previous_month_label",
+          "collections_paise",
+          "reversed_this_month",
+          "reversed_this_month_paise",
+          "collection_trend",
+          "department_collections",
+          "new_patients",
+          "returning_patients_this_month",
+          "patient_trend"
+        ],
+        "title": "ManagementOverviewResponse",
         "type": "object"
       },
       "MeResponse": {
@@ -2994,6 +4720,38 @@
         "title": "MeResponse",
         "type": "object"
       },
+      "MonthOverMonth": {
+        "additionalProperties": false,
+        "description": "A monthly figure next to the previous month's. change_pct is null when last month was 0.",
+        "properties": {
+          "change_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Change Pct"
+          },
+          "current": {
+            "title": "Current",
+            "type": "integer"
+          },
+          "previous": {
+            "title": "Previous",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "current",
+          "previous",
+          "change_pct"
+        ],
+        "title": "MonthOverMonth",
+        "type": "object"
+      },
       "OverviewAlertOut": {
         "additionalProperties": false,
         "description": "Factual condition worth an administrator's attention (no invented thresholds).",
@@ -3037,6 +4795,20 @@
           "max_length"
         ],
         "title": "PasswordPolicyOut",
+        "type": "object"
+      },
+      "PatientCountResponse": {
+        "description": "Total number of patients matching a directory search.",
+        "properties": {
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "total"
+        ],
+        "title": "PatientCountResponse",
         "type": "object"
       },
       "PatientCreate": {
@@ -3147,6 +4919,48 @@
         "title": "PatientCreate",
         "type": "object"
       },
+      "PatientExportRequest": {
+        "additionalProperties": false,
+        "description": "Administrative request payload for patient dataset export.",
+        "properties": {
+          "fields": {
+            "description": "List of patient fields to include in export",
+            "items": {
+              "type": "string"
+            },
+            "minItems": 1,
+            "title": "Fields",
+            "type": "array"
+          },
+          "format": {
+            "default": "csv",
+            "description": "Desired export file format ('csv' or 'xlsx')",
+            "enum": [
+              "csv",
+              "xlsx"
+            ],
+            "title": "Format",
+            "type": "string"
+          },
+          "reason": {
+            "description": "Documented purpose / justification for export (audited)",
+            "maxLength": 500,
+            "minLength": 5,
+            "title": "Reason",
+            "type": "string"
+          },
+          "scope": {
+            "$ref": "#/components/schemas/ExportScope",
+            "description": "Filter parameters for scoping patients"
+          }
+        },
+        "required": [
+          "reason",
+          "fields"
+        ],
+        "title": "PatientExportRequest",
+        "type": "object"
+      },
       "PatientOut": {
         "description": "Full patient demographic entity response.",
         "properties": {
@@ -3214,6 +5028,17 @@
             "title": "Is Active",
             "type": "boolean"
           },
+          "legacy_urn": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Legacy Urn"
+          },
           "mobile": {
             "title": "Mobile",
             "type": "string"
@@ -3276,6 +5101,25 @@
           "updated_at"
         ],
         "title": "PatientOut",
+        "type": "object"
+      },
+      "PatientTrendMonth": {
+        "additionalProperties": false,
+        "properties": {
+          "month": {
+            "title": "Month",
+            "type": "string"
+          },
+          "new_patients": {
+            "title": "New Patients",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "month",
+          "new_patients"
+        ],
+        "title": "PatientTrendMonth",
         "type": "object"
       },
       "PatientUpdate": {
@@ -3578,9 +5422,31 @@
             ],
             "title": "Notes"
           },
+          "patient_address": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Patient Address"
+          },
           "patient_id": {
             "title": "Patient Id",
             "type": "integer"
+          },
+          "patient_mobile": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Patient Mobile"
           },
           "patient_name": {
             "title": "Patient Name",
@@ -3704,8 +5570,15 @@
             "type": "integer"
           },
           "condition_diagnosis": {
-            "title": "Condition Diagnosis",
-            "type": "string"
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Condition Diagnosis"
           },
           "paid_paise": {
             "title": "Paid Paise",
@@ -3742,7 +5615,6 @@
           "patient_urn",
           "patient_name",
           "plan_name",
-          "condition_diagnosis",
           "agreed_price_paise",
           "paid_paise",
           "balance_paise",
@@ -3802,16 +5674,40 @@
         "title": "PolicyFieldLimits",
         "type": "object"
       },
+      "PrescriptionCancelRequest": {
+        "additionalProperties": false,
+        "description": "Schema for cancelling an existing prescription (D-19-15).",
+        "properties": {
+          "reason": {
+            "description": "Clinical or administrative cancellation reason",
+            "maxLength": 1000,
+            "minLength": 3,
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "reason"
+        ],
+        "title": "PrescriptionCancelRequest",
+        "type": "object"
+      },
       "PrescriptionCreate": {
         "additionalProperties": false,
-        "description": "Schema for doctor creating a prescription.",
+        "description": "Schema for doctor creating a prescription (RX-01, DWS-07).",
         "properties": {
           "diagnosis": {
-            "description": "Clinical diagnosis",
-            "maxLength": 1000,
-            "minLength": 2,
-            "title": "Diagnosis",
-            "type": "string"
+            "anyOf": [
+              {
+                "maxLength": 1000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Clinical diagnosis (inherited from encounter if omitted)",
+            "title": "Diagnosis"
           },
           "dietary_advice": {
             "anyOf": [
@@ -3863,11 +5759,10 @@
             "title": "General Advice"
           },
           "items": {
-            "description": "At least one prescribed medicine item required",
+            "description": "Prescribed medicine items",
             "items": {
               "$ref": "#/components/schemas/PrescriptionItemCreate"
             },
-            "minItems": 1,
             "title": "Items",
             "type": "array"
           },
@@ -3876,12 +5771,16 @@
             "exclusiveMinimum": 0.0,
             "title": "Patient Id",
             "type": "integer"
+          },
+          "status": {
+            "default": "AUTHORISED",
+            "description": "Prescription status: DRAFT or AUTHORISED",
+            "title": "Status",
+            "type": "string"
           }
         },
         "required": [
-          "patient_id",
-          "diagnosis",
-          "items"
+          "patient_id"
         ],
         "title": "PrescriptionCreate",
         "type": "object"
@@ -3903,6 +5802,19 @@
             "minimum": 1.0,
             "title": "Duration Days",
             "type": "integer"
+          },
+          "form": {
+            "anyOf": [
+              {
+                "maxLength": 32,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Form (e.g. Tablet, Eye Drops, Syrup)",
+            "title": "Form"
           },
           "frequency": {
             "description": "Frequency (e.g. 1-0-1, OD, BD, TDS)",
@@ -3936,6 +5848,32 @@
             "minLength": 1,
             "title": "Medicine Name",
             "type": "string"
+          },
+          "route": {
+            "anyOf": [
+              {
+                "maxLength": 32,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Route (e.g. Oral, Right Eye (OD), Left Eye (OS))",
+            "title": "Route"
+          },
+          "strength": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Strength specification (e.g. 500mg, 0.5%)",
+            "title": "Strength"
           }
         },
         "required": [
@@ -3958,6 +5896,17 @@
           "duration_days": {
             "title": "Duration Days",
             "type": "integer"
+          },
+          "form": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Form"
           },
           "frequency": {
             "title": "Frequency",
@@ -3989,6 +5938,28 @@
           "prescription_id": {
             "title": "Prescription Id",
             "type": "integer"
+          },
+          "route": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Route"
+          },
+          "strength": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Strength"
           }
         },
         "required": [
@@ -4006,6 +5977,52 @@
       "PrescriptionOut": {
         "description": "Schema for full prescription reading including items.",
         "properties": {
+          "authorised_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Authorised At"
+          },
+          "cancellation_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cancellation Reason"
+          },
+          "cancelled_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cancelled At"
+          },
+          "cancelled_by_user_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cancelled By User Id"
+          },
           "created_at": {
             "format": "date-time",
             "title": "Created At",
@@ -4072,6 +6089,11 @@
             "title": "Id",
             "type": "integer"
           },
+          "is_printable": {
+            "default": false,
+            "title": "Is Printable",
+            "type": "boolean"
+          },
           "items": {
             "items": {
               "$ref": "#/components/schemas/PrescriptionItemOut"
@@ -4079,9 +6101,31 @@
             "title": "Items",
             "type": "array"
           },
+          "patient_address": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Patient Address"
+          },
           "patient_id": {
             "title": "Patient Id",
             "type": "integer"
+          },
+          "patient_mobile": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Patient Mobile"
           },
           "patient_name": {
             "title": "Patient Name",
@@ -4089,6 +6133,10 @@
           },
           "patient_urn": {
             "title": "Patient Urn",
+            "type": "string"
+          },
+          "status": {
+            "title": "Status",
             "type": "string"
           },
           "updated_at": {
@@ -4108,6 +6156,7 @@
           "patient_name",
           "doctor_id",
           "doctor_name",
+          "status",
           "diagnosis",
           "version_id",
           "created_at",
@@ -4179,6 +6228,10 @@
           "patient_urn": {
             "title": "Patient Urn",
             "type": "string"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
           }
         },
         "required": [
@@ -4188,11 +6241,227 @@
           "patient_name",
           "doctor_id",
           "doctor_name",
+          "status",
           "diagnosis",
           "items_count",
           "created_at"
         ],
         "title": "PrescriptionSummary",
+        "type": "object"
+      },
+      "PrescriptionUpdate": {
+        "additionalProperties": false,
+        "description": "Schema for updating a draft prescription.",
+        "properties": {
+          "diagnosis": {
+            "anyOf": [
+              {
+                "maxLength": 1000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Diagnosis"
+          },
+          "dietary_advice": {
+            "anyOf": [
+              {
+                "maxLength": 1000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dietary Advice"
+          },
+          "follow_up_date": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Follow Up Date"
+          },
+          "general_advice": {
+            "anyOf": [
+              {
+                "maxLength": 1000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "General Advice"
+          },
+          "items": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/PrescriptionItemCreate"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Items"
+          },
+          "version_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Expected version_id for optimistic locking",
+            "title": "Version Id"
+          }
+        },
+        "title": "PrescriptionUpdate",
+        "type": "object"
+      },
+      "PrintTemplateRead": {
+        "description": "Bilingual print template configuration schema (SET-01, BIL-04).",
+        "properties": {
+          "document_type": {
+            "title": "Document Type",
+            "type": "string"
+          },
+          "footer_en": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Footer En"
+          },
+          "footer_hi": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Footer Hi"
+          },
+          "header_en": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Header En"
+          },
+          "header_hi": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Header Hi"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "document_type",
+          "version",
+          "updated_at"
+        ],
+        "title": "PrintTemplateRead",
+        "type": "object"
+      },
+      "PrintTemplateUpdate": {
+        "description": "Payload to update bilingual print template header/footer.",
+        "properties": {
+          "footer_en": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Footer En"
+          },
+          "footer_hi": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Footer Hi"
+          },
+          "header_en": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Header En"
+          },
+          "header_hi": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Header Hi"
+          },
+          "version": {
+            "description": "Current template version for optimistic locking",
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "version"
+        ],
+        "title": "PrintTemplateUpdate",
         "type": "object"
       },
       "RecentAdminActionOut": {
@@ -4257,18 +6526,165 @@
         "title": "RecentAdminActionOut",
         "type": "object"
       },
+      "ReceptionFollowUpResponse": {
+        "description": "Reception projection for follow-up scheduling (DWS-08, D-19-19).\n\nCRITICAL SECURITY & PRIVACY INVARIANT:\nclinical_reason is STRICTLY omitted from this schema and never returned to reception.",
+        "properties": {
+          "booked_appointment_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Booked Appointment Id"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "encounter_id": {
+            "title": "Encounter Id",
+            "type": "integer"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "patient_id": {
+            "title": "Patient Id",
+            "type": "integer"
+          },
+          "patient_mobile": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Patient Mobile"
+          },
+          "patient_name": {
+            "title": "Patient Name",
+            "type": "string"
+          },
+          "patient_urn": {
+            "title": "Patient Urn",
+            "type": "string"
+          },
+          "recommended_date": {
+            "format": "date",
+            "title": "Recommended Date",
+            "type": "string"
+          },
+          "recommended_doctor_id": {
+            "title": "Recommended Doctor Id",
+            "type": "integer"
+          },
+          "recommended_doctor_name": {
+            "title": "Recommended Doctor Name",
+            "type": "string"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "encounter_id",
+          "patient_id",
+          "patient_name",
+          "patient_urn",
+          "recommended_doctor_id",
+          "recommended_doctor_name",
+          "recommended_date",
+          "status",
+          "created_at"
+        ],
+        "title": "ReceptionFollowUpResponse",
+        "type": "object"
+      },
       "ReceptionOverviewResponse": {
         "additionalProperties": false,
         "description": "Reception dashboard summary.",
         "properties": {
+          "alerts": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/OverviewAlertOut"
+            },
+            "title": "Alerts",
+            "type": "array"
+          },
+          "appointments_today": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "default": {},
+            "title": "Appointments Today",
+            "type": "object"
+          },
           "area": {
             "default": "reception",
             "title": "Area",
             "type": "string"
           },
+          "business_date": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Business Date"
+          },
+          "collections_today": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CollectionsTodayOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "doctors_today": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/DoctorTodayOut"
+            },
+            "title": "Doctors Today",
+            "type": "array"
+          },
+          "hourly_collections": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/HourlyCollectionOut"
+            },
+            "title": "Hourly Collections",
+            "type": "array"
+          },
           "name": {
             "title": "Name",
             "type": "string"
+          },
+          "outstanding_dues_paise": {
+            "default": 0,
+            "title": "Outstanding Dues Paise",
+            "type": "integer"
+          },
+          "registrations_today": {
+            "default": 0,
+            "title": "Registrations Today",
+            "type": "integer"
           },
           "role": {
             "title": "Role",
@@ -4280,6 +6696,24 @@
           "role"
         ],
         "title": "ReceptionOverviewResponse",
+        "type": "object"
+      },
+      "ResolveDuplicatesRequest": {
+        "additionalProperties": false,
+        "description": "Batch duplicate decision submission.",
+        "properties": {
+          "resolutions": {
+            "items": {
+              "$ref": "#/components/schemas/DuplicateResolutionItem"
+            },
+            "title": "Resolutions",
+            "type": "array"
+          }
+        },
+        "required": [
+          "resolutions"
+        ],
+        "title": "ResolveDuplicatesRequest",
         "type": "object"
       },
       "RestoreRequest": {
@@ -4920,6 +7354,70 @@
         "title": "SystemStatusOut",
         "type": "object"
       },
+      "TemplateResponseInput": {
+        "description": "Payload to save specialty template responses for an encounter.",
+        "properties": {
+          "response_data": {
+            "additionalProperties": true,
+            "description": "Captured specialty form responses",
+            "title": "Response Data",
+            "type": "object"
+          },
+          "template_version_id": {
+            "description": "Approved template version ID",
+            "exclusiveMinimum": 0.0,
+            "title": "Template Version Id",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "template_version_id"
+        ],
+        "title": "TemplateResponseInput",
+        "type": "object"
+      },
+      "TemplateResponseRead": {
+        "description": "Encounter template response schema.",
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "encounter_id": {
+            "title": "Encounter Id",
+            "type": "integer"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "response_data": {
+            "additionalProperties": true,
+            "title": "Response Data",
+            "type": "object"
+          },
+          "template_version_id": {
+            "title": "Template Version Id",
+            "type": "integer"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "encounter_id",
+          "template_version_id",
+          "response_data",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "TemplateResponseRead",
+        "type": "object"
+      },
       "TimelineItemOut": {
         "description": "Normalized timeline item for patient chronological history.",
         "properties": {
@@ -5503,6 +8001,62 @@
         "title": "TreatmentSessionOut",
         "type": "object"
       },
+      "UnfinishedEncounterItem": {
+        "description": "Active draft clinical encounter awaiting doctor completion (D-19-24, DWS-02).",
+        "properties": {
+          "department_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Department Id"
+          },
+          "department_name": {
+            "default": "",
+            "title": "Department Name",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "is_finalised": {
+            "default": false,
+            "title": "Is Finalised",
+            "type": "boolean"
+          },
+          "patient_id": {
+            "title": "Patient Id",
+            "type": "integer"
+          },
+          "patient_name": {
+            "title": "Patient Name",
+            "type": "string"
+          },
+          "patient_urn": {
+            "title": "Patient Urn",
+            "type": "string"
+          },
+          "started_at": {
+            "format": "date-time",
+            "title": "Started At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "patient_id",
+          "patient_urn",
+          "patient_name",
+          "started_at"
+        ],
+        "title": "UnfinishedEncounterItem",
+        "type": "object"
+      },
       "UserCreate": {
         "additionalProperties": false,
         "description": "Payload for creating a new user account.",
@@ -5581,6 +8135,10 @@
             "title": "Is Locked",
             "type": "boolean"
           },
+          "is_super_admin": {
+            "title": "Is Super Admin",
+            "type": "boolean"
+          },
           "last_login_at": {
             "anyOf": [
               {
@@ -5645,6 +8203,7 @@
           "role",
           "doctor_id",
           "is_active",
+          "is_super_admin",
           "must_change_password",
           "is_locked",
           "locked_until",
@@ -5691,6 +8250,10 @@
           },
           "is_locked": {
             "title": "Is Locked",
+            "type": "boolean"
+          },
+          "is_super_admin": {
+            "title": "Is Super Admin",
             "type": "boolean"
           },
           "last_login_at": {
@@ -5753,6 +8316,7 @@
           "role",
           "doctor_id",
           "is_active",
+          "is_super_admin",
           "must_change_password",
           "is_locked",
           "locked_until",
@@ -5842,6 +8406,309 @@
         ],
         "title": "ValidationError",
         "type": "object"
+      },
+      "ValidationSummaryResponse": {
+        "additionalProperties": false,
+        "description": "Result of batch row validation and duplicate matching.",
+        "properties": {
+          "batch_id": {
+            "title": "Batch Id",
+            "type": "string"
+          },
+          "duplicate_rows": {
+            "title": "Duplicate Rows",
+            "type": "integer"
+          },
+          "invalid_rows": {
+            "title": "Invalid Rows",
+            "type": "integer"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "total_rows": {
+            "title": "Total Rows",
+            "type": "integer"
+          },
+          "valid_rows": {
+            "title": "Valid Rows",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "batch_id",
+          "total_rows",
+          "valid_rows",
+          "duplicate_rows",
+          "invalid_rows",
+          "status"
+        ],
+        "title": "ValidationSummaryResponse",
+        "type": "object"
+      },
+      "VitalObservationInput": {
+        "description": "Payload to record or update vitals for a clinical encounter.",
+        "properties": {
+          "diastolic_bp": {
+            "anyOf": [
+              {
+                "maximum": 200.0,
+                "minimum": 20.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Diastolic blood pressure mmHg (20-200)",
+            "title": "Diastolic Bp"
+          },
+          "height_cm": {
+            "anyOf": [
+              {
+                "exclusiveMaximum": 280.0,
+                "exclusiveMinimum": 20.0,
+                "type": "number"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Height in centimeters (20 < height < 280)",
+            "title": "Height Cm"
+          },
+          "pulse_bpm": {
+            "anyOf": [
+              {
+                "maximum": 260.0,
+                "minimum": 30.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Pulse rate beats per minute (30-260)",
+            "title": "Pulse Bpm"
+          },
+          "respiratory_rate": {
+            "anyOf": [
+              {
+                "maximum": 80.0,
+                "minimum": 5.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Respiratory rate breaths per minute (5-80)",
+            "title": "Respiratory Rate"
+          },
+          "spo2_percent": {
+            "anyOf": [
+              {
+                "maximum": 100.0,
+                "minimum": 40.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Oxygen saturation SpO2 percentage (40-100)",
+            "title": "Spo2 Percent"
+          },
+          "systolic_bp": {
+            "anyOf": [
+              {
+                "maximum": 300.0,
+                "minimum": 40.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Systolic blood pressure mmHg (40-300)",
+            "title": "Systolic Bp"
+          },
+          "temperature_f": {
+            "anyOf": [
+              {
+                "maximum": 110.0,
+                "minimum": 85.0,
+                "type": "number"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Body temperature in Fahrenheit (85.0-110.0)",
+            "title": "Temperature F"
+          },
+          "weight_kg": {
+            "anyOf": [
+              {
+                "exclusiveMaximum": 400.0,
+                "exclusiveMinimum": 1.0,
+                "type": "number"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Weight in kilograms (1 < weight < 400)",
+            "title": "Weight Kg"
+          }
+        },
+        "title": "VitalObservationInput",
+        "type": "object"
+      },
+      "VitalObservationResponse": {
+        "description": "Detailed vitals observations with server-calculated BMI.",
+        "properties": {
+          "bmi": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bmi"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "diastolic_bp": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Diastolic Bp"
+          },
+          "encounter_id": {
+            "title": "Encounter Id",
+            "type": "integer"
+          },
+          "height_cm": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Height Cm"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "patient_id": {
+            "title": "Patient Id",
+            "type": "integer"
+          },
+          "pulse_bpm": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pulse Bpm"
+          },
+          "respiratory_rate": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Respiratory Rate"
+          },
+          "spo2_percent": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Spo2 Percent"
+          },
+          "systolic_bp": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Systolic Bp"
+          },
+          "temperature_f": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Temperature F"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          },
+          "weight_kg": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Weight Kg"
+          }
+        },
+        "required": [
+          "id",
+          "encounter_id",
+          "patient_id",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "VitalObservationResponse",
+        "type": "object"
       }
     }
   },
@@ -5851,6 +8718,614 @@
   },
   "openapi": "3.1.0",
   "paths": {
+    "/api/admin/assets": {
+      "get": {
+        "description": "List historical and active hospital assets.",
+        "operationId": "list_assets_api_admin_assets_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "asset_type",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Asset Type"
+            }
+          },
+          {
+            "in": "query",
+            "name": "is_active",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Is Active"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/AssetOut"
+                  },
+                  "title": "Response List Assets Api Admin Assets Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Assets",
+        "tags": [
+          "assets"
+        ]
+      },
+      "post": {
+        "description": "Upload and validate a new hospital logo, certificate, or photograph.",
+        "operationId": "upload_asset_api_admin_assets_post",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_upload_asset_api_admin_assets_post"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AssetOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Upload Asset",
+        "tags": [
+          "assets"
+        ]
+      }
+    },
+    "/api/admin/assets/{asset_id}/deactivate": {
+      "post": {
+        "description": "Deactivate an asset without physical file deletion.",
+        "operationId": "deactivate_asset_api_admin_assets__asset_id__deactivate_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "asset_id",
+            "required": true,
+            "schema": {
+              "title": "Asset Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AssetOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Deactivate Asset",
+        "tags": [
+          "assets"
+        ]
+      }
+    },
+    "/api/admin/assets/{asset_id}/file": {
+      "get": {
+        "description": "Stream raw asset file for authenticated admin review.",
+        "operationId": "get_asset_file_api_admin_assets__asset_id__file_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "asset_id",
+            "required": true,
+            "schema": {
+              "title": "Asset Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Asset File",
+        "tags": [
+          "assets"
+        ]
+      }
+    },
+    "/api/admin/exports": {
+      "post": {
+        "description": "Stream field-selective, formula-sanitized patient records in CSV or XLSX format.",
+        "operationId": "export_patients_api_admin_exports_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PatientExportRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Export Patients",
+        "tags": [
+          "admin-exports"
+        ]
+      }
+    },
+    "/api/admin/imports": {
+      "post": {
+        "description": "Stage raw spreadsheet rows into staging table and record PATIENT_IMPORT_STAGED.",
+        "operationId": "stage_import_batch_api_admin_imports_post",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_stage_import_batch_api_admin_imports_post"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BatchSummaryResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Stage Import Batch",
+        "tags": [
+          "admin-imports"
+        ]
+      }
+    },
+    "/api/admin/imports/inspect": {
+      "post": {
+        "description": "Analyze uploaded spreadsheet file structure, detect encoding, and preview headers.",
+        "operationId": "inspect_import_file_api_admin_imports_inspect_post",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_inspect_import_file_api_admin_imports_inspect_post"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InspectFileResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Inspect Import File",
+        "tags": [
+          "admin-imports"
+        ]
+      }
+    },
+    "/api/admin/imports/{batch_id}": {
+      "get": {
+        "description": "Get metadata, row metrics, and staging status for an import batch.",
+        "operationId": "get_import_batch_api_admin_imports__batch_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "batch_id",
+            "required": true,
+            "schema": {
+              "title": "Batch Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BatchSummaryResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Import Batch",
+        "tags": [
+          "admin-imports"
+        ]
+      }
+    },
+    "/api/admin/imports/{batch_id}/commit": {
+      "post": {
+        "description": "Run pre-commit safety backup, mint gap-free URNs, insert patients, and record audit event.",
+        "operationId": "commit_import_batch_api_admin_imports__batch_id__commit_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "batch_id",
+            "required": true,
+            "schema": {
+              "title": "Batch Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommitBatchResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Commit Import Batch",
+        "tags": [
+          "admin-imports"
+        ]
+      }
+    },
+    "/api/admin/imports/{batch_id}/duplicates": {
+      "get": {
+        "description": "Retrieve duplicate candidate rows alongside existing patient records for side-by-side review.",
+        "operationId": "get_duplicate_candidates_api_admin_imports__batch_id__duplicates_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "batch_id",
+            "required": true,
+            "schema": {
+              "title": "Batch Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DuplicateListResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Duplicate Candidates",
+        "tags": [
+          "admin-imports"
+        ]
+      }
+    },
+    "/api/admin/imports/{batch_id}/errors": {
+      "get": {
+        "description": "Export CSV of invalid or skipped rows for offline administrative review.",
+        "operationId": "export_error_records_api_admin_imports__batch_id__errors_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "batch_id",
+            "required": true,
+            "schema": {
+              "title": "Batch Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Export Error Records",
+        "tags": [
+          "admin-imports"
+        ]
+      }
+    },
+    "/api/admin/imports/{batch_id}/resolve": {
+      "post": {
+        "description": "Record explicit duplicate resolution decisions ('SKIP' or 'IMPORT_AS_NEW').",
+        "operationId": "resolve_duplicates_api_admin_imports__batch_id__resolve_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "batch_id",
+            "required": true,
+            "schema": {
+              "title": "Batch Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResolveDuplicatesRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Resolve Duplicates Api Admin Imports  Batch Id  Resolve Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Resolve Duplicates",
+        "tags": [
+          "admin-imports"
+        ]
+      }
+    },
+    "/api/admin/imports/{batch_id}/validate": {
+      "post": {
+        "description": "Execute row validation, enforce required fields, and flag duplicate candidates.",
+        "operationId": "validate_import_batch_api_admin_imports__batch_id__validate_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "batch_id",
+            "required": true,
+            "schema": {
+              "title": "Batch Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationSummaryResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Validate Import Batch",
+        "tags": [
+          "admin-imports"
+        ]
+      }
+    },
+    "/api/admin/management-overview": {
+      "get": {
+        "description": "Monthly collections, departments and patient numbers, computed from records only.",
+        "operationId": "get_management_overview_api_admin_management_overview_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ManagementOverviewResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Get Management Overview",
+        "tags": [
+          "areas"
+        ]
+      }
+    },
     "/api/admin/overview": {
       "get": {
         "description": "Return administrative overview metrics and user counts across all roles.",
@@ -5870,6 +9345,242 @@
         "summary": "Get Admin Overview",
         "tags": [
           "areas"
+        ]
+      }
+    },
+    "/api/admin/patients/search": {
+      "get": {
+        "description": "Server-side patient search matching URN, legacy URN, full name, or mobile for correction.",
+        "operationId": "search_patients_for_correction_api_admin_patients_search_get",
+        "parameters": [
+          {
+            "description": "Search term for patient lookup",
+            "in": "query",
+            "name": "q",
+            "required": true,
+            "schema": {
+              "description": "Search term for patient lookup",
+              "maxLength": 100,
+              "minLength": 1,
+              "title": "Q",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/PatientOut"
+                  },
+                  "title": "Response Search Patients For Correction Api Admin Patients Search Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Search Patients For Correction",
+        "tags": [
+          "admin-patients"
+        ]
+      }
+    },
+    "/api/admin/patients/{id}/demographics": {
+      "patch": {
+        "description": "Administratively correct patient demographics with optimistic concurrency and permanent audit log.",
+        "operationId": "correct_patient_demographics_api_admin_patients__id__demographics_patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "title": "Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AdminPatientDemographicCorrection"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PatientOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Correct Patient Demographics",
+        "tags": [
+          "admin-patients"
+        ]
+      }
+    },
+    "/api/admin/templates": {
+      "get": {
+        "description": "Retrieve all document print templates.",
+        "operationId": "list_print_templates_api_admin_templates_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/PrintTemplateRead"
+                  },
+                  "title": "Response List Print Templates Api Admin Templates Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "List Print Templates",
+        "tags": [
+          "admin-templates"
+        ]
+      }
+    },
+    "/api/admin/templates/{doc_type}": {
+      "get": {
+        "description": "Retrieve print template configuration for a document type.",
+        "operationId": "get_print_template_api_admin_templates__doc_type__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "doc_type",
+            "required": true,
+            "schema": {
+              "title": "Doc Type",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PrintTemplateRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Print Template",
+        "tags": [
+          "admin-templates"
+        ]
+      },
+      "patch": {
+        "description": "Update print template header/footer text with optimistic concurrency check.",
+        "operationId": "update_print_template_api_admin_templates__doc_type__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "doc_type",
+            "required": true,
+            "schema": {
+              "title": "Doc Type",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PrintTemplateUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PrintTemplateRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Print Template",
+        "tags": [
+          "admin-templates"
         ]
       }
     },
@@ -6138,6 +9849,44 @@
         ]
       }
     },
+    "/api/assets/active-logo": {
+      "get": {
+        "description": "Stream current active hospital logo crest or default crest for login and printouts.",
+        "operationId": "get_active_logo_endpoint_api_assets_active_logo_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Get Active Logo Endpoint",
+        "tags": [
+          "assets"
+        ]
+      },
+      "head": {
+        "description": "Stream current active hospital logo crest or default crest for login and printouts.",
+        "operationId": "get_active_logo_endpoint_api_assets_active_logo_head",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Get Active Logo Endpoint",
+        "tags": [
+          "assets"
+        ]
+      }
+    },
     "/api/audit-logs": {
       "get": {
         "description": "List system audit log records with multi-dimensional filtering (AUD-02).",
@@ -6322,6 +10071,32 @@
           }
         },
         "summary": "List Audit Logs",
+        "tags": [
+          "audit"
+        ]
+      }
+    },
+    "/api/audit-logs/actions": {
+      "get": {
+        "description": "Return sorted distinct list of audit action names recorded in the system.",
+        "operationId": "list_audit_actions_api_audit_logs_actions_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "title": "Response List Audit Actions Api Audit Logs Actions Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "List Audit Actions",
         "tags": [
           "audit"
         ]
@@ -6871,6 +10646,49 @@
         ]
       }
     },
+    "/api/doctors/me/settings": {
+      "patch": {
+        "description": "Update consultation fee for the authenticated doctor.",
+        "operationId": "update_doctor_me_settings_api_doctors_me_settings_patch",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DoctorMeSettingsUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DoctorOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Doctor Me Settings",
+        "tags": [
+          "doctors",
+          "fees"
+        ]
+      }
+    },
     "/api/doctors/{doctor_id}/departments": {
       "get": {
         "operationId": "list_doctor_departments_api_doctors__doctor_id__departments_get",
@@ -7027,7 +10845,7 @@
     },
     "/api/encounters": {
       "post": {
-        "description": "Record a new clinical encounter note for a patient (CLN-01).",
+        "description": "Record a new clinical encounter note or return existing for appointment (CLN-01, DWS-01).",
         "operationId": "create_encounter_api_encounters_post",
         "requestBody": {
           "content": {
@@ -7040,7 +10858,7 @@
           "required": true
         },
         "responses": {
-          "201": {
+          "200": {
             "content": {
               "application/json": {
                 "schema": {
@@ -7067,9 +10885,129 @@
         ]
       }
     },
+    "/api/encounters/unfinished": {
+      "get": {
+        "description": "Retrieve unfinished consultation drafts for authenticated doctor (D-19-24, DWS-02).",
+        "operationId": "list_unfinished_encounters_api_encounters_unfinished_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/UnfinishedEncounterItem"
+                  },
+                  "title": "Response List Unfinished Encounters Api Encounters Unfinished Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "List Unfinished Encounters",
+        "tags": [
+          "encounters"
+        ]
+      }
+    },
+    "/api/encounters/{encounter_id}/vitals": {
+      "get": {
+        "description": "Retrieve recorded vitals and biometrics for encounter.",
+        "operationId": "get_encounter_vitals_api_encounters__encounter_id__vitals_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "encounter_id",
+            "required": true,
+            "schema": {
+              "title": "Encounter Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VitalObservationResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Encounter Vitals",
+        "tags": [
+          "vitals"
+        ]
+      },
+      "put": {
+        "description": "Upsert vitals observations and automatically calculate authoritative BMI (DWS-06).",
+        "operationId": "upsert_encounter_vitals_api_encounters__encounter_id__vitals_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "encounter_id",
+            "required": true,
+            "schema": {
+              "title": "Encounter Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VitalObservationInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VitalObservationResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Upsert Encounter Vitals",
+        "tags": [
+          "vitals"
+        ]
+      }
+    },
     "/api/encounters/{id}": {
       "get": {
-        "description": "Retrieve encounter details including addenda (CLN-01). Scoped to doctor silo (D-03).",
+        "description": "Retrieve encounter details including addenda (CLN-01, DWS-04).",
         "operationId": "get_encounter_api_encounters__id__get",
         "parameters": [
           {
@@ -7216,7 +11154,7 @@
     },
     "/api/encounters/{id}/finalise": {
       "post": {
-        "description": "Finalise encounter notes, locking them against future updates (CLN-02).",
+        "description": "Finalise encounter notes, locking them against future updates (CLN-02, D-19-09).",
         "operationId": "finalise_encounter_api_encounters__id__finalise_post",
         "parameters": [
           {
@@ -7229,6 +11167,23 @@
             }
           }
         ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/EncounterFinaliseRequest"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Payload"
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
             "content": {
@@ -7252,6 +11207,194 @@
           }
         },
         "summary": "Finalise Encounter",
+        "tags": [
+          "encounters"
+        ]
+      }
+    },
+    "/api/encounters/{id}/follow-up": {
+      "get": {
+        "description": "Retrieve full clinical follow-up recommendation with clinical reason for doctor.",
+        "operationId": "get_encounter_follow_up_api_encounters__id__follow_up_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "title": "Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DoctorFollowUpResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Encounter Follow Up",
+        "tags": [
+          "follow-ups"
+        ]
+      },
+      "post": {
+        "description": "Record a clinical follow-up recommendation for an encounter (D-19-18, D-19-20).",
+        "operationId": "create_encounter_follow_up_api_encounters__id__follow_up_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "title": "Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FollowUpRecommendationCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DoctorFollowUpResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Encounter Follow Up",
+        "tags": [
+          "follow-ups"
+        ]
+      }
+    },
+    "/api/encounters/{id}/template-response": {
+      "get": {
+        "description": "Retrieve saved specialty template responses for encounter.",
+        "operationId": "get_encounter_template_response_api_encounters__id__template_response_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "title": "Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TemplateResponseRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Encounter Template Response",
+        "tags": [
+          "encounters"
+        ]
+      },
+      "put": {
+        "description": "Save or update specialty template response for a draft encounter (D-19-09, DWS-05).",
+        "operationId": "save_encounter_template_response_api_encounters__id__template_response_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "title": "Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TemplateResponseInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TemplateResponseRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Save Encounter Template Response",
         "tags": [
           "encounters"
         ]
@@ -7398,6 +11541,112 @@
         "tags": [
           "doctors",
           "fees"
+        ]
+      }
+    },
+    "/api/follow-ups/{id}/book": {
+      "post": {
+        "description": "Convert recommendation to a scheduled appointment (D-19-18). Accessible by Doctor or Reception.",
+        "operationId": "book_follow_up_api_follow_ups__id__book_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "title": "Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FollowUpBookRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReceptionFollowUpResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Book Follow Up",
+        "tags": [
+          "follow-ups"
+        ]
+      }
+    },
+    "/api/follow-ups/{id}/close": {
+      "post": {
+        "description": "Close an unbooked recommendation with recorded reason (D-19-21).",
+        "operationId": "close_follow_up_api_follow_ups__id__close_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "title": "Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FollowUpCloseRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReceptionFollowUpResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Close Follow Up",
+        "tags": [
+          "follow-ups"
         ]
       }
     },
@@ -7644,10 +11893,85 @@
     },
     "/api/operations/integrity": {
       "get": {
-        "description": "Run full diagnostic audit on database constraints, ledger balances, and files.",
-        "operationId": "get_integrity_report_api_operations_integrity_get",
+        "description": "Read the latest stored run. Reading does not run the checks or write an audit entry.",
+        "operationId": "get_latest_integrity_report_api_operations_integrity_get",
         "responses": {
           "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/IntegrityReportOut"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "title": "Response Get Latest Integrity Report Api Operations Integrity Get"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Latest stored integrity check result, or null if none has run (BAK-03)",
+        "tags": [
+          "operations"
+        ]
+      }
+    },
+    "/api/operations/integrity/history": {
+      "get": {
+        "operationId": "get_integrity_history_api_operations_integrity_history_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 20,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IntegrityHistoryOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Recent integrity check runs, newest first (BAK-03)",
+        "tags": [
+          "operations"
+        ]
+      }
+    },
+    "/api/operations/integrity/run": {
+      "post": {
+        "description": "Run the read-only checks, store the run and record one audit entry.",
+        "operationId": "run_integrity_report_api_operations_integrity_run_post",
+        "responses": {
+          "201": {
             "content": {
               "application/json": {
                 "schema": {
@@ -7658,7 +11982,7 @@
             "description": "Successful Response"
           }
         },
-        "summary": "Run live clinical and financial integrity inspection (BAK-03)",
+        "summary": "Run every clinical, financial and file integrity check and store the result (BAK-03)",
         "tags": [
           "operations"
         ]
@@ -7879,6 +12203,58 @@
         ]
       }
     },
+    "/api/patients/count": {
+      "get": {
+        "description": "Total patients matching the same search the directory list endpoint uses.",
+        "operationId": "count_patients_api_patients_count_get",
+        "parameters": [
+          {
+            "description": "Search query matching URN, mobile, or name.",
+            "in": "query",
+            "name": "q",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Search query matching URN, mobile, or name.",
+              "title": "Q"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PatientCountResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Count Patients",
+        "tags": [
+          "patients"
+        ]
+      }
+    },
     "/api/patients/{id}": {
       "get": {
         "description": "Retrieve full patient demographic record by identifier.",
@@ -8057,7 +12433,7 @@
     },
     "/api/patients/{patient_id}/encounters": {
       "get": {
-        "description": "List historical encounters for a patient scoped to the authenticated doctor (D-03).",
+        "description": "List historical encounters for a patient scoped via CLINICAL_READ (DWS-04).",
         "operationId": "list_patient_encounters_api_patients__patient_id__encounters_get",
         "parameters": [
           {
@@ -8151,7 +12527,7 @@
     },
     "/api/patients/{patient_id}/prescriptions": {
       "get": {
-        "description": "List historical prescriptions for a given patient.",
+        "description": "List historical prescriptions for a given patient scoped via CLINICAL_READ (DWS-04).",
         "operationId": "list_patient_prescriptions_api_patients__patient_id__prescriptions_get",
         "parameters": [
           {
@@ -8473,7 +12849,7 @@
     },
     "/api/prescriptions": {
       "post": {
-        "description": "Issue a new structured prescription with medication lines (RX-01).",
+        "description": "Issue a new structured prescription with medication lines (RX-01, DWS-07).",
         "operationId": "create_prescription_api_prescriptions_post",
         "requestBody": {
           "content": {
@@ -8591,7 +12967,7 @@
     },
     "/api/prescriptions/{id}": {
       "get": {
-        "description": "Retrieve full prescription details including all medication lines (RX-01).",
+        "description": "Retrieve full prescription details including all medication lines (RX-01, DWS-04).",
         "operationId": "get_prescription_api_prescriptions__id__get",
         "parameters": [
           {
@@ -8630,11 +13006,270 @@
         "tags": [
           "prescriptions"
         ]
+      },
+      "put": {
+        "description": "Modify an in-progress prescription draft. Authorised prescriptions return HTTP 409 (DWS-07).",
+        "operationId": "update_prescription_draft_api_prescriptions__id__put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "title": "Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PrescriptionUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PrescriptionOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Prescription Draft",
+        "tags": [
+          "prescriptions"
+        ]
+      }
+    },
+    "/api/prescriptions/{id}/authorise": {
+      "post": {
+        "description": "Transition a DRAFT prescription to AUTHORISED (DWS-07).",
+        "operationId": "authorise_prescription_api_prescriptions__id__authorise_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "title": "Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PrescriptionOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Authorise Prescription",
+        "tags": [
+          "prescriptions"
+        ]
+      }
+    },
+    "/api/prescriptions/{id}/cancel": {
+      "post": {
+        "description": "Cancel an active prescription with recorded reason and attribution (D-19-15).",
+        "operationId": "cancel_prescription_api_prescriptions__id__cancel_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "title": "Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PrescriptionCancelRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PrescriptionOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Cancel Prescription",
+        "tags": [
+          "prescriptions"
+        ]
+      }
+    },
+    "/api/reception/follow-ups": {
+      "get": {
+        "description": "Query follow-up recommendations for administrative booking (D-19-19, DWS-08).\n\nCRITICAL PRIVACY INVARIANT:\nclinical_reason is STRICTLY omitted from both query and response.",
+        "operationId": "list_reception_follow_ups_api_reception_follow_ups_get",
+        "parameters": [
+          {
+            "description": "Filter by status (PENDING, BOOKED, CLOSED)",
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by status (PENDING, BOOKED, CLOSED)",
+              "title": "Status"
+            }
+          },
+          {
+            "description": "Recommended date on or after",
+            "in": "query",
+            "name": "date_from",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Recommended date on or after",
+              "title": "Date From"
+            }
+          },
+          {
+            "description": "Recommended date on or before",
+            "in": "query",
+            "name": "date_to",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Recommended date on or before",
+              "title": "Date To"
+            }
+          },
+          {
+            "description": "Filter for overdue pending recommendations",
+            "in": "query",
+            "name": "overdue",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter for overdue pending recommendations",
+              "title": "Overdue"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ReceptionFollowUpResponse"
+                  },
+                  "title": "Response List Reception Follow Ups Api Reception Follow Ups Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Reception Follow Ups",
+        "tags": [
+          "follow-ups"
+        ]
       }
     },
     "/api/reception/overview": {
       "get": {
-        "description": "Return reception overview profile.",
+        "description": "Return reception overview operational metrics, queue counters, and alerts.",
         "operationId": "get_reception_overview_api_reception_overview_get",
         "responses": {
           "200": {
@@ -9011,6 +13646,118 @@
         "summary": "Get System Status",
         "tags": [
           "system"
+        ]
+      }
+    },
+    "/api/templates/active": {
+      "get": {
+        "description": "List active specialty clinical templates with active schemas.",
+        "operationId": "list_active_templates_api_templates_active_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ClinicalTemplateRead"
+                  },
+                  "title": "Response List Active Templates Api Templates Active Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "List Active Templates",
+        "tags": [
+          "templates"
+        ]
+      }
+    },
+    "/api/templates/by-department/{department_id}": {
+      "get": {
+        "description": "Retrieve active specialty clinical template and schema for department.",
+        "operationId": "get_template_by_department_api_templates_by_department__department_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "department_id",
+            "required": true,
+            "schema": {
+              "title": "Department Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClinicalTemplateRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Template By Department",
+        "tags": [
+          "templates"
+        ]
+      }
+    },
+    "/api/templates/versions/{version_id}": {
+      "get": {
+        "description": "Retrieve specific clinical template version schema.",
+        "operationId": "get_template_version_api_templates_versions__version_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "version_id",
+            "required": true,
+            "schema": {
+              "title": "Version Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClinicalTemplateVersionRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Template Version",
+        "tags": [
+          "templates"
         ]
       }
     },
@@ -9475,6 +14222,48 @@
         ]
       }
     },
+    "/api/users/bulk-delete": {
+      "post": {
+        "description": "Delete several deactivated, never-used accounts under one super admin password.",
+        "operationId": "bulk_delete_existing_users_api_users_bulk_delete_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BulkDeleteUsersRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BulkDeleteUsersOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Bulk Delete Existing Users",
+        "tags": [
+          "users"
+        ]
+      }
+    },
     "/api/users/{id}": {
       "get": {
         "description": "Retrieve details for a single user record.",
@@ -9617,6 +14406,59 @@
           }
         },
         "summary": "Deactivate Existing User",
+        "tags": [
+          "users"
+        ]
+      }
+    },
+    "/api/users/{id}/delete": {
+      "post": {
+        "description": "Permanently delete a deactivated, never-used account; needs the super admin password.",
+        "operationId": "delete_existing_user_api_users__id__delete_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "title": "Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeleteUserRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeleteUserOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Existing User",
         "tags": [
           "users"
         ]

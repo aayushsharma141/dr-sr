@@ -68,7 +68,7 @@ Defined in `.planning/REQUIREMENTS.md` for v3.0.
   - Clinic 1: नवादा थाना के सामने वाली गली, आरा, भोजपुर (802301)
   - Clinic 2: श्रीरामपुर रोड, गड़हनी, उदवन्तनगर, भोजपुर (802206)
 - **Consultants:** Dr. Madan Mohan Dwivedi & Dr. Chandan Kr. Dwivedi.
-- **Reference implementation:** `app/` (PySide6 + SQLite, v2.0, phases 1–10 archived under `.planning/milestones/v2.0-restart-phases/`).
+- **Reference implementation:** `legacy/app/` (PySide6 + SQLite, v2.0, phases 1–10 archived under `.planning/milestones/v2.0-restart-phases/`).
 - **Open-source references to study (not audited, verify licence and offline behaviour before reuse):** Open Hospital, ICTHospital, OpenEMR, GNU Health, VITALIt OS.
 - **Data Policy:** 100% synthetic fictional patient records during development and demos.
 
@@ -96,12 +96,12 @@ Defined in `.planning/REQUIREMENTS.md` for v3.0.
 | Plain HTTP transport on isolated LAN (D-01) | Eliminates root CA install on staff PCs; zero cert warnings on offline LAN | ✓ Approved by user 2026-10-30 (see 11-ENTRY-GATE.md EG-4) |
 | Dedicated 600VA+ UPS with synchronous_commit = on (D-02) | Guarantees database durability against sudden Bhojpur grid cuts | ✓ Approved by user 2026-10-30 (see 11-ENTRY-GATE.md EG-2) |
 | Strict doctor silo partitioning by doctor_id (D-03) | Doctors only view and manage patients and encounters assigned to them | ✓ Approved by user 2026-10-30 (see 11-ENTRY-GATE.md EG-6) |
-| Strict default-deny for reception on clinical records (D-04) | Reception accesses demographics/billing; backend blocks SOAP notes/prescriptions | ✓ Approved by user 2026-10-30 (see 11-ENTRY-GATE.md EG-7) |
+| Strict default-deny for reception on clinical records (D-04) | Doctors read all, edit own. Reception and Admin denied clinical views. Phase 20 exception (D-20-15): Admin permitted field-selective clinical data export with mandatory justification and permanent audit event. | ✓ Approved by user 2026-10-30; updated 2026-11-07 (see 11-ENTRY-GATE.md EG-7, D-20-15) |
 | Configurable receipt numbering cycle (D-05) | Indian FY (1 Apr – 31 Mar) default aligns with trust accounting compliance | ✓ Approved by user 2026-10-30 (see 11-ENTRY-GATE.md EG-8) |
 | Payment reversals restricted to Admin role (D-06) | Requires mandatory reason; writes contra-record and immutable audit row | ✓ Approved by user 2026-10-30 (see 11-ENTRY-GATE.md EG-9) |
 | 30-min idle timeout and 5-failure lockout (D-07) | 15-min lockout cooldown or Admin unlock balances workflow with security | ✓ Approved by user 2026-10-30 (see 11-ENTRY-GATE.md EG-10) |
 | Optimistic concurrency via version_id with 409 and 1-click reload (D-08) | Prevents silent record overwrites during simultaneous edits | ✓ Approved by user 2026-10-30 (see 11-ENTRY-GATE.md EG-11) |
-| Backend package layout and sync ORM (EG-14, EG-20) | `backend/src/kalyan_api` avoids legacy `app/` collision; sync ORM guarantees atomic audit commits | ✓ Approved by user 2026-10-30 (see 11-ENTRY-GATE.md EG-14, EG-20) |
+| Backend package layout and sync ORM (EG-14, EG-20) | `backend/src/kalyan_api` avoids legacy `legacy/app/` (formerly root `app/`) collision; sync ORM guarantees atomic audit commits | ✓ Approved by user 2026-10-30 (see 11-ENTRY-GATE.md EG-14, EG-20) |
 
 ## Evolution
 

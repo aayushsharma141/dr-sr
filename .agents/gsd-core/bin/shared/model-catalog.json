@@ -1,4 +1,4 @@
-﻿{
+{
   "profiles": ["quality", "balanced", "budget", "adaptive", "inherit"],
   "phaseTypes": ["planning", "discuss", "research", "execution", "verification", "completion"],
   "adaptiveTierMap": {

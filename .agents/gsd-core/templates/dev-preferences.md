@@ -1,4 +1,4 @@
-﻿---
+---
 description: Load developer preferences into this session
 ---
 

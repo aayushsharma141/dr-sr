@@ -1,4 +1,4 @@
-﻿# Thinking Models: Verification Cluster
+# Thinking Models: Verification Cluster
 
 Structured reasoning models for the **verifier** and **plan-checker** agents. Apply these during verification passes, not continuously. Each model counters a specific documented failure mode.
 

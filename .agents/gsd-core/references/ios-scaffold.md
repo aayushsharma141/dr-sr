@@ -1,4 +1,4 @@
-﻿# iOS App Scaffold Reference
+# iOS App Scaffold Reference
 
 Rules and patterns for scaffolding iOS applications. Apply when any plan involves creating a new iOS app target.
 

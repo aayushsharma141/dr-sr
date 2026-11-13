@@ -1,6 +1,8 @@
 import { Fragment, useMemo } from 'react'
 import { useMe, useRolePermissions } from '../../api/queries'
 import { AppShell } from '../../components/AppShell'
+import { AdminPageHeader } from '../../components/admin/AdminPageHeader'
+import { TableSkeleton } from '../../components/AdminSkeleton'
 import { InlineAlert } from '../../components/InlineAlert'
 import type { PermissionInfo, RolePermissionsOut } from '../../api/types'
 
@@ -39,19 +41,12 @@ export function RolesMatrixPage() {
   return (
     <AppShell name={me?.full_name ?? 'Admin'} role={me?.role ?? 'ADMIN'}>
       <div className="flex min-h-0 flex-col gap-6">
-        <div>
-          <h1 className="text-2xl font-bold text-neutral-900">Role permissions (fixed catalogue)</h1>
-          <p className="mt-1 max-w-3xl text-sm text-neutral-700">
-            The three roles and what each one may do are fixed by the approved scope. Per-user permissions are not
-            available, and this page cannot change anything. The server checks these permissions on every request.
-          </p>
-        </div>
+        <AdminPageHeader
+          title="Roles & Permissions"
+          description="The three roles and what each one may do are fixed by the approved scope. Per-user permissions are not available, and this page cannot change anything. The server checks these permissions on every request."
+        />
 
-        {isPending && (
-          <p role="status" className="rounded-lg border border-neutral-200 bg-white p-6 text-sm text-neutral-700">
-            Loading the role permission catalogue...
-          </p>
-        )}
+        {isPending && <TableSkeleton label="Loading the role permission catalogue..." rows={6} columns={4} />}
 
         {isError && (
           <InlineAlert tone="error">
@@ -62,7 +57,13 @@ export function RolesMatrixPage() {
           </InlineAlert>
         )}
 
-        {data && (
+        {data && data.permissions.length === 0 && (
+          <div className="rounded-lg border border-dashed border-neutral-300 bg-white p-6 text-center text-sm text-neutral-700">
+            No permissions are configured on this server yet.
+          </div>
+        )}
+
+        {data && data.permissions.length > 0 && (
           <>
             <dl className="grid grid-cols-1 gap-3 sm:grid-cols-3">
               {data.roles.map((r) => (
@@ -76,12 +77,13 @@ export function RolesMatrixPage() {
               ))}
             </dl>
 
-            <div className="max-h-[70vh] overflow-auto rounded-lg border border-neutral-200 bg-white shadow-xs">
+            {/* No inner scroll box: the page content area is the only scroller, and the header row sticks to its top. */}
+            <div className="overflow-clip rounded-lg border border-neutral-200 bg-white shadow-xs">
               <table className="w-full border-collapse text-left text-sm text-neutral-800">
                 <caption className="sr-only">
                   Permission matrix: rows are permissions, columns are roles. Read only.
                 </caption>
-                <thead className="sticky top-0 z-10 bg-neutral-50 text-neutral-800">
+                <thead className="sticky -top-4 z-10 bg-neutral-50 text-neutral-800">
                   <tr className="border-b border-neutral-200">
                     <th scope="col" className="px-4 py-3 font-semibold">Permission</th>
                     {data.roles.map((r) => (
@@ -103,8 +105,8 @@ export function RolesMatrixPage() {
                           {g.name}
                         </th>
                       </tr>
-                      {g.permissions.map((p) => (
-                        <tr key={p.key} className="border-b border-neutral-100 hover:bg-neutral-50">
+                      {g.permissions.map((p, index) => (
+                        <tr key={p.key} className="border-b border-neutral-100 hover:bg-neutral-50 transition-colors" style={{ transitionDelay: `${index * 50}ms` }}>
                           <th scope="row" className="px-4 py-2 font-normal">
                             <div className="text-neutral-900">{p.label}</div>
                             <div className="font-mono text-sm text-neutral-600">{p.key}</div>

@@ -33,7 +33,7 @@ No default production credentials. On a fresh server with no administrator, a on
 
 ## Legacy desktop application
 
-The existing app/ source is a Python/PySide6 desktop app backed by local SQLite. It contains patient, treatment, billing, print and local backup functionality. It remains a reference/migration source, not a centralized LAN server. Never share its SQLite database over a network drive.
+The existing `legacy/` folder (`legacy/app`, `legacy/main.py`) is a Python/PySide6 desktop app backed by local SQLite. It contains patient, treatment, billing, print and local backup functionality. It remains a reference/migration source, not a centralized LAN server. Never share its SQLite database over a network drive.
 
 ## Development status
 

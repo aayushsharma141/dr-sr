@@ -1,4 +1,4 @@
-﻿# Dev Context Profile
+# Dev Context Profile
 
 Agent output guidance for dev mode. Loaded when `context: dev` is set in config.json.
 

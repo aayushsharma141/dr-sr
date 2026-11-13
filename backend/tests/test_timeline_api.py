@@ -165,7 +165,7 @@ def test_timeline_chronological_ordering_admin(
     db_session: Session,
     login_client: type[TestClient],
 ) -> None:
-    """Admin views complete unified chronological timeline with all 6 event types (CLN-03)."""
+    """Admin sees the administrative timeline but no clinical events (CLN-03, D-04, BR-002)."""
     pat = _seed_patient_activity(
         db_session, doctor_a_user.doctor_id, doctor_b_user.doctor_id, admin_user
     )
@@ -179,23 +179,24 @@ def test_timeline_chronological_ordering_admin(
     assert "PAYMENT" in event_types
     assert "TREATMENT_SESSION" in event_types
     assert "TREATMENT_PLAN" in event_types
-    assert "PRESCRIPTION" in event_types
-    assert "ENCOUNTER" in event_types
     assert "APPOINTMENT" in event_types
+    # Clinical events are doctor-only: admin must not receive them.
+    assert "PRESCRIPTION" not in event_types
+    assert "ENCOUNTER" not in event_types
 
     # Ensure items are strictly sorted descending by event_date
     dates = [item["event_date"] for item in timeline]
     assert dates == sorted(dates, reverse=True)
 
 
-def test_timeline_doctor_silo_filtering(
+def test_timeline_cross_doctor_access(
     doctor_a_user: User,
     doctor_b_user: User,
     admin_user: User,
     db_session: Session,
     login_client: type[TestClient],
 ) -> None:
-    """Doctor views timeline but cannot see encounters/prescriptions from other doctors (D-03)."""
+    """Doctor views timeline and sees encounters/prescriptions across all doctors (DWS-04)."""
     pat = _seed_patient_activity(
         db_session, doctor_a_user.doctor_id, doctor_b_user.doctor_id, admin_user
     )
@@ -205,12 +206,12 @@ def test_timeline_doctor_silo_filtering(
     assert resp.status_code == 200
     timeline = resp.json()
 
-    # Doctor A's encounter should be present
+    # Both Doctor A's and Doctor B's encounters should be present under DWS-04
     enc_items = [it for it in timeline if it["event_type"] == "ENCOUNTER"]
-    assert len(enc_items) == 1
-    assert "Lumbar radiculopathy" in enc_items[0]["summary"]
-    # Doctor B's encounter ("Early osteo-arthritis") must NOT be leaked
-    assert not any("osteo-arthritis" in (it.get("summary") or "") for it in timeline)
+    assert len(enc_items) == 2
+    summaries = [it.get("summary") or "" for it in enc_items]
+    assert any("Lumbar radiculopathy" in s for s in summaries)
+    assert any("osteo-arthritis" in s for s in summaries)
 
 
 def test_timeline_reception_access(
@@ -239,3 +240,32 @@ def test_timeline_reception_access(
     # Encounters and prescriptions are hidden from Reception
     assert "ENCOUNTER" not in event_types
     assert "PRESCRIPTION" not in event_types
+
+
+def test_timeline_doctor_cannot_see_payments_or_prices(
+    doctor_a_user: User,
+    doctor_b_user: User,
+    admin_user: User,
+    db_session: Session,
+    login_client: type[TestClient],
+) -> None:
+    """Doctor timeline omits financial rows (payments) and prices (RB-2, SEC-04)."""
+    pat = _seed_patient_activity(
+        db_session, doctor_a_user.doctor_id, doctor_b_user.doctor_id, admin_user
+    )
+
+    doc_c = login_client(doctor_a_user)
+    resp = doc_c.get(f"/api/patients/{pat.id}/timeline")
+    assert resp.status_code == 200
+    timeline = resp.json()
+
+    event_types = set(it["event_type"] for it in timeline)
+    # Doctors lack PAYMENT_READ permission; no PAYMENT items may appear in timeline
+    assert "PAYMENT" not in event_types
+
+    # Treatment plans must not leak agreed price to doctors
+    plan_items = [it for it in timeline if it["event_type"] == "TREATMENT_PLAN"]
+    assert len(plan_items) > 0
+    for plan in plan_items:
+        assert "₹" not in plan["subtitle"]
+        assert "agreed_price_paise" not in plan["metadata"]

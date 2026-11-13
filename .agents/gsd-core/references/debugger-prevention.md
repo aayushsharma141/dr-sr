@@ -1,4 +1,4 @@
-﻿# Prevention / Blameless-Postmortem Output
+# Prevention / Blameless-Postmortem Output
 
 Loaded by `gsd-debugger` via `@-include` from `archive_session`. Emits the
 forward-looking half of a resolved debug session — not just *what* was wrong and

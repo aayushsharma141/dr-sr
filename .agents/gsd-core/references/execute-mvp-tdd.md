@@ -1,4 +1,4 @@
-﻿# Execute-Phase — TDD Gate (Runtime Enforcement)
+# Execute-Phase — TDD Gate (Runtime Enforcement)
 
 > Loaded by `execute-phase` workflow and `gsd-executor` agent when `TDD_MODE=true` for the phase (#4011 — the gate no longer requires MVP mode; MVP may imply TDD, but TDD never requires MVP). Defines the runtime gate that blocks behavior-adding tasks until a failing-test commit exists.
 

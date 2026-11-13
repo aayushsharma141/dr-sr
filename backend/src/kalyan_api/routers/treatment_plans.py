@@ -8,7 +8,7 @@ Guarantees:
 """
 
 from fastapi import APIRouter, Depends, Request
-from sqlalchemy import select
+from sqlalchemy import select, true
 
 from kalyan_api import clock
 from kalyan_api.core.errors import ApiError, require_version
@@ -19,6 +19,7 @@ from kalyan_api.core.principal import (
     build_audit_context,
     current_principal,
 )
+from kalyan_api.core.scope import ScopeFamily, get_scoped_or_404, row_scope
 from kalyan_api.db.session import SessionDep
 from kalyan_api.models import (
     ClinicalEncounter,
@@ -86,12 +87,20 @@ def create_treatment_plan(
         raise ApiError(status_code=404, code="patient_not_found", message="Patient not found.")
 
     if payload.encounter_id is not None:
-        encounter = session.get(ClinicalEncounter, payload.encounter_id)
-        if not encounter or encounter.doctor_id != principal.doctor_id:
+        encounter = get_scoped_or_404(
+            session,
+            ClinicalEncounter,
+            payload.encounter_id,
+            principal,
+            family=ScopeFamily.CLINICAL_WRITE,
+            doctor_id_col=ClinicalEncounter.doctor_id,
+        )
+        # BR-001: the encounter must belong to the same patient as the plan.
+        if encounter.patient_id != payload.patient_id:
             raise ApiError(
                 status_code=404,
                 code="encounter_not_found",
-                message="Clinical encounter not found or not assigned to this doctor.",
+                message="Encounter not found for this patient.",
             )
 
     plan = TreatmentPlan(
@@ -140,19 +149,22 @@ def get_treatment_plan(
     principal: Principal = Depends(current_principal),
 ) -> TreatmentPlanOut:
     """Retrieve details and progress of a treatment plan."""
-    plan = session.get(TreatmentPlan, id)
-    if not plan:
-        raise ApiError(
-            status_code=404,
-            code="plan_not_found",
-            message="Treatment plan not found.",
-        )
-
-    if principal.role == Role.DOCTOR and plan.doctor_id != principal.doctor_id:
-        raise ApiError(
-            status_code=404,
-            code="plan_not_found",
-            message="Treatment plan not found.",
+    if principal.role in (Role.ADMIN, Role.RECEPTION):
+        plan = session.get(TreatmentPlan, id)
+        if not plan:
+            raise ApiError(
+                status_code=404,
+                code="plan_not_found",
+                message="Treatment plan not found.",
+            )
+    else:
+        plan = get_scoped_or_404(
+            session,
+            TreatmentPlan,
+            id,
+            principal,
+            family=ScopeFamily.CLINICAL_READ,
+            doctor_id_col=TreatmentPlan.doctor_id,
         )
 
     return _to_plan_out(plan)
@@ -169,14 +181,16 @@ def list_patient_treatment_plans(
     principal: Principal = Depends(current_principal),
 ) -> list[TreatmentPlanOut]:
     """List historical and active treatment plans for a patient."""
+    scope_expr = (
+        true()
+        if principal.role in (Role.ADMIN, Role.RECEPTION)
+        else row_scope(principal, ScopeFamily.CLINICAL_READ, TreatmentPlan.doctor_id)
+    )
     stmt = (
         select(TreatmentPlan)
-        .where(TreatmentPlan.patient_id == patient_id)
+        .where(TreatmentPlan.patient_id == patient_id, scope_expr)
         .order_by(TreatmentPlan.created_at.desc())
     )
-
-    if principal.role == Role.DOCTOR:
-        stmt = stmt.where(TreatmentPlan.doctor_id == principal.doctor_id)
 
     plans = session.execute(stmt).scalars().all()
     return [_to_plan_out(p) for p in plans]
@@ -202,13 +216,14 @@ def update_treatment_plan(
             message="Only authenticated doctors can update treatment plans.",
         )
 
-    plan = session.get(TreatmentPlan, id)
-    if not plan or plan.doctor_id != principal.doctor_id:
-        raise ApiError(
-            status_code=404,
-            code="plan_not_found",
-            message="Treatment plan not found.",
-        )
+    plan = get_scoped_or_404(
+        session,
+        TreatmentPlan,
+        id,
+        principal,
+        family=ScopeFamily.CLINICAL_WRITE,
+        doctor_id_col=TreatmentPlan.doctor_id,
+    )
 
     # Enforce optimistic locking
     require_version(plan, payload.version_id, label="treatment_plan")

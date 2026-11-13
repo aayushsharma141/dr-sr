@@ -1,4 +1,4 @@
-﻿# Runtime-Aware Subagent Dispatch (epic #2505 Phase 4 / #2508)
+# Runtime-Aware Subagent Dispatch (epic #2505 Phase 4 / #2508)
 
 GSD workflows dispatch specialized subagents by role (planner, executor,
 verifier, …). On **named-dispatch runtimes** (Claude Code, OpenCode, Cursor,

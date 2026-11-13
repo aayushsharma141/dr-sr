@@ -1,5 +1,7 @@
 """Admin department catalogue and doctor-specialty membership endpoints."""
 
+import re
+
 from fastapi import APIRouter, Depends, Request
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -21,6 +23,19 @@ from kalyan_api.services import audit_service
 from kalyan_api.services.audit_service import AuditAction
 
 router = APIRouter(tags=["departments"])
+
+
+def _unique_code(session: Session, name_en: str) -> str:
+    """Machine code for a new department, e.g. "General Medicine" -> "GENERAL_MEDICINE".
+
+    The code picks the specialty template, so it never changes after creation, even if the
+    display name is edited later.
+    """
+    base = re.sub(r"[^A-Z0-9]+", "_", name_en.strip().upper()).strip("_")[:56] or "DEPARTMENT"
+    code, n = base, 2
+    while session.scalar(select(Department.id).where(Department.code == code)) is not None:
+        code, n = f"{base}_{n}", n + 1
+    return code
 
 
 @router.get(
@@ -48,7 +63,10 @@ def create_department(
     principal: Principal = Depends(current_principal),
 ) -> DepartmentOut:
     row = Department(
-        name_en=payload.name_en.strip(), name_hi=payload.name_hi, description=payload.description
+        code=_unique_code(session, payload.name_en),
+        name_en=payload.name_en.strip(),
+        name_hi=payload.name_hi,
+        description=payload.description,
     )
     session.add(row)
     session.flush()

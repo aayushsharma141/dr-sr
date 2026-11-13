@@ -1,4 +1,4 @@
-﻿## 3.5. Handle PRD Express Path
+## 3.5. Handle PRD Express Path
 
 **Skip if:** No `--prd` flag in arguments.
 

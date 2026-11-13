@@ -1,4 +1,4 @@
-﻿# Gap Closure Mode — Planner Reference
+# Gap Closure Mode — Planner Reference
 
 Triggered by `--gaps` flag. Creates plans to address verification or UAT failures.
 

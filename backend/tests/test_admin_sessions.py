@@ -16,8 +16,28 @@ from sqlalchemy.orm import Session
 from kalyan_api.config import Settings
 from kalyan_api.models import AuditLog, AuthSession, User
 from kalyan_api.services.audit_service import AuditAction
+from kalyan_api.services.auth_service import create_session
 
 SECRET_KEYS = {"token", "token_hash", "csrf_token", "password", "password_hash"}
+
+
+def _add_direct_session(
+    app: Any,
+    db_session: Session,
+    user: User,
+    test_settings: Settings,
+    client_ip: str = "192.168.1.50",
+    user_agent: str = "pytest-direct-session",
+) -> TestClient:
+    """Helper to create an active AuthSession directly in DB and return authenticated TestClient
+    without login endpoint."""
+    auth_sess, raw_token = create_session(
+        db_session, user, client_ip=client_ip, user_agent=user_agent
+    )
+    c = TestClient(app, base_url="http://testserver", headers={"Origin": "http://testserver"})
+    c.cookies.set(test_settings.cookie_name, raw_token)
+    c.headers["X-CSRF-Token"] = auth_sess.csrf_token
+    return c
 
 
 def _assert_no_secret_keys(payload: Any) -> None:
@@ -96,16 +116,19 @@ def test_list_sessions_shows_active_sessions_without_secrets(
 
 
 def test_list_sessions_user_filter(
+    app: Any,
     login_client: Callable[..., TestClient],
     admin_user: User,
     reception_user: User,
     doctor_a_user: User,
+    db_session: Session,
+    test_settings: Settings,
 ) -> None:
     """?user_id narrows the list to one user's sessions."""
     admin_c = login_client(admin_user)
-    login_client(reception_user)
-    login_client(reception_user)
-    login_client(doctor_a_user)
+    _add_direct_session(app, db_session, reception_user, test_settings, client_ip="192.168.1.101")
+    _add_direct_session(app, db_session, reception_user, test_settings, client_ip="192.168.1.102")
+    _add_direct_session(app, db_session, doctor_a_user, test_settings, client_ip="192.168.1.103")
 
     res = admin_c.get("/api/sessions", params={"user_id": reception_user.id})
     assert res.status_code == 200
@@ -250,7 +273,14 @@ def test_cannot_revoke_own_current_session_but_can_revoke_own_other_session(
     ).all()
     assert refused_audits == []
 
-    other_c = login_client(admin_user)
+    other_c = _add_direct_session(
+        admin_c.app,
+        db_session,
+        admin_user,
+        admin_c.app.state.settings
+        if hasattr(admin_c.app.state, "settings")
+        else Settings(env="test"),
+    )
     other_id = next(i["id"] for i in other_c.get("/api/sessions").json() if i["is_current"])
     ok = admin_c.post(f"/api/sessions/{other_id}/revoke", json={})
     assert ok.status_code == 200
@@ -289,15 +319,21 @@ def test_session_endpoints_authorization(
 
 
 def test_revoke_all_user_sessions(
+    app: Any,
     login_client: Callable[..., TestClient],
     admin_user: User,
     reception_user: User,
     db_session: Session,
+    test_settings: Settings,
 ) -> None:
     """Every active session of the target is revoked and USER_SESSIONS_REVOKED audited."""
     admin_c = login_client(admin_user)
-    rec_a = login_client(reception_user)
-    rec_b = login_client(reception_user)
+    rec_a = _add_direct_session(
+        app, db_session, reception_user, test_settings, client_ip="192.168.1.101"
+    )
+    rec_b = _add_direct_session(
+        app, db_session, reception_user, test_settings, client_ip="192.168.1.102"
+    )
     before_ids = _session_ids_for(db_session, reception_user)
     assert len(before_ids) == 2
 
@@ -336,11 +372,17 @@ def test_revoke_all_user_sessions(
 
 
 def test_revoke_own_sessions_keeps_current(
-    login_client: Callable[..., TestClient], admin_user: User, db_session: Session
+    app: Any,
+    login_client: Callable[..., TestClient],
+    admin_user: User,
+    db_session: Session,
+    test_settings: Settings,
 ) -> None:
     """Targeting oneself revokes other sessions while keeping the caller's current one."""
     admin_a = login_client(admin_user)
-    admin_b = login_client(admin_user)
+    admin_b = _add_direct_session(
+        app, db_session, admin_user, test_settings, client_ip="192.168.1.104"
+    )
 
     res = admin_a.post(f"/api/users/{admin_user.id}/revoke-sessions", json={})
     assert res.status_code == 200

@@ -1,4 +1,4 @@
-﻿# Semantic Knowledge-Base Recall via MemPalace
+# Semantic Knowledge-Base Recall via MemPalace
 
 Loaded by `gsd-debugger` via `@-include` from the `knowledge_base_protocol`
 Matching Logic. Replaces keyword-overlap matching with **semantic recall** so a

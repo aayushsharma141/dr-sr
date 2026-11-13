@@ -1,4 +1,4 @@
-﻿## Converge Fail-Fast
+## Converge Fail-Fast
 
 #4600: an explicit `--converge` / `--cross-ai` on the command line OVERRIDES the `workflow.plan_review_convergence` config gate. `PLAN_STRATEGY` is `converge` only when the
 operator explicitly passed one of those flags, so this run performs plan-review convergence

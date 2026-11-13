@@ -2,6 +2,8 @@ import { useMemo, useState } from 'react'
 import { useActiveSessions, useAuditLogs, useMe, useRevokeSession, useSecurityPolicy } from '../../api/queries'
 import { ApiError } from '../../api/client'
 import { AppShell } from '../../components/AppShell'
+import { AdminPageHeader } from '../../components/admin/AdminPageHeader'
+import { TableSkeleton } from '../../components/AdminSkeleton'
 import { InlineAlert } from '../../components/InlineAlert'
 import { Modal } from '../../components/Modal'
 import { SecurityPolicyEditor } from './SecurityPolicyEditor'
@@ -143,11 +145,7 @@ function SecurityPolicySection() {
           : 'Set at server installation.'}{' '}
         Administrators can make these stricter. Relaxing them needs a server change and client approval.
       </p>
-      {isPending && (
-        <p role="status" className="mt-4 text-sm text-neutral-700">
-          Loading the security policy...
-        </p>
-      )}
+      {isPending && <TableSkeleton label="Loading the security policy..." rows={3} columns={2} className="mt-4" />}
       {isError && (
         <InlineAlert tone="error" className="mt-4">
           Could not load the security policy: {error.message}{' '}
@@ -244,11 +242,7 @@ function ActiveSessionsSection() {
           {notice}
         </InlineAlert>
       )}
-      {isPending && (
-        <p role="status" className="mt-4 text-sm text-neutral-700">
-          Loading active sessions...
-        </p>
-      )}
+      {isPending && <TableSkeleton label="Loading active sessions..." rows={4} columns={5} className="mt-4" />}
       {isError && (
         <InlineAlert tone="error" className="mt-4">
           Could not load active sessions: {error.message}
@@ -272,10 +266,11 @@ function ActiveSessionsSection() {
               </tr>
             </thead>
             <tbody className="divide-y divide-neutral-200">
-              {data.map((s) => {
+              {data.map((s, index) => {
                 const exp = sessionExpiry(s)
+                const rowDelay = index * 50
                 return (
-                  <tr key={s.id} className={`align-top ${s.is_current ? 'bg-[#FFF8E7]' : 'hover:bg-neutral-50'}`}>
+                  <tr key={s.id} className={`align-top transition-colors ${s.is_current ? 'bg-[#FFF8E7]' : 'hover:bg-neutral-50'}`} style={{ transitionDelay: `${rowDelay}ms` }}>
                     <td className="px-3 py-2">
                       <div className="font-medium text-neutral-900">{s.full_name}</div>
                       <div className="font-mono text-neutral-700">{s.username}</div>
@@ -425,11 +420,7 @@ function SecurityEventsSection() {
         </div>
       </div>
 
-      {isPending && (
-        <p role="status" className="mt-4 text-sm text-neutral-700">
-          Loading security events...
-        </p>
-      )}
+      {isPending && <TableSkeleton label="Loading security events..." rows={4} columns={5} className="mt-4" />}
       {isError && (
         <InlineAlert tone="error" className="mt-4">
           Could not load security events: {error.message}{' '}
@@ -462,8 +453,8 @@ function SecurityEventsSection() {
               </tr>
             </thead>
             <tbody className="divide-y divide-neutral-200">
-              {events.map((e) => (
-                <tr key={e.id} className="align-top">
+              {events.map((e, index) => (
+                <tr key={e.id} className="align-top transition-colors" style={{ transitionDelay: `${index * 50}ms` }}>
                   <td className="px-3 py-2 whitespace-nowrap">{formatDateTime(e.occurred_at)}</td>
                   <td className="px-3 py-2">{SECURITY_ACTION_LABEL.get(e.action) ?? e.action}</td>
                   <td className="px-3 py-2">
@@ -492,12 +483,10 @@ export function SecurityCenterPage() {
   return (
     <AppShell name={me?.full_name ?? 'Admin'} role={me?.role ?? 'ADMIN'}>
       <div className="flex min-h-0 flex-col gap-6">
-        <div>
-          <h1 className="text-2xl font-bold text-neutral-900">Security & Access</h1>
-          <p className="mt-1 text-sm text-neutral-700">
-            The effective sign-in policy, who is signed in right now, and recent security events.
-          </p>
-        </div>
+        <AdminPageHeader
+          title="Security & Sessions"
+          description="The effective sign-in policy, who is signed in right now, and recent security events."
+        />
         <SecurityPolicySection />
         <ActiveSessionsSection />
         <SecurityEventsSection />

@@ -1,4 +1,4 @@
-﻿{
+{
   "_comment": "Canonical CONFIG_DEFAULTS for the Configuration Module. Nested shape is canonical. CJS flat projection (branching_strategy, sub_repos, etc.) is handled by consumers at the boundary. Security keys (security_enforcement, security_asvs_level, security_block_on) and post_planning_gaps live in workflow.* as their canonical location. resolve_model_ids, context_window, phase_naming are CJS-originated top-level keys included here. brave_search, firecrawl, exa_search default to false in the manifest; at runtime buildNewProjectConfig detects API keys. The plan_checker (CJS flat) \u2192 workflow.plan_check (canonical nested) divergence is resolved: canonical name is workflow.plan_check. _auto_chain_active is a runtime-state field included for completeness.",
   "model_profile": "balanced",
   "commit_docs": true,
@@ -13,7 +13,7 @@
   "project_code": null,
   "phase_id_convention": null,
   "mode": "interactive",
-  "claude_md_path": "./.agents/GEMINI.md",
+  "claude_md_path": "./.claude/CLAUDE.md",
   "gates": {
     "execute_next_plan": true,
     "confirm_transition": true,

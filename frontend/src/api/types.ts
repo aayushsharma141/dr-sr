@@ -62,6 +62,15 @@ export interface DoctorTodayOut {
   waiting: number
   in_consultation: number
   done: number
+  arrived_waiting?: number
+  department?: string
+  next_token?: number | null
+}
+
+export interface HourlyCollectionPoint {
+  hour: string
+  amount_paise: number
+  count: number
 }
 
 /**
@@ -146,10 +155,57 @@ export interface AdminOverview {
   alerts: OverviewAlertOut[]
 }
 
+/** A monthly figure next to the previous month's; change_pct is null when last month was 0. */
+export interface MonthOverMonth {
+  current: number
+  previous: number
+  change_pct: number | null
+}
+
+export interface CollectionTrendMonth {
+  month: string
+  collected_paise: number
+}
+
+/** Collected this month against appointments in a department; null id = not linked to one. */
+export interface DepartmentCollection {
+  department_id: number | null
+  name: string
+  collected_paise: number
+  percentage: number
+}
+
+export interface PatientTrendMonth {
+  month: string
+  new_patients: number
+}
+
+/** Monthly figures, every one computed from records. The hospital records no expenses. */
+export interface ManagementOverview {
+  current_month_label: string
+  previous_month_label: string
+  collections_paise: MonthOverMonth
+  reversed_this_month: number
+  reversed_this_month_paise: number
+  collection_trend: CollectionTrendMonth[]
+  department_collections: DepartmentCollection[]
+  new_patients: MonthOverMonth
+  returning_patients_this_month: number
+  patient_trend: PatientTrendMonth[]
+}
+
 export interface ReceptionOverview {
   area: 'reception'
   name: string
   role: string
+  business_date?: string
+  registrations_today?: number
+  appointments_today?: Record<string, number>
+  doctors_today?: DoctorTodayOut[]
+  collections_today?: CollectionsTodayOut
+  outstanding_dues_paise?: number
+  hourly_collections?: HourlyCollectionPoint[]
+  alerts?: OverviewAlertOut[]
 }
 
 export interface DoctorOverview {
@@ -170,6 +226,8 @@ export interface UserOut {
   role: Role
   doctor_id: number | null
   is_active: boolean
+  /** The administrator whose password authorises deleting user accounts. */
+  is_super_admin: boolean
   must_change_password: boolean
   is_locked: boolean
   /** Non-null only while the lock is in effect. */
@@ -201,6 +259,39 @@ export interface ActionRequest {
   version_id: number
   /** Optional justification (max 500 chars; blank becomes null) stored on the audit row. */
   reason?: string | null
+}
+
+export interface DeleteUserRequest extends ActionRequest {
+  /** Password of the super admin account; never stored or logged. */
+  super_admin_password: string
+}
+
+export interface BulkDeleteUsersRequest {
+  items: { id: number; version_id: number }[]
+  reason?: string | null
+  /** Password of the super admin account; checked once for the whole batch, never stored. */
+  super_admin_password: string
+}
+
+export interface BulkDeleteEntry {
+  id: number
+  username: string | null
+  deleted: boolean
+  /** Why an account was skipped (null when deleted). */
+  code: string | null
+  message: string | null
+}
+
+export interface BulkDeleteUsersOut {
+  deleted_count: number
+  skipped_count: number
+  results: BulkDeleteEntry[]
+}
+
+export interface DeleteUserOut {
+  id: number
+  username: string
+  deleted: boolean
 }
 
 export const ADMIN_REASON_MAX_LENGTH = 500
@@ -460,6 +551,8 @@ export interface ReceiptCycleConfirmationExtra {
 
 export interface DepartmentOut {
   id: number
+  /** Stable machine code, e.g. PHYSIOTHERAPY; picks the consultation template. */
+  code: string
   name_en: string
   name_hi: string | null
   description: string | null
@@ -488,6 +581,7 @@ export interface DepartmentDoctorOut {
   name_en: string
   name_hi: string | null
   qualification: string | null
+  cabin_code?: string | null
   default_fee_paise: number
 }
 
@@ -497,6 +591,7 @@ export interface DoctorOut {
   name_hi: string | null
   qualification: string | null
   registration_number: string | null
+  cabin_code?: string | null
   default_fee_paise: number
   is_active: boolean
   version_id: number
@@ -509,6 +604,7 @@ export interface DoctorCreate {
   name_hi?: string | null
   qualification?: string | null
   registration_number?: string | null
+  cabin_code?: string | null
   default_fee_paise?: number
 }
 
@@ -517,8 +613,14 @@ export interface DoctorUpdate {
   name_hi?: string | null
   qualification?: string | null
   registration_number?: string | null
+  cabin_code?: string | null
   default_fee_paise: number
   is_active: boolean
+  version_id: number
+}
+
+export interface DoctorMeSettingsUpdate {
+  default_fee_paise: number
   version_id: number
 }
 
@@ -549,6 +651,7 @@ export interface FeeUpdate {
 export interface PatientOut {
   id: number
   urn: string
+  legacy_urn?: string | null
   full_name: string
   guardian_name: string
   gender: 'M' | 'F' | 'O'
@@ -605,6 +708,21 @@ export interface DuplicateCheckResponse {
   matching_patient: PatientOut | null
 }
 
+export interface AdminPatientDemographicCorrection {
+  reason: string
+  version_id: number
+  full_name: string
+  guardian_name: string
+  gender: 'M' | 'F' | 'O'
+  dob?: string | null
+  age_years: number
+  mobile: string
+  address: string
+  district: string
+  state: string
+  emergency_contact?: string | null
+}
+
 // ==============================================================================
 // Appointments & Encounters (Phase 13)
 // ==============================================================================
@@ -619,6 +737,8 @@ export type AppointmentStatus =
 
 export interface Appointment {
   id: number
+  /** Department (specialty) chosen at booking; null for appointments booked before it existed. */
+  department_id?: number | null
   patient_id: number
   patient_urn: string
   patient_name: string
@@ -630,6 +750,7 @@ export interface Appointment {
   token_number: number
   status: AppointmentStatus
   status_updated_at: string
+  check_in_at?: string | null
   cancellation_reason: string | null
   notes: string | null
   version_id: number
@@ -686,6 +807,8 @@ export interface DoctorQueueResponse {
 export interface EncounterCreate {
   patient_id: number
   appointment_id?: number | null
+  /** Omit to let the server take it from the appointment or the doctor's only department. */
+  department_id?: number | null
   symptoms: string
   clinical_notes: string
   diagnosis: string
@@ -716,9 +839,12 @@ export interface EncounterRead {
   patient_id: number
   patient_urn: string
   patient_name: string
+  patient_mobile?: string | null
+  patient_address?: string | null
   doctor_id: number
   doctor_name: string
   appointment_id: number | null
+  department_id?: number | null
   encounter_date: string
   symptoms: string
   clinical_notes: string
@@ -743,6 +869,17 @@ export interface EncounterSummary {
   addenda_count: number
 }
 
+export interface UnfinishedEncounter {
+  id: number
+  patient_id: number
+  patient_urn: string
+  patient_name: string
+  department_id?: number | null
+  department_name?: string
+  started_at: string
+  is_finalised: boolean
+}
+
 // ==========================================
 // Phase 14: Prescriptions & Treatment Types
 // ==========================================
@@ -754,6 +891,9 @@ export interface PrescriptionItemCreate {
   frequency: string
   duration_days: number
   instructions?: string | null
+  strength?: string | null
+  form?: string | null
+  route?: string | null
 }
 
 export interface PrescriptionItemOut {
@@ -765,16 +905,33 @@ export interface PrescriptionItemOut {
   frequency: string
   duration_days: number
   instructions: string | null
+  strength?: string | null
+  form?: string | null
+  route?: string | null
 }
 
 export interface PrescriptionCreate {
   patient_id: number
   encounter_id?: number | null
-  diagnosis: string
+  status?: string
+  diagnosis?: string | null
   dietary_advice?: string | null
   general_advice?: string | null
   follow_up_date?: string | null
   items: PrescriptionItemCreate[]
+}
+
+export interface PrescriptionUpdate {
+  diagnosis?: string | null
+  dietary_advice?: string | null
+  general_advice?: string | null
+  follow_up_date?: string | null
+  items?: PrescriptionItemCreate[]
+  version_id?: number | null
+}
+
+export interface PrescriptionCancelRequest {
+  reason: string
 }
 
 export interface PrescriptionOut {
@@ -782,9 +939,17 @@ export interface PrescriptionOut {
   patient_id: number
   patient_urn: string
   patient_name: string
+  patient_mobile?: string | null
+  patient_address?: string | null
   doctor_id: number
   doctor_name: string
   encounter_id: number | null
+  status: string
+  authorised_at?: string | null
+  cancelled_at?: string | null
+  cancellation_reason?: string | null
+  cancelled_by_user_id?: number | null
+  is_printable: boolean
   diagnosis: string
   dietary_advice: string | null
   general_advice: string | null
@@ -803,6 +968,7 @@ export interface PrescriptionSummary {
   doctor_id: number
   doctor_name: string
   encounter_id: number | null
+  status: string
   diagnosis: string
   items_count: number
   follow_up_date: string | null
@@ -915,6 +1081,8 @@ export interface PaymentOut {
   patient_id: number
   patient_urn: string
   patient_name: string
+  patient_mobile?: string | null
+  patient_address?: string | null
   treatment_plan_id: number | null
   treatment_plan_name: string | null
   appointment_id: number | null
@@ -1037,24 +1205,227 @@ export interface RestoreResultOut {
   manifest?: Record<string, unknown> | null
 }
 
-export type IntegritySeverity = 'ERROR' | 'WARNING'
+/** ERROR: a record is wrong or points at something missing. WARNING: review, may be expected.
+ * CLEANUP: harmless clutter, such as a stored file no record uses. */
+export type IntegritySeverity = 'ERROR' | 'WARNING' | 'CLEANUP'
 
 export interface IntegrityCheckItemOut {
+  /** Stable check identifier, e.g. 'asset_files'. */
+  code: string
   name: string
   passed: boolean
-  /** ERROR findings make the report unhealthy; WARNING findings are reported only. */
+  /** Worst severity among the findings. */
   severity: IntegritySeverity
   details: string
+  /** Each finding carries its own `issue` code and `severity`. */
   discrepancies: Record<string, unknown>[]
 }
 
+/** One stored run of the integrity check. */
 export interface IntegrityReportOut {
+  id: number | null
   generated_at: string
+  run_by_username: string | null
+  duration_ms: number
   is_healthy: boolean
   total_checks: number
   passed_checks: number
-  /** Counts ERROR-level failures only. */
+  /** Checks whose worst finding is an ERROR. */
   failed_checks: number
   warning_checks: number
+  cleanup_checks: number
   checks: IntegrityCheckItemOut[]
 }
+
+export interface IntegrityRunSummaryOut {
+  id: number
+  generated_at: string
+  run_by_username: string | null
+  is_healthy: boolean
+  total_checks: number
+  passed_checks: number
+  failed_checks: number
+  warning_checks: number
+  cleanup_checks: number
+}
+
+export interface IntegrityHistoryOut {
+  runs: IntegrityRunSummaryOut[]
+}
+
+// Phase 19: Universal Consultation Workspace Contracts
+export interface VitalObservationInput {
+  height_cm?: number | null
+  weight_kg?: number | null
+  systolic_bp?: number | null
+  diastolic_bp?: number | null
+  pulse_bpm?: number | null
+  temperature_f?: number | null
+  respiratory_rate?: number | null
+  spo2_percent?: number | null
+}
+
+export interface VitalObservationResponse {
+  id: number
+  encounter_id: number
+  patient_id: number
+  height_cm: number | null
+  weight_kg: number | null
+  bmi: number | null
+  systolic_bp: number | null
+  diastolic_bp: number | null
+  pulse_bpm: number | null
+  temperature_f: number | null
+  respiratory_rate: number | null
+  spo2_percent: number | null
+  created_at: string
+  updated_at: string
+}
+
+export interface ClinicalTemplateVersionRead {
+  id: number
+  template_id: number
+  version_number: number
+  schema_json: Record<string, any>
+  is_active: boolean
+  approved_by: string
+  approved_at: string
+  created_at: string
+}
+
+export interface ClinicalTemplateRead {
+  id: number
+  department_id: number
+  code: string
+  name_en: string
+  name_hi?: string | null
+  is_active: boolean
+  created_at: string
+  active_version?: ClinicalTemplateVersionRead | null
+}
+
+export interface TemplateResponseInput {
+  template_version_id: number
+  response_data: Record<string, any>
+}
+
+export interface TemplateResponseRead {
+  id: number
+  encounter_id: number
+  template_version_id: number
+  response_data: Record<string, any>
+  created_at: string
+  updated_at: string
+}
+
+export interface FollowUpRecommendationCreate {
+  recommended_date: string
+  recommended_doctor_id?: number | null
+  clinical_reason?: string | null
+}
+
+export interface FollowUpCloseRequest {
+  reason: string
+}
+
+export interface FollowUpBookRequest {
+  appointment_date?: string | null
+  notes?: string | null
+}
+
+export interface DoctorFollowUpResponse {
+  id: number
+  encounter_id: number
+  patient_id: number
+  patient_name: string
+  patient_urn: string
+  doctor_id: number
+  doctor_name: string
+  recommended_doctor_id: number
+  recommended_doctor_name: string
+  recommended_date: string
+  clinical_reason?: string | null
+  status: string
+  booked_appointment_id?: number | null
+  closed_reason?: string | null
+  closed_by_user_id?: number | null
+  closed_at?: string | null
+  version_id: number
+  created_at: string
+  updated_at: string
+}
+
+export interface ReceptionFollowUpResponse {
+  id: number
+  encounter_id: number
+  patient_id: number
+  patient_name: string
+  patient_urn: string
+  patient_mobile?: string | null
+  recommended_doctor_id: number
+  recommended_doctor_name: string
+  recommended_date: string
+  status: string
+  booked_appointment_id?: number | null
+  created_at: string
+}
+
+export type AssetType = 'LOGO' | 'PHOTO' | 'REGISTRATION_DOC'
+
+export interface HospitalAssetOut {
+  id: number
+  asset_type: AssetType
+  filename: string
+  original_filename: string
+  mime_type: string
+  file_size_bytes: number
+  is_active: boolean
+  version: number
+  uploaded_by_user_id: number
+  uploaded_by_name: string | null
+  created_at: string
+}
+
+export type PrintDocumentType =
+  | 'prescription'
+  | 'receipt'
+  | 'registration_card'
+  | 'consultation_summary'
+
+export interface PrintTemplateOut {
+  id: number
+  document_type: PrintDocumentType
+  header_en: string | null
+  header_hi: string | null
+  footer_en: string | null
+  footer_hi: string | null
+  version: number
+  updated_at: string
+}
+
+export interface PrintTemplateUpdatePayload {
+  header_en?: string | null
+  header_hi?: string | null
+  footer_en?: string | null
+  footer_hi?: string | null
+  version: number
+}
+
+// Phase 20 Data Governance: Export Centre
+export interface ExportScope {
+  start_date?: string | null
+  end_date?: string | null
+  department_id?: number | null
+  search_query?: string | null
+}
+
+export interface PatientExportRequest {
+  reason: string
+  format: 'csv' | 'xlsx'
+  scope: ExportScope
+  fields: string[]
+}
+
+
+
+

@@ -1,4 +1,4 @@
-﻿# Planner — Tracer-First Decomposition (Vertical Slices)
+# Planner — Tracer-First Decomposition (Vertical Slices)
 
 > Loaded by `gsd-planner` for the **default** tracer-first decomposition: every phase LEADS with one thin end-to-end `type="tracer"` slice, then expansion tasks. `--no-tracer` (`TRACER_MODE=false`) restores standard horizontal-layer planning. The MVP enrichment (user-story framing) and Walking Skeleton mode apply *on top* when `MVP_MODE=true` / `WALKING_SKELETON=true`.
 
@@ -37,7 +37,7 @@ When the orchestrator sets `WALKING_SKELETON=true` (Phase 1 of a new project und
   - One real DB read/write
   - One real UI interaction wired to the API
   - Deployment to a dev environment (or a documented local-run command that exercises the full stack)
-- The plan **must produce** `SKELETON.md` in the phase directory alongside `PLAN.md`. Use the template at `@.agents/gsd-core/references/skeleton-template.md`. `SKELETON.md` records the architectural decisions that subsequent phases will build on (chosen framework, DB, deployment target, auth approach, directory layout).
+- The plan **must produce** `SKELETON.md` in the phase directory alongside `PLAN.md`. Use the template at `@~/.claude/gsd-core/references/skeleton-template.md`. `SKELETON.md` records the architectural decisions that subsequent phases will build on (chosen framework, DB, deployment target, auth approach, directory layout).
 
 `SKELETON.md` is the architectural backbone for every later vertical slice; treat it as a contract, not a scratchpad.
 

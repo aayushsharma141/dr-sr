@@ -1,4 +1,4 @@
-﻿# Graphify Auto-Update — Status Surfacing
+# Graphify Auto-Update — Status Surfacing
 
 > Documents how `gsd-planner` and `gsd-phase-researcher` surface the opt-in graphify auto-update state (issue #3347). The status surface lives inside `graphifyStatus()` in `gsd-core/bin/lib/graphify.cjs`; no planner-side prompt changes are required.
 

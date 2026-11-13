@@ -1,4 +1,4 @@
-﻿Apply response_language to all user-facing prose — narration between tool calls, status updates, progress notes, and findings included; preserve code, paths, and identifiers.
+Apply response_language to all user-facing prose — narration between tool calls, status updates, progress notes, and findings included; preserve code, paths, and identifiers.
 
 # --power mode — bulk question generation, async answering
 
@@ -10,7 +10,7 @@
 ## Dispatch
 
 ```
-Read @.agents/gsd-core/workflows/discuss-phase-power.md
+Read @~/.claude/gsd-core/workflows/discuss-phase-power.md
 ```
 
 Execute it end-to-end. Do not continue with the standard interactive steps.

@@ -3,7 +3,9 @@ import { Modal } from './Modal'
 import { useClinicSettings } from '../api/queries'
 import {
   LetterheadBanner,
+  LetterheadContactLine,
   LetterheadDoctors,
+  LetterheadHeaderNote,
   LetterheadFooter,
   PatientStrip,
   PRINT_INK,
@@ -62,10 +64,15 @@ export function PrescriptionPrint({ prescription, onClose }: PrescriptionPrintPr
         className="printable-sheet mx-auto mt-4 w-[198mm] max-w-full bg-white p-3 text-slate-900 print:mt-0 print:w-full print:p-0 print:shadow-none"
         data-testid="prescription-sheet"
       >
-        <LetterheadBanner clinicName={clinicNameEn} />
+        <LetterheadBanner clinicName={clinicNameEn} clinicNameHi={settings?.name_hi} />
+        <LetterheadHeaderNote settings={settings} />
         <LetterheadDoctors />
         <PatientStrip
-          values={{ name: prescription.patient_name, date: issuedOn }}
+          values={{
+            name: prescription.patient_name,
+            date: issuedOn,
+            address: prescription.patient_address ?? undefined,
+          }}
         />
 
         <div className="mt-2 flex items-center justify-between text-[12px]">
@@ -75,6 +82,12 @@ export function PrescriptionPrint({ prescription, onClose }: PrescriptionPrintPr
               {prescription.patient_urn}
             </span>
           </span>
+          {prescription.patient_mobile && (
+            <span>
+              <span className="font-bold text-slate-600">Mobile (मोबाइल):</span>{' '}
+              <span className="font-mono font-semibold text-slate-900">{prescription.patient_mobile}</span>
+            </span>
+          )}
           <span>
             <span className="font-bold text-slate-600">Doctor (चिकित्सक):</span>{' '}
             <span className="font-semibold">{prescription.doctor_name}</span>
@@ -174,6 +187,7 @@ export function PrescriptionPrint({ prescription, onClose }: PrescriptionPrintPr
 
         <div className="mt-3 break-inside-avoid">
           <LetterheadFooter addresses={addresses} />
+        <LetterheadContactLine settings={settings} />
         </div>
       </div>
     </Modal>

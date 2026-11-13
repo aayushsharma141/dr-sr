@@ -1,4 +1,4 @@
-﻿# Common Bug Patterns
+# Common Bug Patterns
 
 Checklist of frequent bug patterns to scan before forming hypotheses. Ordered by frequency. Check these FIRST — they cover ~80% of bugs across all technology stacks.
 

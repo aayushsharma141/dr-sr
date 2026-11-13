@@ -1,4 +1,4 @@
-﻿# GSD Artifact Types
+# GSD Artifact Types
 
 This reference documents all artifact types in the GSD planning taxonomy. Each type has a defined
 shape, lifecycle, location, and consumption mechanism. A well-formatted artifact that no workflow
@@ -70,7 +70,7 @@ reads is inert — the consumption mechanism is what gives an artifact meaning.
 ### USER-PROFILE.md
 - **Shape**: Calibration tier and preferences profile
 - **Lifecycle**: Created by `profile-user` → Updated as preferences are observed
-- **Location**: `.agents/gsd-core/USER-PROFILE.md`
+- **Location**: `$HOME/.claude/gsd-core/USER-PROFILE.md`
 - **Consumed by**: `discuss-phase-assumptions` (calibration tier), `plan-phase`
 
 ### SPIKE.md / DESIGN.md (per-spike)

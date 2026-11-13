@@ -22,9 +22,13 @@ REM Verify database connection and durability
 echo Checking database readiness...
 "%VENV_PYTHON%" "%BACKEND_DIR%\src\kalyan_api\cli.py" check-db
 if %ERRORLEVEL% neq 0 (
-    echo WARNING: Database checks reported warnings or schema drift.
+    echo ERROR: Database check failed. Aborting startup to protect data integrity.
+    pause
+    exit /b 1
 )
 
 REM Launch Uvicorn Production Server
+REM Note: --no-access-log prevents patient search query parameters from leaking into plaintext server logs.
+REM Audit trails are securely captured via in-transaction database audit_events.
 echo Launching Uvicorn server on 0.0.0.0:8000...
-"%VENV_PYTHON%" -m uvicorn kalyan_api.main:create_app --factory --host 0.0.0.0 --port 8000 --access-log
+"%VENV_PYTHON%" -m uvicorn kalyan_api.main:create_app --factory --host 0.0.0.0 --port 8000 --no-access-log

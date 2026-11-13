@@ -1,4 +1,4 @@
-﻿# Architecture Template
+# Architecture Template
 
 Template for `.planning/codebase/ARCHITECTURE.md` - captures conceptual code organization.
 

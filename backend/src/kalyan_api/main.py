@@ -17,16 +17,21 @@ from kalyan_api.core.setup_code import (
 )
 from kalyan_api.db.session import SessionLocal, build_engine
 from kalyan_api.db.startup import run_startup_checks, setup_completed
+from kalyan_api.routers.admin_patients import router as admin_patients_router
 from kalyan_api.routers.appointments import doctor_router
 from kalyan_api.routers.appointments import router as appointments_router
 from kalyan_api.routers.areas import router as areas_router
+from kalyan_api.routers.assets import router as assets_router
 from kalyan_api.routers.audit import router as audit_router
 from kalyan_api.routers.auth import router as auth_router
 from kalyan_api.routers.billing import router as billing_router
 from kalyan_api.routers.departments import router as departments_router
 from kalyan_api.routers.doctors import router as doctors_router
 from kalyan_api.routers.encounters import router as encounters_router
+from kalyan_api.routers.exports import router as exports_router
+from kalyan_api.routers.follow_up import router as follow_up_router
 from kalyan_api.routers.health import router as health_router
+from kalyan_api.routers.imports import router as imports_router
 from kalyan_api.routers.operations import router as operations_router
 from kalyan_api.routers.patients import router as patients_router
 from kalyan_api.routers.prescriptions import router as prescriptions_router
@@ -36,10 +41,13 @@ from kalyan_api.routers.sessions import router as sessions_router
 from kalyan_api.routers.settings import router as settings_router
 from kalyan_api.routers.setup import router as setup_router
 from kalyan_api.routers.system import router as system_router
+from kalyan_api.routers.templates import admin_router as admin_templates_router
+from kalyan_api.routers.templates import router as templates_router
 from kalyan_api.routers.timeline import router as timeline_router
 from kalyan_api.routers.treatment_plans import router as treatment_plans_router
 from kalyan_api.routers.treatment_sessions import router as treatment_sessions_router
 from kalyan_api.routers.users import router as users_router
+from kalyan_api.routers.vitals import router as vitals_router
 
 logger = logging.getLogger("kalyan_api.main")
 
@@ -48,7 +56,10 @@ SECURITY_HEADERS = {
     "X-Frame-Options": "DENY",
     "Referrer-Policy": "no-referrer",
     "Content-Security-Policy": (
-        "default-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'"
+        # img-src allows blob: so locally generated previews (webcam snapshot, chosen
+        # file) render before upload; the objects never leave the browser.
+        "default-src 'self'; img-src 'self' blob:; frame-ancestors 'none'; "
+        "base-uri 'none'; form-action 'self'"
     ),
 }
 
@@ -81,6 +92,8 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """Manage application startup and shutdown lifecycle."""
     settings: Settings = app.state.settings
+    settings.photos_dir.mkdir(parents=True, exist_ok=True)
+    settings.assets_dir.mkdir(parents=True, exist_ok=True)
     engine = build_engine(settings, owner=False)
     SessionLocal.configure(bind=engine)
     app.state.engine = engine
@@ -146,12 +159,20 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(areas_router, prefix="/api")
     app.include_router(users_router, prefix="/api")
     app.include_router(settings_router, prefix="/api")
+    app.include_router(assets_router, prefix="/api")
     app.include_router(doctors_router, prefix="/api")
     app.include_router(departments_router, prefix="/api")
     app.include_router(patients_router, prefix="/api")
+    app.include_router(admin_patients_router, prefix="/api")
+    app.include_router(imports_router, prefix="/api")
+    app.include_router(exports_router, prefix="/api")
     app.include_router(appointments_router, prefix="/api")
     app.include_router(doctor_router, prefix="/api")
     app.include_router(encounters_router, prefix="/api")
+    app.include_router(templates_router, prefix="/api")
+    app.include_router(admin_templates_router, prefix="/api")
+    app.include_router(vitals_router, prefix="/api")
+    app.include_router(follow_up_router, prefix="/api")
     app.include_router(prescriptions_router, prefix="/api")
     app.include_router(treatment_plans_router, prefix="/api")
     app.include_router(treatment_sessions_router, prefix="/api")

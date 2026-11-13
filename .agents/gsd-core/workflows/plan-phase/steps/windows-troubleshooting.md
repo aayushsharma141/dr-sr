@@ -1,4 +1,4 @@
-﻿# Windows Troubleshooting
+# Windows Troubleshooting
 
 **Windows users:** If plan-phase freezes during agent spawning (common on Windows due to
 stdio deadlocks with MCP servers — see Claude Code issue anthropics/claude-code#28126):

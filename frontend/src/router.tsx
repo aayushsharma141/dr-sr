@@ -114,13 +114,6 @@ export const router = createBrowserRouter([
             },
           },
           {
-            path: '/admin/departments',
-            lazy: async () => {
-              const { DepartmentsPage } = await import('./pages/admin/DepartmentsPage')
-              return { Component: DepartmentsPage }
-            },
-          },
-          {
             path: '/admin/billing',
             lazy: async () => {
               const { BillingAdminPage } = await import('./pages/admin/BillingAdminPage')
@@ -165,11 +158,53 @@ export const router = createBrowserRouter([
               }
             },
           },
+          {
+            // Hospital Identity & Logo merged into Hospital Settings; keep old links working.
+            path: '/admin/assets',
+            element: <Navigate to="/admin/settings#hospital-crest" replace />,
+          },
+          {
+            path: '/admin/templates',
+            lazy: async () => {
+              const { PrintTemplatesPage } = await import('./pages/admin/PrintTemplatesPage')
+              return {
+                Component: PrintTemplatesPage,
+              }
+            },
+          },
+          {
+            path: '/admin/patients/correct',
+            lazy: async () => {
+              const { PatientCorrectionPage } = await import('./pages/admin/PatientCorrectionPage')
+              return {
+                Component: PatientCorrectionPage,
+              }
+            },
+          },
+          {
+            // Patient Import Centre merged into Backup & Restore module; keep old links working.
+            path: '/admin/imports',
+            element: <Navigate to="/admin/backups?action=import" replace />,
+          },
+          {
+            // Patient Export Centre merged into Backup & Restore module; keep old links working.
+            path: '/admin/exports',
+            element: <Navigate to="/admin/backups?action=export" replace />,
+          },
         ],
       },
       {
         element: <RequireRole role={['ADMIN', 'RECEPTION']} />,
         children: [
+          {
+            path: '/reception/billing',
+            lazy: async () => {
+              const { ReceptionBillingPage } = await import('./pages/ReceptionBillingPage')
+              return {
+                Component: ReceptionBillingPage,
+              }
+            },
+          },
           {
             path: '/reception/dues',
             lazy: async () => {
@@ -190,6 +225,25 @@ export const router = createBrowserRouter([
               const { PatientRegister } = await import('./pages/PatientRegister')
               return {
                 Component: PatientRegister,
+              }
+            },
+          },
+          {
+            // The registration form, pre-filled, for changing an existing patient (PATCH /patients/{id}).
+            path: '/reception/patients/:id/edit',
+            lazy: async () => {
+              const { PatientRegister } = await import('./pages/PatientRegister')
+              return {
+                Component: PatientRegister,
+              }
+            },
+          },
+          {
+            path: '/reception/tokens',
+            lazy: async () => {
+              const { TokenGenerationPage } = await import('./pages/TokenGenerationPage')
+              return {
+                Component: TokenGenerationPage,
               }
             },
           },
@@ -306,6 +360,15 @@ export const router = createBrowserRouter([
               const { TreatmentPlanWorkspace } = await import('./pages/TreatmentPlanWorkspace')
               return {
                 Component: TreatmentPlanWorkspace,
+              }
+            },
+          },
+          {
+            path: '/doctor/settings',
+            lazy: async () => {
+              const { DoctorSettings } = await import('./pages/DoctorSettings')
+              return {
+                Component: DoctorSettings,
               }
             },
           },

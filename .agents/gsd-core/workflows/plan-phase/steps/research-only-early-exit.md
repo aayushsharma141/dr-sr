@@ -1,4 +1,4 @@
-﻿### Research-Only Early Exit (`--research-phase`)
+### Research-Only Early Exit (`--research-phase`)
 
 **Skip if:** `RESEARCH_ONLY` is `false` (the default).
 

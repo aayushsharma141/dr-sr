@@ -13,7 +13,7 @@ import hmac
 import os
 import secrets
 import sys
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 from fastapi import FastAPI
@@ -25,6 +25,7 @@ SETUP_CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
 SETUP_LOCK_THRESHOLD = 5
 SETUP_LOCK_MINUTES = 15
 SETUP_ROTATE_AFTER = 10
+SETUP_CODE_TTL_MINUTES = 60
 
 
 def get_default_setup_code_path() -> Path:
@@ -49,6 +50,7 @@ def issue_setup_code(
 
     app.state.setup_code_hash = code_hash
     app.state.setup_code_path = code_path
+    app.state.setup_code_issued_at = datetime.now(UTC)
     app.state.setup_failures_by_ip = {}
     app.state.setup_total_failures = 0
 
@@ -73,11 +75,25 @@ def issue_setup_code(
     return code
 
 
-def verify_setup_code(app: FastAPI, submitted: str) -> bool:
-    """Validate submitted setup code against the in-memory hash in constant time."""
+def verify_setup_code(
+    app: FastAPI,
+    submitted: str,
+    now: datetime | None = None,
+) -> bool:
+    """Validate submitted setup code against the in-memory hash in constant time, checking TTL."""
     expected_hash: str | None = getattr(app.state, "setup_code_hash", None)
     if not expected_hash:
         return False
+
+    issued_at: datetime | None = getattr(app.state, "setup_code_issued_at", None)
+    if issued_at is not None:
+        current_time = now or datetime.now(UTC)
+        if issued_at.tzinfo is None and current_time.tzinfo is not None:
+            issued_at = issued_at.replace(tzinfo=UTC)
+        elif issued_at.tzinfo is not None and current_time.tzinfo is None:
+            current_time = current_time.replace(tzinfo=UTC)
+        if (current_time - issued_at) > timedelta(minutes=SETUP_CODE_TTL_MINUTES):
+            return False
 
     normalized = normalize_setup_code(submitted)
     submitted_hash = hashlib.sha256(normalized.encode("ascii")).hexdigest()
@@ -87,6 +103,7 @@ def verify_setup_code(app: FastAPI, submitted: str) -> bool:
 def consume_setup_code(app: FastAPI, path: Path | None = None) -> None:
     """Atomically consume the setup code, clearing hash from memory and deleting file."""
     app.state.setup_code_hash = None
+    app.state.setup_code_issued_at = None
     target_path = (
         path or getattr(app.state, "setup_code_path", None) or get_default_setup_code_path()
     )

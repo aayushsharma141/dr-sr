@@ -6,6 +6,20 @@ import { MemoryRouter } from 'react-router'
 import '../../test/dialog-shim'
 import { BackupManagerPage } from '../admin/BackupManagerPage'
 
+const sampleBackupSettings = {
+  schedule_enabled: true,
+  frequency: 'DAILY' as const,
+  run_at: '02:00:00',
+  weekly_day: null,
+  destination_dir: 'E:/KalyanHospitalBackups',
+  retention_count: 30,
+  version_id: 1,
+  updated_at: '2026-11-01T10:00:00Z',
+  next_run_at: '2026-11-12T02:00:00Z',
+  overdue: false,
+  approved_destinations: ['E:/KalyanHospitalBackups'],
+}
+
 const mocks = vi.hoisted(() => ({
   createMutate: vi.fn(),
   restoreMutate: vi.fn(),
@@ -36,7 +50,22 @@ const sampleBackups = {
   backup_dir: '/var/backups',
 }
 
+vi.mock('../../api/branding', () => ({
+  useClinicBranding: () => ({
+    trustNameEn: 'Sri Vashishtha Kalyan Trust',
+    trustNameHi: 'श्री वशिष्ठ कल्याण ट्रस्ट',
+    hospitalName: 'Kalyan Hospital',
+    address: 'Hospital Road, Ara, Bhojpur, Bihar - 802301',
+    locationLine: 'Ara, Bhojpur, Bihar',
+    crestUrl: '/kalyan-hospital-crest.webp',
+  }),
+}))
+
 vi.mock('../../api/queries', () => ({
+  useMe: () => ({
+    data: { full_name: 'System Administrator', role: 'ADMIN' },
+    isLoading: false,
+  }),
   useBackups: () => ({
     data: sampleBackups,
     isPending: false,
@@ -57,12 +86,30 @@ vi.mock('../../api/queries', () => ({
     mutateAsync: vi.fn(),
     isPending: false,
   }),
+  useBackupSettings: () => ({
+    data: sampleBackupSettings,
+    isPending: false,
+    isError: false,
+    error: null,
+    isFetching: false,
+    refetch: vi.fn(),
+  }),
+  useBackupRuns: () => ({
+    data: [],
+    isPending: false,
+    isError: false,
+    error: null,
+  }),
+  useUpdateBackupSettings: () => ({
+    mutateAsync: vi.fn(),
+    isPending: false,
+  }),
 }))
 
 describe('BackupManagerPage', () => {
-  const renderPage = () => render(
-    <QueryClientProvider client={new QueryClient()}>
-      <MemoryRouter>
+  const renderPage = (initialEntries: string[] = ['/admin/backups']) => render(
+    <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+      <MemoryRouter initialEntries={initialEntries}>
         <BackupManagerPage />
       </MemoryRouter>
     </QueryClientProvider>,
@@ -71,7 +118,7 @@ describe('BackupManagerPage', () => {
   it('renders archive overview and removes developer-facing text and per-row destructive buttons', () => {
     renderPage()
 
-    expect(screen.getByRole('heading', { name: 'Backup & Recovery' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Backup & Restore' })).toBeInTheDocument()
     expect(screen.getByText('kalyan_backup_20261102_100000.tar.gz')).toBeInTheDocument()
     expect(screen.getAllByText('Integrity passed').length).toBeGreaterThanOrEqual(1)
     expect(screen.getByText('1.00 MB')).toBeInTheDocument()
@@ -90,12 +137,14 @@ describe('BackupManagerPage', () => {
     expect(screen.queryByText('kalyan_backup_20261102_100000.tar.gz')).not.toBeInTheDocument()
   })
 
-  it('shows an honest schedule state when the API has no schedule data', () => {
+  it('renders the backup schedule configuration and controls', () => {
     renderPage()
     fireEvent.click(screen.getByRole('tab', { name: 'Schedule & automation' }))
 
-    expect(screen.getByText('Schedule information is not connected')).toBeInTheDocument()
-    expect(screen.getByText(/does not provide the active schedule/i)).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Scheduled backups' })).toBeInTheDocument()
+    expect(screen.getByRole('checkbox', { name: /run scheduled backups/i })).toBeInTheDocument()
+    expect(screen.getByLabelText(/frequency/i)).toBeInTheDocument()
+    expect(screen.getByLabelText(/time \(ist\)/i)).toBeInTheDocument()
   })
 
   it('requires the confirmation phrase and a reason before restore can proceed', () => {
@@ -115,6 +164,45 @@ describe('BackupManagerPage', () => {
       target: { value: 'RESTORE-DATABASE-OVERWRITE' },
     })
     expect(screen.getByRole('button', { name: 'Confirm database restoration' })).toBeEnabled()
+  })
+
+  it('renders data portability buttons and migration overview', () => {
+    renderPage()
+
+    expect(screen.getByRole('button', { name: 'Import Spreadsheet' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Export Dataset' })).toBeInTheDocument()
+    expect(screen.getByText('Patient Spreadsheet Ingestion')).toBeInTheDocument()
+    expect(screen.getByText('Patient Dataset Export')).toBeInTheDocument()
+  })
+
+  it('opens import wizard modal when clicking Import Spreadsheet', async () => {
+    const user = userEvent.setup()
+    renderPage()
+
+    await user.click(screen.getByRole('button', { name: 'Import Spreadsheet' }))
+    expect(screen.getByRole('heading', { name: 'Patient Import Centre' })).toBeInTheDocument()
+    expect(screen.getByText(/Step 1: Upload Patient Spreadsheet/i)).toBeInTheDocument()
+  })
+
+  it('opens export dialog when clicking Export Dataset', async () => {
+    const user = userEvent.setup()
+    renderPage()
+
+    await user.click(screen.getByRole('button', { name: 'Export Dataset' }))
+    expect(screen.getByRole('heading', { name: 'Export Patient Dataset' })).toBeInTheDocument()
+  })
+
+  it('automatically opens import modal when navigated with ?action=import', () => {
+    renderPage(['/admin/backups?action=import'])
+
+    expect(screen.getByRole('heading', { name: 'Patient Import Centre' })).toBeInTheDocument()
+    expect(screen.getByText(/Step 1: Upload Patient Spreadsheet/i)).toBeInTheDocument()
+  })
+
+  it('automatically opens export dialog when navigated with ?action=export', () => {
+    renderPage(['/admin/backups?action=export'])
+
+    expect(screen.getByRole('heading', { name: 'Export Patient Dataset' })).toBeInTheDocument()
   })
 })
 
@@ -139,7 +227,7 @@ describe('BackupManagerPage failures are persistent inline alerts (UX-03)', () =
       status: 'SUCCESS',
       prerestore_snapshot: '/var/backups/prerestore.tar.gz',
     })
-    alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {})
+    alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => { })
   })
 
   afterEach(() => {

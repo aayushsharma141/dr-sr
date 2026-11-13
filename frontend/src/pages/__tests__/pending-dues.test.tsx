@@ -1,6 +1,7 @@
-import { render, screen, fireEvent } from '@testing-library/react'
+import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { describe, it, expect, vi } from 'vitest'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { MemoryRouter } from 'react-router'
 import { PendingDuesPage } from '../PendingDuesPage'
 
 const sampleDues = [
@@ -19,6 +20,8 @@ const sampleDues = [
   },
 ]
 
+const mocks = vi.hoisted(() => ({ recordMutate: vi.fn() }))
+
 vi.mock('../../api/queries', () => ({
   usePendingDues: () => ({
     data: sampleDues,
@@ -26,8 +29,20 @@ vi.mock('../../api/queries', () => ({
     error: null,
   }),
   useRecordPayment: () => ({
-    mutateAsync: vi.fn(),
+    mutateAsync: mocks.recordMutate,
     isPending: false,
+  }),
+  useMe: () => ({ data: { full_name: 'Reception User', role: 'RECEPTION' }, isLoading: false }),
+  useLogout: () => ({ mutateAsync: vi.fn(), isPending: false }),
+}))
+
+vi.mock('../../api/branding', () => ({
+  useClinicBranding: () => ({
+    trustNameEn: 'Sri Vashishtha Kalyan Trust',
+    trustNameHi: 'श्री वशिष्ठ कल्याण ट्रस्ट',
+    hospitalName: 'Kalyan Hospital',
+    address: 'Hospital Road, Ara, Bhojpur, Bihar - 802301',
+    locationLine: 'Ara, Bhojpur, Bihar',
   }),
 }))
 
@@ -37,11 +52,13 @@ describe('PendingDuesPage', () => {
   it('renders pending dues table with formatted rupee balances', () => {
     render(
       <QueryClientProvider client={queryClient}>
-        <PendingDuesPage />
+        <MemoryRouter>
+          <PendingDuesPage />
+        </MemoryRouter>
       </QueryClientProvider>
     )
 
-    expect(screen.getByText('Pending Dues Ledger')).toBeInTheDocument()
+    expect(screen.getByText('Pending Dues')).toBeInTheDocument()
     expect(screen.getByText('Sunita Devi')).toBeInTheDocument()
     expect(screen.getByText('KLY-0010')).toBeInTheDocument()
     expect(screen.getByText('Knee Osteoarthritis Rehab')).toBeInTheDocument()
@@ -55,7 +72,80 @@ describe('PendingDuesPage', () => {
     expect(collectBtn).toBeInTheDocument()
     fireEvent.click(collectBtn)
 
-    // Verify payment modal opens
+    // Verify payment modal opens, pre-filled with the outstanding balance
+    expect(screen.getByRole('dialog')).toBeInTheDocument()
+    expect(screen.getByLabelText(/Amount/i)).toHaveValue(4000)
+  })
+
+  it('collects a package instalment against the treatment plan', async () => {
+    mocks.recordMutate.mockReset()
+    mocks.recordMutate.mockResolvedValueOnce({ id: 55, receipt_number: 'RCP-TEST-0055' })
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter>
+          <PendingDuesPage />
+        </MemoryRouter>
+      </QueryClientProvider>
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: /Collect Payment/i }))
+    fireEvent.change(screen.getByLabelText(/Amount/i), { target: { value: '1500' } })
+    fireEvent.click(screen.getByRole('button', { name: 'UPI' }))
+    fireEvent.click(screen.getByRole('button', { name: /Collect & Issue Receipt/i }))
+
+    await waitFor(() => expect(mocks.recordMutate).toHaveBeenCalledTimes(1))
+    expect(mocks.recordMutate).toHaveBeenCalledWith({
+      patient_id: 10,
+      treatment_plan_id: 1,
+      appointment_id: null,
+      amount_paise: 150000,
+      payment_method: 'UPI',
+      notes: null,
+    })
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+  })
+
+  it('blocks an amount above the remaining balance without calling the API', async () => {
+    mocks.recordMutate.mockReset()
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter>
+          <PendingDuesPage />
+        </MemoryRouter>
+      </QueryClientProvider>
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: /Collect Payment/i }))
+    fireEvent.change(screen.getByLabelText(/Amount/i), { target: { value: '5000' } })
+    fireEvent.click(screen.getByRole('button', { name: /Collect & Issue Receipt/i }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Amount cannot exceed the remaining package balance of ₹4,000.00.',
+    )
+    expect(mocks.recordMutate).not.toHaveBeenCalled()
+    // The dialog stays open so reception can correct the amount.
+    expect(screen.getByRole('dialog')).toBeInTheDocument()
+  })
+
+  it('shows a server rejection for an amount inside the balance', async () => {
+    mocks.recordMutate.mockReset()
+    mocks.recordMutate.mockRejectedValueOnce(new Error('Payment could not be saved. Please retry.'))
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter>
+          <PendingDuesPage />
+        </MemoryRouter>
+      </QueryClientProvider>
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: /Collect Payment/i }))
+    fireEvent.change(screen.getByLabelText(/Amount/i), { target: { value: '3000' } })
+    fireEvent.click(screen.getByRole('button', { name: /Collect & Issue Receipt/i }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Payment could not be saved. Please retry.')
     expect(screen.getByRole('dialog')).toBeInTheDocument()
   })
 })

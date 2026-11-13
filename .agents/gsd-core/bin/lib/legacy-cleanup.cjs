@@ -1,4 +1,4 @@
-﻿'use strict';
+'use strict';
 
 /**
  * legacy-cleanup.cjs — detect and remove leftover artifacts from the old package.

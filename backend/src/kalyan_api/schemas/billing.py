@@ -35,6 +35,8 @@ class PaymentOut(BaseModel):
     patient_id: int
     patient_urn: str
     patient_name: str
+    patient_mobile: str | None = None
+    patient_address: str | None = None
     treatment_plan_id: int | None = None
     treatment_plan_name: str | None = None
     appointment_id: int | None = None
@@ -84,7 +86,7 @@ class PendingDueOut(BaseModel):
     patient_urn: str
     patient_name: str
     plan_name: str
-    condition_diagnosis: str
+    condition_diagnosis: str | None = None
     agreed_price_paise: int
     paid_paise: int
     balance_paise: int

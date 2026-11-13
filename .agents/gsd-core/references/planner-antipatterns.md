@@ -1,4 +1,4 @@
-﻿# Planner Anti-Patterns and Specificity Examples
+# Planner Anti-Patterns and Specificity Examples
 
 > Reference file for gsd-planner agent. Loaded on-demand via `@` reference.
 > For sub-200K context windows, this content is stripped from the agent prompt and available here for on-demand loading.

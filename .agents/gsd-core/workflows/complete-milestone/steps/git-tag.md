@@ -1,4 +1,4 @@
-﻿<step name="git_tag">
+<step name="git_tag">
 
 Create git tag:
 

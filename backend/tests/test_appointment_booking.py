@@ -180,3 +180,82 @@ def test_booking_rejects_inactive_department(
         "Selected department is inactive and cannot accept new appointments."
     )
     assert db_session.query(Appointment).filter_by(patient_id=patient.id).count() == 0
+
+
+def test_duplicate_same_day_booking_requires_override_reason(
+    login_client, reception_user, doctor_a_user, db_session
+):
+    """BR-006: Duplicate active booking on same date for same doctor requires >= 5 char override."""
+    from kalyan_api.models import Appointment
+
+    patient = Patient(
+        urn="KH-2026-8888",
+        full_name="Duplicate Test Patient",
+        guardian_name="Guardian",
+        gender="M",
+        age_years=35,
+        mobile="9876543888",
+        address="Ara",
+    )
+    db_session.add(patient)
+    db_session.flush()
+
+    doctor = doctor_a_user.doctor
+    department = doctor.departments[0]
+    client = login_client(reception_user)
+
+    # 1. First booking succeeds
+    resp1 = client.post(
+        "/api/appointments",
+        json={
+            "patient_id": patient.id,
+            "doctor_id": doctor.id,
+            "department_id": department.id,
+            "appointment_date": "2026-11-10",
+            "notes": "First visit",
+        },
+    )
+    assert resp1.status_code == 201
+
+    # 2. Duplicate same-day booking without override reason is blocked (409)
+    resp2 = client.post(
+        "/api/appointments",
+        json={
+            "patient_id": patient.id,
+            "doctor_id": doctor.id,
+            "department_id": department.id,
+            "appointment_date": "2026-11-10",
+        },
+    )
+    assert resp2.status_code == 409
+    assert resp2.json()["code"] == "duplicate_appointment"
+
+    # 3. Duplicate same-day booking with short override reason (<5 chars) is blocked (409)
+    resp3 = client.post(
+        "/api/appointments",
+        json={
+            "patient_id": patient.id,
+            "doctor_id": doctor.id,
+            "department_id": department.id,
+            "appointment_date": "2026-11-10",
+            "override_reason": "test",
+        },
+    )
+    assert resp3.status_code == 409
+    assert resp3.json()["code"] == "duplicate_appointment"
+
+    # 4. Duplicate same-day booking with valid override reason (>= 5 chars) succeeds
+    resp4 = client.post(
+        "/api/appointments",
+        json={
+            "patient_id": patient.id,
+            "doctor_id": doctor.id,
+            "department_id": department.id,
+            "appointment_date": "2026-11-10",
+            "override_reason": "Emergency second consult today",
+        },
+    )
+    assert resp4.status_code == 201
+    appt4_id = resp4.json()["id"]
+    appt4 = db_session.get(Appointment, appt4_id)
+    assert "[Override: Emergency second consult today]" in appt4.notes

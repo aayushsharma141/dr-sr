@@ -29,7 +29,7 @@ describe('legibility guard (UX-04)', () => {
   // the semantic colours that fail 4.5:1 on white. Print-only documents keep their small
   // print type by design. The guard reads class names, so it cannot see the surface behind
   // the text: a light-on-dark panel needs a documented exception (see PENDING below).
-  const PRINT_ONLY = new Set(['PrintLetterhead.tsx', 'RegistrationCard.tsx', 'PrescriptionPrint.tsx', 'ReceiptPrint.tsx'])
+  const PRINT_ONLY = new Set(['PrintLetterhead.tsx', 'RegistrationCard.tsx', 'PrescriptionPrint.tsx', 'ReceiptPrint.tsx', 'ConsultationSummaryPrint.tsx'])
   const SIZE = /(?<![\w-])(?:[a-z-]+:)*text-\[(\d+(?:\.\d+)?)(px|rem)\]/g // rem counts as 16px
   const GREY = /(?<![\w-])((?:[a-z-]+:)*)text-(?:neutral|slate|gray|zinc|stone)-(?:300|400)(?![\w-])/g
   const SEMANTIC = /(?<![\w-])((?:[a-z-]+:)*)text-(?:red-500|emerald-600|amber-600|teal-600)(?![\w-])/g
@@ -68,10 +68,7 @@ describe('legibility guard (UX-04)', () => {
    */
   const PENDING: Record<string, { max: number; reason: string }> = {
     // Existing code on main that Phase 18 did not touch: fixing it needs its own review.
-
-    'pages/AppointmentsReception.tsx': { max: 2, reason: '1 sub-12px class, 1 grey. Existing main code.' },
     'pages/PatientsDirectory.tsx': { max: 4, reason: '4 grey 300/400 classes. Existing main code.' },
-    'pages/PendingDuesPage.tsx': { max: 4, reason: '2 grey, 2 semantic colours. Existing main code.' },
     'pages/PatientDetail.tsx': { max: 1, reason: '1 sub-12px class in the payments table header (11px). The four grey section labels were fixed to neutral-600. Existing main code.' },
     // Held by client decisions.
     'components/VasTrendChart.tsx': { max: 4, reason: 'SVG font sizes (3) and 1 class: needs a visual review before changing. Held by the client.' },

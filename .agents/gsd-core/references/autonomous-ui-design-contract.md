@@ -1,4 +1,4 @@
-﻿# UI Design Contract (Frontend Phases) — Autonomous Mode
+# UI Design Contract (Frontend Phases) — Autonomous Mode
 
 Step 3a.5 of `/gsd-autonomous`: resolve whether the current phase needs a UI-SPEC.md generated before planning, and generate one via active `plan:pre` step hooks if so. Non-blocking for every answer it gets — proceeds to step 3b (Plan) — except a gate that could not look (below), which is surfaced and stops.
 

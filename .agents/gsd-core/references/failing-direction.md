@@ -1,4 +1,4 @@
-﻿# Check 8f — Stated Failing Direction (#3172)
+# Check 8f — Stated Failing Direction (#3172)
 
 > Reference file for gsd-plan-checker agent. Loaded on-demand via `@` reference.
 

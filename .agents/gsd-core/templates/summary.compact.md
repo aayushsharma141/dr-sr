@@ -1,4 +1,4 @@
-﻿# Summary Template
+# Summary Template
 
 Template for `.planning/phases/XX-name/{phase}-{plan}-SUMMARY.md` - phase completion documentation.
 

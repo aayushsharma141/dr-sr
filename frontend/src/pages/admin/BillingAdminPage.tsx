@@ -2,6 +2,8 @@ import { useState, type FormEvent } from 'react'
 import { useBillingConfiguration, useLedger, useMe, type LedgerFilter } from '../../api/queries'
 import type { PaymentOut } from '../../api/types'
 import { AppShell } from '../../components/AppShell'
+import { AdminPageHeader } from '../../components/admin/AdminPageHeader'
+import { TableSkeleton } from '../../components/AdminSkeleton'
 import { InlineAlert } from '../../components/InlineAlert'
 import { PaymentReversalModal } from '../../components/PaymentReversalModal'
 
@@ -56,9 +58,9 @@ function ConfigurationSection() {
         Billing rules in force
       </h2>
       <p className="mt-1 text-sm text-slate-700">
-        Read-only. The numbering cycle is set in Clinic Settings; the other rules are fixed until the client decides.
+        Read-only. The numbering cycle is set in Hospital Settings; the other rules are fixed until the client decides.
       </p>
-      {isPending && <p role="status" className="mt-3 text-sm text-slate-700">Loading billing rules...</p>}
+      {isPending && <TableSkeleton label="Loading billing rules..." rows={2} columns={3} className="mt-3" />}
       {isError && (
         <InlineAlert tone="error" className="mt-3">
           Could not load billing rules: {error.message}
@@ -78,9 +80,9 @@ function ConfigurationSection() {
   )
 }
 
-function LedgerRow({ payment, onReverse }: { payment: PaymentOut; onReverse: (p: PaymentOut) => void }) {
+function LedgerRow({ payment, onReverse, index = 0 }: { payment: PaymentOut; onReverse: (p: PaymentOut) => void; index?: number }) {
   return (
-    <tr>
+    <tr className="transition-colors hover:bg-slate-50/60" style={{ transitionDelay: `${index * 50}ms` }}>
       <td className={`${CELL} font-mono`}>{payment.receipt_number}</td>
       <td className={CELL}>{formatIst(payment.created_at)}</td>
       <td className={CELL}>
@@ -167,7 +169,7 @@ function LedgerSection() {
           Search
         </button>
       </form>
-      {isPending && <p role="status" className="mt-3 text-sm text-slate-700">Loading payments...</p>}
+      {isPending && <TableSkeleton label="Loading payments..." rows={5} columns={6} className="mt-3" />}
       {isError && (
         <InlineAlert tone="error" className="mt-3">
           Could not load payments: {error.message}
@@ -175,9 +177,9 @@ function LedgerSection() {
       )}
       {data && data.length === 0 && <p className="mt-3 text-sm text-slate-700">No payments match this search.</p>}
       {data && data.length > 0 && (
-        <div className="relative mt-3 overflow-x-auto">
+        <div className="relative mt-3 max-h-[65vh] overflow-auto">
           <table className="w-full">
-            <thead className="border-b border-slate-200 bg-slate-50">
+            <thead className="sticky top-0 z-10 border-b border-slate-200 bg-slate-50">
               <tr>
                 <th scope="col" className={HEAD}>Receipt</th>
                 <th scope="col" className={HEAD}>Date</th>
@@ -189,8 +191,8 @@ function LedgerSection() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {data.map((p) => (
-                <LedgerRow key={p.id} payment={p} onReverse={setReversing} />
+              {data.map((p, index) => (
+                <LedgerRow key={p.id} payment={p} onReverse={setReversing} index={index} />
               ))}
             </tbody>
           </table>
@@ -211,10 +213,7 @@ export function BillingAdminPage() {
   return (
     <AppShell name={me?.full_name ?? 'Admin'} role={me?.role ?? 'ADMIN'}>
       <div className="space-y-6">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-900">Billing & Financial</h1>
-          <p className="mt-1 text-sm text-slate-700">Receipt rules, payment search and authorised reversals.</p>
-        </div>
+        <AdminPageHeader title="Receipts & Reversals" description="Receipt rules, payment search and authorised reversals." />
         <ConfigurationSection />
         <LedgerSection />
       </div>

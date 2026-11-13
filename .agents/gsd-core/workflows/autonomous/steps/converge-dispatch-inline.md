@@ -1,4 +1,4 @@
-﻿## Converge Dispatch (Inline)
+## Converge Dispatch (Inline)
 
 If `PLAN_STRATEGY=converge`:
 

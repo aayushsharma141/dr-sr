@@ -62,6 +62,11 @@ export class ApiError extends Error {
   }
 }
 
+/** True only for a genuine optimistic-lock conflict (409 version_conflict). */
+export function isVersionConflict(err: unknown): boolean {
+  return err instanceof ApiError && err.code === 'version_conflict'
+}
+
 export async function apiFetch<T = unknown>(
   path: string,
   init: ApiFetchOptions = {},

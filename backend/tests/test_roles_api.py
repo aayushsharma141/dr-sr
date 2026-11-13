@@ -78,3 +78,24 @@ def test_catalogue_is_not_editable(
     for method in ("post", "put", "patch", "delete"):
         res = admin_c.request(method.upper(), PATH, json={})
         assert res.status_code == 405, method
+
+
+def test_admin_grants_include_phase20_data_governance_permissions(
+    login_client: Callable[..., TestClient], admin_user: User
+) -> None:
+    """D-20-01: Admin role includes patient:correct, patient:import, patient:export; lacks
+    patient:update."""
+    body = login_client(admin_user).get(PATH).json()
+    admin_grants = set(body["grants"]["ADMIN"])
+    assert Permission.PATIENT_CORRECT.value in admin_grants
+    assert Permission.PATIENT_IMPORT.value in admin_grants
+    assert Permission.PATIENT_EXPORT.value in admin_grants
+    assert Permission.PATIENT_UPDATE.value not in admin_grants
+    reception_grants = set(body["grants"]["RECEPTION"])
+    assert Permission.PATIENT_CORRECT.value not in reception_grants
+    assert Permission.PATIENT_IMPORT.value not in reception_grants
+    assert Permission.PATIENT_EXPORT.value not in reception_grants
+    doctor_grants = set(body["grants"]["DOCTOR"])
+    assert Permission.PATIENT_CORRECT.value not in doctor_grants
+    assert Permission.PATIENT_IMPORT.value not in doctor_grants
+    assert Permission.PATIENT_EXPORT.value not in doctor_grants

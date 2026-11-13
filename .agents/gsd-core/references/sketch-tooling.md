@@ -1,4 +1,4 @@
-﻿# Sketch Toolbar
+# Sketch Toolbar
 
 Include a small floating toolbar in every sketch. It provides utilities without competing with the actual design.
 

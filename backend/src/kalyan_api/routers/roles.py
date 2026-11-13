@@ -53,6 +53,7 @@ PERMISSION_LABELS: dict[Permission, str] = {
     Permission.USER_DEACTIVATE: "Deactivate and reactivate user accounts",
     Permission.USER_RESET_PASSWORD: "Reset user passwords",
     Permission.USER_UNLOCK: "Unlock locked user accounts",
+    Permission.USER_DELETE: "Delete unused user accounts (needs the super admin password)",
     Permission.DASHBOARD_ADMIN: "Open the administrator dashboard",
     Permission.DASHBOARD_RECEPTION: "Open the reception dashboard",
     Permission.DASHBOARD_DOCTOR: "Open the doctor dashboard",
@@ -92,6 +93,9 @@ PERMISSION_LABELS: dict[Permission, str] = {
     Permission.SECURITY_WRITE: "Tighten security policy",
     Permission.BACKUP_CONFIGURE: "Configure backup schedule and retention",
     Permission.SYSTEM_READ: "View system health",
+    Permission.PATIENT_CORRECT: "Correct patient demographics",
+    Permission.PATIENT_IMPORT: "Import patients",
+    Permission.PATIENT_EXPORT: "Export patient data",
 }
 
 

@@ -1,4 +1,4 @@
-﻿# Stack Research Template
+# Stack Research Template
 
 Template for `.planning/research/STACK.md` — recommended technologies for the project domain.
 

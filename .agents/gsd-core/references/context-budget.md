@@ -1,4 +1,4 @@
-﻿# Context Budget Rules
+# Context Budget Rules
 
 Standard rules for keeping orchestrator context lean. Reference this in workflows that spawn subagents or read significant content.
 
@@ -50,7 +50,7 @@ When delegating to agents, the orchestrator cannot verify semantic correctness o
 
 ## MCP Tool Schema Cost (Harness Concern)
 
-Every enabled MCP server injects its tool schema into **every turn**, regardless of whether you call any of its tools. Heavyweight servers can cost 20k+ tokens per turn each — often dwarfing whatever GSD itself can save through `model_profile` tuning. This is a Claude Code harness concern, not a GSD concern: GSD does **not** manage MCP enablement. The toggle lives in `.agents/settings.json` under `enabledMcpjsonServers` and `disabledMcpjsonServers`.
+Every enabled MCP server injects its tool schema into **every turn**, regardless of whether you call any of its tools. Heavyweight servers can cost 20k+ tokens per turn each — often dwarfing whatever GSD itself can save through `model_profile` tuning. This is a Claude Code harness concern, not a GSD concern: GSD does **not** manage MCP enablement. The toggle lives in `.claude/settings.json` under `enabledMcpjsonServers` and `disabledMcpjsonServers`.
 
 ### Why this is the biggest cost lever you don't own
 
@@ -69,7 +69,7 @@ Each item disabled removes its schema from every subsequent turn for the rest of
 
 ### How to toggle
 
-The keys live in `.agents/settings.json` (project) or `.agents/settings.json` (global) — **not** in `.planning/config.json`:
+The keys live in `.claude/settings.json` (project) or `$HOME/.claude/settings.json` (global) — **not** in `.planning/config.json`:
 
 ```json
 {
@@ -122,4 +122,4 @@ Plans should complete within ~50% context (not 80%). No context anxiety, quality
 
 **CONSIDER splitting:** >5 files total, natural semantic boundaries, context cost estimate exceeds 40% for a single plan. See `<planner_authority_limits>` for prohibited split reasons.
 
-See @.agents/gsd-core/references/planner-guidance.md for Granularity Calibration table (Coarse/Standard/Fine plans-per-phase).
+See @~/.claude/gsd-core/references/planner-guidance.md for Granularity Calibration table (Coarse/Standard/Fine plans-per-phase).

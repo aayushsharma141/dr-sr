@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import {
+  useBulkDeleteUsers,
   useCreateUser,
   useDeactivateUser,
+  useDeleteUser,
   useLoginHistory,
   useMe,
   useReactivateUser,
@@ -13,11 +15,14 @@ import {
 } from '../../api/queries'
 import { ApiError, apiFetch } from '../../api/client'
 import { AppShell } from '../../components/AppShell'
+import { AdminPageHeader } from '../../components/admin/AdminPageHeader'
+import { TableSkeleton } from '../../components/AdminSkeleton'
 import { Modal } from '../../components/Modal'
 import { ConflictBanner } from '../../components/ConflictBanner'
 import { InlineAlert } from '../../components/InlineAlert'
 import {
   ADMIN_REASON_MAX_LENGTH,
+  type BulkDeleteUsersOut,
   type LoginHistoryEntry,
   type Role,
   type UserCreatedOut,
@@ -133,7 +138,7 @@ function errorMessage(err: unknown, fallback: string): string {
 // Account action dialog configuration
 // ---------------------------------------------------------------------------
 
-type ActionType = 'deactivate' | 'reactivate' | 'reset-password' | 'unlock' | 'revoke-sessions'
+type ActionType = 'deactivate' | 'reactivate' | 'reset-password' | 'unlock' | 'revoke-sessions' | 'delete'
 type StatusFilter = 'all' | 'active' | 'inactive' | 'locked'
 
 const ACTION_COPY: Record<
@@ -171,6 +176,14 @@ const ACTION_COPY: Record<
     destructive: false,
     failed: 'Could not unlock this account. Try again.',
     body: 'Clears the failed sign-in count and the lockout so the user can sign in again straight away.',
+  },
+  delete: {
+    title: 'Delete account',
+    confirm: 'Delete account',
+    busy: 'Deleting...',
+    destructive: true,
+    failed: 'Could not delete this account. Try again.',
+    body: 'Permanently removes this account. It only works for an account that has never been used: if it has signed in or has any recorded activity, it must stay deactivated instead. This cannot be undone. Enter the super admin password to confirm.',
   },
   'revoke-sessions': {
     title: 'Sign out everywhere',
@@ -235,11 +248,7 @@ function LoginHistoryDialog({ user, onClose }: { user: UserOut; onClose: () => v
       dismiss="any"
       className="max-w-5xl"
     >
-      {isPending && (
-        <p role="status" className="text-sm text-neutral-700">
-          Loading sign-in history...
-        </p>
-      )}
+      {isPending && <TableSkeleton label="Loading sign-in history..." rows={4} columns={4} />}
       {isError && (
         <InlineAlert tone="error">
           Could not load the sign-in history: {error.message}{' '}
@@ -252,10 +261,10 @@ function LoginHistoryDialog({ user, onClose }: { user: UserOut; onClose: () => v
         <p className="text-sm text-neutral-700">No sign-in or security events are recorded for this account yet.</p>
       )}
       {data && data.length > 0 && (
-        <div className="overflow-x-auto rounded border border-neutral-200">
+        <div className="max-h-[60vh] overflow-auto rounded border border-neutral-200">
           <table className="w-full text-left text-sm text-neutral-800">
             <caption className="sr-only">Sign-in history for {user.username}</caption>
-            <thead className="bg-neutral-50 border-b border-neutral-200 text-neutral-700 font-semibold">
+            <thead className="sticky top-0 z-10 bg-neutral-50 border-b border-neutral-200 text-neutral-700 font-semibold">
               <tr>
                 <th scope="col" className="px-3 py-2">When</th>
                 <th scope="col" className="px-3 py-2">Event</th>
@@ -266,10 +275,11 @@ function LoginHistoryDialog({ user, onClose }: { user: UserOut; onClose: () => v
               </tr>
             </thead>
             <tbody className="divide-y divide-neutral-200">
-              {data.map((entry) => {
+              {data.map((entry, index) => {
                 const details = historyDetails(entry, user.username)
+                const rowDelay = index * 50
                 return (
-                  <tr key={entry.id} className="align-top">
+                  <tr key={entry.id} className="align-top transition-colors" style={{ transitionDelay: `${rowDelay}ms` }}>
                     <td className="px-3 py-2 whitespace-nowrap">{formatDateTime(entry.occurred_at)}</td>
                     <td className="px-3 py-2">{HISTORY_ACTION_LABEL[entry.action] ?? entry.action}</td>
                     <td className="px-3 py-2">
@@ -299,6 +309,150 @@ function LoginHistoryDialog({ user, onClose }: { user: UserOut; onClose: () => v
 }
 
 // ---------------------------------------------------------------------------
+// Bulk delete dialog
+// ---------------------------------------------------------------------------
+
+function BulkDeleteDialog({
+  users,
+  onClose,
+  onFinished,
+}: {
+  users: UserOut[]
+  onClose: () => void
+  onFinished: (result: BulkDeleteUsersOut) => void
+}) {
+  const mutation = useBulkDeleteUsers()
+  const [password, setPassword] = useState('')
+  const [reason, setReason] = useState('')
+  const [error, setError] = useState<string | null>(null)
+  const [result, setResult] = useState<BulkDeleteUsersOut | null>(null)
+
+  const submit = async () => {
+    setError(null)
+    try {
+      const out = await mutation.mutateAsync({
+        items: users.map((u) => ({ id: u.id, version_id: u.version_id })),
+        reason: reason.trim() === '' ? null : reason.trim(),
+        super_admin_password: password,
+      })
+      setResult(out)
+    } catch (err: unknown) {
+      setError(errorMessage(err, 'Could not delete these accounts. Try again.'))
+    } finally {
+      // The password is never kept after it has been sent.
+      setPassword('')
+    }
+  }
+
+  const close = () => (result ? onFinished(result) : onClose())
+  const skipped = result ? result.results.filter((r) => !r.deleted) : []
+  const count = users.length
+
+  return (
+    <Modal
+      open
+      title={result ? 'Bulk delete finished' : `Delete ${count} ${count === 1 ? 'account' : 'accounts'}`}
+      variant={result ? 'warning' : 'destructive'}
+      onClose={close}
+      dismiss="none"
+      busy={mutation.isPending}
+      className="max-w-lg"
+    >
+      {result ? (
+        <div className="space-y-4">
+          <p className="text-sm text-neutral-800">
+            Deleted {result.deleted_count} {result.deleted_count === 1 ? 'account' : 'accounts'}.
+            {result.skipped_count > 0 && ` Skipped ${result.skipped_count}.`}
+          </p>
+          {skipped.length > 0 && (
+            <div className="max-h-56 overflow-auto rounded border border-neutral-200">
+              <ul className="divide-y divide-neutral-200 text-sm text-neutral-800">
+                {skipped.map((r) => (
+                  <li key={r.id} className="px-3 py-2">
+                    <span className="font-mono font-medium">{r.username ?? `#${r.id}`}</span>
+                    <span className="block text-neutral-700">{r.message ?? 'Not deleted.'}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+          <div className="flex justify-end pt-2">
+            <button type="button" data-autofocus onClick={close} className={BTN_PRIMARY}>
+              Done
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div className="space-y-4">
+          <p className="text-sm text-neutral-700">
+            Permanently removes the selected accounts. It only works for accounts that have never been used: any
+            account with recorded activity is skipped and stays deactivated. This cannot be undone. Enter the
+            super admin password once to confirm all of them.
+          </p>
+
+          <div className="max-h-40 overflow-auto rounded border border-neutral-200 bg-neutral-50 px-3 py-2">
+            <ul className="text-sm font-mono text-neutral-800" aria-label="Accounts to delete">
+              {users.map((u) => (
+                <li key={u.id}>{u.username}</li>
+              ))}
+            </ul>
+          </div>
+
+          <div>
+            <label htmlFor="bulk-super-admin-password" className="block text-sm font-medium text-neutral-800 mb-1">
+              Super admin password
+            </label>
+            <input
+              id="bulk-super-admin-password"
+              type="password"
+              autoComplete="off"
+              required
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              aria-describedby="bulk-super-admin-password-help"
+              className={INPUT}
+            />
+            <p id="bulk-super-admin-password-help" className="mt-1 text-sm text-neutral-600">
+              The password of the super admin account, not your own. It is checked once and never stored.
+            </p>
+          </div>
+
+          <div>
+            <label htmlFor="bulk-delete-reason" className="block text-sm font-medium text-neutral-800 mb-1">
+              Reason (optional)
+            </label>
+            <textarea
+              id="bulk-delete-reason"
+              rows={2}
+              maxLength={ADMIN_REASON_MAX_LENGTH}
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
+              className={INPUT}
+            />
+          </div>
+
+          {error && <InlineAlert tone="error">{error}</InlineAlert>}
+
+          <div className="flex items-center justify-end gap-3 pt-2">
+            <button type="button" data-autofocus onClick={onClose} disabled={mutation.isPending} className={BTN_SECONDARY}>
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={submit}
+              disabled={mutation.isPending || password === ''}
+              className={BTN_DANGER}
+            >
+              {mutation.isPending ? 'Deleting...' : `Delete ${count} ${count === 1 ? 'account' : 'accounts'}`}
+            </button>
+          </div>
+        </div>
+      )}
+    </Modal>
+  )
+}
+
+// ---------------------------------------------------------------------------
 // Page
 // ---------------------------------------------------------------------------
 
@@ -309,6 +463,9 @@ export function Users() {
 
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
   const [successNotice, setSuccessNotice] = useState<string | null>(null)
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(() => new Set())
+  // Snapshot of the accounts the dialog was opened for, so the result view survives the list refresh.
+  const [bulkUsers, setBulkUsers] = useState<UserOut[] | null>(null)
 
   // Modals state
   const [createOpen, setCreateOpen] = useState(false)
@@ -316,6 +473,7 @@ export function Users() {
   const [historyUser, setHistoryUser] = useState<UserOut | null>(null)
   const [confirmAction, setConfirmAction] = useState<{ type: ActionType; user: UserOut } | null>(null)
   const [actionReason, setActionReason] = useState('')
+  const [superAdminPassword, setSuperAdminPassword] = useState('')
   const [tempPasswordNotice, setTempPasswordNotice] = useState<{
     username: string
     password: string
@@ -347,8 +505,10 @@ export function Users() {
   const resetPasswordMutation = useResetUserPassword()
   const unlockMutation = useUnlockUser()
   const revokeSessionsMutation = useRevokeUserSessions()
+  const deleteMutation = useDeleteUser()
 
   const actionBusy =
+    deleteMutation.isPending ||
     deactivateMutation.isPending ||
     reactivateMutation.isPending ||
     resetPasswordMutation.isPending ||
@@ -391,6 +551,7 @@ export function Users() {
   const openAction = (type: ActionType, user: UserOut) => {
     setActionError(null)
     setActionReason('')
+    setSuperAdminPassword('')
     setConfirmAction({ type, user })
   }
 
@@ -398,6 +559,7 @@ export function Users() {
     setConfirmAction(null)
     setActionError(null)
     setActionReason('')
+    setSuperAdminPassword('')
   }
 
   const handleCreateSubmit = async (e: FormEvent) => {
@@ -483,6 +645,12 @@ export function Users() {
       } else if (type === 'unlock') {
         await unlockMutation.mutateAsync({ id: user.id, payload })
         setSuccessNotice(`Account unlocked: ${user.username}`)
+      } else if (type === 'delete') {
+        await deleteMutation.mutateAsync({
+          id: user.id,
+          payload: { ...payload, super_admin_password: superAdminPassword },
+        })
+        setSuccessNotice(`Account deleted: ${user.username}`)
       } else {
         const res = await revokeSessionsMutation.mutateAsync({ id: user.id, payload: { reason } })
         const count = res.revoked_count
@@ -493,28 +661,62 @@ export function Users() {
       }
       setConfirmAction(null)
       setActionReason('')
+      setSuperAdminPassword('')
       refetchUsers()
     } catch (err: unknown) {
       setActionError(errorMessage(err, ACTION_COPY[type].failed))
+      // A rejected password is never kept in the field for another try.
+      if (type === 'delete') setSuperAdminPassword('')
     }
   }
 
   const isSelf = (u: UserOut) => me?.id === u.id
+  // Only a deactivated account that is neither yours nor the super admin can be put forward.
+  const canDelete = (u: UserOut) => !u.is_active && !u.is_super_admin && !isSelf(u)
+  const deletableVisible = visibleUsers.filter(canDelete)
+  const selectedUsers = (users ?? []).filter((u) => selectedIds.has(u.id) && canDelete(u))
+  const allVisibleSelected =
+    deletableVisible.length > 0 && deletableVisible.every((u) => selectedIds.has(u.id))
+
+  const toggleSelected = (id: number) =>
+    setSelectedIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+
+  const toggleAllVisible = () =>
+    setSelectedIds((prev) => {
+      const next = new Set(prev)
+      if (allVisibleSelected) deletableVisible.forEach((u) => next.delete(u.id))
+      else deletableVisible.forEach((u) => next.add(u.id))
+      return next
+    })
+
+  const handleBulkFinished = (out: BulkDeleteUsersOut) => {
+    setBulkUsers(null)
+    setSelectedIds(new Set())
+    setSuccessNotice(
+      `Deleted ${out.deleted_count} ${out.deleted_count === 1 ? 'account' : 'accounts'}${
+        out.skipped_count > 0 ? `, skipped ${out.skipped_count}` : ''
+      }.`,
+    )
+    refetchUsers()
+  }
 
   return (
     <AppShell name={me?.full_name ?? 'Admin'} role={me?.role ?? 'ADMIN'}>
       <div className="space-y-6">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-bold text-neutral-900">User accounts</h1>
-            <p className="text-sm text-neutral-600 mt-1">
-              Staff sign-in accounts, roles, account status, lockouts and password resets.
-            </p>
-          </div>
-          <button type="button" onClick={openCreateDialog} className={`${BTN_PRIMARY} self-start sm:self-auto`}>
-            Create User
-          </button>
-        </div>
+        <AdminPageHeader
+          title="User Accounts"
+          description="Staff sign-in accounts, roles, account status, lockouts and password resets."
+          actions={
+            <button type="button" onClick={openCreateDialog} className={BTN_PRIMARY}>
+              Create User
+            </button>
+          }
+        />
 
         {successNotice && (
           <InlineAlert tone="success" onDismiss={() => setSuccessNotice(null)}>
@@ -522,11 +724,7 @@ export function Users() {
           </InlineAlert>
         )}
 
-        {isPending && (
-          <div className="p-8 text-center bg-white rounded border border-neutral-200">
-            <p role="status" className="text-neutral-600">Loading user accounts...</p>
-          </div>
-        )}
+        {isPending && <TableSkeleton label="Loading user accounts..." rows={5} columns={6} />}
 
         {isError && <InlineAlert tone="error">Failed to load users: {error.message}</InlineAlert>}
 
@@ -553,11 +751,39 @@ export function Users() {
               })}
             </div>
 
-            <div className="bg-white rounded-lg border border-neutral-200 overflow-x-auto shadow-xs">
+            {selectedUsers.length > 0 && (
+              <div
+                role="region"
+                aria-label="Bulk actions"
+                className="flex flex-wrap items-center gap-3 rounded-lg border border-red-300 bg-red-50 px-4 py-3"
+              >
+                <span className="text-sm font-medium text-red-900">
+                  {selectedUsers.length} {selectedUsers.length === 1 ? 'account' : 'accounts'} selected
+                </span>
+                <button type="button" onClick={() => setBulkUsers(selectedUsers)} className={BTN_DANGER}>
+                  Delete selected
+                </button>
+                <button type="button" onClick={() => setSelectedIds(new Set())} className={BTN_SECONDARY}>
+                  Clear selection
+                </button>
+              </div>
+            )}
+
+            <div className="bg-white rounded-lg border border-neutral-200 max-h-[70vh] overflow-auto shadow-xs">
               <table className="w-full text-left text-sm text-neutral-800">
                 <caption className="sr-only">User accounts</caption>
-                <thead className="bg-neutral-50 border-b border-neutral-200 text-neutral-700 font-semibold">
+                <thead className="sticky top-0 z-10 bg-neutral-50 border-b border-neutral-200 text-neutral-700 font-semibold">
                   <tr>
+                    <th scope="col" className="px-4 py-3 w-10">
+                      <input
+                        type="checkbox"
+                        aria-label="Select all deletable accounts shown"
+                        checked={allVisibleSelected}
+                        disabled={deletableVisible.length === 0}
+                        onChange={toggleAllVisible}
+                        className="h-5 w-5 cursor-pointer disabled:cursor-not-allowed"
+                      />
+                    </th>
                     <th scope="col" className="px-4 py-3">Account</th>
                     <th scope="col" className="px-4 py-3">Role</th>
                     <th scope="col" className="px-4 py-3">Status</th>
@@ -569,16 +795,28 @@ export function Users() {
                 <tbody className="divide-y divide-neutral-200">
                   {visibleUsers.length === 0 && (
                     <tr>
-                      <td colSpan={6} className="px-4 py-6 text-center text-neutral-700">
+                      <td colSpan={7} className="px-4 py-6 text-center text-neutral-700">
                         No accounts match this filter.
                       </td>
                     </tr>
                   )}
-                  {visibleUsers.map((u) => {
+                  {visibleUsers.map((u, index) => {
                     const remaining = u.locked_until ? formatRemaining(u.locked_until, now) : null
+                    const rowDelay = index * 50
                     const self = isSelf(u)
                     return (
-                      <tr key={u.id} className="align-top hover:bg-neutral-50 transition-colors">
+                      <tr key={u.id} className="align-top hover:bg-neutral-50 transition-colors" style={{ transitionDelay: `${rowDelay}ms` }}>
+                        <td className="px-4 py-3">
+                          {canDelete(u) && (
+                            <input
+                              type="checkbox"
+                              aria-label={`Select ${u.username}`}
+                              checked={selectedIds.has(u.id)}
+                              onChange={() => toggleSelected(u.id)}
+                              className="h-5 w-5 cursor-pointer"
+                            />
+                          )}
+                        </td>
                         <td className="px-4 py-3">
                           <div className="font-medium text-neutral-900">
                             {u.full_name}
@@ -587,7 +825,14 @@ export function Users() {
                           <div className="font-mono text-neutral-700">{u.username}</div>
                         </td>
                         <td className="px-4 py-3">
-                          <div>{ROLE_LABEL[u.role]}</div>
+                          <div>
+                            {ROLE_LABEL[u.role]}
+                            {u.is_super_admin && (
+                              <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded border text-sm font-medium bg-[#FFF8E7] text-[#5D0B26] border-[#8E1C3D]">
+                                Super admin
+                              </span>
+                            )}
+                          </div>
                           {u.doctor_id !== null && (
                             <div className="text-neutral-600">Doctor profile #{u.doctor_id}</div>
                           )}
@@ -689,6 +934,16 @@ export function Users() {
                                   Reactivate
                                 </button>
                               ))}
+                            {!self && !u.is_active && !u.is_super_admin && (
+                              <button
+                                type="button"
+                                onClick={() => openAction('delete', u)}
+                                aria-label={`Delete ${u.username}`}
+                                className={`${BTN_ROW} border-red-800 bg-white text-red-800 hover:bg-red-50`}
+                              >
+                                Delete
+                              </button>
+                            )}
                           </div>
                         </td>
                       </tr>
@@ -867,6 +1122,27 @@ export function Users() {
                 </InlineAlert>
               )}
 
+              {confirmAction.type === 'delete' && (
+                <div>
+                  <label htmlFor="super-admin-password" className="block text-sm font-medium text-neutral-800 mb-1">
+                    Super admin password
+                  </label>
+                  <input
+                    id="super-admin-password"
+                    type="password"
+                    autoComplete="off"
+                    required
+                    value={superAdminPassword}
+                    onChange={(e) => setSuperAdminPassword(e.target.value)}
+                    aria-describedby="super-admin-password-help"
+                    className={INPUT}
+                  />
+                  <p id="super-admin-password-help" className="mt-1 text-sm text-neutral-600">
+                    The password of the super admin account, not your own. It is checked once and never stored.
+                  </p>
+                </div>
+              )}
+
               <div>
                 <label htmlFor="action-reason" className="block text-sm font-medium text-neutral-800 mb-1">
                   Reason (optional)
@@ -894,7 +1170,7 @@ export function Users() {
                 <button
                   type="button"
                   onClick={handleConfirmAction}
-                  disabled={actionBusy}
+                  disabled={actionBusy || (confirmAction.type === 'delete' && superAdminPassword === '')}
                   className={ACTION_COPY[confirmAction.type].destructive ? BTN_DANGER : BTN_PRIMARY}
                 >
                   {actionBusy ? ACTION_COPY[confirmAction.type].busy : ACTION_COPY[confirmAction.type].confirm}
@@ -902,6 +1178,10 @@ export function Users() {
               </div>
             </div>
           </Modal>
+        )}
+
+        {bulkUsers && (
+          <BulkDeleteDialog users={bulkUsers} onClose={() => setBulkUsers(null)} onFinished={handleBulkFinished} />
         )}
 
         {historyUser && <LoginHistoryDialog user={historyUser} onClose={() => setHistoryUser(null)} />}

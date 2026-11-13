@@ -143,7 +143,7 @@ describe('Doctor Workspace and Clinical Encounters', () => {
       expect(screen.getByText('#1')).toBeInTheDocument()
     })
 
-    expect(screen.getByText('Doctor Consultation Queue')).toBeInTheDocument()
+    expect(screen.getByText('Doctor Dashboard')).toBeInTheDocument()
     expect(screen.getByText('Aarav Kumar')).toBeInTheDocument()
     expect(screen.getByText(/KH-2026-0001/)).toBeInTheDocument()
     expect(screen.getByText(/Penicillin allergy/)).toBeInTheDocument()

@@ -29,6 +29,7 @@ class Permission(StrEnum):
     USER_DEACTIVATE = "user:deactivate"
     USER_RESET_PASSWORD = "user:reset_password"  # noqa: S105
     USER_UNLOCK = "user:unlock"
+    USER_DELETE = "user:delete"
     DASHBOARD_ADMIN = "dashboard:admin"
     DASHBOARD_RECEPTION = "dashboard:reception"
     DASHBOARD_DOCTOR = "dashboard:doctor"
@@ -38,6 +39,7 @@ class Permission(StrEnum):
     SETTINGS_WRITE = "settings:write"
     DOCTOR_READ = "doctor:read"
     DOCTOR_MANAGE = "doctor:manage"
+    DOCTOR_SETTINGS_WRITE = "doctor_settings:write"
     FEE_READ = "fee:read"
     FEE_MANAGE = "fee:manage"
     PATIENT_READ = "patient:read"
@@ -81,6 +83,11 @@ class Permission(StrEnum):
     BACKUP_CONFIGURE = "backup:configure"
     SYSTEM_READ = "system:read"
 
+    # Phase 20: Admin Data Governance & Asset Management (D-20-01)
+    PATIENT_CORRECT = "patient:correct"
+    PATIENT_IMPORT = "patient:import"
+    PATIENT_EXPORT = "patient:export"
+
 
 # Authoritative role-to-permissions catalog
 ROLE_PERMISSIONS: dict[Role, frozenset[Permission]] = {
@@ -92,6 +99,7 @@ ROLE_PERMISSIONS: dict[Role, frozenset[Permission]] = {
             Permission.USER_DEACTIVATE,
             Permission.USER_RESET_PASSWORD,
             Permission.USER_UNLOCK,
+            Permission.USER_DELETE,
             Permission.DASHBOARD_ADMIN,
             Permission.SETTINGS_READ,
             Permission.SETTINGS_WRITE,
@@ -115,6 +123,9 @@ ROLE_PERMISSIONS: dict[Role, frozenset[Permission]] = {
             Permission.SECURITY_WRITE,
             Permission.BACKUP_CONFIGURE,
             Permission.SYSTEM_READ,
+            Permission.PATIENT_CORRECT,
+            Permission.PATIENT_IMPORT,
+            Permission.PATIENT_EXPORT,
         }
     ),
     Role.RECEPTION: frozenset(
@@ -141,6 +152,7 @@ ROLE_PERMISSIONS: dict[Role, frozenset[Permission]] = {
             Permission.DASHBOARD_DOCTOR,
             Permission.SETTINGS_READ,
             Permission.DOCTOR_READ,
+            Permission.DOCTOR_SETTINGS_WRITE,
             Permission.FEE_READ,
             Permission.PATIENT_READ,
             Permission.APPOINTMENT_READ,

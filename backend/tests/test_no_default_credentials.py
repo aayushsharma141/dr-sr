@@ -16,7 +16,7 @@ from fastapi.testclient import TestClient
 def test_legacy_credentials_absent_from_v3_codebase() -> None:
     """Legacy v2.0 credentials must NOT exist anywhere in v3.0 backend/ or frontend/ trees."""
     repo_root = Path(__file__).resolve().parents[2]
-    legacy_auth_file = repo_root / "app" / "services" / "auth_service.py"
+    legacy_auth_file = repo_root / "legacy" / "app" / "services" / "auth_service.py"
     assert legacy_auth_file.exists(), (
         "Legacy auth_service.py must exist to extract legacy credentials"
     )
@@ -72,7 +72,7 @@ def test_legacy_credentials_absent_from_v3_codebase() -> None:
 def test_login_with_legacy_credentials_fails(client: TestClient) -> None:
     """Attempting authentication with legacy default credentials returns 401."""
     repo_root = Path(__file__).resolve().parents[2]
-    legacy_auth_file = repo_root / "app" / "services" / "auth_service.py"
+    legacy_auth_file = repo_root / "legacy" / "app" / "services" / "auth_service.py"
     legacy_content = legacy_auth_file.read_text(encoding="utf-8")
     pw_match = re.search(r'default_password:\s*str\s*=\s*"([^"]+)"', legacy_content)
     user_match = re.search(r'default_username:\s*str\s*=\s*"([^"]+)"', legacy_content)

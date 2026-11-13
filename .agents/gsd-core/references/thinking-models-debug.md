@@ -1,4 +1,4 @@
-﻿# Thinking Models: Debug Cluster
+# Thinking Models: Debug Cluster
 
 Structured reasoning models for the **debugger** agent. Apply these at decision points during investigation, not continuously. Each model counters a specific documented failure mode.
 

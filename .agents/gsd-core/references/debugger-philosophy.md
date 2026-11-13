@@ -1,4 +1,4 @@
-﻿# Debugger Philosophy
+# Debugger Philosophy
 
 Evergreen debugging disciplines — applies across every bug, every language, every system. Loaded by `gsd-debugger` via `@file` include.
 

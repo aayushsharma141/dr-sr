@@ -1,4 +1,4 @@
-﻿# Planner Coupling — Same-Wave Shared Mutable State
+# Planner Coupling — Same-Wave Shared Mutable State
 
 > Progressive-disclosure reference for `agents/gsd-planner.md`. The planner agent
 > reads this file when assigning waves (issue #3724). The slim pointer in

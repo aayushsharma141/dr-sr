@@ -32,6 +32,7 @@ def validate_status_transition(
     target_status: AppointmentStatus,
     principal: Principal,
     cancellation_reason: str | None = None,
+    session=None,
 ) -> None:
     """Validate that transition from appt.status to target_status is permitted."""
     current = AppointmentStatus(appt.status)
@@ -63,6 +64,24 @@ def validate_status_transition(
             code="cancellation_reason_required",
             message="A cancellation reason must be provided when cancelling an appointment.",
         )
+
+    # Cannot cancel if clinical consultation has already been finalised (BR-013)
+    if target_status == AppointmentStatus.CANCELLED and session is not None:
+        from sqlalchemy import select
+
+        from kalyan_api.models import ClinicalEncounter
+
+        enc = session.scalar(
+            select(ClinicalEncounter).where(ClinicalEncounter.appointment_id == appt.id)
+        )
+        if enc is not None and enc.is_finalised:
+            raise ApiError(
+                status_code=422,
+                code="cannot_cancel_finalised",
+                message=(
+                    "Cannot cancel an appointment whose consultation has already been finalised."
+                ),
+            )
 
     # Doctor-only transition enforcement: IN_CONSULTATION and DONE must be initiated by DOCTOR
     if target_status in (AppointmentStatus.IN_CONSULTATION, AppointmentStatus.DONE):

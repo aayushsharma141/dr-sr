@@ -1,4 +1,4 @@
-﻿# Verify Command Path Resolvability (#2401)
+# Verify Command Path Resolvability (#2401)
 
 > Reference file for gsd-plan-checker agent. Loaded on-demand via `@` reference.
 

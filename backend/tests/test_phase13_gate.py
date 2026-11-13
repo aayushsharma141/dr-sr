@@ -206,9 +206,16 @@ def test_phase13_full_lifecycle_and_security_gate(
     rec_enc_read = rec_c.get(f"/api/encounters/{enc_id}")
     assert rec_enc_read.status_code == 403, rec_enc_read.text
 
-    # Doctor B attempts to read Doctor A's encounter -> 404 Not Found (cross-isolation)
+    # Doctor B reads Doctor A's encounter -> 200 OK (audited cross-doctor read per DWS-04)
     doc_b_enc_read = doc_b_c.get(f"/api/encounters/{enc_id}")
-    assert doc_b_enc_read.status_code == 404, doc_b_enc_read.text
+    assert doc_b_enc_read.status_code == 200, doc_b_enc_read.text
+
+    # Doctor B write attempt remains strictly denied -> 404 Not Found (siloed write per DWS-04)
+    doc_b_enc_write = doc_b_c.patch(
+        f"/api/encounters/{enc_id}",
+        json={"symptoms": "Doctor B tampering", "version_id": enc_v_id},
+    )
+    assert doc_b_enc_write.status_code == 404, doc_b_enc_write.text
 
     # 5. Doctor updates draft notes
     patch_draft_res = doc_a_c.patch(

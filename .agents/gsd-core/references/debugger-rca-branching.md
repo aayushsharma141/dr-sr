@@ -1,4 +1,4 @@
-﻿# RCA Branching — Anti-Single-Cause Bias
+# RCA Branching — Anti-Single-Cause Bias
 
 Loaded by `gsd-debugger` via `@-include` from Phase 2 (form hypothesis) and the
 pre-fix Structured Reasoning Checkpoint. A lightweight discipline that guards

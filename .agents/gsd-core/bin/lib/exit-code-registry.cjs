@@ -1,4 +1,4 @@
-﻿'use strict';
+'use strict';
 
 // GENERATED FILE — DO NOT EDIT BY HAND.
 // Source of truth: gsd-core/bin/shared/exit-codes.json. Regenerate with:

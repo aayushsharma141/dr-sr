@@ -13,17 +13,18 @@ from kalyan_api.schemas.billing import PendingDueOut
 
 
 def compute_pending_dues(session: Session) -> list[PendingDueOut]:
-    """Return active treatment packages with a positive outstanding balance, newest first."""
+    """Return active and completed treatment packages with a positive outstanding balance, newest
+    first (BR-003)."""
     stmt = (
         select(TreatmentPlan)
-        .where(TreatmentPlan.status == "ACTIVE")
+        .where(TreatmentPlan.status.in_(["ACTIVE", "COMPLETED"]))
         .options(selectinload(TreatmentPlan.patient))
         .order_by(TreatmentPlan.created_at.desc())
     )
-    active_plans = session.execute(stmt).scalars().all()
+    plans = session.execute(stmt).scalars().all()
 
     dues: list[PendingDueOut] = []
-    for plan in active_plans:
+    for plan in plans:
         paid_stmt = select(func.coalesce(func.sum(Payment.amount_paise), 0)).where(
             Payment.treatment_plan_id == plan.id,
             Payment.is_reversed.is_(False),
@@ -39,7 +40,8 @@ def compute_pending_dues(session: Session) -> list[PendingDueOut]:
                     patient_urn=plan.patient.urn if plan.patient else "",
                     patient_name=plan.patient.full_name if plan.patient else "",
                     plan_name=plan.plan_name,
-                    condition_diagnosis=plan.condition_diagnosis,
+                    # D-04/FB-05: clinical diagnosis hidden from billing dues
+                    condition_diagnosis=None,
                     agreed_price_paise=plan.agreed_price_paise,
                     paid_paise=paid_paise,
                     balance_paise=balance_paise,

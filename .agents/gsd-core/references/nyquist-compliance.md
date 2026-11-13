@@ -1,4 +1,4 @@
-﻿# Dimension 8 — Nyquist Compliance (checks 8a–8e)
+# Dimension 8 — Nyquist Compliance (checks 8a–8e)
 
 > Reference file for gsd-plan-checker agent. Loaded on-demand via `@` reference.
 > Extracted from `agents/gsd-plan-checker.md` in #3172 to stay under the agent's

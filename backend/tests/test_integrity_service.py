@@ -18,8 +18,12 @@ def test_integrity_audit_clean_database(db_session):
         for f in settings.photos_dir.glob("*"):
             if f.is_file() and not f.name.startswith("test_"):
                 f.unlink()
+    if settings.assets_dir.exists():
+        for f in settings.assets_dir.glob("*"):
+            if f.is_file() and not f.name.startswith("test_"):
+                f.unlink()
     report = run_integrity_audit(db_session, settings)
-    assert report.total_checks == 6
+    assert report.total_checks == 7
     assert report.is_healthy is True
     assert report.failed_checks == 0
     assert all(c.passed for c in report.checks)
@@ -59,3 +63,98 @@ def test_integrity_audit_detects_orphan_and_missing_photos(db_session, tmp_path:
     finally:
         if orphan_file.exists():
             orphan_file.unlink()
+
+
+def test_each_finding_has_its_own_severity(db_session, tmp_path: Path):
+    """A missing linked file is an ERROR; an unlinked file on disk is only CLEANUP."""
+    settings = get_settings().model_copy(update={"photos_dir": tmp_path})
+    (tmp_path / "unlinked_leftover.jpg").write_bytes(b"x" * 12)
+
+    only_orphan = check_photo_storage_integrity(db_session, settings)
+    assert only_orphan.code == "photo_files"
+    assert only_orphan.passed is False
+    assert [d["severity"] for d in only_orphan.discrepancies] == ["CLEANUP"]
+    assert only_orphan.severity == "CLEANUP"
+
+    db_session.add(
+        Patient(
+            urn="KHM-2026-88889",
+            full_name="Missing Photo Patient",
+            guardian_name="Guardian",
+            gender="F",
+            age_years=40,
+            mobile="9876543212",
+            address="Street 2",
+            district="Kangra",
+            state="Himachal Pradesh",
+            photo_path="/api/patients/photos/gone.jpg",
+        )
+    )
+    db_session.flush()
+
+    mixed = check_photo_storage_integrity(db_session, settings)
+    by_issue = {d["issue"]: d["severity"] for d in mixed.discrepancies}
+    assert by_issue == {"orphan_photo_file": "CLEANUP", "missing_photo_file": "ERROR"}
+    assert mixed.severity == "ERROR"
+
+
+def test_cleanup_only_findings_leave_the_report_healthy(db_session, tmp_path: Path):
+    """Clutter is counted separately and does not make the report unhealthy."""
+    photos = tmp_path / "photos"
+    assets = tmp_path / "assets"
+    photos.mkdir()
+    assets.mkdir()
+    (photos / "stray.jpg").write_bytes(b"x")
+    settings = get_settings().model_copy(update={"photos_dir": photos, "assets_dir": assets})
+
+    report = run_integrity_audit(db_session, settings)
+    assert report.cleanup_checks == 1
+    assert report.failed_checks == 0
+    assert report.is_healthy is True
+    assert (
+        report.passed_checks
+        + report.failed_checks
+        + report.warning_checks
+        + (report.cleanup_checks)
+        == report.total_checks
+    )
+
+
+def test_integrity_new_format_urn_sequence_check(db_session):
+    """New URN format KH-YY-P-MM-NNNNN produces no false gap warnings when sequential."""
+    from kalyan_api.models import UrnSequence
+    from kalyan_api.services.integrity_service import check_urn_sequence_gaps
+
+    # Add 2 consecutive patients for 2026
+    p1 = Patient(
+        urn="KH-26-P-11-00001",
+        full_name="Patient One",
+        guardian_name="Guardian",
+        gender="M",
+        age_years=30,
+        mobile="9876543210",
+        address="Address 1",
+    )
+    p2 = Patient(
+        urn="KH-26-P-11-00002",
+        full_name="Patient Two",
+        guardian_name="Guardian",
+        gender="F",
+        age_years=28,
+        mobile="9876543211",
+        address="Address 2",
+    )
+    db_session.add_all([p1, p2])
+    # Sync counter
+    seq = db_session.get(UrnSequence, 2026)
+    if not seq:
+        seq = UrnSequence(year=2026, last_seq=2)
+        db_session.add(seq)
+    else:
+        seq.last_seq = max(seq.last_seq, 2)
+    db_session.flush()
+
+    res = check_urn_sequence_gaps(db_session)
+    assert res.passed is True
+    assert len(res.discrepancies) == 0
+

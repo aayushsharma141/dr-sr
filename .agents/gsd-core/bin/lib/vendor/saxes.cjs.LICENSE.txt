@@ -1,4 +1,4 @@
-﻿saxes@6.0.0 (package metadata: ISC)
+saxes@6.0.0 (package metadata: ISC)
 
 The ISC License
 

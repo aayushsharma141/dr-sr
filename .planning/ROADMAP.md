@@ -21,7 +21,9 @@ Ordering notes:
 - [ ] **Phase 16: Audit Viewer, Backup/Restore & Integrity** - Audit log viewer, scheduled checksummed backups on a second drive, verified restore, integrity report.
 - [ ] **Phase 17: LAN Deployment, Printer & Acceptance** - One-time server install, auto-recovery after power cut, LAN multi-PC offline operation, real-printer sign-off, full acceptance suite.
 - [ ] **Phase 18: UI/UX Review Hardening** - Receipt printing from the app, native modal dialogs, non-blocking errors, 12px text and contrast floor, bundled Hindi font and language marking, form accessibility, webcam HTTPS decision, headless print verification.
-- [ ] **Phase 19: Universal Consultation Workspace** - One consultation for Physiotherapy and Ophthalmology: real drafts with auto-save, new and follow-up encounters, versioned specialty templates, vitals, integrated prescription, follow-up recommendations, read-all edit-own access, one login at a time and a printed summary.
+- [x] **Phase 19: Universal Consultation Workspace** - One consultation for Physiotherapy and Ophthalmology: real drafts with auto-save, new and follow-up encounters, versioned specialty templates, vitals, integrated prescription, follow-up recommendations, read-all edit-own access, one login at a time and a printed summary. (completed 2026-11-06)
+- [x] **Phase 20: Admin Data Governance & Asset Management** - Patient demographic correction with audit; CSV/XLSX import centre (8-stage staging pipeline: upload → inspect → map → validate → resolve → preview → commit → reconcile); controlled patient export (permission-checked, field-selective, audited); hospital identity and logo/asset CRUD with version history; bilingual print template management per document type (prescription, receipt, registration card); five-section Admin navigation reorganization (Hospital Configuration, Patient & Data Management, Users/Security/Governance, System & Maintenance). Uses existing RBAC; no new permission system. All existing admin pages preserved and reorganized, not removed. (completed 2026-11-08)
+- [ ] **Phase 21: Advanced Data Operations** (deferred) - Duplicate patient detection and merge workflow (high-risk FK cascade; dedicated transaction design); bulk archive and bulk delete for eligible records; extended data-edit permission controls; LAN workstation status monitoring. Depends on Phase 20 stable data foundation.
 
 ## Phase Details
 
@@ -231,11 +233,17 @@ Plans:
   8. After finalising, the patient-copy summary prints on one A4 page using the approved letterhead, with no medicines listed.
   9. A second login on another PC is refused with the option to end the other session; taking over is audited, and a crashed PC never locks an account out.
 
-**Plans**: TBD
+**Plans**: 7/7 plans complete
 
 Plans:
 
-- [ ] TBD (created by plan-phase)
+- [x] 19-01-PLAN.md - Prerequisites & Base Migration (PR alignment, encounter uniqueness, check-in timestamp, single-session login DWS-10) (Wave 1)
+- [x] 19-02-PLAN.md - Specialty Clinical Templates & Vitals Engine (migration 0012, template registry, Physiotherapy/Ophthalmology seeds, BMI auto-calc, DWS-05, DWS-06) (Wave 2)
+- [x] 19-03-PLAN.md - Prescription Lifecycle & Follow-up Recommendations (migration 0013/0014, draft->authorised->print, cancellation with reason, medicine extra fields, recommendations & reception booking, DWS-07, DWS-08) (Wave 3)
+- [x] 19-04-PLAN.md - Centralized Scope & Cross-Doctor Reads (refactor core/scope.py, eliminate inline silo checks, audit log cross-doctor reads, preserve reception/admin denial, DWS-04) (Wave 4)
+- [x] 19-05-PLAN.md - Universal Consultation Frontend Workspace (single-page continuous layout with jump list, prior visit copy controls, 3s debounced auto-save, vitals, specialty form, prescription authoring & auth modal, DWS-01, DWS-02, DWS-05, DWS-06, DWS-07) (Wave 5)
+- [x] 19-06-PLAN.md - Dashboard Unfinished List & Print Summary (Doctor dashboard unfinished drafts card, consultation summary print component on letterhead without medications DWS-09, 409 session takeover dialog DWS-10) (Wave 6)
+- [x] 19-07-PLAN.md - Integration Gate & Verification Suite (test_phase19_gate.py, end-to-end clinical workflow roundtrip, vitest suite, 85% coverage floor, OpenAPI & RBAC snapshot checks) (Wave 7)
 
 ## Backlog
 
@@ -244,19 +252,77 @@ Plans:
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 11 → 12 → 13 → 14 → 15 → 16 → 17 → 18 → 19
+Phases execute in numeric order: 11 → 12 → 13 → 14 → 15 → 16 → 17 → 18 → 19 → 20 → 21 → 22
 
 | Phase | Plans Complete | Status | Completed |
 | --- | --- | --- | --- |
-| 11. Decisions Gate, Foundation & Auth | 0/16 | Planned | - |
-| 12. Clinic Settings & Patient Registration | 0/TBD | Not started | - |
-| 13. Appointments & Clinical Encounters | 0/TBD | Not started | - |
-| 14. Prescriptions, Treatment Plans & Sessions | 0/TBD | Not started | - |
-| 15. Billing, Receipts & Reversals | 0/TBD | Not started | - |
-| 16. Audit Viewer, Backup/Restore & Integrity | 0/TBD | Not started | - |
-| 17. LAN Deployment, Printer & Acceptance | 0/TBD | Not started | - |
-| 18. UI/UX Review Hardening | 5/8 | In progress (04 closed with printer waiver; 05 closed with criterion 4 unmet; 06-08 pending) | - |
-| 19. Universal Consultation Workspace | 0/TBD | Not started | - |
+| 11. Decisions Gate, Foundation & Auth | 16/16 | Complete | 2026-10-31 |
+| 12. Clinic Settings & Patient Registration | 8/8 | Complete | 2026-11-01 |
+| 13. Appointments & Clinical Encounters | 7/7 | Complete | 2026-11-01 |
+| 14. Prescriptions, Treatment Plans & Sessions | 7/7 | Complete | 2026-11-02 |
+| 15. Billing, Receipts & Reversals | 7/7 | Complete | 2026-11-02 |
+| 16. Audit Viewer, Backup/Restore & Integrity | 7/7 | Complete | 2026-11-04 |
+| 17. LAN Deployment, Printer & Acceptance | 5/5 | Complete | 2026-11-05 |
+| 18. UI/UX Review Hardening | 5/8 | Skipped / Superseded by current build | - |
+| 19. Universal Consultation Workspace | 7/7 | Complete | 2026-11-06 |
+| 20. Admin Data Governance & Asset Management | 8/8 | Complete | 2026-11-08 |
+| 21. Build Takeover & System Stabilization | 0/2 | In progress | - |
+| 22. Advanced Data Operations | 0/0 | Deferred — depends on Phase 21 | - |
 
 ---
 *Roadmap created: 2026-10-30*
+
+---
+
+### Phase 20: Admin Data Governance & Asset Management
+
+**Goal**: Transform the Admin panel into a self-contained Hospital Administration and Data
+Governance system. The administrator can independently manage hospital identity, correct
+patient records, import/export data, and use all existing admin functions through a coherent
+five-section navigation — without developer intervention.
+
+**Depends on**: Phase 12 (patient registration, settings), Phase 15 (billing), Phase 16 (audit)
+
+**Permission model**: Uses the existing RBAC system. `ADMIN` role required for all operations.
+No new permissions are introduced. Server-side enforcement on every new endpoint.
+
+**Navigation reorganization**: The existing admin sidebar is restructured into five sections.
+All existing pages (`/admin/settings`, `/admin/doctors`, `/admin/billing`, `/admin/users`,
+`/admin/security`, `/admin/audit`, `/admin/backups`, `/admin/integrity`, `/admin/system`)
+are preserved and relocated — not removed or rewritten.
+
+**Plans:** 8/8 plans complete
+
+Plans:
+
+- [x] 20-01-PLAN.md — Admin inventory audit, permissions foundation (patient:correct, patient:import, patient:export), and schema freeze (Wave 1)
+- [x] 20-02-PLAN.md — Five-section Admin sidebar navigation reorganization in AppShell and module registry (Wave 2)
+- [x] 20-03-PLAN.md — Hospital identity and logo asset management (upload, version history, asset directory, backup/integrity) (Wave 3)
+- [x] 20-04-PLAN.md — Per-document-type print template management (prescription, receipt, registration_card, consultation_summary) (Wave 4)
+- [x] 20-05-PLAN.md — Patient demographic correction workflow (PATCH route, reason, audit, print snapshot backfill) (Wave 5)
+- [x] 20-06-PLAN.md — Patient import centre (8-stage pipeline, CSV/XLSX, staging, safety backup before commit, URN sequence) (Wave 6)
+- [x] 20-07-PLAN.md — Patient export centre (stream to browser, field-selective, audited, formula sanitization) (Wave 7)
+- [x] 20-08-PLAN.md — Phase 20 integration gate (all tests pass, typecheck clean, coverage floor maintained) (Wave 8)
+
+---
+
+### Phase 21: Build Takeover & System Stabilization
+
+**Goal**: Take over the active build on branch `refactor/admin-modules-ssot` from the multi-agent session. Reconcile frontend admin navigation tests, ensure 100% green test suites across frontend and backend, stabilize the 5-section Admin SSOT navigation, and complete verification for hospital lifecycles WF-001 through WF-017.
+
+**Depends on**: Current build in tree (Phase 20 foundation)
+
+**Plans:** 2 plans
+
+Plans:
+
+- [ ] 21-01-PLAN.md — Reconcile admin navigation architecture test with real AdminDashboard component shape and types (Wave 1)
+- [ ] 21-02-PLAN.md — Full-stack regression verification gate (Vitest 54/54 suites, pytest 1,064 tests, typecheck) (Wave 2)
+
+---
+
+### Phase 22: Advanced Data Operations
+
+**Goal**: Duplicate patient detection and merge workflow (high-risk FK cascade; dedicated transaction design); bulk archive and bulk delete for eligible records; extended data-edit permission controls; LAN workstation status monitoring.
+
+**Depends on**: Phase 21 stable data foundation

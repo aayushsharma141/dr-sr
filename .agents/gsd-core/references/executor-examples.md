@@ -1,4 +1,4 @@
-﻿# Executor Extended Examples
+# Executor Extended Examples
 
 > Reference file for gsd-executor agent. Loaded on-demand via `@` reference.
 > For sub-200K context windows, this content is stripped from the agent prompt and available here for on-demand loading.

@@ -28,6 +28,7 @@ from kalyan_api.db.session import SessionDep
 from kalyan_api.models import (
     Appointment,
     ClinicSettings,
+    Doctor,
     Patient,
     Payment,
     PaymentMethod,
@@ -58,8 +59,10 @@ def _to_payment_out(p: Payment) -> PaymentOut:
         id=p.id,
         receipt_number=p.receipt_number,
         patient_id=p.patient_id,
-        patient_urn=p.patient.urn if p.patient else "",
-        patient_name=p.patient.full_name if p.patient else "",
+        patient_urn=p.patient_urn or (p.patient.urn if p.patient else ""),
+        patient_name=p.patient_name or (p.patient.full_name if p.patient else ""),
+        patient_mobile=p.patient_mobile or (p.patient.mobile if p.patient else None),
+        patient_address=p.patient_address or (p.patient.address if p.patient else None),
         treatment_plan_id=p.treatment_plan_id,
         treatment_plan_name=p.treatment_plan.plan_name if p.treatment_plan else None,
         appointment_id=p.appointment_id,
@@ -115,11 +118,11 @@ def record_payment(
                 code="plan_not_found",
                 message="Treatment package not found for patient.",
             )
-        if plan.status != "ACTIVE":
+        if plan.status == "CANCELLED":
             raise ApiError(
                 status_code=422,
-                code="plan_not_active",
-                message=f"Cannot record payment for {plan.status.lower()} treatment package.",
+                code="plan_cancelled",
+                message="Cannot record payment for cancelled treatment package.",
             )
 
         # Calculate current sum of non-reversed payments
@@ -142,15 +145,45 @@ def record_payment(
                 ),
             )
 
-    # 3. If appointment linked, verify
+    # 3. If appointment linked, verify and block consultation fee overpayments (BR-004, FB-02)
     if payload.appointment_id is not None:
-        appt = session.get(Appointment, payload.appointment_id)
+        appt_stmt = (
+            select(Appointment)
+            .where(Appointment.id == payload.appointment_id)
+            .options(
+                lazyload(Appointment.patient),
+                lazyload(Appointment.doctor),
+                lazyload(Appointment.department),
+                lazyload(Appointment.created_by_user),
+            )
+            .with_for_update()
+        )
+        appt = session.execute(appt_stmt).scalar_one_or_none()
         if not appt or appt.patient_id != payload.patient_id:
             raise ApiError(
                 status_code=404,
                 code="appointment_not_found",
                 message="Appointment not found for patient.",
             )
+        doctor = session.get(Doctor, appt.doctor_id)
+        if doctor and doctor.default_fee_paise > 0:
+            paid_stmt = select(func.coalesce(func.sum(Payment.amount_paise), 0)).where(
+                Payment.appointment_id == appt.id,
+                Payment.is_reversed.is_(False),
+            )
+            already_paid: int = session.scalar(paid_stmt) or 0
+            remaining_balance = doctor.default_fee_paise - already_paid
+            if payload.amount_paise > remaining_balance:
+                max_rupees = max(0, remaining_balance) / 100
+                attempted_rupees = payload.amount_paise / 100
+                raise ApiError(
+                    status_code=422,
+                    code="overpayment_rejected",
+                    message=(
+                        f"Payment of ₹{attempted_rupees:,.2f} exceeds remaining "
+                        f"consultation fee balance of ₹{max_rupees:,.2f}."
+                    ),
+                )
 
     # 4. Determine receipt sequence cycle from clinic settings
     settings = session.scalar(select(ClinicSettings).where(ClinicSettings.id == 1))
@@ -162,6 +195,10 @@ def record_payment(
     payment = Payment(
         receipt_number=receipt_number,
         patient_id=payload.patient_id,
+        patient_name=patient.full_name,
+        patient_urn=patient.urn,
+        patient_mobile=patient.mobile,
+        patient_address=patient.address,
         treatment_plan_id=payload.treatment_plan_id,
         appointment_id=payload.appointment_id,
         amount_paise=payload.amount_paise,

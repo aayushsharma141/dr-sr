@@ -280,3 +280,102 @@ def test_doctor_queue_retrieval(login_client, reception_user, doctor_a_user, db_
     rec_client = login_client(reception_user)
     rec_queue_resp = rec_client.get("/api/doctor/queue")
     assert rec_queue_resp.status_code == 403
+
+
+def test_in_consultation_cancellation_lifecycle(
+    login_client, reception_user, doctor_a_user, db_session
+):
+    """BR-013: IN_CONSULTATION can be cancelled while draft with reason; blocked once finalised."""
+    from kalyan_api.models import ClinicalEncounter
+
+    patient = Patient(
+        urn="KH-2026-7799",
+        full_name="Consultation Cancel Patient",
+        guardian_name="Guardian",
+        gender="F",
+        age_years=38,
+        mobile="9876543799",
+        address="Ara",
+    )
+    db_session.add(patient)
+    db_session.flush()
+
+    today = clock.ist_today()
+    rec_client = login_client(reception_user)
+    doc_client = login_client(doctor_a_user)
+    dept = doctor_a_user.doctor.departments[0]
+
+    # 1. Book and arrive
+    book = rec_client.post(
+        "/api/appointments",
+        json={
+            "patient_id": patient.id,
+            "doctor_id": doctor_a_user.doctor_id,
+            "department_id": dept.id,
+            "appointment_date": today.isoformat(),
+        },
+    )
+    appt_id = book.json()["id"]
+
+    rec_client.patch(
+        f"/api/appointments/{appt_id}/status",
+        json={"status": "ARRIVED", "version_id": 1},
+    )
+
+    # 2. Doctor starts consultation -> IN_CONSULTATION (version_id becomes 3)
+    doc_client.patch(
+        f"/api/appointments/{appt_id}/status",
+        json={"status": "IN_CONSULTATION", "version_id": 2},
+    )
+
+    # 3. Cancel while in consultation (draft) with reason succeeds
+    cancel_resp = doc_client.patch(
+        f"/api/appointments/{appt_id}/status",
+        json={
+            "status": "CANCELLED",
+            "version_id": 3,
+            "cancellation_reason": "Patient had emergency and had to leave immediately",
+        },
+    )
+    assert cancel_resp.status_code == 200
+    assert cancel_resp.json()["status"] == "CANCELLED"
+
+    # 4. Now test that an appointment with a FINALISED encounter cannot be cancelled
+    book2 = rec_client.post(
+        "/api/appointments",
+        json={
+            "patient_id": patient.id,
+            "doctor_id": doctor_a_user.doctor_id,
+            "department_id": dept.id,
+            "appointment_date": today.isoformat(),
+            "override_reason": "Second visit following emergency",
+        },
+    )
+    appt2_id = book2.json()["id"]
+    appt2 = db_session.get(Appointment, appt2_id)
+    appt2.status = AppointmentStatus.IN_CONSULTATION.value
+    db_session.flush()
+
+    enc = ClinicalEncounter(
+        appointment_id=appt2_id,
+        patient_id=patient.id,
+        doctor_id=doctor_a_user.doctor_id,
+        department_id=dept.id,
+        symptoms="Headache",
+        is_finalised=True,
+        finalised_at=clock.utcnow(),
+        created_by_user_id=doctor_a_user.id,
+    )
+    db_session.add(enc)
+    db_session.flush()
+
+    fail_cancel = doc_client.patch(
+        f"/api/appointments/{appt2_id}/status",
+        json={
+            "status": "CANCELLED",
+            "version_id": appt2.version_id,
+            "cancellation_reason": "Attempting to cancel finalized encounter",
+        },
+    )
+    assert fail_cancel.status_code == 422
+    assert fail_cancel.json()["code"] == "cannot_cancel_finalised"

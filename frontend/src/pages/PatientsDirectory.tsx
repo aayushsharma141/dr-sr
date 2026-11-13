@@ -1,9 +1,12 @@
 import { useState, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router'
-import { usePatients, useMe } from '../api/queries'
+import { usePatients, usePatientCount, useMe } from '../api/queries'
 import { AppShell } from '../components/AppShell'
-import { PatientEditModal } from '../components/PatientEditModal'
-import type { PatientOut } from '../api/types'
+import { TableSkeleton } from '../components/AdminSkeleton'
+
+// Rows shown per page. The list endpoint returns a plain array with no total,
+// so each page asks for one extra row to learn whether a next page exists.
+export const PATIENTS_PAGE_SIZE = 20
 
 export function PatientsDirectory() {
   const { data: me } = useMe()
@@ -11,76 +14,60 @@ export function PatientsDirectory() {
 
   const [searchInput, setSearchInput] = useState('')
   const [debouncedQuery, setDebouncedQuery] = useState('')
-  const [selectedPatientForEdit, setSelectedPatientForEdit] = useState<PatientOut | null>(null)
-  const [isEditModalOpen, setIsEditModalOpen] = useState(false)
-  const [successBanner, setSuccessBanner] = useState<string | null>(null)
+  const [page, setPage] = useState(0)
 
   useEffect(() => {
+    const next = searchInput.trim()
+    if (next === debouncedQuery) return
     const handler = setTimeout(() => {
-      setDebouncedQuery(searchInput.trim())
+      // A new search always starts again from the first page.
+      setDebouncedQuery(next)
+      setPage(0)
     }, 300)
     return () => clearTimeout(handler)
-  }, [searchInput])
+  }, [searchInput, debouncedQuery])
 
   const {
-    data: patients = [],
+    data: fetched = [],
     isPending,
     isError,
     error,
-    refetch,
-  } = usePatients(debouncedQuery)
+  } = usePatients(debouncedQuery, PATIENTS_PAGE_SIZE + 1, page * PATIENTS_PAGE_SIZE)
 
-  const handleEditClick = (patient: PatientOut) => {
-    setSelectedPatientForEdit(patient)
-    setIsEditModalOpen(true)
-  }
+  const { data: countData } = usePatientCount(debouncedQuery)
+  const total = countData?.total
 
-  const handleEditSuccess = (updated: PatientOut) => {
-    setIsEditModalOpen(false)
-    setSelectedPatientForEdit(null)
-    setSuccessBanner(`Patient ${updated.full_name} (${updated.urn}) updated successfully.`)
-    refetch()
-  }
+  const patients = fetched.slice(0, PATIENTS_PAGE_SIZE)
+  const hasNextPage =
+    fetched.length > PATIENTS_PAGE_SIZE || (total !== undefined && (page + 1) * PATIENTS_PAGE_SIZE < total)
+  const firstRowNumber = page * PATIENTS_PAGE_SIZE + 1
+  const lastRowNumber = page * PATIENTS_PAGE_SIZE + patients.length
+  const totalPages = total !== undefined ? Math.max(1, Math.ceil(total / PATIENTS_PAGE_SIZE)) : undefined
 
   return (
     <AppShell
       name={me?.full_name || 'Staff'}
       role={me?.role || 'RECEPTION'}
     >
-      <div className="space-y-6 max-w-7xl mx-auto">
+      <div className="mx-auto w-full max-w-[1600px] space-y-6">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
-            <h2 className="text-2xl font-bold text-neutral-900 tracking-tight">
-              Patient Directory
-            </h2>
+            <h1 className="text-xl font-bold text-neutral-900 tracking-tight">
+              Patient Records
+            </h1>
             <p className="text-sm text-neutral-500">
               Search and manage registered patients across the hospital LAN
             </p>
           </div>
-          <Link
-            to="/reception/patients/new"
-            className="inline-flex items-center justify-center px-4 py-2 bg-red-900 text-white rounded text-sm font-medium hover:bg-red-800 focus-visible:outline-2 focus-visible:outline-red-800 min-h-[44px] min-w-[44px] shadow-xs"
-          >
-            + Register New Patient
-          </Link>
-        </div>
-
-        {successBanner && (
-          <div
-            role="status"
-            className="p-4 bg-emerald-50 border border-emerald-300 rounded text-emerald-900 text-sm flex items-center justify-between"
-          >
-            <span>{successBanner}</span>
-            <button
-              type="button"
-              onClick={() => setSuccessBanner(null)}
-              className="text-emerald-700 hover:text-emerald-950 font-bold ml-4"
-              aria-label="Dismiss message"
+          {me?.role === 'RECEPTION' && (
+            <Link
+              to="/reception/patients/new"
+              className="inline-flex items-center justify-center px-4 py-2 bg-red-900 text-white rounded text-sm font-medium hover:bg-red-800 focus-visible:outline-2 focus-visible:outline-red-800 min-h-[44px] min-w-[44px] shadow-xs"
             >
-              &times;
-            </button>
-          </div>
-        )}
+              + Register New Patient
+            </Link>
+          )}
+        </div>
 
         {/* Search Controls */}
         <div className="bg-white p-4 rounded-lg border border-neutral-200 shadow-xs">
@@ -93,7 +80,7 @@ export function PatientsDirectory() {
               type="search"
               value={searchInput}
               onChange={(e) => setSearchInput(e.target.value)}
-              placeholder="Search by URN (e.g. KH-2026-0001), mobile number, or patient name..."
+              placeholder="Search by URN (e.g. KH-26-P-11-00001), mobile number, or patient name..."
               className="w-full px-4 py-3 pl-10 border border-neutral-300 rounded-md text-sm text-neutral-900 focus-visible:outline-2 focus-visible:outline-red-800"
             />
             <span
@@ -117,17 +104,26 @@ export function PatientsDirectory() {
 
         {/* Content Section */}
         {isPending ? (
-          <div className="bg-white p-12 text-center rounded-lg border border-neutral-200">
-            <p className="text-sm text-neutral-500" role="status">
-              Loading patients...
-            </p>
-          </div>
+          <TableSkeleton label="Loading patients..." rows={6} columns={8} />
         ) : isError ? (
           <div
             role="alert"
             className="p-4 bg-red-50 border border-red-200 rounded text-red-900 text-sm"
           >
             Failed to load patients: {error.message}
+          </div>
+        ) : patients.length === 0 && page > 0 ? (
+          <div className="bg-white p-12 text-center rounded-lg border border-neutral-200 space-y-4">
+            <p className="text-base font-semibold text-neutral-900">
+              No more patients on this page
+            </p>
+            <button
+              type="button"
+              onClick={() => setPage(0)}
+              className="inline-flex items-center justify-center px-4 py-2 text-sm font-medium text-neutral-700 bg-neutral-100 hover:bg-neutral-200 rounded focus-visible:outline-2 focus-visible:outline-neutral-500 cursor-pointer min-h-[44px]"
+            >
+              Back to first page
+            </button>
           </div>
         ) : patients.length === 0 ? (
           <div className="bg-white p-12 text-center rounded-lg border border-neutral-200 space-y-4">
@@ -170,11 +166,12 @@ export function PatientsDirectory() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-neutral-200">
-                  {patients.map((p) => (
+                  {patients.map((p, index) => (
                     <tr
                       key={p.id}
                       className="hover:bg-neutral-50 transition-colors"
                       data-testid={`patient-row-${p.id}`}
+                      style={{ transitionDelay: `${index * 50}ms` }}
                     >
                       <td className="px-4 py-3 whitespace-nowrap">
                         <div className="w-10 h-10 rounded-full border border-neutral-200 bg-neutral-100 flex items-center justify-center overflow-hidden">
@@ -221,35 +218,55 @@ export function PatientsDirectory() {
                         >
                           View Card
                         </button>
-                        <button
-                          type="button"
-                          onClick={() => handleEditClick(p)}
-                          className="px-2.5 py-1.5 text-xs font-medium text-neutral-700 bg-neutral-100 hover:bg-neutral-200 rounded focus-visible:outline-2 focus-visible:outline-neutral-500 cursor-pointer min-h-[36px]"
-                        >
-                          Edit
-                        </button>
+                        {/* Opens the registration form pre-filled; RECEPTION only, as on the API. */}
+                        {me?.role === 'RECEPTION' && (
+                          <Link
+                            to={`/reception/patients/${p.id}/edit`}
+                            className="inline-flex items-center px-2.5 py-1.5 text-xs font-medium text-neutral-700 bg-neutral-100 hover:bg-neutral-200 rounded focus-visible:outline-2 focus-visible:outline-neutral-500 cursor-pointer min-h-[36px]"
+                          >
+                            Edit
+                          </Link>
+                        )}
                       </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
+            <nav
+              aria-label="Patient list pages"
+              className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 px-4 py-3 border-t border-neutral-200 bg-neutral-50 text-sm text-neutral-600"
+            >
+              <p role="status">
+                Showing {firstRowNumber}–{lastRowNumber}
+                {total !== undefined ? ` of ${total} patients` : ''}
+              </p>
+              <div className="flex items-center gap-2">
+                <span className="mr-1">
+                  Page {page + 1}
+                  {totalPages !== undefined ? ` of ${totalPages}` : ''}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setPage((p) => Math.max(0, p - 1))}
+                  disabled={page === 0}
+                  className="px-3 py-1.5 text-xs font-medium text-neutral-700 bg-white border border-neutral-300 hover:bg-neutral-100 rounded focus-visible:outline-2 focus-visible:outline-neutral-500 cursor-pointer min-h-[36px] disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  Previous
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPage((p) => p + 1)}
+                  disabled={!hasNextPage}
+                  className="px-3 py-1.5 text-xs font-medium text-neutral-700 bg-white border border-neutral-300 hover:bg-neutral-100 rounded focus-visible:outline-2 focus-visible:outline-neutral-500 cursor-pointer min-h-[36px] disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  Next
+                </button>
+              </div>
+            </nav>
           </div>
         )}
       </div>
-
-      {/* Demographic Edit Modal */}
-      {selectedPatientForEdit && (
-        <PatientEditModal
-          patient={selectedPatientForEdit}
-          isOpen={isEditModalOpen}
-          onClose={() => {
-            setIsEditModalOpen(false)
-            setSelectedPatientForEdit(null)
-          }}
-          onSuccess={handleEditSuccess}
-        />
-      )}
     </AppShell>
   )
 }

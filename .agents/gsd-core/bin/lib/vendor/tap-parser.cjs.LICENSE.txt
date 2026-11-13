@@ -1,4 +1,4 @@
-﻿events-to-array@2.0.3 (package metadata: ISC)
+events-to-array@2.0.3 (package metadata: ISC)
 
 LICENSE:
 The ISC License

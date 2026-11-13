@@ -6,6 +6,7 @@ const FALLBACK = {
   trustNameEn: 'Sri Vashishtha Kalyan Trust',
   trustNameHi: 'श्री वशिष्ठ कल्याण ट्रस्ट',
   hospitalName: 'Kalyan Hospital',
+  hospitalNameHi: 'कल्याण हॉस्पिटल',
   address: 'स्टेशन रोड, नवादा थाना के सामने वाली गली, आरा, भोजपुर, बिहार - 802301',
   locationLine: 'Ara, Bhojpur, Bihar',
 }
@@ -20,6 +21,7 @@ export function useClinicBranding() {
     trustNameEn: data?.trust_name_en || FALLBACK.trustNameEn,
     trustNameHi: data?.trust_name_hi || FALLBACK.trustNameHi,
     hospitalName: data?.name_en || FALLBACK.hospitalName,
+    hospitalNameHi: data?.name_hi || FALLBACK.hospitalNameHi,
     address: data?.address_1 || FALLBACK.address,
     locationLine: data?.location_line || FALLBACK.locationLine,
   }

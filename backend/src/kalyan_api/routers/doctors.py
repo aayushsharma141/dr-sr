@@ -11,6 +11,7 @@ from kalyan_api.db.session import SessionDep
 from kalyan_api.models import ConsultationFee, Doctor
 from kalyan_api.schemas.doctors import (
     DoctorCreate,
+    DoctorMeSettingsUpdate,
     DoctorOut,
     DoctorUpdate,
     FeeCreate,
@@ -63,11 +64,28 @@ def create_doctor(
     principal: Principal = Depends(current_principal),
 ) -> DoctorOut:
     """Create a new doctor profile (ADMIN only)."""
+    if payload.cabin_code:
+        clash = session.scalar(
+            select(Doctor).where(
+                Doctor.cabin_code == payload.cabin_code, Doctor.is_active.is_(True)
+            )
+        )
+        if clash:
+            raise ApiError(
+                status_code=409,
+                code="cabin_code_taken",
+                message=(
+                    f"Cabin code '{payload.cabin_code}' is already assigned to active doctor Dr. "
+                    f"{clash.name_en}"
+                ),
+            )
+
     doc = Doctor(
         name_en=payload.name_en,
         name_hi=payload.name_hi,
         qualification=payload.qualification,
         registration_number=payload.registration_number,
+        cabin_code=payload.cabin_code,
         default_fee_paise=payload.default_fee_paise,
     )
     session.add(doc)
@@ -83,8 +101,65 @@ def create_doctor(
         after={
             "name_en": doc.name_en,
             "registration_number": doc.registration_number,
+            "cabin_code": doc.cabin_code,
             "default_fee_paise": doc.default_fee_paise,
         },
+    )
+
+    return DoctorOut.model_validate(doc)
+
+
+@router.patch(
+    "/doctors/me/settings",
+    dependencies=[Depends(require(Permission.DOCTOR_SETTINGS_WRITE))],
+    response_model=DoctorOut,
+)
+def update_doctor_me_settings(
+    request: Request,
+    payload: DoctorMeSettingsUpdate,
+    session: SessionDep,
+    principal: Principal = Depends(current_principal),
+) -> DoctorOut:
+    """Update consultation fee for the authenticated doctor."""
+    if not principal.doctor_id:
+        raise ApiError(
+            status_code=403,
+            code="doctor_required",
+            message="Authenticated user is not linked to a doctor profile",
+        )
+
+    doc = session.scalar(select(Doctor).where(Doctor.id == principal.doctor_id).with_for_update())
+    if not doc:
+        raise ApiError(
+            status_code=404,
+            code="not_found",
+            message=f"Doctor #{principal.doctor_id} not found",
+        )
+
+    require_version(doc, payload.version_id, "doctor")
+
+    before_state = {
+        "default_fee_paise": doc.default_fee_paise,
+        "version_id": doc.version_id,
+    }
+
+    doc.default_fee_paise = payload.default_fee_paise
+    session.flush()
+
+    after_state = {
+        "default_fee_paise": doc.default_fee_paise,
+        "version_id": doc.version_id,
+    }
+
+    ctx = build_audit_context(request, principal)
+    audit_service.record(
+        session,
+        ctx,
+        AuditAction.DOCTOR_SETTINGS_UPDATED,
+        "DOCTOR",
+        str(doc.id),
+        before=before_state,
+        after=after_state,
     )
 
     return DoctorOut.model_validate(doc)
@@ -109,11 +184,30 @@ def update_doctor(
 
     require_version(doc, payload.version_id, "doctor")
 
+    if payload.cabin_code and payload.is_active:
+        clash = session.scalar(
+            select(Doctor).where(
+                Doctor.cabin_code == payload.cabin_code,
+                Doctor.is_active.is_(True),
+                Doctor.id != id,
+            )
+        )
+        if clash:
+            raise ApiError(
+                status_code=409,
+                code="cabin_code_taken",
+                message=(
+                    f"Cabin code '{payload.cabin_code}' is already assigned to active doctor Dr. "
+                    f"{clash.name_en}"
+                ),
+            )
+
     before_state = {
         "name_en": doc.name_en,
         "name_hi": doc.name_hi,
         "qualification": doc.qualification,
         "registration_number": doc.registration_number,
+        "cabin_code": doc.cabin_code,
         "default_fee_paise": doc.default_fee_paise,
         "is_active": doc.is_active,
         "version_id": doc.version_id,
@@ -123,6 +217,7 @@ def update_doctor(
     doc.name_hi = payload.name_hi
     doc.qualification = payload.qualification
     doc.registration_number = payload.registration_number
+    doc.cabin_code = payload.cabin_code
     doc.default_fee_paise = payload.default_fee_paise
     doc.is_active = payload.is_active
 
@@ -133,6 +228,7 @@ def update_doctor(
         "name_hi": doc.name_hi,
         "qualification": doc.qualification,
         "registration_number": doc.registration_number,
+        "cabin_code": doc.cabin_code,
         "default_fee_paise": doc.default_fee_paise,
         "is_active": doc.is_active,
         "version_id": doc.version_id,

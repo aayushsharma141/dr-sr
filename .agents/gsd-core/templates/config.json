@@ -1,4 +1,4 @@
-﻿{
+{
   "mode": "interactive",
   "granularity": "standard",
   "workflow": {
@@ -51,5 +51,5 @@
   },
   "project_code": null,
   "agent_skills": {},
-  "claude_md_path": "./.agents/GEMINI.md"
+  "claude_md_path": "./.claude/CLAUDE.md"
 }

@@ -1,7 +1,9 @@
 """Row-level access authorization and default-deny scope filters for clinical privacy.
 
 Architectural Guarantees:
-- D-03: Doctor silo: clinical records (ScopeFamily.CLINICAL) are strictly scoped
+- DWS-04: Cross-doctor clinical reads: any authenticated doctor can read clinical records
+  (ScopeFamily.CLINICAL_READ), triggering audited CROSS_DOCTOR_CLINICAL_READ entries.
+- D-03: Doctor silo: clinical mutations (ScopeFamily.CLINICAL_WRITE) are strictly scoped
   to the owning doctor (doctor_id_col == principal.doctor_id).
 - D-04: Reception default-deny for clinical encounters and notes.
 - Informational leaks prevented: get_scoped_or_404 returns 404 not_found
@@ -30,7 +32,9 @@ SCOPED_MODELS: list[Any] = []
 class ScopeFamily(StrEnum):
     """Scope domain families governing row-level access."""
 
-    CLINICAL = "CLINICAL"
+    CLINICAL_READ = "CLINICAL_READ"
+    CLINICAL_WRITE = "CLINICAL_WRITE"
+    CLINICAL = "CLINICAL_WRITE"  # Alias for backward compatibility
     DEMOGRAPHIC = "DEMOGRAPHIC"
     FINANCIAL = "FINANCIAL"
 
@@ -46,8 +50,17 @@ def row_scope(
 
     role_str = principal.role.value if hasattr(principal.role, "value") else str(principal.role)
 
-    if family == ScopeFamily.CLINICAL:
-        # D-03 & D-04: Clinical rows visible only to the owning doctor with valid doctor_id
+    if family == ScopeFamily.CLINICAL_READ or str(family) == "CLINICAL_READ":
+        # DWS-04: Any authenticated doctor can read clinical rows across all doctors
+        if role_str == Role.DOCTOR.value and principal.doctor_id is not None:
+            return true()
+        return false()
+
+    if (
+        family in (ScopeFamily.CLINICAL_WRITE, ScopeFamily.CLINICAL)
+        or str(family) in ("CLINICAL_WRITE", "CLINICAL")
+    ):
+        # D-03 & D-04: Clinical mutations scoped strictly to the owning doctor
         if role_str == Role.DOCTOR.value and principal.doctor_id is not None:
             return doctor_id_col == principal.doctor_id
         return false()
@@ -99,5 +112,37 @@ def get_scoped_or_404(
             code="not_found",
             message="Resource not found",
         )
+
+    # Cross-doctor clinical read audit logging
+    role_str = principal.role.value if hasattr(principal.role, "value") else str(principal.role)
+    if (
+        (family == ScopeFamily.CLINICAL_READ or str(family) == "CLINICAL_READ")
+        and role_str == Role.DOCTOR.value
+        and principal.doctor_id is not None
+    ):
+        row_doc_id = getattr(row, "doctor_id", None)
+        if row_doc_id is not None and row_doc_id != principal.doctor_id:
+            from kalyan_api.services import audit_service
+            from kalyan_api.services.audit_service import AuditAction
+
+            entity_type = (
+                target.__name__
+                if hasattr(target, "__name__")
+                else getattr(target, "name", str(target))
+            )
+            audit_service.record_audit_event(
+                session,
+                actor_user_id=principal.user_id,
+                action=AuditAction.CROSS_DOCTOR_CLINICAL_READ,
+                entity_type=entity_type,
+                entity_id=obj_id,
+                details={
+                    "actor_doctor_id": principal.doctor_id,
+                    "record_doctor_id": row_doc_id,
+                    "patient_id": getattr(row, "patient_id", None),
+                },
+                actor_username=principal.username,
+                actor_role=role_str,
+            )
 
     return row

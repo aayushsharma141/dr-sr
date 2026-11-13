@@ -14,20 +14,20 @@ export function PatientCardPrint() {
 
   if (patientPending) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-white p-6">
-        <p className="text-neutral-500 font-medium">Loading patient card...</p>
+      <div role="status" className="min-h-screen flex items-center justify-center bg-white p-6">
+        <p className="text-neutral-600 font-medium">Loading patient card...</p>
       </div>
     )
   }
 
   if (patientError || !patient) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-white p-6 space-y-4">
-        <p className="text-red-700 font-medium">Failed to load patient card.</p>
+      <div role="alert" className="min-h-screen flex flex-col items-center justify-center bg-white p-6 space-y-4">
+        <p className="text-red-800 font-medium">Failed to load patient card.</p>
         <button
           type="button"
           onClick={() => navigate('/reception/patients')}
-          className="text-sm text-red-900 underline"
+          className="min-h-11 rounded text-sm font-medium text-red-900 underline underline-offset-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-900"
         >
           &larr; Back to Patient Directory
         </button>
@@ -40,7 +40,7 @@ export function PatientCardPrint() {
       <RegistrationCard
         patient={patient}
         settings={settings}
-        onClose={() => navigate(`/reception/patients/${patient.id}`)}
+        onBack={() => navigate(`/reception/patients/${patient.id}`)}
       />
     </div>
   )

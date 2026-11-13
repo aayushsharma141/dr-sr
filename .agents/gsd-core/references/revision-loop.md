@@ -1,4 +1,4 @@
-﻿# Revision Loop Pattern
+# Revision Loop Pattern
 
 Standard pattern for iterative agent revision with feedback. Used when a checker/validator finds issues and the producing agent needs to revise its output.
 
@@ -116,13 +116,13 @@ so they restate the operative rules inline; this section is the authority they m
    `prev_issue_count`. Do NOT re-spawn the checker yet — the conflict is not a revised output.
 2. **Record**, where the host has a channel an arbitration loop reads. `review.md` emits one
    fixed writer-owned slot immediately after the artifact title, between
-   `<!-- gsd-plan-revision-conflicts:begin -->` and
-   `<!-- gsd-plan-revision-conflicts:end -->`. When `workflow.plan_review_convergence` is enabled
+   `<!-- gsd:plan-revision-conflicts:begin -->` and
+   `<!-- gsd:plan-revision-conflicts:end -->`. When `workflow.plan_review_convergence` is enabled
    and the phase `*-REVIEWS.md` already exists, `plan-phase` appends one line per conflict under
    `## Plan-Revision Conflicts` inside that slot:
 
 ```markdown
-- [ ] REVISION_CONFLICT {dimension}/{plan} — required_property: {property} | conflicts with: {locked decision D-nn / GEMINI.md rule / plan constraint} | alternatives: {the agent's alternatives}
+- [ ] REVISION_CONFLICT {dimension}/{plan} — required_property: {property} | conflicts with: {locked decision D-nn / CLAUDE.md rule / plan constraint} | alternatives: {the agent's alternatives}
 ```
 
    A checkbox, not a table row: `- [ ] REVISION_CONFLICT` is open and `- [x] REVISION_CONFLICT`

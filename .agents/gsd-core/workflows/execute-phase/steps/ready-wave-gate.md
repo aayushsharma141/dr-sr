@@ -1,4 +1,4 @@
-﻿# Ready-wave gate (#4628)
+# Ready-wave gate (#4628)
 
 Read and follow this fragment from `execute-phase.md` step 1
 (`discover_and_group_plans`). It owns the #4628 readiness rules so the host

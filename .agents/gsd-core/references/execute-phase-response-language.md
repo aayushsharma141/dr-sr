@@ -1,4 +1,4 @@
-﻿# Execute-Phase Response-Language Directive (#2402)
+# Execute-Phase Response-Language Directive (#2402)
 
 **If `response_language` is set:** User-facing orchestrator output (questions, narration, report-template prose) in `{response_language}`; technical terms, code, file paths, and subagent prompts stay in English. Pass `response_language: {value}` into every spawned subagent prompt so any user-facing output they produce stays in the configured language.
 

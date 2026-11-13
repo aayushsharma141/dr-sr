@@ -1,4 +1,4 @@
-﻿# Making Sketches Feel Alive
+# Making Sketches Feel Alive
 
 Static mockups are barely better than screenshots. Every interactive element in a sketch must respond to interaction.
 

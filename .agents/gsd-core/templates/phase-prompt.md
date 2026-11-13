@@ -1,4 +1,4 @@
-﻿# Phase Prompt Template
+# Phase Prompt Template
 
 > **Note:** Planning methodology is in `agents/gsd-planner.md`.
 > This template defines the PLAN.md output format that the agent produces.
@@ -45,10 +45,10 @@ Output: [What artifacts will be created]
 </objective>
 
 <execution_context>
-@.agents/gsd-core/workflows/execute-plan.md
-@.agents/gsd-core/templates/summary.md
+@~/.claude/gsd-core/workflows/execute-plan.md
+@~/.claude/gsd-core/templates/summary.md
 [If plan contains checkpoint tasks (type="checkpoint:*"), add:]
-@.agents/gsd-core/references/checkpoints.md
+@~/.claude/gsd-core/references/checkpoints.md
 </execution_context>
 
 <context>
@@ -92,7 +92,7 @@ Output: [What artifacts will be created]
   <done>[Acceptance criteria]</done>
 </task>
 
-<!-- For checkpoint task examples and patterns, see @.agents/gsd-core/references/checkpoints.md -->
+<!-- For checkpoint task examples and patterns, see @~/.claude/gsd-core/references/checkpoints.md -->
 
 <task type="checkpoint:decision" gate="blocking">
   <decision>[What needs deciding]</decision>
@@ -285,7 +285,7 @@ TDD features get dedicated plans with `type: tdd`.
 → Yes: Create a TDD plan
 → No: Standard task in standard plan
 
-See `.agents/gsd-core/references/tdd.md` for TDD plan structure.
+See `$HOME/.claude/gsd-core/references/tdd.md` for TDD plan structure.
 
 ---
 
@@ -389,9 +389,9 @@ Output: Working dashboard component.
 </objective>
 
 <execution_context>
-@.agents/gsd-core/workflows/execute-plan.md
-@.agents/gsd-core/templates/summary.md
-@.agents/gsd-core/references/checkpoints.md
+@~/.claude/gsd-core/workflows/execute-plan.md
+@~/.claude/gsd-core/templates/summary.md
+@~/.claude/gsd-core/references/checkpoints.md
 </execution_context>
 
 <context>
@@ -547,7 +547,7 @@ user_setup:
 
 **Result:** Execute-plan generates `{phase}-USER-SETUP.md` with checklist for the user.
 
-See `.agents/gsd-core/templates/user-setup.md` for full schema and examples
+See `$HOME/.claude/gsd-core/templates/user-setup.md` for full schema and examples
 
 ---
 

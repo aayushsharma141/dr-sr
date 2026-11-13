@@ -14,6 +14,7 @@ from sqlalchemy.orm import Session
 from kalyan_api.config import Settings
 from kalyan_api.core.security import build_hasher, hash_password
 from kalyan_api.core.setup_code import issue_setup_code
+from kalyan_api.db.guards import require_test_database
 from kalyan_api.db.migrate import upgrade_head
 from kalyan_api.db.session import build_engine, get_session
 from kalyan_api.main import create_app
@@ -21,7 +22,7 @@ from kalyan_api.models import Department, Doctor, User
 
 
 @pytest.fixture(scope="session")
-def test_settings() -> Settings:
+def test_settings(tmp_path_factory: pytest.TempPathFactory) -> Settings:
     """Provide Settings configured specifically for the test suite."""
     test_db = os.environ.get("KALYAN_TEST_DB_NAME", "kalyan_test")
     if not test_db.endswith("_test"):
@@ -30,6 +31,15 @@ def test_settings() -> Settings:
             "Database name must end with '_test'.",
             returncode=2,
         )
+
+    # Several tests unlink every file in photos_dir/assets_dir. Point all file
+    # storage at a throwaway directory so the suite can never touch the live
+    # server's backend/var (uploaded logos, patient photos, backups).
+    storage_root = tmp_path_factory.mktemp("kalyan_storage")
+    os.environ["KALYAN_PHOTOS_DIR"] = str(storage_root / "photos")
+    os.environ["KALYAN_ASSETS_DIR"] = str(storage_root / "assets")
+    os.environ["KALYAN_BACKUP_DIR"] = str(storage_root / "backups")
+    os.environ["KALYAN_SETUP_CODE_PATH"] = str(storage_root / "setup-code.txt")
 
     # Base settings with lightweight Argon2 parameters for test execution speed
     settings = Settings(
@@ -59,6 +69,8 @@ def configure_test_environment(test_settings: Settings) -> None:
 @pytest.fixture(scope="session")
 def migrated_db(test_settings: Settings) -> dict[str, int]:
     """Wipe public schema, run alembic migrations from head, and assert zero seed rows."""
+    # Refuses to wipe anything that is not clearly a test database.
+    require_test_database(test_settings, "wipe the test schema")
     owner_engine = create_engine(test_settings.owner_url, isolation_level="AUTOCOMMIT")
     with owner_engine.connect() as conn:
         conn.execute(text("DROP SCHEMA IF EXISTS public CASCADE"))
@@ -214,6 +226,7 @@ def make_user(
     must_change: bool = False,
     is_active: bool = True,
     doctor_name: str | None = None,
+    is_super_admin: bool = False,
 ) -> User:
     """Helper creating user record (and linked Doctor stub if role is DOCTOR)."""
     hasher = build_hasher(settings)
@@ -241,6 +254,7 @@ def make_user(
         password_hash=pw_hash,
         must_change_password=must_change,
         is_active=is_active,
+        is_super_admin=is_super_admin,
     )
     session.add(user)
     session.flush()
@@ -279,9 +293,12 @@ def doctor_b_user(db_session: Session, test_settings: Settings) -> User:
 def login_client(app: FastAPI):
     """Factory fixture returning an authenticated TestClient for a given user."""
 
-    def _create(user: User, password: str = TEST_PASSWORD) -> TestClient:
+    def _create(user: User, password: str = TEST_PASSWORD, takeover: bool = True) -> TestClient:
         c = TestClient(app, base_url="http://testserver", headers={"Origin": "http://testserver"})
-        res = c.post("/api/auth/login", json={"username": user.username, "password": password})
+        res = c.post(
+            "/api/auth/login",
+            json={"username": user.username, "password": password, "takeover": takeover},
+        )
         assert res.status_code == 200, f"login_client failed: {res.text}"
         data = res.json()
         c.headers["X-CSRF-Token"] = data["csrf_token"]

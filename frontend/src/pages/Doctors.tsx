@@ -10,6 +10,7 @@ import {
 } from '../api/queries'
 import { ApiError } from '../api/client'
 import { AppShell } from '../components/AppShell'
+import { TableSkeleton } from '../components/AdminSkeleton'
 import { ConflictBanner } from '../components/ConflictBanner'
 import { InlineAlert } from '../components/InlineAlert'
 import { Modal } from '../components/Modal'
@@ -20,6 +21,7 @@ interface DoctorForm {
   name_hi: string
   qualification: string
   registration_number: string
+  cabin_code: string
   fee_rupees: string
   is_active: boolean
 }
@@ -35,6 +37,7 @@ const EMPTY_DOCTOR_FORM: DoctorForm = {
   name_hi: '',
   qualification: '',
   registration_number: '',
+  cabin_code: '',
   fee_rupees: '500',
   is_active: true,
 }
@@ -47,6 +50,7 @@ function doctorToForm(doc: DoctorOut): DoctorForm {
     name_hi: doc.name_hi ?? '',
     qualification: doc.qualification ?? '',
     registration_number: doc.registration_number ?? '',
+    cabin_code: doc.cabin_code ?? '',
     fee_rupees: String(doc.default_fee_paise / 100),
     is_active: doc.is_active,
   }
@@ -62,6 +66,7 @@ function doctorFormsEqual(a: DoctorForm, b: DoctorForm): boolean {
     a.name_hi === b.name_hi &&
     a.qualification === b.qualification &&
     a.registration_number === b.registration_number &&
+    a.cabin_code === b.cabin_code &&
     a.fee_rupees === b.fee_rupees &&
     a.is_active === b.is_active
   )
@@ -232,12 +237,15 @@ export function Doctors() {
       return
     }
 
+    const cabinCodeVal = docForm.cabin_code.trim() ? docForm.cabin_code.trim().toUpperCase() : null
+
     if (editingDoctor) {
       const body: DoctorUpdate = {
         name_en: docForm.name_en.trim(),
         name_hi: docForm.name_hi.trim() || null,
         qualification: docForm.qualification.trim() || null,
         registration_number: docForm.registration_number.trim() || null,
+        cabin_code: cabinCodeVal,
         default_fee_paise: feePaise,
         is_active: docForm.is_active,
         version_id: editingDoctor.version_id,
@@ -248,7 +256,11 @@ export function Doctors() {
         closeDoctorModal()
       } catch (err) {
         if (err instanceof ApiError && err.status === 409) {
-          setDocConflict(true)
+          if (err.code === 'cabin_code_taken') {
+            setDocErrors([err.message])
+          } else {
+            setDocConflict(true)
+          }
         } else {
           setDocErrors(errorMessages(err, 'Failed to update doctor profile'))
         }
@@ -259,6 +271,7 @@ export function Doctors() {
         name_hi: docForm.name_hi.trim() || null,
         qualification: docForm.qualification.trim() || null,
         registration_number: docForm.registration_number.trim() || null,
+        cabin_code: cabinCodeVal,
         default_fee_paise: feePaise,
       }
 
@@ -266,7 +279,11 @@ export function Doctors() {
         await createDoctorMutation.mutateAsync(body)
         closeDoctorModal()
       } catch (err) {
-        setDocErrors(errorMessages(err, 'Failed to create doctor profile'))
+        if (err instanceof ApiError && err.status === 409 && err.code === 'cabin_code_taken') {
+          setDocErrors([err.message])
+        } else {
+          setDocErrors(errorMessages(err, 'Failed to create doctor profile'))
+        }
       }
     }
   }
@@ -402,12 +419,13 @@ export function Doctors() {
 
   return (
     <AppShell name={me?.full_name ?? 'Admin'} role={me?.role ?? 'ADMIN'}>
-      <div className="space-y-8 max-w-6xl mx-auto">
+      <div className="mx-auto w-full max-w-[1600px] space-y-6">
         {/* Doctors Section */}
+        <h1 className="text-xl font-bold tracking-tight text-slate-900">Doctors &amp; Fees</h1>
         <section aria-labelledby="doctors-heading" className="space-y-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
-              <h2 id="doctors-heading" className="text-2xl font-bold text-neutral-900 tracking-tight">
+              <h2 id="doctors-heading" className="text-lg font-semibold text-neutral-900">
                 Doctor Profiles
               </h2>
               <p className="text-sm text-neutral-600">Manage doctor credentials, qualifications, and default fees</p>
@@ -418,7 +436,7 @@ export function Doctors() {
           </div>
 
           {doctorsLoading ? (
-            <p className="text-sm text-neutral-600 py-6 text-center">Loading doctors...</p>
+            <TableSkeleton label="Loading doctors..." rows={4} columns={7} />
           ) : (
             <div className="bg-white rounded-lg border border-neutral-200 overflow-x-auto shadow-xs">
               <table className="w-full text-left text-sm text-neutral-800">
@@ -428,6 +446,7 @@ export function Doctors() {
                     <th scope="col" className="px-4 py-3">Hindi Name</th>
                     <th scope="col" className="px-4 py-3">Qualification</th>
                     <th scope="col" className="px-4 py-3">Registration No</th>
+                    <th scope="col" className="px-4 py-3">Cabin</th>
                     <th scope="col" className="px-4 py-3 text-right">Default Fee</th>
                     <th scope="col" className="px-4 py-3">Status</th>
                     <th scope="col" className="px-4 py-3 text-right">Actions</th>
@@ -435,14 +454,15 @@ export function Doctors() {
                 </thead>
                 <tbody className="divide-y divide-neutral-200">
                   {doctors && doctors.length > 0 ? (
-                    doctors.map((doc) => (
-                      <tr key={doc.id} className="hover:bg-neutral-50">
+                    doctors.map((doc, index) => (
+                      <tr key={doc.id} className="hover:bg-neutral-50 transition-colors" style={{ transitionDelay: `${index * 50}ms` }}>
                         <td className="px-4 py-3 font-medium text-neutral-900">{doc.name_en}</td>
                         <td className="px-4 py-3 text-neutral-700" lang={doc.name_hi ? 'hi' : undefined}>
                           {doc.name_hi || '-'}
                         </td>
                         <td className="px-4 py-3 text-neutral-700">{doc.qualification || '-'}</td>
                         <td className="px-4 py-3 font-mono text-neutral-700">{doc.registration_number || '-'}</td>
+                        <td className="px-4 py-3 font-mono font-semibold text-neutral-800">{doc.cabin_code || '-'}</td>
                         <td className="px-4 py-3 text-right font-medium tabular-nums text-neutral-900">
                           {formatRupees(doc.default_fee_paise)}
                         </td>
@@ -478,7 +498,7 @@ export function Doctors() {
         <section aria-labelledby="fees-heading" className="space-y-4 pt-6 border-t border-neutral-200">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
-              <h2 id="fees-heading" className="text-2xl font-bold text-neutral-900 tracking-tight">
+              <h2 id="fees-heading" className="text-lg font-semibold text-neutral-900">
                 Consultation Fee Schedules
               </h2>
               <p className="text-sm text-neutral-600">Configure standard fee rates used across departments and billing</p>
@@ -516,7 +536,7 @@ export function Doctors() {
           )}
 
           {feesLoading ? (
-            <p className="text-sm text-neutral-600 py-6 text-center">Loading fees...</p>
+            <TableSkeleton label="Loading fees..." rows={3} columns={4} />
           ) : (
             <div className="bg-white rounded-lg border border-neutral-200 overflow-x-auto shadow-xs">
               <table className="w-full text-left text-sm text-neutral-800">
@@ -530,8 +550,8 @@ export function Doctors() {
                 </thead>
                 <tbody className="divide-y divide-neutral-200">
                   {visibleFees.length > 0 ? (
-                    visibleFees.map((fee) => (
-                      <tr key={fee.id} className={fee.is_active ? 'hover:bg-neutral-50' : 'bg-neutral-50'}>
+                    visibleFees.map((fee, index) => (
+                      <tr key={fee.id} className={`transition-colors ${fee.is_active ? 'hover:bg-neutral-50' : 'bg-neutral-50'}`} style={{ transitionDelay: `${index * 50}ms` }}>
                         <td className="px-4 py-3 font-medium text-neutral-900">{fee.name}</td>
                         <td className="px-4 py-3 text-right font-semibold tabular-nums text-neutral-900">
                           {formatRupees(fee.fee_paise)}
@@ -653,6 +673,21 @@ export function Doctors() {
                     type="text"
                     value={docForm.registration_number}
                     onChange={(e) => setDocField('registration_number', e.target.value)}
+                    className={INPUT_CLASS}
+                  />
+                </div>
+
+                <div>
+                  <label htmlFor="doc-cabin-code" className="block text-sm font-medium text-neutral-800 mb-1">
+                    Cabin Code (Optional, A–Z)
+                  </label>
+                  <input
+                    id="doc-cabin-code"
+                    type="text"
+                    maxLength={1}
+                    value={docForm.cabin_code}
+                    onChange={(e) => setDocField('cabin_code', e.target.value.toUpperCase())}
+                    placeholder="e.g. A"
                     className={INPUT_CLASS}
                   />
                 </div>

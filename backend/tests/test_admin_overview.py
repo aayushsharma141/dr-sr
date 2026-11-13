@@ -394,3 +394,105 @@ def test_admin_overview_backup_and_integrity_status(
     codes2 = _alert_codes(body2)
     assert "last_backup_failed" not in codes2
     assert "integrity_issues" not in codes2
+
+
+def test_admin_management_overview_endpoint(
+    login_client: Any,
+    admin_user: User,
+    reception_user: User,
+    doctor_a_user: User,
+    overview_settings: Settings,
+) -> None:
+    path = "/api/admin/management-overview"
+    # RBAC check
+    assert login_client(reception_user).get(path).status_code == 403
+    assert login_client(doctor_a_user).get(path).status_code == 403
+
+    res = login_client(admin_user).get(path)
+    assert res.status_code == 200
+    data = res.json()
+
+    # Every figure comes from records: nothing invented, no expense or utilisation figures.
+    for invented in ("operating_expenses", "net_surplus", "doctor_utilization", "system_health"):
+        assert invented not in data
+    assert data["current_month_label"] and data["previous_month_label"]
+    assert len(data["collection_trend"]) == 6
+    assert len(data["patient_trend"]) == 6
+    assert data["collection_trend"][-1]["collected_paise"] == data["collections_paise"]["current"]
+    assert data["collection_trend"][-2]["collected_paise"] == data["collections_paise"]["previous"]
+    assert data["patient_trend"][-1]["new_patients"] == data["new_patients"]["current"]
+    if data["collections_paise"]["previous"] == 0:
+        assert data["collections_paise"]["change_pct"] is None
+    total = sum(d["collected_paise"] for d in data["department_collections"])
+    assert total == data["collections_paise"]["current"]
+
+
+def test_management_overview_counts_real_collections_and_reversals(
+    login_client: Any,
+    admin_user: User,
+    reception_user: User,
+    db_session: Session,
+    overview_settings: Settings,
+) -> None:
+    """Collections, reversals and new patients move by exactly what was recorded."""
+    path = "/api/admin/management-overview"
+    admin_c = login_client(admin_user)
+    before = admin_c.get(path).json()
+
+    patient = _patient(db_session, "mo")
+    rec_c = login_client(reception_user)
+    paid = []
+    for amount in (35000, 15000):
+        res = rec_c.post(
+            "/api/payments",
+            json={"patient_id": patient.id, "amount_paise": amount, "payment_method": "CASH"},
+        )
+        assert res.status_code == 201, res.text
+        paid.append(res.json()["id"])
+    rev = admin_c.post(
+        f"/api/payments/{paid[1]}/reverse", json={"reversal_reason": "Entered twice"}
+    )
+    assert rev.status_code == 200, rev.text
+
+    after = admin_c.get(path).json()
+    assert after["collections_paise"]["current"] - before["collections_paise"]["current"] == 35000
+    assert after["reversed_this_month"] - before["reversed_this_month"] == 1
+    assert after["reversed_this_month_paise"] - before["reversed_this_month_paise"] == 15000
+    assert after["new_patients"]["current"] - before["new_patients"]["current"] == 1
+    unlinked = {d["name"]: d["collected_paise"] for d in after["department_collections"]}
+    assert unlinked.get("Not linked to a department", 0) >= 35000
+
+
+def test_admin_overview_warns_when_scheduled_backups_are_disabled(
+    login_client: Any,
+    admin_user: User,
+    overview_settings: Settings,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A switched-off backup schedule is surfaced instead of failing silently."""
+    monkeypatch.setattr(areas, "schedule_is_enabled", lambda _session: False)
+    admin_c = login_client(admin_user)
+
+    res = admin_c.get(OVERVIEW)
+    assert res.status_code == 200
+    alerts = res.json()["alerts"]
+    codes = [a["code"] for a in alerts]
+    assert "backup_schedule_disabled" in codes
+    alert = next(a for a in alerts if a["code"] == "backup_schedule_disabled")
+    assert alert["severity"] == "warning"
+    assert "Scheduled backups are turned off" in alert["message"]
+
+
+def test_admin_overview_has_no_disabled_alert_when_schedule_is_enabled(
+    login_client: Any,
+    admin_user: User,
+    overview_settings: Settings,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(areas, "schedule_is_enabled", lambda _session: True)
+    admin_c = login_client(admin_user)
+
+    res = admin_c.get(OVERVIEW)
+    assert res.status_code == 200
+    codes = [a["code"] for a in res.json()["alerts"]]
+    assert "backup_schedule_disabled" not in codes

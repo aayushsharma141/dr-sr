@@ -1,4 +1,4 @@
-﻿<step name="forensic_audit">
+<step name="forensic_audit">
 **Forensic Integrity Audit** — only runs when `--forensic` is present in ARGUMENTS.
 
 If `--forensic` is NOT present in ARGUMENTS: skip this step entirely. Default progress behavior (standard report + routing) is unchanged.

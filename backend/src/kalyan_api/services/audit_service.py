@@ -35,6 +35,8 @@ class AuditAction(StrEnum):
     USER_REACTIVATED = "USER_REACTIVATED"
     USER_PASSWORD_RESET = "USER_PASSWORD_RESET"  # noqa: S105
     USER_UNLOCKED = "USER_UNLOCKED"
+    USER_DELETED = "USER_DELETED"
+    USER_DELETE_DENIED = "USER_DELETE_DENIED"
     SETUP_CODE_REJECTED = "SETUP_CODE_REJECTED"
     ADMIN_BOOTSTRAPPED = "ADMIN_BOOTSTRAPPED"
     ADMIN_PASSWORD_RESET_CLI = "ADMIN_PASSWORD_RESET_CLI"  # noqa: S105
@@ -42,6 +44,7 @@ class AuditAction(StrEnum):
     SETTINGS_UPDATED = "SETTINGS_UPDATED"
     DOCTOR_CREATED = "DOCTOR_CREATED"
     DOCTOR_UPDATED = "DOCTOR_UPDATED"
+    DOCTOR_SETTINGS_UPDATED = "doctor.settings.update"
     FEE_CREATED = "FEE_CREATED"
     FEE_UPDATED = "FEE_UPDATED"
     DEPARTMENT_CREATED = "DEPARTMENT_CREATED"
@@ -58,11 +61,19 @@ class AuditAction(StrEnum):
     ENCOUNTER_ADDENDUM_ADDED = "ENCOUNTER_ADDENDUM_ADDED"
     # Phase 14 actions
     PRESCRIPTION_CREATED = "PRESCRIPTION_CREATED"
+    PRESCRIPTION_UPDATED = "PRESCRIPTION_UPDATED"
+    PRESCRIPTION_AUTHORISED = "PRESCRIPTION_AUTHORISED"
+    PRESCRIPTION_CANCELLED = "PRESCRIPTION_CANCELLED"
+    FOLLOW_UP_RECOMMENDED = "FOLLOW_UP_RECOMMENDED"
+    FOLLOW_UP_BOOKED = "FOLLOW_UP_BOOKED"
+    FOLLOW_UP_CLOSED = "FOLLOW_UP_CLOSED"
     TREATMENT_PLAN_CREATED = "TREATMENT_PLAN_CREATED"
     TREATMENT_PLAN_UPDATED = "TREATMENT_PLAN_UPDATED"
     TREATMENT_PLAN_CANCELLED = "TREATMENT_PLAN_CANCELLED"
     TREATMENT_SESSION_LOGGED = "TREATMENT_SESSION_LOGGED"
     TREATMENT_SESSION_ADDENDUM_ADDED = "TREATMENT_SESSION_ADDENDUM_ADDED"
+    # Phase 19 actions
+    CROSS_DOCTOR_CLINICAL_READ = "CROSS_DOCTOR_CLINICAL_READ"
     # Phase 15 actions
     PAYMENT_RECORDED = "PAYMENT_RECORDED"
     PAYMENT_REVERSED = "PAYMENT_REVERSED"
@@ -73,12 +84,23 @@ class AuditAction(StrEnum):
     # Admin Panel expansion actions
     SESSION_REVOKED = "SESSION_REVOKED"
     USER_SESSIONS_REVOKED = "USER_SESSIONS_REVOKED"
+    SESSION_TAKEOVER = "SESSION_TAKEOVER"
     RECEIPT_REPRINTED = "RECEIPT_REPRINTED"
     BACKUP_FAILED = "BACKUP_FAILED"
     BACKUP_RESTORE_FAILED = "BACKUP_RESTORE_FAILED"
     SECURITY_POLICY_UPDATED = "SECURITY_POLICY_UPDATED"
     BACKUP_SETTINGS_UPDATED = "BACKUP_SETTINGS_UPDATED"
     BACKUP_PRUNED = "BACKUP_PRUNED"
+    # Phase 20 asset actions
+    ASSET_UPLOADED = "ASSET_UPLOADED"
+    ASSET_DEACTIVATED = "ASSET_DEACTIVATED"
+    # Phase 20 print template actions
+    PRINT_TEMPLATE_UPDATED = "PRINT_TEMPLATE_UPDATED"
+    # Phase 20 data governance actions
+    PATIENT_CORRECTED = "PATIENT_CORRECTED"
+    PATIENT_IMPORT_STAGED = "PATIENT_IMPORT_STAGED"
+    PATIENT_IMPORT_COMMITTED = "PATIENT_IMPORT_COMMITTED"
+    PATIENT_EXPORTED = "PATIENT_EXPORTED"
 
 
 class Outcome(StrEnum):
@@ -265,3 +287,30 @@ def record(
     session.add(entry)
     session.flush()
     return entry
+
+
+def record_audit_event(
+    session: Session,
+    actor_user_id: int | None,
+    action: AuditAction | str,
+    entity_type: str | None,
+    entity_id: int | str | None,
+    details: dict[str, Any] | None = None,
+    actor_username: str | None = None,
+    actor_role: str | None = None,
+) -> AuditLog:
+    """Convenience helper to record an audit event with details payload."""
+    ctx = AuditContext(
+        actor_user_id=actor_user_id,
+        actor_username=actor_username or (f"user_{actor_user_id}" if actor_user_id else "SYSTEM"),
+        actor_role=actor_role or "DOCTOR",
+    )
+    return record(
+        session=session,
+        ctx=ctx,
+        action=action,
+        entity_type=entity_type,
+        entity_id=entity_id,
+        after=details,
+    )
+

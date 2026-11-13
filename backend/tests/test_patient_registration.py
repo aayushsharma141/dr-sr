@@ -84,12 +84,14 @@ def test_patient_registration_success_and_audit(
     assert resp.status_code == 201
     data = resp.json()
 
-    # 1. Verify URN format KH-YYYY-XXXX
+    # 1. Verify URN format KH-YY-P-MM-NNNNN
     assert data["urn"].startswith("KH-")
     parts = data["urn"].split("-")
-    assert len(parts) == 3
-    assert len(parts[1]) == 4  # Year
-    assert len(parts[2]) == 4  # 4-digit sequence
+    assert len(parts) == 5
+    assert len(parts[1]) == 2  # Year (2-digit)
+    assert parts[2] == "P"  # Patient
+    assert len(parts[3]) == 2  # Month (2-digit)
+    assert len(parts[4]) == 5  # 5-digit sequence
 
     # 2. Verify Canonical fields
     assert data["full_name"] == "Meena Devi"

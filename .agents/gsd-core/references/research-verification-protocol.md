@@ -1,4 +1,4 @@
-﻿## Known Pitfalls
+## Known Pitfalls
 
 ### Configuration Scope Blindness
 **Trap:** Assuming global configuration means no project-scoping exists

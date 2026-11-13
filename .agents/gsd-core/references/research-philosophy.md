@@ -1,4 +1,4 @@
-﻿## Claude's Training as Hypothesis
+## Claude's Training as Hypothesis
 
 Training data is 6-18 months stale. Treat pre-existing knowledge as hypothesis, not fact.
 

@@ -11,6 +11,20 @@ build/
 node_modules/
 *.tsbuildinfo
 coverage/
+.coverage
+.coverage.*
 backend/var/
 var/
 graphify-out/
+
+# Leftover runtime files of the dropped Node.js HMS app (database, keys,
+# node_modules). Never commit them; delete the folder once its server is stopped.
+/hms/
+
+# Quarantine: PDF outputs and customer documents
+demo/*.pdf
+quarantine/
+unsloth_compiled_cache/
+.codex/
+.claude/
+

@@ -257,23 +257,30 @@ def test_phase14_full_lifecycle_and_security_gate(
     assert rx_data["items"][1]["item_order"] == 2
     assert rx_data["doctor_id"] == doctor_a_user.doctor_id
 
-    # Doctor Silo: Doctor B attempts to view Doctor A's prescription -> 404
+    # Cross-Doctor Read: Doctor B views Doctor A's prescription -> 200 OK audited (DWS-04)
     doc_b_rx_view = doc_b_c.get(f"/api/prescriptions/{rx_id}")
-    assert doc_b_rx_view.status_code == 404
+    assert doc_b_rx_view.status_code == 200
+
+    # Cross-Doctor Write Denial: Doctor B attempts to cancel Doctor A's prescription -> 404
+    doc_b_cancel = doc_b_c.post(
+        f"/api/prescriptions/{rx_id}/cancel",
+        json={"reason": "Unauthorized doctor attempt"},
+    )
+    assert doc_b_cancel.status_code == 404
 
     # Doctor A views own prescription -> 200 OK
     doc_a_rx_view = doc_a_c.get(f"/api/prescriptions/{rx_id}")
     assert doc_a_rx_view.status_code == 200
     assert doc_a_rx_view.json()["diagnosis"] == "Cervical Spondylotic Radiculopathy"
 
-    # Patient Prescriptions endpoint silo check
+    # Patient Prescriptions endpoint cross-doctor continuity check (DWS-04)
     doc_a_pat_rxs = doc_a_c.get(f"/api/patients/{patient_id}/prescriptions")
     assert doc_a_pat_rxs.status_code == 200
     assert any(r["id"] == rx_id for r in doc_a_pat_rxs.json())
 
     doc_b_pat_rxs = doc_b_c.get(f"/api/patients/{patient_id}/prescriptions")
     assert doc_b_pat_rxs.status_code == 200
-    assert not any(r["id"] == rx_id for r in doc_b_pat_rxs.json())
+    assert any(r["id"] == rx_id for r in doc_b_pat_rxs.json())
 
     # Audit log for prescription
     rx_audit = db_session.execute(
@@ -320,9 +327,16 @@ def test_phase14_full_lifecycle_and_security_gate(
     assert plan_data["completed_sessions"] == 0
     assert plan_data["total_sessions"] == 7
 
-    # Doctor Silo: Doctor B cannot read Doctor A's treatment plan -> 404
+    # Cross-Doctor Read: Doctor B can view Doctor A's treatment plan (DWS-04)
     doc_b_plan_view = doc_b_c.get(f"/api/treatment-plans/{created_plan_id}")
-    assert doc_b_plan_view.status_code == 404
+    assert doc_b_plan_view.status_code == 200
+
+    # Cross-Doctor Write Denial: Doctor B cannot update Doctor A's treatment plan -> 404 (DWS-04)
+    doc_b_plan_patch = doc_b_c.patch(
+        f"/api/treatment-plans/{created_plan_id}",
+        json={"version_id": plan_data["version_id"], "plan_name": "Tampered Title"},
+    )
+    assert doc_b_plan_patch.status_code == 404
 
     # Optimistic locking 409 Conflict test on plan update
     conflict_resp = doc_a_c.patch(
@@ -436,9 +450,21 @@ def test_phase14_full_lifecycle_and_security_gate(
     assert len(s1["addenda"]) == 1
     assert "soreness 2 hours later" in s1["addenda"][0]["note"]
 
-    # Doctor Silo: Doctor B cannot read Doctor A's treatment sessions
+    # Cross-Doctor Read: Doctor B can read Doctor A's treatment sessions (DWS-04)
     doc_b_sessions = doc_b_c.get(f"/api/treatment-plans/{created_plan_id}/sessions")
-    assert doc_b_sessions.status_code == 404
+    assert doc_b_sessions.status_code == 200
+
+    # Cross-Doctor Write Denial: Doctor B cannot log session on Doctor A's plan -> 404 (DWS-04)
+    doc_b_add_sess = doc_b_c.post(
+        f"/api/treatment-plans/{created_plan_id}/sessions",
+        json={
+            "session_date": "2026-11-03",
+            "vas_score": 4,
+            "modalities": ["Hot Pack"],
+            "clinical_notes": "Unauthorized write",
+        },
+    )
+    assert doc_b_add_sess.status_code == 404
 
     # Audit Logs verification
     session_audit = db_session.execute(

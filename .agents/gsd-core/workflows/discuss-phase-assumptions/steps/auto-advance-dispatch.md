@@ -1,4 +1,4 @@
-﻿**If `--auto` flag present OR `AUTO_MODE` is true:**
+**If `--auto` flag present OR `AUTO_MODE` is true:**
 
 Display banner:
 ```text

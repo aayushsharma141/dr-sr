@@ -1,0 +1,73 @@
+{
+  "contract": "1.0.0",
+  "flavor": "core",
+  "milestone": "v3.0 — Centralized LAN Web Platform",
+  "phases": [
+    {
+      "number": "11",
+      "name": "Decisions Gate, Foundation & Auth",
+      "status": "complete"
+    },
+    {
+      "number": "12",
+      "name": "Clinic Settings & Patient Registration",
+      "status": "complete"
+    },
+    {
+      "number": "13",
+      "name": "Appointments & Clinical Encounters",
+      "status": "complete"
+    },
+    {
+      "number": "14",
+      "name": "Prescriptions, Treatment Plans & Sessions",
+      "status": "complete"
+    },
+    {
+      "number": "15",
+      "name": "Billing, Receipts & Reversals",
+      "status": "complete"
+    },
+    {
+      "number": "16",
+      "name": "Audit Viewer, Backup/Restore & Integrity",
+      "status": "complete"
+    },
+    {
+      "number": "17",
+      "name": "LAN Deployment, Printer & Acceptance",
+      "status": "complete"
+    },
+    {
+      "number": "18",
+      "name": "UI/UX Review Hardening",
+      "status": "complete"
+    },
+    {
+      "number": "19",
+      "name": "Universal Consultation Workspace",
+      "status": "complete"
+    },
+    {
+      "number": "20",
+      "name": "Admin Data Governance & Asset Management",
+      "status": "complete"
+    },
+    {
+      "number": "21",
+      "name": "Build Takeover & System Stabilization",
+      "status": "complete"
+    },
+    {
+      "number": "22",
+      "name": "Advanced Data Operations",
+      "status": "pending"
+    }
+  ],
+  "next": {
+    "command": "/gsd-complete-milestone",
+    "label": "Complete milestone v3.0",
+    "reason": "Release blockers and P1 clinical UX gaps remediated; full test suites green"
+  },
+  "updated_at": "2026-11-11T21:55:00.000Z"
+}

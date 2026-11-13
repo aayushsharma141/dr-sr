@@ -30,7 +30,10 @@ def _app_with_settings(db_session: Session, settings: Settings) -> FastAPI:
 
 def _login(app: FastAPI, user: User) -> TestClient:
     c = TestClient(app, base_url="http://testserver", headers={"Origin": "http://testserver"})
-    res = c.post("/api/auth/login", json={"username": user.username, "password": TEST_PASSWORD})
+    res = c.post(
+        "/api/auth/login",
+        json={"username": user.username, "password": TEST_PASSWORD, "takeover": True},
+    )
     assert res.status_code == 200, res.text
     c.headers["X-CSRF-Token"] = res.json()["csrf_token"]
     return c

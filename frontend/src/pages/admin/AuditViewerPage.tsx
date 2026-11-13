@@ -2,6 +2,8 @@ import { Fragment, useState } from 'react'
 import { useAuditActions, useAuditLogs, useMe } from '../../api/queries'
 import type { AuditLogOut } from '../../api/types'
 import { AppShell } from '../../components/AppShell'
+import { AdminPageHeader } from '../../components/admin/AdminPageHeader'
+import { TableSkeleton } from '../../components/AdminSkeleton'
 import { InlineAlert } from '../../components/InlineAlert'
 
 const PAGE_SIZE = 20
@@ -98,11 +100,12 @@ function AuditDiff({ log }: { log: AuditLogOut }) {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {rows.map((r) => (
+              {rows.map((r, index) => (
                 <tr
                   key={r.field}
                   data-changed={r.changed ? 'true' : 'false'}
-                  className={r.changed ? 'border-l-4 border-l-[#C39A35] bg-[#FFF8E7]' : ''}
+                  className={`transition-colors ${r.changed ? 'border-l-4 border-l-[#C39A35] bg-[#FFF8E7]' : ''}`}
+                  style={{ transitionDelay: `${index * 50}ms` }}
                 >
                   <th scope="row" className="px-3 py-2 text-left font-mono text-sm font-semibold text-slate-900">
                     {r.field}
@@ -218,13 +221,10 @@ export function AuditViewerPage() {
   return (
     <AppShell name={me?.full_name ?? 'Admin'} role={me?.role ?? 'ADMIN'}>
       <div className="space-y-6">
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-bold text-slate-900">System Audit Log</h1>
-            <p className="mt-1 text-sm text-slate-700">
-              Immutable, append-only operational and security event log (AUD-02). Dates are IST business days.
-            </p>
-          </div>
+        <AdminPageHeader
+          title="Audit Trail"
+          description="Immutable, append-only operational and security event log (AUD-02). Dates are IST business days."
+          actions={
           <button
             type="button"
             onClick={() => void refetch()}
@@ -233,7 +233,8 @@ export function AuditViewerPage() {
           >
             {isFetching ? 'Refreshing...' : 'Refresh Logs'}
           </button>
-        </div>
+          }
+        />
 
         <form
           role="search"
@@ -346,9 +347,7 @@ export function AuditViewerPage() {
 
         <div className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-xs">
           {isPending && (
-            <p role="status" className="p-8 text-center text-sm text-slate-700">
-              Loading audit records...
-            </p>
+            <TableSkeleton label="Loading audit records..." rows={5} columns={6} className="border-0" />
           )}
 
           {isError && (
@@ -359,9 +358,9 @@ export function AuditViewerPage() {
 
           {data && (
             <>
-              <div className="overflow-x-auto">
+              <div className="max-h-[65vh] overflow-auto">
                 <table className="w-full text-left text-sm text-slate-800">
-                  <thead className="border-b border-slate-200 bg-slate-50">
+                  <thead className="sticky top-0 z-10 border-b border-slate-200 bg-slate-50">
                     <tr>
                       <th scope="col" className={TH}>Timestamp</th>
                       <th scope="col" className={TH}>Actor</th>
@@ -379,12 +378,13 @@ export function AuditViewerPage() {
                         </td>
                       </tr>
                     ) : (
-                      data.items.map((log) => {
+                      data.items.map((log, index) => {
                         const expanded = expandedId === log.id
                         const detailsId = `audit-entry-${log.id}`
+                        const rowDelay = index * 50
                         return (
                           <Fragment key={log.id}>
-                            <tr className={expanded ? 'bg-[#FFF8E7]' : 'hover:bg-slate-50'}>
+                            <tr className={`transition-colors ${expanded ? 'bg-[#FFF8E7]' : 'hover:bg-slate-50'}`} style={{ transitionDelay: `${rowDelay}ms` }}>
                               <td className="whitespace-nowrap px-4 py-3 font-mono text-sm text-slate-800">
                                 {formatIst(log.occurred_at)}
                               </td>

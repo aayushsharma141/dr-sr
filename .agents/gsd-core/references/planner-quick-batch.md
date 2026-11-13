@@ -1,4 +1,4 @@
-﻿# Quick-Batch Mode — Planner Reference
+# Quick-Batch Mode — Planner Reference
 
 Triggered when `<planning_context>` declares `**Mode:** quick-batch`
 (#3676, epic #3344, ADR-1239 "Quick-batch binding"). One dispatch = one

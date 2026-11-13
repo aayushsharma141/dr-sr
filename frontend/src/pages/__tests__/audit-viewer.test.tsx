@@ -58,7 +58,7 @@ describe('AuditViewerPage', () => {
       </QueryClientProvider>
     )
 
-    expect(screen.getByText('System Audit Log')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { level: 1, name: 'Audit Trail' })).toBeInTheDocument()
     expect(screen.getByText('admin')).toBeInTheDocument()
     expect(screen.getAllByText('USER_CREATED').length).toBeGreaterThan(0)
     expect(screen.getAllByText('SUCCESS').length).toBeGreaterThan(0)

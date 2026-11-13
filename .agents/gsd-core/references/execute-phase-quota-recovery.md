@@ -1,4 +1,4 @@
-﻿**Step 7.1 detail — `class == "quota-exceeded"` recovery.**
+**Step 7.1 detail — `class == "quota-exceeded"` recovery.**
 
 Do not offer "retry now". Run the step-5 spot-check first; if SUMMARY.md is missing but
 commits exist, route to safe-resume (`state.verify-against-disk`) instead of an immediate

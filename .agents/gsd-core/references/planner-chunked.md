@@ -1,4 +1,4 @@
-﻿# Chunked Mode Return Formats
+# Chunked Mode Return Formats
 
 Used when `plan-phase` spawns `gsd-planner` with `CHUNKED_MODE=true` (triggered by `--chunked`
 flag or `workflow.plan_chunked: true` config). Splits the single long-lived planner Task into

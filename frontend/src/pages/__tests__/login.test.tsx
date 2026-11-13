@@ -199,8 +199,8 @@ describe('Login & Role Navigation Flow', () => {
 
     await waitFor(() => {
       expect(screen.getByRole('heading', { name: 'Administration Dashboard' })).toBeInTheDocument()
-      expect(screen.getByText('System User Counts')).toBeInTheDocument()
-      expect(screen.getByText(/3 active/)).toBeInTheDocument()
+      expect(screen.getByText('Staff accounts')).toBeInTheDocument()
+      expect(screen.getByText('6 active')).toBeInTheDocument()
     })
   })
 
@@ -270,7 +270,7 @@ describe('Login & Role Navigation Flow', () => {
     await waitFor(() => {
       expect(screen.getByText('Reception Dashboard')).toBeInTheDocument()
       expect(
-        screen.getByText(/Reception area active. Ready for patient check-ins/i),
+        screen.getByText(/Front Desk & Reception Command Center/i),
       ).toBeInTheDocument()
     })
   })

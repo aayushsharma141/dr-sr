@@ -1,4 +1,4 @@
-﻿# Gates Taxonomy
+# Gates Taxonomy
 
 Canonical gate types used across GSD workflows. Every validation checkpoint maps to one of these four types.
 

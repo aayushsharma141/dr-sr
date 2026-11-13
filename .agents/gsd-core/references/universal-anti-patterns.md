@@ -1,4 +1,4 @@
-﻿# Universal Anti-Patterns
+# Universal Anti-Patterns
 
 Rules that apply to ALL workflows and agents. Individual workflows may have additional specific anti-patterns.
 

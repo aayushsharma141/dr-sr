@@ -1,4 +1,4 @@
-﻿---
+---
 phase: XX-name
 plan: YY
 subsystem: [primary category]

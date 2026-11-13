@@ -1,0 +1,180 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "Kalyan Hospital — Codebase File Architecture & Call Relationships",
+    "output": "kalyan-hospital-architecture.html",
+    "quality_profile": "showcase"
+  },
+  "components": [
+    {
+      "id": "c_auth_pages",
+      "type": "frontend",
+      "label": "Login.tsx & Setup.tsx",
+      "sublabel": "Auth & Bootstrap Wizard",
+      "pos": [30, 100],
+      "size": [190, 64],
+      "tag": "Auth Views"
+    },
+    {
+      "id": "c_clinical_pages",
+      "type": "frontend",
+      "label": "ClinicalEncounter.tsx",
+      "sublabel": "DoctorDashboard.tsx & Templates",
+      "pos": [30, 220],
+      "size": [190, 64],
+      "tag": "Doctor Views"
+    },
+    {
+      "id": "c_reception_pages",
+      "type": "frontend",
+      "label": "PatientRegister.tsx",
+      "sublabel": "ReceptionBillingPage.tsx & Dues",
+      "pos": [30, 340],
+      "size": [190, 64],
+      "tag": "Reception Views"
+    },
+    {
+      "id": "c_admin_pages",
+      "type": "frontend",
+      "label": "AreaHome.tsx & Users.tsx",
+      "sublabel": "BackupManagerPage.tsx & Assets",
+      "pos": [30, 460],
+      "size": [190, 64],
+      "tag": "Admin Views"
+    },
+    {
+      "id": "c_router_shell",
+      "type": "frontend",
+      "label": "router.tsx & AppShell.tsx",
+      "sublabel": "Role Guards & App Shell",
+      "pos": [260, 220],
+      "size": [170, 64],
+      "tag": "Navigation Root"
+    },
+    {
+      "id": "c_api_client",
+      "type": "frontend",
+      "label": "client.ts & queries.ts",
+      "sublabel": "TanStack Query & REST Client",
+      "pos": [260, 340],
+      "size": [170, 64],
+      "tag": "API Client"
+    },
+    {
+      "id": "c_security_core",
+      "type": "security",
+      "label": "permissions.py & csrf.py",
+      "sublabel": "principal.py & security.py",
+      "pos": [480, 100],
+      "size": [180, 64],
+      "tag": "Security Core"
+    },
+    {
+      "id": "c_backend_main",
+      "type": "backend",
+      "label": "main.py & config.py",
+      "sublabel": "FastAPI App & 37 Env Vars",
+      "pos": [480, 220],
+      "size": [180, 64],
+      "tag": "Central API"
+    },
+    {
+      "id": "c_backend_routers",
+      "type": "backend",
+      "label": "routers/ Endpoints",
+      "sublabel": "auth, patients, billing, audit",
+      "pos": [480, 340],
+      "size": [180, 64],
+      "tag": "REST Routers"
+    },
+    {
+      "id": "c_backend_services",
+      "type": "backend",
+      "label": "services/ Modules",
+      "sublabel": "backup, audit, billing, photo",
+      "pos": [480, 460],
+      "size": [180, 64],
+      "tag": "Domain Logic"
+    },
+    {
+      "id": "c_alembic_migrations",
+      "type": "database",
+      "label": "migrations/env.py",
+      "sublabel": "Alembic Version Revisions",
+      "pos": [770, 100],
+      "size": [170, 64],
+      "tag": "DDL Owner"
+    },
+    {
+      "id": "c_db_models",
+      "type": "database",
+      "label": "models.py & session.py",
+      "sublabel": "SQLAlchemy 2.0 ORM Engine",
+      "pos": [770, 220],
+      "size": [170, 64],
+      "tag": "PostgreSQL DB"
+    },
+    {
+      "id": "c_storage_backups",
+      "type": "database",
+      "label": "var/backups/ & var/photos/",
+      "sublabel": "Checksummed Tarballs & PHI",
+      "pos": [770, 460],
+      "size": [170, 64],
+      "tag": "Local Storage"
+    }
+  ],
+  "boundaries": [
+    {
+      "kind": "region",
+      "label": "Hospital LAN Clients & Workstations",
+      "wraps": ["c_auth_pages", "c_clinical_pages", "c_reception_pages", "c_admin_pages", "c_router_shell", "c_api_client"]
+    },
+    {
+      "kind": "security-group",
+      "label": "Central Hospital Server PC (Offline LAN :8000)",
+      "wraps": ["c_security_core", "c_backend_main", "c_backend_routers", "c_backend_services", "c_alembic_migrations", "c_db_models", "c_storage_backups"]
+    }
+  ],
+  "connections": [
+    { "id": "auth-to-shell", "from": "c_auth_pages", "to": "c_router_shell", "fromSide": "right", "toSide": "top" },
+    { "id": "clin-to-shell", "from": "c_clinical_pages", "to": "c_router_shell", "fromSide": "right", "toSide": "left" },
+    { "id": "rec-to-shell", "from": "c_reception_pages", "to": "c_router_shell", "fromSide": "right", "toSide": "left" },
+    { "id": "adm-to-shell", "from": "c_admin_pages", "to": "c_router_shell", "fromSide": "right", "toSide": "bottom" },
+    { "id": "shell-to-api", "from": "c_router_shell", "to": "c_api_client", "fromSide": "bottom", "toSide": "top" },
+    { "id": "api-to-main", "from": "c_api_client", "to": "c_backend_main", "label": "HTTP :8000", "variant": "emphasis" },
+    { "id": "main-to-sec", "from": "c_backend_main", "to": "c_security_core", "fromSide": "top", "toSide": "bottom", "label": "RBAC Policy" },
+    { "id": "main-to-routers", "from": "c_backend_main", "to": "c_backend_routers", "fromSide": "bottom", "toSide": "top" },
+    { "id": "routers-to-srv", "from": "c_backend_routers", "to": "c_backend_services", "fromSide": "bottom", "toSide": "top" },
+    { "id": "alembic-to-db", "from": "c_alembic_migrations", "to": "c_db_models", "fromSide": "bottom", "toSide": "top", "label": "DDL Migrations" },
+    { "id": "main-to-db", "from": "c_backend_main", "to": "c_db_models", "label": "SQL queries", "variant": "emphasis" },
+    { "id": "srv-to-storage", "from": "c_backend_services", "to": "c_storage_backups", "label": "Photos / Dumps", "fromSide": "right", "toSide": "left" }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "Frontend Presentation Layer",
+      "items": [
+        "AreaHome.tsx, Login.tsx, Setup.tsx, PatientRegister.tsx, ClinicalEncounter.tsx",
+        "router.tsx & AppShell.tsx enforce role boundaries; client.ts queries REST API over LAN"
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "Backend Service & Security Core",
+      "items": [
+        "main.py mounts 24 router modules and serves the compiled React distribution statically",
+        "config.py parses 37 environment variables; permissions.py enforces strict doctor silo"
+      ]
+    },
+    {
+      "dot": "violet",
+      "title": "Data Durability & Engine",
+      "items": [
+        "PostgreSQL 18 database with dual-role security (kalyan_app DML vs kalyan_owner DDL)",
+        "backup_service.py bundles SQL dump + var/photos into SHA-256 verified .tar.gz archives"
+      ]
+    }
+  ]
+}

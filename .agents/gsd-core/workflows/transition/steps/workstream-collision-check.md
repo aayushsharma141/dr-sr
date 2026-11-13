@@ -1,4 +1,4 @@
-﻿**Workstream collision check (when `is_last_phase: true`):**
+**Workstream collision check (when `is_last_phase: true`):**
 
 Before routing to Route B, check whether other workstreams are still active.
 This prevents one workstream from advancing or completing the milestone while

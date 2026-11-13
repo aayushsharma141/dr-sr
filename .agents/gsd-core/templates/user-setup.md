@@ -1,4 +1,4 @@
-﻿# User Setup Template
+# User Setup Template
 
 Template for `.planning/phases/XX-name/{phase}-USER-SETUP.md` - human-required configuration that Claude cannot automate.
 

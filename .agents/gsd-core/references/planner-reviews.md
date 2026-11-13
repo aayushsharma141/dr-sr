@@ -1,4 +1,4 @@
-﻿# Reviews Mode — Planner Reference
+# Reviews Mode — Planner Reference
 
 Triggered when orchestrator sets Mode to `reviews`. Replanning from scratch with REVIEWS.md feedback as additional context.
 

@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "receiptId": "e1a0141a-4021-46d2-a96a-79d71a294d03",
+  "status": "current",
+  "command": "deliver",
+  "type": "architecture",
+  "input": "D:\\dr-sr\\.archify\\kalyan-hospital-architecture.json",
+  "output": "D:\\dr-sr\\.archify\\kalyan-hospital-architecture.html",
+  "specification": {
+    "sha256": "91b393a54275b87cee9dcb44bab2bf5e6688e20927b90888ee227e107bd329b8",
+    "bytes": 6327
+  },
+  "artifact": {
+    "sha256": "adae2fcb48b0a9e9b43c7172e49e56d9251078ccdcbb9442e9a59583117417bb",
+    "bytes": 872048
+  }
+}

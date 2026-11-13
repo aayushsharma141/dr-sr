@@ -1,4 +1,4 @@
-﻿<ui_patterns>
+<ui_patterns>
 
 Visual patterns for user-facing GSD output. Orchestrators @-reference this file.
 

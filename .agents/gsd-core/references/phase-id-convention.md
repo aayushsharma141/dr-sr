@@ -1,4 +1,4 @@
-﻿# Bracket phase-ID convention
+# Bracket phase-ID convention
 
 The bracket convention is opt-in through `phase_id_convention: "bracket"`.
 Its compact grammar card below is generated from `src/phase-id-card.cts`; edit

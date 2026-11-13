@@ -7,15 +7,15 @@ from pydantic import BaseModel, ConfigDict, Field
 
 class DepartmentCreate(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    name_en: str = Field(min_length=2, max_length=120)
-    name_hi: str | None = Field(default=None, max_length=120)
+    name_en: str = Field(min_length=2, max_length=128)
+    name_hi: str | None = Field(default=None, max_length=128)
     description: str | None = Field(default=None, max_length=500)
 
 
 class DepartmentUpdate(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    name_en: str = Field(min_length=2, max_length=120)
-    name_hi: str | None = Field(default=None, max_length=120)
+    name_en: str = Field(min_length=2, max_length=128)
+    name_hi: str | None = Field(default=None, max_length=128)
     description: str | None = Field(default=None, max_length=500)
     is_active: bool
     version_id: int = Field(ge=1)
@@ -24,6 +24,7 @@ class DepartmentUpdate(BaseModel):
 class DepartmentOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: int
+    code: str
     name_en: str
     name_hi: str | None
     description: str | None

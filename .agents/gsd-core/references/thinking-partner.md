@@ -1,4 +1,4 @@
-﻿# Thinking Partner Integration
+# Thinking Partner Integration
 
 Conditional extended thinking at workflow decision points. Activates when `features.thinking_partner: true` in `.planning/config.json` (default: false).
 

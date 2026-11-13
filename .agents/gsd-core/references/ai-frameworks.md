@@ -1,4 +1,4 @@
-﻿# AI Framework Decision Matrix
+# AI Framework Decision Matrix
 
 > Reference used by `gsd-framework-selector` and `gsd-ai-researcher`.
 > Distilled from official docs, benchmarks, and developer reports (2026).

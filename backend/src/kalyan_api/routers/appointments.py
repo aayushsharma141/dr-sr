@@ -67,6 +67,7 @@ def _to_read_schema(appt: Appointment) -> AppointmentRead:
         token_number=appt.token_number,
         status=appt.status,
         status_updated_at=appt.status_updated_at,
+        check_in_at=appt.check_in_at,
         cancellation_reason=appt.cancellation_reason,
         notes=appt.notes,
         version_id=appt.version_id,
@@ -89,8 +90,8 @@ def book_appointment(
     settings=Depends(get_current_settings),
 ) -> AppointmentRead:
     """Book a per-doctor daily appointment with atomic token generation (APT-01)."""
-    # 1. Validate active patient exists
-    patient = session.get(Patient, payload.patient_id)
+    # 1. Validate active patient exists and lock row to serialize concurrent bookings (FB-03)
+    patient = session.get(Patient, payload.patient_id, with_for_update=True)
     if not patient or not patient.is_active:
         raise ApiError(
             status_code=404,
@@ -128,12 +129,53 @@ def book_appointment(
             message="Selected doctor is not assigned to the selected department.",
         )
 
-    # 4. Generate sequential token for (doctor_id, appointment_date)
+    # 4. Enforce duplicate same-day booking prevention (BR-006)
+    active_statuses = [
+        AppointmentStatus.BOOKED.value,
+        AppointmentStatus.ARRIVED.value,
+        AppointmentStatus.IN_CONSULTATION.value,
+        AppointmentStatus.DONE.value,
+    ]
+    existing_appt = session.scalar(
+        select(Appointment).where(
+            Appointment.patient_id == payload.patient_id,
+            Appointment.doctor_id == payload.doctor_id,
+            Appointment.appointment_date == payload.appointment_date,
+            Appointment.status.in_(active_statuses),
+        )
+    )
+    if existing_appt is not None:
+        override = (payload.override_reason or "").strip()
+        if len(override) < 5:
+            raise ApiError(
+                status_code=409,
+                code="duplicate_appointment",
+                message=(
+                    "Patient already has an active appointment with this doctor on this date. "
+                    "An override reason of at least 5 characters is required."
+                ),
+                details={
+                    "existing_appointment_id": existing_appt.id,
+                    "existing_token_number": existing_appt.token_number,
+                    "existing_status": existing_appt.status,
+                },
+            )
+
+    # 5. Generate sequential token for (doctor_id, appointment_date)
     token_num = token_service.generate_next_daily_token(
         session, payload.doctor_id, payload.appointment_date
     )
 
-    # 5. Create appointment
+    # 6. Create appointment
+    override_text = (payload.override_reason or "").strip() or None
+    final_notes = payload.notes
+    if override_text:
+        final_notes = (
+            f"{final_notes} | [Override: {override_text}]"
+            if final_notes
+            else f"[Override: {override_text}]"
+        )
+
     appt = Appointment(
         patient_id=payload.patient_id,
         doctor_id=payload.doctor_id,
@@ -141,29 +183,33 @@ def book_appointment(
         appointment_date=payload.appointment_date,
         token_number=token_num,
         status=AppointmentStatus.BOOKED.value,
-        notes=payload.notes,
+        notes=final_notes,
         created_by_user_id=principal.user_id,
     )
     session.add(appt)
     session.flush()
 
-    # 5. Audit creation
+    # 7. Audit creation
     ctx = build_audit_context(request, principal)
+    audit_after = {
+        "patient_id": appt.patient_id,
+        "patient_urn": patient.urn,
+        "doctor_id": appt.doctor_id,
+        "department_id": payload.department_id,
+        "appointment_date": appt.appointment_date.isoformat(),
+        "token_number": appt.token_number,
+        "status": appt.status,
+    }
+    if override_text:
+        audit_after["override_reason"] = override_text
+
     audit_service.record(
         session,
         ctx,
         action=AuditAction.APPOINTMENT_CREATED,
         entity_type="appointment",
         entity_id=appt.id,
-        after={
-            "patient_id": appt.patient_id,
-            "patient_urn": patient.urn,
-            "doctor_id": appt.doctor_id,
-            "department_id": payload.department_id,
-            "appointment_date": appt.appointment_date.isoformat(),
-            "token_number": appt.token_number,
-            "status": appt.status,
-        },
+        after=audit_after,
     )
 
     return _to_read_schema(appt)
@@ -283,11 +329,15 @@ def update_appointment_status(
         )
 
     require_version(appt, payload.version_id, label="appointment")
-    validate_status_transition(appt, payload.status, principal, payload.cancellation_reason)
+    validate_status_transition(
+        appt, payload.status, principal, payload.cancellation_reason, session=session
+    )
 
     old_status = appt.status
     appt.status = payload.status.value
     appt.status_updated_at = clock.utcnow()
+    if payload.status == AppointmentStatus.ARRIVED and appt.check_in_at is None:
+        appt.check_in_at = clock.utcnow()
     if payload.cancellation_reason is not None:
         appt.cancellation_reason = payload.cancellation_reason
     appt.version_id += 1

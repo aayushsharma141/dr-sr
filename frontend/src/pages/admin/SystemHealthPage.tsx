@@ -2,6 +2,8 @@ import type { ReactNode } from 'react'
 import { useMe, useSystemStatus } from '../../api/queries'
 import type { ServiceCheckOut, StorageVolumeOut, SystemStatusOut } from '../../api/types'
 import { AppShell } from '../../components/AppShell'
+import { AdminPageHeader } from '../../components/admin/AdminPageHeader'
+import { TableSkeleton } from '../../components/AdminSkeleton'
 import { InlineAlert } from '../../components/InlineAlert'
 
 // Admin module 12: System Health & Maintenance. Shows the raw facts reported by
@@ -97,17 +99,21 @@ function ServiceChecks({ checks }: { checks: ServiceCheckOut[] }) {
         Live checks
       </h2>
       <ul className="mt-3 divide-y divide-slate-100">
-        {checks.map((check) => (
-          <li key={check.key} className="flex flex-wrap items-center justify-between gap-2 py-2">
-            <div>
-              <p className="text-sm font-semibold text-slate-900">{check.label}</p>
-              <p className="text-sm text-slate-700">{check.detail}</p>
-            </div>
-            <span className={`rounded border px-2 py-0.5 text-sm font-semibold ${CHECK_STYLE[check.status].className}`}>
-              {CHECK_STYLE[check.status].label}
-            </span>
-          </li>
-        ))}
+        {checks.length === 0 ? (
+          <li className="py-2 text-sm text-slate-700">No live checks were reported by the server.</li>
+        ) : (
+          checks.map((check) => (
+            <li key={check.key} className="flex flex-wrap items-center justify-between gap-2 py-2">
+              <div>
+                <p className="text-sm font-semibold text-slate-900">{check.label}</p>
+                <p className="text-sm text-slate-700">{check.detail}</p>
+              </div>
+              <span className={`rounded border px-2 py-0.5 text-sm font-semibold ${CHECK_STYLE[check.status].className}`}>
+                {CHECK_STYLE[check.status].label}
+              </span>
+            </li>
+          ))
+        )}
       </ul>
     </section>
   )
@@ -138,14 +144,10 @@ export function SystemHealthPage() {
   return (
     <AppShell name={me?.full_name ?? 'Admin'} role={me?.role ?? 'ADMIN'}>
       <div className="space-y-6">
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-bold text-slate-900">System Health & Maintenance</h1>
-            <p className="mt-1 text-sm text-slate-700">
-              Server, database and storage facts as reported by the server.
-              {dataUpdatedAt > 0 && ` Fetched ${new Date(dataUpdatedAt).toLocaleTimeString('en-IN')}.`}
-            </p>
-          </div>
+        <AdminPageHeader
+          title="System Health"
+          description={`Server, database and storage facts as reported by the server.${dataUpdatedAt > 0 ? ` Fetched ${new Date(dataUpdatedAt).toLocaleTimeString('en-IN')}.` : ''}`}
+          actions={
           <button
             type="button"
             onClick={() => void refetch()}
@@ -154,13 +156,10 @@ export function SystemHealthPage() {
           >
             {isFetching ? 'Refreshing...' : 'Refresh'}
           </button>
-        </div>
+          }
+        />
 
-        {isPending && (
-          <p role="status" className="text-sm text-slate-700">
-            Loading system status...
-          </p>
-        )}
+        {isPending && <TableSkeleton label="Loading system status..." rows={3} columns={3} />}
         {isError && (
           <InlineAlert tone="error">Failed to load system status: {error.message}</InlineAlert>
         )}
@@ -203,9 +202,9 @@ export function SystemHealthPage() {
               {data.storage.length === 0 ? (
                 <p className="mt-2 text-sm text-slate-700">No storage volumes reported.</p>
               ) : (
-                <div className="mt-3 overflow-x-auto">
+                <div className="mt-3 max-h-[50vh] overflow-auto">
                   <table className="w-full">
-                    <thead className="border-b border-slate-200 bg-slate-50">
+                    <thead className="sticky top-0 z-10 border-b border-slate-200 bg-slate-50">
                       <tr>
                         <th scope="col" className="px-3 py-2 text-left text-sm font-semibold text-slate-700">Volume</th>
                         <th scope="col" className="px-3 py-2 text-left text-sm font-semibold text-slate-700">Path</th>
@@ -215,8 +214,8 @@ export function SystemHealthPage() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
-                      {data.storage.map((v) => (
-                        <tr key={v.label}>
+                      {data.storage.map((v, index) => (
+                        <tr key={v.label} className="transition-colors" style={{ transitionDelay: `${index * 50}ms` }}>
                           <td className="px-3 py-2 text-sm font-medium text-slate-900">
                             {STORAGE_LABELS[v.label] ?? v.label}
                           </td>

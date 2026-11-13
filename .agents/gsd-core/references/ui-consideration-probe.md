@@ -1,4 +1,4 @@
-﻿# UI-Consideration Probe — Spec-Completeness Reference
+# UI-Consideration Probe — Spec-Completeness Reference
 
 The **third** adapter of the shared `probe-core` resolution model (ADR-550 Decision 7), on
 the **UI element/state axis**. It surfaces the shape-rooted UI *state* considerations a

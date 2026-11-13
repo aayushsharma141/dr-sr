@@ -13,6 +13,7 @@ const INITIAL_USER: UserOut = {
   role: 'RECEPTION',
   doctor_id: null,
   is_active: true,
+  is_super_admin: false,
   must_change_password: false,
   is_locked: false,
   locked_until: null,

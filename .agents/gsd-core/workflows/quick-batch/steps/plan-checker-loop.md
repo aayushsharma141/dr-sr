@@ -1,4 +1,4 @@
-﻿Apply response_language to all user-facing prose — narration between tool calls, status updates, progress notes, and findings included; preserve code, paths, and identifiers.
+Apply response_language to all user-facing prose — narration between tool calls, status updates, progress notes, and findings included; preserve code, paths, and identifiers.
 
 **Step 4.5: Plan-checker loop (only when `$VALIDATE_MODE`, called from planner-wave.md)**
 
@@ -98,7 +98,7 @@ Make targeted updates to address checker issues.
 
 `required_property` + evidence + severity BIND. `fix_hint` is ONE non-binding example route: a
 smaller or different mechanism reaching the same property resolves it — say which. Re-check
-capability guidance (GEMINI.md, project skills) and the constraints this plan already encodes
+capability guidance (CLAUDE.md, project skills) and the constraints this plan already encodes
 BEFORE editing; if a hint would contradict one, or the property is unreachable without breaking
 one, return `## REVISION_CONFLICT` with the conflict and the alternatives rather than applying or
 working around it. Full contract: `gsd-core/references/planner-revision.md`.

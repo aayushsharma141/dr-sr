@@ -1,4 +1,4 @@
-﻿<purpose>
+<purpose>
 Check for GSD updates via npm, display changelog for versions between installed and latest, obtain user confirmation, and execute clean installation with cache clearing.
 </purpose>
 
@@ -14,7 +14,7 @@ Detect the installed GSD version, scope, runtime, and config dir.
 
 First, derive `PREFERRED_CONFIG_DIR` and `PREFERRED_RUNTIME` from the invoking prompt's `execution_context` path — this is the one input only the workflow knows:
 - If the path contains `/gsd-core/workflows/update.md`, strip that suffix and store the remainder as `PREFERRED_CONFIG_DIR`.
-- Infer `PREFERRED_RUNTIME` from the path: `/.agents/` -> `claude`; `/.codex/` -> `codex`; `/.gemini/antigravity-ide/`, `/.gemini/antigravity-cli/`, `/.gemini/antigravity/`, `/.agents/` or `/.agent/` -> `antigravity` (`.agents` is the canonical local Antigravity install dir (#791); `.agent` is the legacy form (#503); see bin/install.js `getDirName('antigravity')`); `/.windsurf/`, `/.devin/` -> `windsurf`; `/.config/kilo/` or `/.kilo/` -> `kilo`; `/.config/opencode/` or `/.opencode/` -> `opencode`; otherwise leave it empty.
+- Infer `PREFERRED_RUNTIME` from the path: `/.claude/` -> `claude`; `/.codex/` -> `codex`; `/.gemini/antigravity-ide/`, `/.gemini/antigravity-cli/`, `/.gemini/antigravity/`, `/.agents/` or `/.agent/` -> `antigravity` (`.agents` is the canonical local Antigravity install dir (#791); `.agent` is the legacy form (#503); see bin/install.js `getDirName('antigravity')`); `/.windsurf/`, `/.devin/` -> `windsurf`; `/.config/kilo/` or `/.kilo/` -> `kilo`; `/.config/opencode/` or `/.opencode/` -> `opencode`; otherwise leave it empty.
 
 Then resolve the install context via the deterministic projection (#498). **Do NOT re-derive scope, runtime, or version by hand** — `update-context` owns that cascade in tested code (`gsd-core/bin/lib/update-context.cjs`), the same way `check-latest-version` owns the package name (#2992):
 
@@ -26,7 +26,7 @@ Then resolve the install context via the deterministic projection (#498). **Do N
 GSD_TOOLS=""
 for cand in \
   "$PREFERRED_CONFIG_DIR/gsd-core/bin/gsd-tools.cjs" \
-  ".agents/gsd-core/bin/gsd-tools.cjs"; do
+  "$HOME/.claude/gsd-core/bin/gsd-tools.cjs"; do
   if [ -n "$cand" ] && [ -f "$cand" ]; then GSD_TOOLS="$cand"; break; fi
 done
 # Last resort: the gsd-tools shim on PATH — resolved to its absolute path and
@@ -99,9 +99,9 @@ Exit.
 Determine the release channel from `$ARGUMENTS`. This selects which npm dist-tag the entire update flow targets — `latest` (stable) by default, or `next` (the RC channel established by ADR #660) when the user opts in with `--next`/`--rc`:
 
 ```bash
-IFS= read -rd '' GSD_ARGS <<'GSD_ARGS_END' || true
+IFS= read -rd '' GSD_ARGS <<'GSD_ARGS_END_9c87c098896f7c82a00468c2925a58a2' || true
 $ARGUMENTS
-GSD_ARGS_END
+GSD_ARGS_END_9c87c098896f7c82a00468c2925a58a2
 GSD_ARGS=${GSD_ARGS%$'\n'}
 case " $GSD_ARGS " in
   *" --next "*|*" --rc "*)
@@ -136,7 +136,7 @@ Extract `section_manifest` from `INIT_UPDATE` — gates the `channel-banner` sec
 <step name="check_latest_version">
 Check npm for latest version via the deterministic script. **Do NOT run `npm view` or `npm search` directly** — the package name must come from the script, not from a free choice at execution time. (#2992: LLM-driven prescriptions of npm package names produced wrong-package queries; moving the package name into a script constant closes that gap.)
 
-The `GSD_DIR` value emitted by `get_installed_version` (line 4) resolves to the runtime-specific config dir (`.agents/`, `~/.gemini/antigravity/`, `~/.codex/`, etc.), so the script invocation works for every runtime — not just Claude. An unresolved target exits in `get_installed_version` before this step.
+The `GSD_DIR` value emitted by `get_installed_version` (line 4) resolves to the runtime-specific config dir (`$HOME/.claude/`, `~/.gemini/antigravity/`, `~/.codex/`, etc.), so the script invocation works for every runtime — not just Claude. An unresolved target exits in `get_installed_version` before this step.
 
 `LATEST_RESULT` is a JSON document with the documented shape `{ ok: bool, version: string, reason: string, detail?: string }`. Parse it with the Node-only `uc_field` helper. When the script cannot run or returns nothing, preserve its failure as a meaningful diagnostic (#2993 CR feedback):
 
@@ -178,9 +178,7 @@ Exit.
 <step name="compare_versions">
 Compare installed vs latest:
 
-<!-- gsd-section id="channel-banner" when="state:next-channel" -->
 If `section_manifest` (from `INIT_UPDATE`) is `null` or `"channel-banner"` is in its `included` list: read and execute `gsd-core/workflows/update/steps/channel-banner.md`. Otherwise (default stable channel) skip — do not read the file; the output must match the prior stable behavior exactly, with no channel line.
-<!-- /gsd-section -->
 
 **If installed == latest:**
 ```
@@ -277,14 +275,14 @@ rm -f "$CHANGELOG_TMP"
 - `agents/gsd-*` files will be replaced
 
 (Paths are relative to detected runtime install location:
-global: `.agents/`, `~/.config/opencode/`, `~/.opencode/`, `~/.gemini/antigravity/`, `~/.config/kilo/`, or `~/.codex/`
-local: `./.agents/`, `./.config/opencode/`, `./.opencode/`, `./.agents/`, `./.kilo/`, or `./.codex/`)
+global: `$HOME/.claude/`, `~/.config/opencode/`, `~/.opencode/`, `~/.gemini/antigravity/`, `~/.config/kilo/`, or `~/.codex/`
+local: `./.claude/`, `./.config/opencode/`, `./.opencode/`, `./.agents/`, `./.kilo/`, or `./.codex/`)
 
 Your custom files in other locations are preserved:
 - Custom commands not in `commands/gsd/` ✓
 - Custom agents not prefixed with `gsd-` ✓
 - Custom hooks ✓
-- Your GEMINI.md files ✓
+- Your CLAUDE.md files ✓
 
 If you've modified any GSD files directly, they'll be automatically backed up to `gsd-local-patches/` and can be reapplied with `/gsd-update --reapply` after the update.
 ```

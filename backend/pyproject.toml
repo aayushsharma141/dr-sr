@@ -21,6 +21,7 @@ dependencies = [
     "argon2-cffi==25.1.0",
     "tzdata==2026.6",
     "python-multipart>=0.0.20",
+    "openpyxl==3.1.5",
 ]
 
 [project.optional-dependencies]
@@ -64,6 +65,8 @@ extend-immutable-calls = [
     "fastapi.params.Depends",
     "fastapi.Query",
     "fastapi.params.Query",
+    "fastapi.File",
+    "fastapi.params.File",
     "kalyan_api.core.policy.require",
 ]
 

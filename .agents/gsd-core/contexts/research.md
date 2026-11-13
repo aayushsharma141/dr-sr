@@ -1,4 +1,4 @@
-﻿# Research Context Profile
+# Research Context Profile
 
 Agent output guidance for research mode. Loaded when `context: research` is set in config.json.
 

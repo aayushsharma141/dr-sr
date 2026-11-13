@@ -317,7 +317,7 @@ export function TreatmentPlanWorkspace() {
         </Modal>
       )}
 
-      <div className="space-y-6 max-w-5xl mx-auto">
+      <div className="mx-auto w-full max-w-[1600px] space-y-6">
         {/* Navigation Bar */}
         <div className="flex flex-wrap items-center justify-between gap-4 bg-white p-4 rounded-xl shadow-sm border border-gray-200">
           <div className="flex items-center gap-3">

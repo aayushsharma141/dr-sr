@@ -1,4 +1,4 @@
-﻿---
+---
 component: verifier
 version: 2
 last_calibrated: 2026-03-25

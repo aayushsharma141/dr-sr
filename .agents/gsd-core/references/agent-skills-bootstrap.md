@@ -1,4 +1,4 @@
-﻿# Agent Skills Self-Load (Bootstrap)
+# Agent Skills Self-Load (Bootstrap)
 
 > **Shared contract.** Every `agent_skills` consumer agent self-loads its configured
 > skills in its mandatory init step, so a project's `.planning/config.json`
@@ -31,7 +31,7 @@ In your mandatory init step — right after `mandatory-initial-read.md` / the
 
    ```bash
    # 1. Launcher: paste the bash block from gsd-run-resolver.md here unless gsd_run
-   #    is already defined in this shell (@.agents/gsd-core/references/gsd-run-resolver.md).
+   #    is already defined in this shell (@~/.claude/gsd-core/references/gsd-run-resolver.md).
    # 2. Query:
    _AGENT_SKILLS=$(gsd_run query agent-skills <your-agent-type> --skills-only)
    ```

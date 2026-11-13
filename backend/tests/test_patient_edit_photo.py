@@ -153,3 +153,60 @@ def test_patient_photo_upload_and_streaming(
     assert "image/jpeg" in stream_resp.headers.get("content-type", "")
     assert "private" in stream_resp.headers.get("cache-control", "")
     assert stream_resp.content == valid_jpeg
+
+
+def test_patient_edit_empty_string_clears_optional_fields_and_null_leaves_them(
+    login_client: Any,
+    reception_user: User,
+    db_session: Session,
+) -> None:
+    """The edit form clears emergency contact and notes by sending '' (null means unchanged)."""
+    rec_c = login_client(reception_user)
+
+    patient = Patient(
+        urn="KH-2026-0701",
+        full_name="Optional Fields Patient",
+        guardian_name="Guardian",
+        gender="M",
+        age_years=41,
+        mobile="9800033344",
+        address="Station Road, Ara",
+        emergency_contact="9800099999",
+        notes="Referred by Dr. Sharma",
+    )
+    db_session.add(patient)
+    db_session.flush()
+
+    # null (field omitted or explicit null) leaves the stored value unchanged
+    kept = rec_c.patch(
+        f"/api/patients/{patient.id}",
+        json={"version_id": 1, "emergency_contact": None, "notes": None, "address": "New Colony"},
+    )
+    assert kept.status_code == 200
+    assert kept.json()["emergency_contact"] == "9800099999"
+    assert kept.json()["notes"] == "Referred by Dr. Sharma"
+    assert kept.json()["address"] == "New Colony"
+    assert kept.json()["version_id"] == 2
+
+    # '' clears them, and the cleared state is what a reload reads back
+    cleared = rec_c.patch(
+        f"/api/patients/{patient.id}",
+        json={"version_id": 2, "emergency_contact": "", "notes": ""},
+    )
+    assert cleared.status_code == 200
+    assert cleared.json()["emergency_contact"] is None
+    assert cleared.json()["notes"] is None
+    assert cleared.json()["version_id"] == 3
+
+    reloaded = rec_c.get(f"/api/patients/{patient.id}")
+    assert reloaded.status_code == 200
+    assert reloaded.json()["emergency_contact"] is None
+    assert reloaded.json()["notes"] is None
+    assert reloaded.json()["address"] == "New Colony"
+
+    # A stale version is refused, so two receptionists cannot overwrite each other
+    stale = rec_c.patch(
+        f"/api/patients/{patient.id}", json={"version_id": 2, "address": "Overwrite attempt"}
+    )
+    assert stale.status_code == 409
+    assert stale.json()["code"] == "version_conflict"
