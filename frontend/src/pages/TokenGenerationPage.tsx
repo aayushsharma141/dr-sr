@@ -66,10 +66,10 @@ export function TokenGenerationPage() {
   const selectedDepartment = useMemo(() => {
     return departments?.find((d) => d.id === Number(selectedDepartmentId))
   }, [departments, selectedDepartmentId])
-
   const selectedDoctor = useMemo(() => {
     return departmentDoctors?.find((d: DepartmentDoctorOut) => d.id === Number(selectedDoctorId))
   }, [departmentDoctors, selectedDoctorId])
+  const cabinCode = selectedDoctor?.cabin_code ?? undefined
 
   // Query appointments for selected doctor on today's date to calculate live queue
   const { data: appointmentsData } = useAppointments({
@@ -580,8 +580,9 @@ export function TokenGenerationPage() {
               tokenNumber={queueStats.nextTokenNum}
               patientName={selectedPatient?.full_name || 'No patient selected'}
               patientUrn={selectedPatient?.urn || 'KH-YYYY-XXXX'}
+              cabinCode={cabinCode}
               waitingCount={queueStats.waiting}
-              nextToken={queueStats.nextTokenNum}
+              hasNextToken={queueStats.nextTokenNum != null}
             />
           </section>
         </div>

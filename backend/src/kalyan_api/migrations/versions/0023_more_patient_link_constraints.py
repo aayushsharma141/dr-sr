@@ -99,3 +99,4 @@ def downgrade() -> None:
     for name, child, _column, _parent, _ondel in reversed(LINKS):
         op.drop_constraint(name, child, type_="foreignkey")
     op.drop_constraint("uq_treatment_plans_id_patient", "treatment_plans", type_="unique")
+

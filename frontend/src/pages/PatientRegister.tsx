@@ -236,6 +236,9 @@ export function PatientRegister() {
     return departmentDoctors?.find((d: DepartmentDoctorOut) => d.id === Number(selectedDoctorId))
   }, [departmentDoctors, selectedDoctorId])
 
+  // Extract cabin code from doctor data if available
+  const cabinCode = selectedDoctor?.cabin_code ?? undefined
+
   const tokenPrefix = useMemo(() => {
     if (!selectedDepartment) return 'G'
     return selectedDepartment.name_en.charAt(0).toUpperCase()
@@ -991,7 +994,7 @@ export function PatientRegister() {
                           <span className="mt-1.5 text-xs font-semibold text-slate-600 group-hover:text-[#5D0B26]">
                             Add Photo
                           </span>
-                          <span className="mt-0.5 text-[10px] font-medium uppercase tracking-wider text-slate-400">
+                          <span className="mt-0.5 text-xs font-medium uppercase tracking-wider text-slate-500">
                             Optional
                           </span>
                         </>
@@ -1010,7 +1013,7 @@ export function PatientRegister() {
                             Remove only appears for a photo chosen in this session. */}
                         {(!isEditMode || photoFile) && (
                           <>
-                            <span className="text-slate-400">•</span>
+                            <span className="text-slate-500">•</span>
                             <button
                               type="button"
                               onClick={handleRemovePhoto}
@@ -1079,7 +1082,7 @@ export function PatientRegister() {
                             className={INPUT_WITH_ICON_CLASS}
                           />
                           {duplicateChecking && (
-                            <span className="absolute right-3 top-3.5 text-[10px] font-bold uppercase tracking-wider text-[#8E1C3D]">
+                            <span className="absolute right-3 top-3.5 text-xs font-bold uppercase tracking-wider text-[#8E1C3D]">
                               Checking…
                             </span>
                           )}
@@ -1285,7 +1288,7 @@ export function PatientRegister() {
                       onChange={(e) => setAllergies(e.target.value)}
                       className={`${INPUT_CLASS} border-amber-300 focus:border-[#8E1C3D]`}
                     />
-                    <p className="mt-1 text-[11px] text-slate-500">
+                    <p className="mt-1 text-xs text-slate-500">
                       Write “None reported” when the patient reports no allergy.
                     </p>
                   </div>
@@ -1426,7 +1429,7 @@ export function PatientRegister() {
 
                   {/* Live summary of what will be booked */}
                   <div className="rounded-lg border-l-2 border-[#C39A35] bg-[#FBF5F7] px-3 py-2">
-                    <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                    <p className="text-xs font-bold uppercase tracking-wider text-slate-500">
                       Booking summary
                     </p>
                     <p className="truncate text-xs font-semibold text-[#5D0B26]">
@@ -1453,11 +1456,13 @@ export function PatientRegister() {
                     departmentName={selectedDepartment?.name_en || 'General OPD'}
                     doctorName={selectedDoctor?.name_en || 'Select doctor'}
                     tokenPrefix={tokenPrefix}
-                    tokenNumber={allocatedToken || (selectedDoctorId ? 'Auto' : '—')}
+                    tokenNumber={allocatedToken}
+                    emptyLabel="Token on save"
+                    cabinCode={cabinCode}
                     patientName={fullName.trim() || 'New Patient'}
                     patientUrn={createdPatient?.urn || 'URN on save'}
                     waitingCount={0}
-                    nextToken={allocatedToken || 'Next'}
+                    hasNextToken={allocatedToken != null}
                   />
                 </div>
               </section>
