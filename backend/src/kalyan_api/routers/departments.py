@@ -178,6 +178,20 @@ def list_doctor_departments(doctor_id: int, session: SessionDep) -> list[Departm
     ]
 
 
+def lock_departments_for_assignment(
+    session: Session, department_ids: list[int]
+) -> list[Department]:
+    """Lock the named departments in ID order, so a concurrent deactivation is awaited."""
+    return list(
+        session.scalars(
+            select(Department)
+            .where(Department.id.in_(department_ids))
+            .order_by(Department.id)
+            .with_for_update()
+        ).all()
+    )
+
+
 @router.put(
     "/doctors/{doctor_id}/departments",
     response_model=list[DepartmentOut],
@@ -200,7 +214,7 @@ def assign_doctor_departments(
             status_code=422, code="duplicate_department", message="Department IDs must be unique."
         )
     before_ids = sorted(d.id for d in doctor.departments)
-    departments = session.scalars(select(Department).where(Department.id.in_(ids))).all()
+    departments = lock_departments_for_assignment(session, ids)
     # A department deactivated later must not block saving the doctor's other memberships, so
     # an existing membership may stay. Only new memberships have to be active.
     usable = [d for d in departments if d.is_active or d.id in before_ids]

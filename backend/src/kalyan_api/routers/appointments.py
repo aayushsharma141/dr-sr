@@ -34,6 +34,11 @@ router = APIRouter(prefix="/appointments", tags=["appointments"])
 doctor_router = APIRouter(prefix="/doctor", tags=["doctor"])
 
 
+def lock_doctor_for_booking(session: Session, doctor_id: int) -> Doctor | None:
+    """Lock the doctor row, as assign_doctor_departments does, so membership changes are awaited."""
+    return session.scalar(select(Doctor).where(Doctor.id == doctor_id).with_for_update())
+
+
 def lock_department_for_booking(session: Session, department_id: int) -> Department | None:
     """Read the department under a row lock, so a concurrent deactivation cannot slip past.
 
@@ -95,7 +100,7 @@ def book_appointment(
         )
 
     # 2. Validate active doctor exists
-    doctor = session.get(Doctor, payload.doctor_id)
+    doctor = lock_doctor_for_booking(session, payload.doctor_id)
     if not doctor or not doctor.is_active:
         raise ApiError(
             status_code=404,
