@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Modal } from './Modal'
-import { useDoctors, usePatients, useBookAppointment } from '../api/queries'
-import type { PatientOut, DoctorOut } from '../api/types'
+import { useDepartments, useDepartmentDoctors, usePatients, useBookAppointment } from '../api/queries'
+import type { PatientOut, DepartmentDoctorOut } from '../api/types'
 import { istToday } from '../format'
 
 interface AppointmentBookingModalProps {
@@ -21,13 +21,15 @@ export function AppointmentBookingModal({
   const [selectedPatient, setSelectedPatient] = useState<PatientOut | null>(
     initialPatient || null,
   )
+  const [selectedDepartmentId, setSelectedDepartmentId] = useState<number | ''>('')
   const [selectedDoctorId, setSelectedDoctorId] = useState<number | ''>('')
   const [appointmentDate, setAppointmentDate] = useState(istToday)
   const [notes, setNotes] = useState('')
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
   const [allocatedToken, setAllocatedToken] = useState<number | null>(null)
 
-  const { data: doctors } = useDoctors(false)
+  const { data: departments } = useDepartments()
+  const { data: doctors } = useDepartmentDoctors(selectedDepartmentId || null)
   const { data: searchResults, isPending: isSearching } = usePatients(patientSearch, 5, 0)
   const bookMutation = useBookAppointment()
 
@@ -46,6 +48,10 @@ export function AppointmentBookingModal({
       setErrorMsg('Please select a patient.')
       return
     }
+    if (!selectedDepartmentId) {
+      setErrorMsg('Please select a department.')
+      return
+    }
     if (!selectedDoctorId) {
       setErrorMsg('Please select a doctor.')
       return
@@ -54,6 +60,7 @@ export function AppointmentBookingModal({
     try {
       const res = await bookMutation.mutateAsync({
         patient_id: selectedPatient.id,
+        department_id: Number(selectedDepartmentId),
         doctor_id: Number(selectedDoctorId),
         appointment_date: appointmentDate,
         notes: notes.trim() || null,
@@ -173,7 +180,29 @@ export function AppointmentBookingModal({
               )}
             </div>
 
-            {/* Doctor Selector */}
+            {/* Department first, then its assigned doctors */}
+            <div>
+              <label htmlFor="department-select" className="block text-xs font-semibold text-neutral-700 uppercase mb-1">
+                Department / Specialty
+              </label>
+              <select
+                id="department-select"
+                value={selectedDepartmentId}
+                onChange={(e) => {
+                  setSelectedDepartmentId(e.target.value ? Number(e.target.value) : '')
+                  setSelectedDoctorId('')
+                }}
+                required
+                className="w-full p-2 border border-neutral-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-red-800"
+              >
+                <option value="">-- Select Department --</option>
+                {departments?.map((department) => (
+                  <option key={department.id} value={department.id}>
+                    {department.name_en}{department.name_hi ? ` / ${department.name_hi}` : ''}
+                  </option>
+                ))}
+              </select>
+            </div>
             <div>
               <label htmlFor="doctor-select" className="block text-xs font-semibold text-neutral-700 uppercase mb-1">
                 Consulting Doctor
@@ -183,15 +212,19 @@ export function AppointmentBookingModal({
                 value={selectedDoctorId}
                 onChange={(e) => setSelectedDoctorId(e.target.value ? Number(e.target.value) : '')}
                 required
-                className="w-full p-2 border border-neutral-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-red-800"
+                disabled={!selectedDepartmentId}
+                className="w-full p-2 border border-neutral-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-red-800 disabled:bg-neutral-100"
               >
                 <option value="">-- Select Doctor --</option>
-                {doctors?.map((d: DoctorOut) => (
+                {doctors?.map((d: DepartmentDoctorOut) => (
                   <option key={d.id} value={d.id}>
-                    {d.name_en} {d.name_hi ? `(${d.name_hi})` : ''} - {d.qualification || 'Physiotherapist'}
+                    {d.name_en} {d.name_hi ? `(${d.name_hi})` : ''} - {d.qualification || 'Clinician'}
                   </option>
                 ))}
               </select>
+              {selectedDepartmentId && doctors?.length === 0 && (
+                <p className="mt-1 text-xs text-amber-700">No active doctors are assigned to this department.</p>
+              )}
             </div>
 
             {/* Date Selector */}

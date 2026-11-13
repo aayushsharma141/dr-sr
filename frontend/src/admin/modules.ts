@@ -59,7 +59,10 @@ export const ADMIN_MODULES: readonly AdminModule[] = [
     requiredPermission: 'doctors:read',
     displayOrder: 2,
     status: 'available',
-    actions: [{ label: 'Doctors & fees', path: '/admin/doctors' }],
+    actions: [
+      { label: 'Doctors & fees', path: '/admin/doctors' },
+      { label: 'Departments', path: '/admin/departments' },
+    ],
   },
   {
     id: 'billing-financial',

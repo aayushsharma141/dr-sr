@@ -4,7 +4,7 @@ on:
   pull_request:
     branches: [main]
   push:
-    branches: [main, ui/redesign-modern-clinical, ui/clinical-navigation-hierarchy]
+    branches: [main, ui/redesign-modern-clinical, ui/clinical-navigation-hierarchy, feature/reception-all-specialties]
 
 permissions:
   contents: read
@@ -47,7 +47,6 @@ jobs:
           PY
       - name: Run automated tests
         run: pytest
-
 
   backend:
     name: backend
@@ -112,6 +111,46 @@ jobs:
       - name: Run Ruff
         working-directory: backend
         run: ruff check .
+      - name: Verify migration lifecycle and schema drift
+        working-directory: backend
+        env:
+          KALYAN_ENV: test
+        run: |
+          python - <<'PY'
+          from alembic import command
+          from alembic.script import ScriptDirectory
+          from sqlalchemy import create_engine, text
+
+          from kalyan_api.config import get_settings
+          from kalyan_api.db.migrate import alembic_config
+
+          settings = get_settings()
+          assert settings.db_name.endswith("_test"), settings.db_name
+          cfg = alembic_config(settings.owner_url)
+          script = ScriptDirectory.from_config(cfg)
+          heads = script.get_heads()
+          assert len(heads) == 1, f"Expected one Alembic head, got {heads}"
+          head = heads[0]
+          previous = script.get_revision(head).down_revision
+          owner_engine = create_engine(settings.owner_url, isolation_level="AUTOCOMMIT")
+
+          def current_revision() -> str:
+              with owner_engine.connect() as conn:
+                  return conn.execute(text("SELECT version_num FROM alembic_version")).scalar()
+
+          with owner_engine.connect() as conn:
+              conn.execute(text("DROP SCHEMA IF EXISTS public CASCADE"))
+              conn.execute(text("CREATE SCHEMA public"))
+
+          command.upgrade(cfg, "head")
+          assert current_revision() == head
+          command.downgrade(cfg, previous)
+          assert current_revision() == previous
+          command.upgrade(cfg, "head")
+          assert current_revision() == head
+          command.check(cfg)
+          print(f"Migrations verified at {head}: upgrade, downgrade, re-upgrade, no drift.")
+          PY
       - name: Run backend tests
         working-directory: backend
         env:

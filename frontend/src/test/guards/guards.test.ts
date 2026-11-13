@@ -68,6 +68,7 @@ describe('legibility guard (UX-04)', () => {
    */
   const PENDING: Record<string, { max: number; reason: string }> = {
     // Existing code on main that Phase 18 did not touch: fixing it needs its own review.
+
     'pages/AppointmentsReception.tsx': { max: 2, reason: '1 sub-12px class, 1 grey. Existing main code.' },
     'pages/PatientsDirectory.tsx': { max: 4, reason: '4 grey 300/400 classes. Existing main code.' },
     'pages/PendingDuesPage.tsx': { max: 4, reason: '2 grey, 2 semantic colours. Existing main code.' },

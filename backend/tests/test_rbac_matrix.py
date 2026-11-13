@@ -34,6 +34,7 @@ from kalyan_api.models import (
     ClinicalEncounter,
     ClinicSettings,
     ConsultationFee,
+    Department,
     Doctor,
     Patient,
     Payment,
@@ -212,15 +213,53 @@ def test_rbac_matrix_cell(
         target_entity = pat
         resolved_path = row.path.replace("{id}", str(pat.id))
 
-    elif "/api/appointments" in row.path:
-        # Resolve doctor_a to own the appointment
-        doc_a_user = db_session.scalar(select(User).where(User.username.like("mat_doc_a%")))
-        doc_a_id = doc_a_user.doctor_id if doc_a_user else None
-        if not doc_a_id:
-            doc = Doctor(name_en=f"Dr. Appt {uuid.uuid4().hex[:6]}", default_fee_paise=30000)
-            db_session.add(doc)
+    elif "/api/departments" in row.path:
+        dept = db_session.scalar(select(Department).where(Department.name_en == "Matrix Dept"))
+        if not dept:
+            dept = Department(name_en="Matrix Dept", is_active=True)
+            db_session.add(dept)
             db_session.flush()
-            doc_a_id = doc.id
+        target_entity = dept
+        resolved_path = row.path.replace("{department_id}", str(dept.id))
+
+    elif "/api/doctors/{doctor_id}/departments" in row.path:
+        dept = db_session.scalar(select(Department).where(Department.is_active.is_(True)))
+        if not dept:
+            dept = Department(name_en="Matrix Dept", is_active=True)
+            db_session.add(dept)
+            db_session.flush()
+        doc = Doctor(name_en=f"Dr. DeptDoc {uuid.uuid4().hex[:6]}")
+        doc.departments.append(dept)
+        db_session.add(doc)
+        db_session.flush()
+        target_entity = doc
+        resolved_path = row.path.replace("{doctor_id}", str(doc.id))
+
+    elif "/api/appointments" in row.path:
+        if identity == "doctor_a" and current_user and current_user.doctor_id:
+            doc_a_id = current_user.doctor_id
+            doc_a_obj = current_user.doctor
+        else:
+            doc_a_user = db_session.scalar(select(User).where(User.username.like("mat_doc_a%")))
+            if doc_a_user and doc_a_user.doctor_id:
+                doc_a_id = doc_a_user.doctor_id
+                doc_a_obj = doc_a_user.doctor
+            else:
+                doc_a_user = make_user(
+                    db_session, test_settings, "DOCTOR", f"mat_doc_a_{uuid.uuid4().hex[:6]}"
+                )
+                doc_a_id = doc_a_user.doctor_id
+                doc_a_obj = doc_a_user.doctor
+
+        dept = doc_a_obj.departments[0] if doc_a_obj.departments else None
+        if not dept:
+            dept = db_session.scalar(select(Department).where(Department.is_active.is_(True)))
+            if not dept:
+                dept = Department(name_en="Physiotherapy / General OPD", is_active=True)
+                db_session.add(dept)
+                db_session.flush()
+            doc_a_obj.departments.append(dept)
+            db_session.flush()
 
         pat = Patient(
             urn=f"KH-2026-{uuid.uuid4().hex[:4]}",
@@ -240,6 +279,7 @@ def test_rbac_matrix_cell(
             appt = Appointment(
                 patient_id=pat.id,
                 doctor_id=doc_a_id,
+                department_id=dept.id,
                 appointment_date=datetime.now(UTC).date(),
                 token_number=1,
                 status="BOOKED",
@@ -250,7 +290,11 @@ def test_rbac_matrix_cell(
             target_entity = appt
             resolved_path = row.path.replace("{id}", str(appt.id))
         else:
-            target_entity = type("TargetAppt", (), {"patient_id": pat.id, "doctor_id": doc_a_id})()
+            target_entity = type(
+                "TargetAppt",
+                (),
+                {"patient_id": pat.id, "doctor_id": doc_a_id, "department_id": dept.id},
+            )()
 
     elif "/api/patients/{patient_id}/" in row.path:
         pat = Patient(
@@ -494,6 +538,11 @@ def test_rbac_matrix_cell(
 
         target_entity = target_user
         resolved_path = row.path.replace("{id}", str(target_user.id))
+
+    if "{filename}" in resolved_path:
+        resolved_path = resolved_path.replace("{filename}", "dummy.tar.gz")
+    if "{session_id}" in resolved_path:
+        resolved_path = resolved_path.replace("{session_id}", "999999")
 
     body = row.body_factory(target_entity) if row.body_factory else None
     if "photo" in row.path and row.method == "POST":

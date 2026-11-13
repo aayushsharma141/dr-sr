@@ -16,6 +16,7 @@ from sqlalchemy import (
     BigInteger,
     Boolean,
     CheckConstraint,
+    Column,
     Date,
     DateTime,
     ForeignKey,
@@ -25,6 +26,7 @@ from sqlalchemy import (
     MetaData,
     SmallInteger,
     String,
+    Table,
     Text,
     Time,
     UniqueConstraint,
@@ -49,6 +51,47 @@ class Base(DeclarativeBase):
     """Base class for all SQLAlchemy declarative models."""
 
     metadata = MetaData(naming_convention=POSTGRES_NAMING_CONVENTION)
+
+
+doctor_departments = Table(
+    "doctor_departments",
+    Base.metadata,
+    Column("doctor_id", BigInteger, ForeignKey("doctors.id", ondelete="CASCADE"), primary_key=True),
+    Column(
+        "department_id",
+        BigInteger,
+        ForeignKey("departments.id", ondelete="RESTRICT"),
+        primary_key=True,
+    ),
+)
+
+
+class Department(Base):
+    """Configured hospital department/specialty used for OPD routing (REC-01)."""
+
+    __tablename__ = "departments"
+    __table_args__ = (
+        UniqueConstraint("name_en", name="uq_departments_name_en"),
+        CheckConstraint("length(trim(name_en)) >= 2", name="departments_name_nonblank"),
+    )
+    id: Mapped[int] = mapped_column(BigInteger, Identity(always=False), primary_key=True)
+    name_en: Mapped[str] = mapped_column(String(120), nullable=False)
+    name_hi: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    description: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    is_active: Mapped[bool] = mapped_column(
+        Boolean, default=True, server_default=text("true"), nullable=False
+    )
+    version_id: Mapped[int] = mapped_column(Integer, default=1, server_default="1", nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
+    )
+    doctors: Mapped[list["Doctor"]] = relationship(
+        secondary=doctor_departments, back_populates="departments"
+    )
+    __mapper_args__ = {"version_id_col": version_id}
 
 
 class Doctor(Base):
@@ -80,6 +123,9 @@ class Doctor(Base):
 
     # Relationships
     user: Mapped["User"] = relationship("User", back_populates="doctor", uselist=False)
+    departments: Mapped[list["Department"]] = relationship(
+        secondary=doctor_departments, back_populates="doctors"
+    )
 
     __mapper_args__ = {"version_id_col": version_id}
 
@@ -538,6 +584,9 @@ class Appointment(Base):
     doctor_id: Mapped[int] = mapped_column(
         BigInteger, ForeignKey("doctors.id", ondelete="RESTRICT"), nullable=False, index=True
     )
+    department_id: Mapped[int | None] = mapped_column(
+        BigInteger, ForeignKey("departments.id", ondelete="RESTRICT"), nullable=True, index=True
+    )
     appointment_date: Mapped[date] = mapped_column(Date, nullable=False, index=True)
     token_number: Mapped[int] = mapped_column(Integer, nullable=False)
     status: Mapped[str] = mapped_column(
@@ -569,6 +618,7 @@ class Appointment(Base):
 
     patient = relationship("Patient", lazy="joined")
     doctor = relationship("Doctor", lazy="joined")
+    department = relationship("Department", lazy="joined")
     created_by_user = relationship("User", lazy="joined")
 
 

@@ -99,6 +99,7 @@ const NAVIGATION: NavigationItem[] = [
     roles: DOCTOR_ONLY,
   },
   {
+
     key: 'billing',
     label: 'Billing & Payments',
     description: 'Patient balances, collections and receipts',
@@ -124,7 +125,7 @@ const NAVIGATION: NavigationItem[] = [
     path: '/admin/doctors',
     icon: 'database',
     roles: ADMIN_ONLY,
-    activePaths: ['/admin/doctors'],
+    activePaths: ['/admin/doctors', '/admin/departments'],
   },
   {
     key: 'billing-financial',

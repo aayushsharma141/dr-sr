@@ -4,6 +4,7 @@ from datetime import date
 
 from fastapi import APIRouter, Depends, Query, Request
 from sqlalchemy import select
+from sqlalchemy.orm import Session
 
 from kalyan_api import clock
 from kalyan_api.core.errors import ApiError, require_version
@@ -16,7 +17,7 @@ from kalyan_api.core.principal import (
     get_current_settings,
 )
 from kalyan_api.db.session import SessionDep
-from kalyan_api.models import Appointment, AppointmentStatus, Doctor, Patient
+from kalyan_api.models import Appointment, AppointmentStatus, Department, Doctor, Patient
 from kalyan_api.schemas.appointments import (
     AppointmentCreate,
     AppointmentListResponse,
@@ -33,6 +34,23 @@ router = APIRouter(prefix="/appointments", tags=["appointments"])
 doctor_router = APIRouter(prefix="/doctor", tags=["doctor"])
 
 
+def lock_doctor_for_booking(session: Session, doctor_id: int) -> Doctor | None:
+    """Lock the doctor row, as assign_doctor_departments does, so membership changes are awaited."""
+    return session.scalar(select(Doctor).where(Doctor.id == doctor_id).with_for_update())
+
+
+def lock_department_for_booking(session: Session, department_id: int) -> Department | None:
+    """Read the department under a row lock, so a concurrent deactivation cannot slip past.
+
+    Deactivation locks the same row, so either this read waits for it and sees is_active=False,
+    or the deactivation waits for this booking to commit. Without the lock, a booking can read
+    the department as active while it is being deactivated and still insert the appointment.
+    """
+    return session.scalar(
+        select(Department).where(Department.id == department_id).with_for_update()
+    )
+
+
 def _to_read_schema(appt: Appointment) -> AppointmentRead:
     """Format an Appointment entity to its read schema."""
     return AppointmentRead(
@@ -42,6 +60,7 @@ def _to_read_schema(appt: Appointment) -> AppointmentRead:
         patient_name=appt.patient.full_name,
         patient_mobile=appt.patient.mobile,
         doctor_id=appt.doctor_id,
+        department_id=appt.department_id,
         doctor_name_en=appt.doctor.name_en,
         doctor_name_hi=appt.doctor.name_hi,
         appointment_date=appt.appointment_date,
@@ -80,7 +99,7 @@ def book_appointment(
         )
 
     # 2. Validate active doctor exists
-    doctor = session.get(Doctor, payload.doctor_id)
+    doctor = lock_doctor_for_booking(session, payload.doctor_id)
     if not doctor or not doctor.is_active:
         raise ApiError(
             status_code=404,
@@ -88,15 +107,37 @@ def book_appointment(
             message="Doctor not found or inactive.",
         )
 
-    # 3. Generate sequential token for (doctor_id, appointment_date)
+    # 3. Verify that the selected doctor belongs to the requested active department.
+    department = lock_department_for_booking(session, payload.department_id)
+    if department is None:
+        raise ApiError(
+            status_code=422,
+            code="department_not_found",
+            message="Selected department does not exist.",
+        )
+    if not department.is_active:
+        raise ApiError(
+            status_code=422,
+            code="department_inactive",
+            message="Selected department is inactive and cannot accept new appointments.",
+        )
+    if department not in doctor.departments:
+        raise ApiError(
+            status_code=422,
+            code="doctor_department_mismatch",
+            message="Selected doctor is not assigned to the selected department.",
+        )
+
+    # 4. Generate sequential token for (doctor_id, appointment_date)
     token_num = token_service.generate_next_daily_token(
         session, payload.doctor_id, payload.appointment_date
     )
 
-    # 4. Create appointment
+    # 5. Create appointment
     appt = Appointment(
         patient_id=payload.patient_id,
         doctor_id=payload.doctor_id,
+        department_id=payload.department_id,
         appointment_date=payload.appointment_date,
         token_number=token_num,
         status=AppointmentStatus.BOOKED.value,
@@ -118,6 +159,7 @@ def book_appointment(
             "patient_id": appt.patient_id,
             "patient_urn": patient.urn,
             "doctor_id": appt.doctor_id,
+            "department_id": payload.department_id,
             "appointment_date": appt.appointment_date.isoformat(),
             "token_number": appt.token_number,
             "status": appt.status,

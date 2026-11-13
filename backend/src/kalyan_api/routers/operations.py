@@ -492,24 +492,27 @@ def trigger_restore(
 
     # An older backup may predate the acting admin; the FK would then reject the audit row and
     # report a completed restore as failed. The username is kept as text either way.
-    actor_survived = session.scalar(select(User.id).where(User.id == ctx.actor_user_id)) is not None
     manifest = result.get("manifest") or {}
-    audit_service.record(
-        session,
-        ctx if actor_survived else replace(ctx, actor_user_id=None),
-        action=AuditAction.BACKUP_RESTORED,
-        entity_type="backup",
-        entity_id=archive_path.name,
-        after={
-            "restored_archive": archive_path.name,
-            "archive_created_at": manifest.get("created_at"),
-            "archive_label": manifest.get("label"),
-            "prerestore_snapshot": result.get("prerestore_snapshot"),
-            "database_restored": result["database_restored"],
-            "photos_restored_count": result["photos_restored_count"],
-        },
-        reason=payload.reason,
-    )
+    with _isolated_audit_session() as audit_session:
+        actor_survived = (
+            audit_session.scalar(select(User.id).where(User.id == ctx.actor_user_id)) is not None
+        )
+        audit_service.record(
+            audit_session,
+            ctx if actor_survived else replace(ctx, actor_user_id=None),
+            action=AuditAction.BACKUP_RESTORED,
+            entity_type="backup",
+            entity_id=archive_path.name,
+            after={
+                "restored_archive": archive_path.name,
+                "archive_created_at": manifest.get("created_at"),
+                "archive_label": manifest.get("label"),
+                "prerestore_snapshot": result.get("prerestore_snapshot"),
+                "database_restored": result["database_restored"],
+                "photos_restored_count": result["photos_restored_count"],
+            },
+            reason=payload.reason,
+        )
 
     return RestoreResultOut(
         status=result["status"],
