@@ -212,17 +212,26 @@ describe('Patient Registration Screen', () => {
 
 describe('Registration desk: no second submit and no silent step failures (BR-007, BR-008)', () => {
   let queryClient: QueryClient
+  const originalCreateObjectURL = URL.createObjectURL
+  const originalRevokeObjectURL = URL.revokeObjectURL
 
   beforeEach(() => {
     queryClient = new QueryClient({
       defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
     })
     vi.restoreAllMocks()
+    // jsdom has no object URLs; number them so each preview can be told apart.
+    let previewCount = 0
+    URL.createObjectURL = vi.fn(() => `blob:http://localhost/preview-${++previewCount}`)
+    URL.revokeObjectURL = vi.fn()
   })
 
   afterEach(() => {
     cleanup()
     vi.restoreAllMocks()
+    URL.createObjectURL = originalCreateObjectURL
+    URL.revokeObjectURL = originalRevokeObjectURL
+    Reflect.deleteProperty(globalThis.navigator, 'mediaDevices')
   })
 
   const jsonResponse = (status: number, body: unknown) => ({
@@ -365,5 +374,82 @@ describe('Registration desk: no second submit and no silent step failures (BR-00
     expect(screen.getByRole('heading', { name: 'Add Patient Photo' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /capture with webcam/i })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /upload from computer/i })).toBeInTheDocument()
+  })
+
+  // The server CSP is "img-src 'self' blob:". A data: preview is blocked there, so the
+  // photo frame stayed empty after a capture and the photo looked as if it was not kept.
+  it('previews the chosen photo with a blob: URL the server CSP allows, never a data: URL', async () => {
+    stubRegistrationApi({ photoFails: false })
+    const user = userEvent.setup()
+    renderPage()
+
+    const first = new File(['jpeg-bytes'], 'face.jpg', { type: 'image/jpeg' })
+    await user.upload(screen.getByLabelText('Patient Photograph'), first)
+
+    const preview = await screen.findByRole('img', { name: 'Patient preview' })
+    expect(URL.createObjectURL).toHaveBeenCalledWith(first)
+    expect(preview.getAttribute('src')).toBe('blob:http://localhost/preview-1')
+
+    // Replacing the photo releases the previous object URL.
+    const second = new File(['other-jpeg-bytes'], 'face-2.jpg', { type: 'image/jpeg' })
+    await user.upload(screen.getByLabelText('Patient Photograph'), second)
+    await waitFor(() => {
+      expect(screen.getByRole('img', { name: 'Patient preview' }).getAttribute('src')).toBe(
+        'blob:http://localhost/preview-2',
+      )
+    })
+    expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:http://localhost/preview-1')
+
+    // Removing the photo releases the current one and empties the frame.
+    await user.click(screen.getByRole('button', { name: /^remove$/i }))
+    expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:http://localhost/preview-2')
+    expect(screen.queryByRole('img', { name: 'Patient preview' })).not.toBeInTheDocument()
+  })
+
+  it('keeps a webcam capture on the form and uploads it when the registration is saved', async () => {
+    stubRegistrationApi({ photoFails: false })
+    Object.defineProperty(globalThis.navigator, 'mediaDevices', {
+      value: { getUserMedia: vi.fn().mockResolvedValue({ getTracks: () => [{ stop: vi.fn() }] }) },
+      writable: true,
+      configurable: true,
+    })
+    vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue({
+      drawImage: vi.fn(),
+    } as unknown as CanvasRenderingContext2D)
+    vi.spyOn(HTMLCanvasElement.prototype, 'toBlob').mockImplementation((callback) => {
+      callback(new Blob(['snapshot-jpeg-data'], { type: 'image/jpeg' }))
+    })
+
+    const user = userEvent.setup()
+    renderPage()
+    await fillRequiredFields(user)
+
+    await user.click(screen.getByTitle('Click to capture or upload patient photo'))
+    await user.click(screen.getByRole('button', { name: /capture with webcam/i }))
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /take snapshot/i })).toBeEnabled()
+    })
+    await user.click(screen.getByRole('button', { name: /take snapshot/i }))
+    await user.click(await screen.findByRole('button', { name: /use this photo/i }))
+
+    // The capture is now shown in the form's photo frame through a CSP-allowed URL.
+    const preview = await screen.findByRole('img', { name: 'Patient preview' })
+    expect(preview.getAttribute('src')).toMatch(/^blob:/)
+
+    await user.click(screen.getByRole('button', { name: /register patient/i }))
+    await waitFor(() => {
+      expect(screen.getByText('Registration Successful!')).toBeInTheDocument()
+    })
+
+    const photoCall = vi
+      .mocked(fetch)
+      .mock.calls.find(([url, init]) => String(url).includes('/photo') && init?.method === 'POST')
+    const photoBody = photoCall?.[1]?.body
+    expect(photoBody).toBeInstanceOf(FormData)
+    const sent = (photoBody as FormData).get('file')
+    expect(sent).toBeInstanceOf(File)
+    expect((sent as File).type).toBe('image/jpeg')
+    expect(await (sent as File).text()).toBe('snapshot-jpeg-data')
+    expect(screen.queryByText('Patient saved, but the photo was not uploaded.')).not.toBeInTheDocument()
   })
 })

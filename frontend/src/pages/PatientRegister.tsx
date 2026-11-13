@@ -106,6 +106,7 @@ export function PatientRegister() {
   // Photo state
   const [photoFile, setPhotoFile] = useState<File | null>(null)
   const [photoPreview, setPhotoPreview] = useState<string | null>(null)
+  const photoPreviewUrlRef = useRef<string | null>(null)
   const [isPhotoModalOpen, setIsPhotoModalOpen] = useState(false)
 
   // Options & Flags
@@ -238,18 +239,38 @@ export function PatientRegister() {
     }
   }
 
+  /**
+   * The preview is a blob: object URL, not a data: URL. The server's Content-Security-Policy
+   * (img-src 'self' blob:) blocks data: images, which left the photo frame empty after a
+   * capture or upload even though the file was held for saving.
+   */
+  const showPhotoPreview = (file: File | null) => {
+    if (photoPreviewUrlRef.current) {
+      URL.revokeObjectURL(photoPreviewUrlRef.current)
+    }
+    const url = file ? URL.createObjectURL(file) : null
+    photoPreviewUrlRef.current = url
+    setPhotoPreview(url)
+  }
+
+  // Release the preview's object URL when leaving the page.
+  useEffect(
+    () => () => {
+      if (photoPreviewUrlRef.current) {
+        URL.revokeObjectURL(photoPreviewUrlRef.current)
+      }
+    },
+    [],
+  )
+
   const handlePhotoConfirmed = (file: File) => {
     setPhotoFile(file)
-    const reader = new FileReader()
-    reader.onloadend = () => {
-      setPhotoPreview(reader.result as string)
-    }
-    reader.readAsDataURL(file)
+    showPhotoPreview(file)
   }
 
   const handleRemovePhoto = () => {
     setPhotoFile(null)
-    setPhotoPreview(null)
+    showPhotoPreview(null)
     if (fileInputRef.current) {
       fileInputRef.current.value = ''
     }
@@ -278,7 +299,7 @@ export function PatientRegister() {
     setVisitType('walk-in')
     setReasonForVisit('')
     setPhotoFile(null)
-    setPhotoPreview(null)
+    showPhotoPreview(null)
     setConfirmDifferentPatient(false)
     setFormError(null)
     setQuickSuccessNotice(null)

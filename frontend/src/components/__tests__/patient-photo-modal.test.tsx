@@ -133,6 +133,47 @@ describe('PatientPhotoModal', () => {
     expect(mockOnClose).toHaveBeenCalled()
   })
 
+  // Retake used to mount a fresh <video> with no stream, so the feed went black and the
+  // next snapshot was a blank frame.
+  it('keeps the camera feed attached after Retake so the next snapshot is not blank', async () => {
+    const mockStream = { getTracks: () => [{ stop: vi.fn() }] }
+    Object.defineProperty(globalThis.navigator, 'mediaDevices', {
+      value: { getUserMedia: vi.fn().mockResolvedValue(mockStream) },
+      writable: true,
+      configurable: true,
+    })
+    vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue({
+      drawImage: vi.fn(),
+    } as unknown as CanvasRenderingContext2D)
+    vi.spyOn(HTMLCanvasElement.prototype, 'toBlob').mockImplementation((callback) => {
+      callback(new Blob(['snapshot-jpeg-data'], { type: 'image/jpeg' }))
+    })
+
+    const { container } = render(
+      <PatientPhotoModal
+        open={true}
+        onClose={mockOnClose}
+        onPhotoSelected={mockOnPhotoSelected}
+      />,
+    )
+    const liveFeed = () => container.querySelector('video') as HTMLVideoElement | null
+
+    fireEvent.click(screen.getByRole('button', { name: /capture with webcam/i }))
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /take snapshot/i })).toBeEnabled()
+    })
+    expect(liveFeed()?.srcObject).toBe(mockStream)
+
+    fireEvent.click(screen.getByRole('button', { name: /take snapshot/i }))
+    fireEvent.click(await screen.findByRole('button', { name: /retake/i }))
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /take snapshot/i })).toBeEnabled()
+    })
+    expect(liveFeed()?.srcObject).toBe(mockStream)
+    expect(liveFeed()).not.toHaveClass('hidden')
+  })
+
   it('shows honest error banner and switch-to-upload button if camera is unavailable', async () => {
     // MediaDevices throws NotAllowedError
     Object.defineProperty(globalThis.navigator, 'mediaDevices', {

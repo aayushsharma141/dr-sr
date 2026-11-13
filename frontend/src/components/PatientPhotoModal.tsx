@@ -412,16 +412,16 @@ export function PatientPhotoModal({
                 </div>
               )}
 
-              {/* Live Video Feed */}
-              {!capturedPreview && (
-                <video
-                  ref={videoRef}
-                  autoPlay
-                  playsInline
-                  muted
-                  className={`h-full w-full object-cover ${cameraLoading || cameraError ? 'hidden' : 'block'}`}
-                />
-              )}
+              {/* Live Video Feed. It stays mounted (hidden) while a snapshot is shown: the stream
+                  is attached to this element once, so a remounted one left Retake with a black feed. */}
+              <video
+                ref={videoRef}
+                autoPlay
+                playsInline
+                muted
+                className={`h-full w-full object-cover ${cameraLoading || cameraError || capturedPreview ? 'hidden' : 'block'}`}
+              />
+
 
               {/* Captured Photo Preview */}
               {capturedPreview && (
