@@ -14,7 +14,10 @@ import re
 from kalyan_api.config import Settings
 
 # ``kalyan_test``, ``test_kalyan``, ``kalyan_test_db``, ``test``.
-TEST_DATABASE_PATTERN = re.compile(r"^(?:test|tests)(?:[_][a-z0-9_]+)?$|^[a-z0-9_]+[_]tests?(?:[_]db)?$")
+TEST_DATABASE_PATTERN = re.compile(
+    r"^(?:test|tests)(?:[_][a-z0-9_]+)?$"
+    r"|^[a-z0-9_]+[_]tests?(?:[_]db)?$"
+)
 
 # Names that must be refused even if a future pattern were loosened.
 PROTECTED_DATABASE_NAMES = frozenset(

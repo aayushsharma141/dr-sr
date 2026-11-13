@@ -1,4 +1,5 @@
-"""Enforce composite same-patient foreign keys on payments, treatment sessions, vitals, and follow-ups.
+"""Enforce composite same-patient foreign keys on payments, treatment sessions, vitals,
+and follow-ups.
 
 Revision ID: 0023
 Revises: 0022
@@ -68,7 +69,8 @@ def upgrade() -> None:
     for _name, child, column, parent, _ondelete in LINKS:
         mismatched = bind.execute(
             sa.text(
-                f"SELECT count(*) FROM {child} c JOIN {parent} p ON p.id = c.{column} "
+                # Table and column names come from the LINKS constant above, not from input.
+                f"SELECT count(*) FROM {child} c JOIN {parent} p ON p.id = c.{column} "  # noqa: S608
                 "WHERE c.patient_id <> p.patient_id"
             )
         ).scalar_one()

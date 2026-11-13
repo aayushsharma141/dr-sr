@@ -209,7 +209,8 @@ def test_pending_dues_ledger(
     assert item["agreed_price_paise"] == 350000
     assert item["paid_paise"] == 0
     assert item["balance_paise"] == 350000
-    assert item.get("condition_diagnosis") is None  # FB-05 / D-04: clinical diagnosis hidden from reception
+    # FB-05 / D-04: clinical diagnosis hidden from reception
+    assert item.get("condition_diagnosis") is None
 
     # Pay ₹2,000 (200000 paise)
     rec_c.post(
