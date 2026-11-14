@@ -20,7 +20,12 @@ from kalyan_api.core.principal import (
     build_audit_context,
     current_principal,
 )
-from kalyan_api.core.scope import ScopeFamily, get_scoped_or_404, row_scope
+from kalyan_api.core.scope import (
+    ScopeFamily,
+    audit_cross_doctor_list_read,
+    get_scoped_or_404,
+    row_scope,
+)
 from kalyan_api.db.session import SessionDep
 from kalyan_api.models import (
     Appointment,
@@ -306,6 +311,7 @@ def list_patient_encounters(
         .order_by(ClinicalEncounter.encounter_date.desc())
     )
     results = session.execute(stmt).scalars().all()
+    audit_cross_doctor_list_read(session, principal, patient_id, "patient_encounters_list", results)
 
     return [
         EncounterSummary(
