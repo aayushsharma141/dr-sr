@@ -1088,7 +1088,7 @@ export function AppShell({ name, role, children }: AppShellProps) {
 
           {/* Middle section: Global search across all tabs */}
           <div className="flex-1 max-w-md xl:max-w-xl mx-2 sm:mx-6 hidden sm:block">
-            <GlobalSearchBar role={role} />
+            <GlobalSearchBar />
           </div>
 
           {/* Right section: Location | Clock | LAN | User Pill | Sign Out */}

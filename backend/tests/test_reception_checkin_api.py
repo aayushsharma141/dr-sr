@@ -198,6 +198,35 @@ def test_a_late_arrival_marked_not_arrived_can_still_check_in(
     assert response.json()["visit_id"] is not None
 
 
+def test_a_no_show_cannot_check_in_when_the_patient_was_booked_again_that_day(
+    clock, login_client, reception_user, doctor_a_user, db_session
+):
+    """BR-006: a missed booking plus a new same-day booking must not both reach consultation."""
+    patient = _patient(db_session, "B5D")
+    client = login_client(reception_user)
+    missed_booking = _book(client, patient, doctor_a_user)
+    missed = client.patch(
+        f"/api/appointments/{missed_booking['id']}/status",
+        json={"status": "NO_SHOW", "version_id": missed_booking["version_id"]},
+    )
+    assert missed.status_code == 200
+    # A NO_SHOW does not block a new booking, so this needs no override.
+    rebooked = _book(client, patient, doctor_a_user)
+
+    response = _check_in(client, missed_booking["id"], missed.json()["version_id"])
+
+    assert response.status_code == 409, response.text
+    assert response.json()["code"] == "duplicate_appointment"
+    assert response.json()["details"]["existing_appointment_id"] == rebooked["id"]
+    still = db_session.get(Appointment, missed_booking["id"])
+    db_session.refresh(still)
+    assert still.status == "NO_SHOW"
+    assert still.visit_id is None
+
+    # The new booking checks in normally.
+    assert _check_in(client, rebooked["id"], rebooked["version_id"]).status_code == 200
+
+
 def test_check_in_is_refused_for_a_booking_on_another_day(
     clock, login_client, reception_user, doctor_a_user, db_session
 ):

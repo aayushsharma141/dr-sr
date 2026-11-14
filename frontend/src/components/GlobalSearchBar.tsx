@@ -1,14 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router'
 import { apiFetch } from '../api/client'
-import type { PatientOut, Role } from '../api/types'
+import type { PatientOut } from '../api/types'
 import { IconSearch } from './icons'
 
-interface GlobalSearchBarProps {
-  role?: Role
-}
-
-export function GlobalSearchBar({ role }: GlobalSearchBarProps) {
+export function GlobalSearchBar() {
   const [query, setQuery] = useState('')
   const [results, setResults] = useState<PatientOut[]>([])
   const [isLoading, setIsLoading] = useState(false)
@@ -67,35 +63,36 @@ export function GlobalSearchBar({ role }: GlobalSearchBarProps) {
     setIsLoading(true)
     setSearchError(null)
 
+    // Once the query changes, this search is stale: a reply that arrives late must not replace
+    // the results for the newer query (staff could open the wrong patient).
+    let stale = false
     const timer = setTimeout(async () => {
       try {
         const data = await apiFetch<PatientOut[]>(
           `/patients?q=${encodeURIComponent(trimmed)}&limit=8`
         )
+        if (stale) return
         setResults(data || [])
         setIsOpen(true)
       } catch (err: unknown) {
+        if (stale) return
         setSearchError(err instanceof Error ? err.message : 'Search failed')
         setResults([])
       } finally {
-        setIsLoading(false)
+        if (!stale) setIsLoading(false)
       }
     }, 220)
 
-    return () => clearTimeout(timer)
+    return () => {
+      stale = true
+      clearTimeout(timer)
+    }
   }, [query])
 
   const handleSelectPatient = (patientId: number) => {
     setIsOpen(false)
     setQuery('')
     navigate(`/reception/patients/${patientId}`)
-  }
-
-  const handleStartConsult = (patientId: number, e: React.MouseEvent) => {
-    e.stopPropagation()
-    setIsOpen(false)
-    setQuery('')
-    navigate(`/doctor/encounters/new?patient_id=${patientId}`)
   }
 
   return (
@@ -213,17 +210,9 @@ export function GlobalSearchBar({ role }: GlobalSearchBarProps) {
                       </div>
                     </div>
 
+                    {/* No "Consult" shortcut here: a consultation starts from the doctor's queue, so it
+                        always belongs to a checked-in appointment and its visit. */}
                     <div className="flex shrink-0 items-center gap-1.5">
-                      {role === 'DOCTOR' && (
-                        <button
-                          type="button"
-                          onClick={(e) => handleStartConsult(patient.id, e)}
-                          title="Start Clinical Consultation"
-                          className="rounded bg-[#8E1C3D] px-2 py-1 text-xs font-semibold text-white shadow-2xs hover:bg-[#721530]"
-                        >
-                          Consult
-                        </button>
-                      )}
                       <span className="text-slate-500 group-hover:text-slate-700">→</span>
                     </div>
                   </div>

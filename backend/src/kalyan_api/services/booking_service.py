@@ -204,6 +204,34 @@ def check_in(session: Session, appt: Appointment, principal: Principal) -> Check
     """
     validate_booking_transition(appt, AppointmentStatus.ARRIVED, principal)
 
+    # A NO_SHOW does not count for the duplicate rule (BR-006), so the patient may have been
+    # booked again with this doctor today. Checking the missed booking in as well would put two
+    # consultations, and two charges, into the same day. Use the other booking instead.
+    if appt.status == AppointmentStatus.NO_SHOW.value:
+        other = session.scalar(
+            select(Appointment).where(
+                Appointment.patient_id == appt.patient_id,
+                Appointment.doctor_id == appt.doctor_id,
+                Appointment.appointment_date == appt.appointment_date,
+                Appointment.id != appt.id,
+                Appointment.status.in_(ACTIVE_BOOKING_STATUSES),
+            )
+        )
+        if other is not None:
+            raise ApiError(
+                status_code=409,
+                code="duplicate_appointment",
+                message=(
+                    "This patient was booked again with this doctor today. "
+                    "Check in that booking instead of the one marked No-show."
+                ),
+                details={
+                    "existing_appointment_id": other.id,
+                    "existing_token_number": other.token_number,
+                    "existing_status": other.status,
+                },
+            )
+
     visit, visit_opened = visit_service.join_or_open_visit(
         session, appt.patient_id, principal.user_id
     )

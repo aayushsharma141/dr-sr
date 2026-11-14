@@ -53,7 +53,7 @@ describe('GlobalSearchBar across all tabs', () => {
   it('renders top search bar with shortcut key indicator', () => {
     render(
       <MemoryRouter>
-        <GlobalSearchBar role="DOCTOR" />
+        <GlobalSearchBar />
       </MemoryRouter>,
     )
 
@@ -66,7 +66,7 @@ describe('GlobalSearchBar across all tabs', () => {
     const user = userEvent.setup()
     render(
       <MemoryRouter>
-        <GlobalSearchBar role="DOCTOR" />
+        <GlobalSearchBar />
       </MemoryRouter>,
     )
 
@@ -80,6 +80,48 @@ describe('GlobalSearchBar across all tabs', () => {
     expect(screen.getByText('KH-2026-0001')).toBeInTheDocument()
     expect(screen.getByText(/34 yrs/)).toBeInTheDocument()
     expect(screen.getByText(/Penicillin/)).toBeInTheDocument()
-    expect(screen.getByText('Consult')).toBeInTheDocument()
+    // A consultation starts from the doctor's queue (a checked-in appointment), never from search.
+    expect(screen.queryByText('Consult')).not.toBeInTheDocument()
+  })
+
+  it('ignores a reply for an older search that arrives after the newer one', async () => {
+    const user = userEvent.setup()
+    const respond = (patients: PatientOut[]) => ({
+      ok: true,
+      status: 200,
+      headers: new Headers({ 'content-type': 'application/json' }),
+      text: () => Promise.resolve(JSON.stringify(patients)),
+    })
+    const sunita: PatientOut = { ...mockPatients[0], id: 102, urn: 'KH-2026-0002', full_name: 'Sunita Devi' }
+    const pending: Record<string, (value: unknown) => void> = {}
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockImplementation((url: string) => {
+        const q = new URL(url, 'http://localhost').searchParams.get('q') ?? ''
+        return new Promise((resolve) => {
+          pending[q] = resolve
+        })
+      }),
+    )
+    render(
+      <MemoryRouter>
+        <GlobalSearchBar />
+      </MemoryRouter>,
+    )
+
+    const input = screen.getByPlaceholderText(/Search URN, name or mobile.../)
+    await user.type(input, 'Ra')
+    await waitFor(() => expect(pending['Ra']).toBeDefined())
+    await user.clear(input)
+    await user.type(input, 'Su')
+    await waitFor(() => expect(pending['Su']).toBeDefined())
+
+    pending['Su'](respond([sunita]))
+    await screen.findByText('Sunita Devi')
+    pending['Ra'](respond(mockPatients)) // the older search answers last
+
+    await new Promise((r) => setTimeout(r, 50))
+    expect(screen.getByText('Sunita Devi')).toBeInTheDocument()
+    expect(screen.queryByText('Rahul Sharma')).not.toBeInTheDocument()
   })
 })
