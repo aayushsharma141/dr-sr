@@ -128,7 +128,8 @@ def test_check_in_opens_a_visit_and_queues_the_consultation(
     body = response.json()
     assert body["status"] == "ARRIVED"
     assert body["consultation_status"] == "WAITING"
-    assert body["token_number"] == booking["token_number"]
+    assert booking["token_number"] is None
+    assert body["token_number"] == 1
     assert body["check_in_at"] is not None
     assert body["version_id"] == 2
     assert body["visit_id"] is not None

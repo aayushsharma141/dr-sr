@@ -43,7 +43,7 @@ from kalyan_api.schemas.follow_up import (
     FollowUpRecommendationCreate,
     ReceptionFollowUpResponse,
 )
-from kalyan_api.services import audit_service, token_service
+from kalyan_api.services import audit_service
 from kalyan_api.services.audit_service import AuditAction
 
 router = APIRouter(tags=["follow-ups"])
@@ -442,11 +442,7 @@ def book_follow_up(
                 },
             )
 
-    # Generate sequential token for doctor and date
-    token_num = token_service.generate_next_daily_token(
-        session, rec.recommended_doctor_id, appt_date
-    )
-
+    # No token yet: it is issued when the patient is checked in (RF-12).
     override_text = (payload.override_reason or "").strip() or None
     final_notes = payload.notes
     if override_text:
@@ -461,7 +457,6 @@ def book_follow_up(
         doctor_id=rec.recommended_doctor_id,
         department_id=department.id,
         appointment_date=appt_date,
-        token_number=token_num,
         status=AppointmentStatus.BOOKED.value,
         notes=final_notes,
         created_by_user_id=principal.user_id,
@@ -478,7 +473,7 @@ def book_follow_up(
         "booked_appointment_id": appt.id,
         "status": rec.status,
         "appointment_date": appt_date.isoformat(),
-        "token_number": token_num,
+        "token_number": appt.token_number,
     }
     if override_text:
         audit_after["override_reason"] = override_text

@@ -1107,11 +1107,13 @@ MATRIX: list[MatrixRow] = [
         method="PATCH",
         path="/api/appointments/{id}/status",
         body_factory=_patch_appointment_status_payload,
+        # The payload asks for ARRIVED, which is a check-in and so reception work (RF-12, owner
+        # decision 10). The treating doctor used to be allowed; now they get 403.
         expected={
             "anonymous": 401,
             "admin": 403,
             "reception": 200,
-            "doctor_a": 200,
+            "doctor_a": 403,
             "doctor_b": 404,
         },
     ),

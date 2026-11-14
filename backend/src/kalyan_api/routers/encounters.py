@@ -29,12 +29,12 @@ from kalyan_api.core.scope import (
 from kalyan_api.db.session import SessionDep
 from kalyan_api.models import (
     Appointment,
-    AppointmentStatus,
     ClinicalAddendum,
     ClinicalEncounter,
     ClinicalTemplate,
     ClinicalTemplateResponse,
     ClinicalTemplateVersion,
+    ConsultationStatus,
     Doctor,
     Patient,
 )
@@ -49,7 +49,7 @@ from kalyan_api.schemas.encounters import (
     UnfinishedEncounterItem,
 )
 from kalyan_api.schemas.templates import TemplateResponseInput, TemplateResponseRead
-from kalyan_api.services import audit_service
+from kalyan_api.services import appointment_service, audit_service
 from kalyan_api.services.audit_service import AuditAction
 
 router = APIRouter(tags=["encounters"])
@@ -166,11 +166,18 @@ def create_encounter(
             response.status_code = 200
             return _to_read_schema(existing_enc)
 
-        # Advance appointment status to IN_CONSULTATION if not already there
-        if appt.status in (AppointmentStatus.BOOKED.value, AppointmentStatus.ARRIVED.value):
-            appt.status = AppointmentStatus.IN_CONSULTATION.value
-            appt.status_updated_at = clock.utcnow()
-            appt.version_id += 1
+        # RF-12: reception must have checked the patient in. Opening the encounter starts the
+        # consultation (WAITING -> IN_CONSULTATION); a cancelled or completed one cannot start.
+        if appt.consultation_status is None:
+            raise ApiError(
+                status_code=422,
+                code="not_checked_in",
+                message=(
+                    "The patient has not been checked in for this appointment. "
+                    "Ask reception to check them in first."
+                ),
+            )
+        appointment_service.start_consultation(session, appt, principal)
 
     # D-19-03: the department (specialty) comes from the appointment. Without an appointment,
     # fall back to the doctor's department when they belong to exactly one.
@@ -496,13 +503,11 @@ def finalise_encounter(
         enc.finalised_at = clock.utcnow()
         enc.version_id += 1
 
-        # Advance linked appointment to DONE if currently IN_CONSULTATION
+        # Finalising the encounter completes the consultation (RF-12).
         if enc.appointment_id is not None:
             appt = session.get(Appointment, enc.appointment_id)
-            if appt and appt.status == AppointmentStatus.IN_CONSULTATION.value:
-                appt.status = AppointmentStatus.DONE.value
-                appt.status_updated_at = clock.utcnow()
-                appt.version_id += 1
+            if appt and appt.consultation_status == ConsultationStatus.IN_CONSULTATION.value:
+                appointment_service.complete_consultation(session, appt, principal)
 
         session.flush()
 

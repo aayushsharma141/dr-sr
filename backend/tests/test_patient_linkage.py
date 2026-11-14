@@ -21,6 +21,7 @@ from kalyan_api.models import (
     AppointmentStatus,
     AuditLog,
     ClinicalEncounter,
+    ConsultationStatus,
     FollowUpRecommendation,
     Patient,
     Payment,
@@ -56,7 +57,9 @@ def _appointment(db_session: Session, patient: Patient, doctor_id: int, user: Us
         doctor_id=doctor_id,
         appointment_date=date(2026, 11, 20),
         token_number=1,
-        status=AppointmentStatus.BOOKED.value,
+        # Checked in: a doctor only opens an encounter for a patient reception has checked in.
+        status=AppointmentStatus.ARRIVED.value,
+        consultation_status=ConsultationStatus.WAITING.value,
         created_by_user_id=user.id,
     )
     db_session.add(appt)
@@ -93,7 +96,9 @@ def test_encounter_rejects_appointment_of_another_patient(
     db_session.expire_all()
     assert db_session.scalar(select(func.count(ClinicalEncounter.id))) == 0
     refreshed = db_session.get(Appointment, appt_a.id)
-    assert refreshed.status == AppointmentStatus.BOOKED.value
+    # The refused attempt must not have started the consultation: still checked in, waiting.
+    assert refreshed.status == AppointmentStatus.ARRIVED.value
+    assert refreshed.consultation_status == ConsultationStatus.WAITING.value
 
 
 def test_encounter_accepts_matching_patient_and_appointment(

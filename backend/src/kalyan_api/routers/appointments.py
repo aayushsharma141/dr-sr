@@ -16,7 +16,7 @@ from kalyan_api.core.principal import (
     get_current_settings,
 )
 from kalyan_api.db.session import SessionDep
-from kalyan_api.models import Appointment, AppointmentStatus, Doctor
+from kalyan_api.models import Appointment, AppointmentStatus, ConsultationStatus, Doctor
 from kalyan_api.schemas.appointments import (
     AppointmentCreate,
     AppointmentListResponse,
@@ -29,7 +29,7 @@ from kalyan_api.schemas.appointments import (
     WalkInCreate,
 )
 from kalyan_api.services import audit_service, booking_service
-from kalyan_api.services.appointment_service import validate_status_transition
+from kalyan_api.services.appointment_service import validate_status_update
 from kalyan_api.services.audit_service import AuditAction
 
 # The booking locks moved to booking_service (RF-12); other routers and tests import them from here.
@@ -149,9 +149,10 @@ def book_appointment(
     principal: Principal = Depends(current_principal),
     settings=Depends(get_current_settings),
 ) -> AppointmentRead:
-    """Book a per-doctor daily appointment with atomic token generation (APT-01).
+    """Book a per-doctor daily appointment (APT-01).
 
-    Still issues the token at booking. RF-12 slice 2 moves that to check-in.
+    The booking has no token: it is issued at check-in (RF-12, owner decision 7), so queue
+    order follows arrival.
     """
     appt = booking_service.create_booking(
         session,
@@ -164,7 +165,7 @@ def book_appointment(
         override_reason=payload.override_reason,
         source=payload.source,
         expected_time=payload.expected_time,
-        issue_token=True,
+        issue_token=False,
     )
     override_text = (payload.override_reason or "").strip() or None
     _record_booking_created(session, build_audit_context(request, principal), appt, override_text)
@@ -389,8 +390,12 @@ def update_appointment_status(
     session: SessionDep,
     principal: Principal = Depends(current_principal),
 ) -> AppointmentRead:
-    """Transition appointment status with optimistic locking and validation (APT-02)."""
-    appt = session.get(Appointment, id)
+    """Transition appointment status with optimistic locking and validation (APT-02).
+
+    Since RF-12 slice 2 an ARRIVED request is a check-in (visit, token, waiting list), and a
+    checked-in patient only moves through the consultation. See validate_status_update.
+    """
+    appt = booking_service.lock_appointment(session, id)
     if not appt:
         raise ApiError(
             status_code=404,
@@ -411,28 +416,32 @@ def update_appointment_status(
         )
 
     require_version(appt, payload.version_id, label="appointment")
-    validate_status_transition(
-        appt, payload.status, principal, payload.cancellation_reason, session=session
-    )
-
-    old_status = appt.status
-    appt.status = payload.status.value
-    appt.status_updated_at = clock.utcnow()
-    if payload.status == AppointmentStatus.ARRIVED and appt.check_in_at is None:
-        appt.check_in_at = clock.utcnow()
-    if payload.cancellation_reason is not None:
-        appt.cancellation_reason = payload.cancellation_reason
-    appt.version_id += 1
-    session.flush()
-
     ctx = build_audit_context(request, principal)
+    before = {"status": appt.status, "version_id": payload.version_id}
+
+    if payload.status == AppointmentStatus.ARRIVED:
+        result = booking_service.check_in(session, appt, principal)
+        _record_check_in(session, ctx, result, before=before)
+    else:
+        consultation_target = validate_status_update(
+            session, appt, payload.status, principal, payload.cancellation_reason
+        )
+        appt.status = payload.status.value
+        appt.status_updated_at = clock.utcnow()
+        if consultation_target is not None:
+            appt.consultation_status = consultation_target.value
+        if payload.cancellation_reason is not None:
+            appt.cancellation_reason = payload.cancellation_reason
+        appt.version_id += 1
+        session.flush()
+
     audit_service.record(
         session,
         ctx,
         action=AuditAction.APPOINTMENT_STATUS_UPDATED,
         entity_type="appointment",
         entity_id=appt.id,
-        before={"status": old_status, "version_id": payload.version_id},
+        before=before,
         after={"status": appt.status, "version_id": appt.version_id},
         reason=payload.cancellation_reason,
     )
@@ -475,7 +484,13 @@ def get_doctor_queue(
             Appointment.doctor_id == principal.doctor_id,
             Appointment.appointment_date == today,
         )
-        .order_by(Appointment.token_number.asc())
+        # Tokens are issued at check-in, so they follow arrival; bookings still waiting for their
+        # patient have none and are ordered by the time the patient said they would come.
+        .order_by(
+            Appointment.token_number.asc().nulls_last(),
+            Appointment.expected_time.asc().nulls_last(),
+            Appointment.id.asc(),
+        )
     )
     appointments = session.execute(stmt).scalars().all()
 
@@ -485,6 +500,8 @@ def get_doctor_queue(
     completed: list[DoctorQueueItem] = []
 
     for a in appointments:
+        if a.status == AppointmentStatus.RESCHEDULED.value:
+            continue  # moved to another date; it has its own row there
         item = DoctorQueueItem(
             id=a.id,
             patient_id=a.patient_id,
@@ -496,13 +513,14 @@ def get_doctor_queue(
             patient_allergies=a.patient.allergies,
             token_number=a.token_number,
             status=a.status,
+            consultation_status=a.consultation_status,
             status_updated_at=a.status_updated_at,
             notes=a.notes,
             version_id=a.version_id,
         )
-        if a.status == AppointmentStatus.IN_CONSULTATION.value:
+        if a.consultation_status == ConsultationStatus.IN_CONSULTATION.value:
             in_consultation.append(item)
-        elif a.status == AppointmentStatus.ARRIVED.value:
+        elif a.consultation_status == ConsultationStatus.WAITING.value:
             waiting.append(item)
         elif a.status == AppointmentStatus.BOOKED.value:
             booked.append(item)

@@ -238,6 +238,7 @@ def test_phase20_demographic_correction_and_snapshot_isolation(
         appointment_date=datetime.now(UTC).date(),
         token_number=1,
         status="ARRIVED",
+        consultation_status="WAITING",
         created_by_user_id=reception_user.id,
     )
     db_session.add(appt)

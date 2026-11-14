@@ -217,6 +217,19 @@ def patch_cli_session(monkeypatch: pytest.MonkeyPatch, db_session: Session) -> N
 TEST_PASSWORD = "ValidTestPassword123!"
 
 
+def check_in_appointment(appointment, token_number: int | None = None) -> None:
+    """Put an appointment built directly in the database in the state a check-in leaves it.
+
+    RF-12: a doctor can only start a consultation for a patient reception has checked in, so a
+    test that opens an encounter on a hand-built appointment needs this first. Tests of the
+    check-in itself go through the API instead.
+    """
+    appointment.status = "ARRIVED"
+    appointment.consultation_status = "WAITING"
+    if token_number is not None:
+        appointment.token_number = token_number
+
+
 def make_user(
     session: Session,
     settings: Settings,

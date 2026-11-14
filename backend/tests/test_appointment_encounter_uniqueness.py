@@ -3,6 +3,7 @@
 from datetime import date
 
 import pytest
+from conftest import check_in_appointment
 from sqlalchemy.exc import IntegrityError
 
 from kalyan_api.models import Appointment, AppointmentStatus, ClinicalEncounter, Patient
@@ -31,6 +32,7 @@ def test_encounter_creation_idempotent_reopens_existing(login_client, doctor_a_u
         status=AppointmentStatus.BOOKED.value,
         created_by_user_id=doctor_a_user.id,
     )
+    check_in_appointment(appt)  # a doctor only starts a consultation for a checked-in patient
     db_session.add(appt)
     db_session.flush()
 

@@ -184,7 +184,9 @@ def test_booking_recommendation_converts_to_appointment(
     assert appt.patient_id == patient.id
     assert appt.doctor_id == doctor_a_user.doctor_id
     assert appt.appointment_date.isoformat() == target_date
-    assert appt.token_number >= 1
+    # No token until the patient is checked in (RF-12).
+    assert appt.token_number is None
+    assert appt.status == "BOOKED"
 
     # Attempting to book already-booked recommendation returns 409
     dup_book = rec_client.post(f"/api/follow-ups/{rec_id}/book", json={})

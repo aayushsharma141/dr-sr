@@ -1,5 +1,6 @@
 """A consultation's department (specialty) follows the appointment, never a default (D-19-03)."""
 
+from kalyan_api import clock
 from kalyan_api.models import Department, Doctor, Patient
 
 
@@ -34,16 +35,23 @@ def test_encounter_takes_the_department_booked_on_the_appointment(
     db_session.flush()
     patient = _patient(db_session, "KH-2026-7701", "9876547701")
 
-    booked = login_client(reception_user).post(
+    reception = login_client(reception_user)
+    booked = reception.post(
         "/api/appointments",
         json={
             "patient_id": patient.id,
             "doctor_id": doctor.id,
             "department_id": eye.id,
-            "appointment_date": "2026-11-08",
+            "appointment_date": clock.ist_today().isoformat(),
         },
     )
     assert booked.status_code == 201, booked.text
+    # The doctor can only open the consultation once reception has checked the patient in.
+    checked_in = reception.post(
+        f"/api/appointments/{booked.json()['id']}/check-in",
+        json={"version_id": booked.json()["version_id"]},
+    )
+    assert checked_in.status_code == 200, checked_in.text
 
     created = login_client(doctor_a_user).post(
         "/api/encounters",

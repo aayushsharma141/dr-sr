@@ -2,11 +2,16 @@
 
 Two sets of rules live here:
 
-- ALLOWED_TRANSITIONS / validate_status_transition: the legacy single-status machine, still used
-  by PATCH /appointments/{id}/status. RF-12 retires it.
+- ALLOWED_TRANSITIONS / validate_status_transition: the legacy single-status machine. Since
+  RF-12 slice 2 it is only the fallback of validate_status_update for a booking that has not
+  been checked in and is asked to make a move the new rules do not describe.
 - BOOKING_TRANSITIONS / validate_booking_transition and CONSULTATION_TRANSITIONS /
   validate_consultation_transition (RF-11): the owner's decision of 2026-11-13 that the booking
-  status and the consultation status are separate. Not wired to an endpoint until RF-12.
+  status and the consultation status are separate. validate_status_update routes
+  PATCH /appointments/{id}/status through them.
+
+The legacy appointment status is kept in step with the consultation status (MIRRORED_STATUS), so
+the dashboards, queues and counters that still read it keep working until they move over.
 """
 
 from sqlalchemy import select
@@ -256,7 +261,9 @@ def validate_consultation_transition(
     may cancel one, with a reason, until its encounter is finalised (BR-013). Nothing changes
     once the visit is closed or cancelled.
     """
-    if appt.status != AppointmentStatus.ARRIVED.value or appt.consultation_status is None:
+    # consultation_status is set at check-in (and backfilled for earlier rows); the appointment
+    # status alone cannot say, because it moves on to IN_CONSULTATION and DONE.
+    if appt.consultation_status is None:
         raise ApiError(
             status_code=422,
             code="not_checked_in",
@@ -322,3 +329,97 @@ def validate_consultation_transition(
             code="cannot_cancel_finalised",
             message="Cannot cancel a consultation whose encounter has already been finalised.",
         )
+
+
+# ------------------------------------------------------- RF-12 slice 2: applying the rules
+
+# The legacy appointment status that goes with each consultation status.
+MIRRORED_STATUS: dict[ConsultationStatus, AppointmentStatus] = {
+    ConsultationStatus.WAITING: AppointmentStatus.ARRIVED,
+    ConsultationStatus.IN_CONSULTATION: AppointmentStatus.IN_CONSULTATION,
+    ConsultationStatus.COMPLETED: AppointmentStatus.DONE,
+    ConsultationStatus.CANCELLED: AppointmentStatus.CANCELLED,
+}
+
+# What PATCH /appointments/{id}/status asks for, as a consultation status, once checked in.
+_STATUS_TO_CONSULTATION: dict[AppointmentStatus, ConsultationStatus] = {
+    AppointmentStatus.IN_CONSULTATION: ConsultationStatus.IN_CONSULTATION,
+    AppointmentStatus.DONE: ConsultationStatus.COMPLETED,
+    AppointmentStatus.CANCELLED: ConsultationStatus.CANCELLED,
+}
+
+
+def validate_status_update(
+    session: Session,
+    appt: Appointment,
+    target: AppointmentStatus,
+    principal: Principal,
+    reason: str | None = None,
+) -> ConsultationStatus | None:
+    """Check a PATCH /appointments/{id}/status request; return the consultation status it sets.
+
+    Check-in (target ARRIVED) is handled by booking_service.check_in, not here. A checked-in
+    patient can only move through the consultation: start, complete or cancel it. A booking that
+    is not checked in can be marked not arrived or cancelled. Raises ApiError when refused; the
+    error codes of the old status machine are kept (invalid_status_transition).
+    """
+    current = AppointmentStatus(appt.status)
+    if target == current:
+        raise _unchanged(current.value)
+
+    if appt.consultation_status is not None:
+        consultation_target = _STATUS_TO_CONSULTATION.get(target)
+        if consultation_target is None:
+            allowed = frozenset(
+                MIRRORED_STATUS[c]
+                for c in CONSULTATION_TRANSITIONS[ConsultationStatus(appt.consultation_status)]
+            )
+            raise _not_allowed("invalid_status_transition", current.value, target.value, allowed)
+        try:
+            validate_consultation_transition(session, appt, consultation_target, principal, reason)
+        except ApiError as error:
+            if error.code != "invalid_consultation_transition":
+                raise
+            raise ApiError(
+                status_code=error.status_code,
+                code="invalid_status_transition",
+                message=error.message,
+                **error.extras,
+            ) from error
+        return consultation_target
+
+    if target in (AppointmentStatus.NO_SHOW, AppointmentStatus.CANCELLED):
+        validate_booking_transition(appt, target, principal, reason)
+        return None
+
+    # Anything else from a booking that has not been checked in (a start or finish, a move to
+    # another date) is not a valid status change; the legacy table says so with its usual error.
+    validate_status_transition(appt, target, principal, reason, session=session)
+    return None
+
+
+def _set_consultation_status(appt: Appointment, target: ConsultationStatus) -> None:
+    appt.consultation_status = target.value
+    appt.status = MIRRORED_STATUS[target].value
+    appt.status_updated_at = clock.utcnow()
+    appt.version_id += 1
+
+
+def start_consultation(session: Session, appt: Appointment, principal: Principal) -> None:
+    """The treating doctor starts the consultation by opening the encounter.
+
+    WAITING -> IN_CONSULTATION. Already in consultation is not an error, so reopening the same
+    encounter is harmless.
+    """
+    if appt.consultation_status == ConsultationStatus.IN_CONSULTATION.value:
+        return
+    validate_consultation_transition(session, appt, ConsultationStatus.IN_CONSULTATION, principal)
+    _set_consultation_status(appt, ConsultationStatus.IN_CONSULTATION)
+
+
+def complete_consultation(session: Session, appt: Appointment, principal: Principal) -> None:
+    """The treating doctor completes the consultation (finalises the encounter)."""
+    if appt.consultation_status == ConsultationStatus.COMPLETED.value:
+        return
+    validate_consultation_transition(session, appt, ConsultationStatus.COMPLETED, principal)
+    _set_consultation_status(appt, ConsultationStatus.COMPLETED)

@@ -125,8 +125,8 @@ def test_phase13_full_lifecycle_and_security_gate(
     assert book_res.status_code == 201, book_res.text
     appt = book_res.json()
     appt_id = appt["id"]
-    token_1 = appt["token_number"]
-    assert token_1 >= 1
+    # The token is issued at check-in, not at booking (RF-12).
+    assert appt["token_number"] is None
     assert appt["status"] == "BOOKED"
     v_id = appt["version_id"]
 
@@ -141,6 +141,7 @@ def test_phase13_full_lifecycle_and_security_gate(
     assert arrived_res.status_code == 200, arrived_res.text
     appt = arrived_res.json()
     assert appt["status"] == "ARRIVED"
+    assert appt["token_number"] >= 1
     v_id = appt["version_id"]
 
     # Optimistic locking test: reusing stale version_id must return 409

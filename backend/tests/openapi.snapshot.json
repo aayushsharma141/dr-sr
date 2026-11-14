@@ -10330,7 +10330,7 @@
         ]
       },
       "post": {
-        "description": "Book a per-doctor daily appointment with atomic token generation (APT-01).\n\nStill issues the token at booking. RF-12 slice 2 moves that to check-in.",
+        "description": "Book a per-doctor daily appointment (APT-01).\n\nThe booking has no token: it is issued at check-in (RF-12, owner decision 7), so queue\norder follows arrival.",
         "operationId": "book_appointment_api_appointments_post",
         "requestBody": {
           "content": {
@@ -10585,7 +10585,7 @@
     },
     "/api/appointments/{id}/status": {
       "patch": {
-        "description": "Transition appointment status with optimistic locking and validation (APT-02).",
+        "description": "Transition appointment status with optimistic locking and validation (APT-02).\n\nSince RF-12 slice 2 an ARRIVED request is a check-in (visit, token, waiting list), and a\nchecked-in patient only moves through the consultation. See validate_status_update.",
         "operationId": "update_appointment_status_api_appointments__id__status_patch",
         "parameters": [
           {

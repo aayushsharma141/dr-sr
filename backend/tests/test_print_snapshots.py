@@ -50,6 +50,7 @@ def _setup_patient_and_appointment(
         appointment_date=datetime.now(UTC).date(),
         token_number=1,
         status="ARRIVED",
+        consultation_status="WAITING",
         created_by_user_id=reception_user.id,
     )
     session.add(appt)
