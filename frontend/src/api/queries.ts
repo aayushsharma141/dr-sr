@@ -833,6 +833,8 @@ export function useUploadPatientPhoto() {
 
 
 // ==============================================================================
+export { useHealth, type HealthStatus } from './health'
+
 // Appointments & Clinical Encounters (Phase 13)
 // ==============================================================================
 
@@ -843,7 +845,7 @@ export function useAppointments(
     patient_id?: number
     status?: string
   },
-  options?: { enabled?: boolean },
+  options?: { enabled?: boolean; refetchInterval?: number | false },
 ) {
   const q = new URLSearchParams()
   if (params?.appointment_date) q.set('appointment_date', params.appointment_date)
@@ -856,6 +858,8 @@ export function useAppointments(
     queryKey: ['appointments', params],
     queryFn: () => apiFetch<AppointmentListResponse>(`/appointments${qs}`),
     enabled: options?.enabled ?? true,
+    // Reception and doctor screens share this list; poll so every workstation sees the same queue.
+    refetchInterval: options?.refetchInterval ?? 10000,
   })
 }
 

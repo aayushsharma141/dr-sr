@@ -44,8 +44,9 @@
 | Reverse Payment with Reason (`payment:reverse`) | **Yes (Exclusive)** | **No (HTTP 403)** | **No (HTTP 403)** | Implemented |
 | View Financial Ledger / Receipts | **Yes** | **Yes** | No | Implemented |
 | Author Clinical Consultation / Rx Notes | No | No | **Yes (Assigned)** | Implemented (Doctor WS) |
-| Real-time Queue Polling (10s interval) | No | **Pending (Manual)** | **Yes (10s poll)** | Engineering Refinement |
-| Persistent LAN Heartbeat / Connectivity Status | No | **Pending** | **Pending** | Engineering Refinement |
+| Real-time Queue Polling (10s interval) | No | **Yes (10s poll)** | **Yes (10s poll)** | Implemented (`feature/reception-refinements`) |
+| Persistent LAN Heartbeat / Connectivity Status | **Yes** | **Yes** | **Yes** | Implemented in `AppShell` (`feature/reception-refinements`) |
+| Walk-in Quick Intake (Immediate Check-in) | **Yes** | **Yes** | No | Implemented in `AppointmentBookingModal` (`feature/reception-refinements`) |
 
 ---
 
