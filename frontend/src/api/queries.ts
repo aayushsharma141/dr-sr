@@ -110,6 +110,13 @@ import type {
   UserOut,
   UserUpdate,
 } from './types'
+import type {
+  VisitCloseRequest,
+  VisitDetail,
+  VisitDueOut,
+  VisitListResponse,
+  VisitStatus,
+} from './types'
 
 export const queryClient = new QueryClient({
   defaultOptions: {
@@ -1376,6 +1383,10 @@ export function useRecordPayment() {
       queryClient.invalidateQueries({ queryKey: ['billing', 'pending-dues'] })
       queryClient.invalidateQueries({ queryKey: ['treatment-plans'] })
       queryClient.invalidateQueries({ queryKey: ['timeline', variables.patient_id] })
+      queryClient.invalidateQueries({ queryKey: ['visits'] })
+      queryClient.invalidateQueries({ queryKey: ['billing', 'visit-dues'] })
+      queryClient.invalidateQueries({ queryKey: ['billing', 'receipts-today'] })
+      queryClient.invalidateQueries({ queryKey: ['billing', 'ledger'] })
     },
   })
 }
@@ -1518,7 +1529,8 @@ export interface LedgerFilter {
   status: 'all' | 'active' | 'reversed'
 }
 
-export function useLedger(filter: LedgerFilter) {
+/** Full ledger search: Admin only (payment:reverse). Reception must not call it (403). */
+export function useLedger(filter: LedgerFilter, options: { enabled?: boolean } = {}) {
   return useQuery({
     queryKey: ['billing', 'ledger', filter],
     queryFn: () => {
@@ -1526,6 +1538,69 @@ export function useLedger(filter: LedgerFilter) {
       if (filter.q) params.set('q', filter.q)
       return apiFetch<PaymentOut[]>(`/api/billing/ledger?${params.toString()}`)
     },
+    enabled: options.enabled ?? true,
+  })
+}
+
+export interface VisitListFilter {
+  readyForCheckout?: boolean
+  visitDate?: string
+  status?: VisitStatus
+  limit?: number
+}
+
+/** GET /visits: reception and admin read. Ready for checkout = open, a completed consultation, none active. */
+export function useVisits(filter: VisitListFilter = {}) {
+  return useQuery({
+    queryKey: ['visits', 'list', filter],
+    queryFn: () => {
+      const params = new URLSearchParams({ limit: String(filter.limit ?? 100) })
+      if (filter.readyForCheckout) params.set('ready_for_checkout', 'true')
+      if (filter.visitDate) params.set('visit_date', filter.visitDate)
+      if (filter.status) params.set('status', filter.status)
+      return apiFetch<VisitListResponse>(`/api/visits?${params.toString()}`)
+    },
+  })
+}
+
+/** GET /visits/{id}: the visit with its consultations, payments and the balance still due. */
+export function useVisit(id: number | null | undefined) {
+  return useQuery({
+    queryKey: ['visits', 'detail', id],
+    queryFn: () => apiFetch<VisitDetail>(`/api/visits/${id}`),
+    enabled: typeof id === 'number' && id > 0,
+  })
+}
+
+/** POST /visits/{id}/close ("Patient Out"). A reason is required while money is still due. */
+export function useCloseVisit() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, body }: { id: number; body: VisitCloseRequest }) =>
+      apiFetch<VisitDetail>(`/api/visits/${id}/close`, { method: 'POST', body }),
+    onSuccess: (data) => {
+      queryClient.setQueryData(['visits', 'detail', data.id], data)
+      queryClient.invalidateQueries({ queryKey: ['visits', 'list'] })
+      queryClient.invalidateQueries({ queryKey: ['billing', 'visit-dues'] })
+      queryClient.invalidateQueries({ queryKey: ['timeline', data.patient_id] })
+    },
+  })
+}
+
+/** GET /billing/visit-dues: fees still owed on visits closed with a balance. */
+export function useVisitDues() {
+  return useQuery({
+    queryKey: ['billing', 'visit-dues'],
+    queryFn: () => apiFetch<VisitDueOut[]>('/api/billing/visit-dues'),
+  })
+}
+
+/** GET /billing/receipts/today: today's receipts (IST), the only ledger reception sees. */
+export function useReceiptsToday(enabled = true) {
+  return useQuery({
+    queryKey: ['billing', 'receipts-today'],
+    queryFn: () => apiFetch<PaymentOut[]>('/api/billing/receipts/today'),
+    enabled,
   })
 }
 

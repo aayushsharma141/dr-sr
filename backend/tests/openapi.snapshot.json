@@ -8662,7 +8662,7 @@
                 "type": "null"
               }
             ],
-            "description": "Required when money is still due; the balance moves to Pending Dues",
+            "description": "Required when money is still due; the balance then stays listed as a due",
             "title": "Reason"
           },
           "version_id": {
@@ -8679,7 +8679,7 @@
         "type": "object"
       },
       "VisitConsultation": {
-        "description": "One doctor's consultation inside a visit.",
+        "description": "One doctor's consultation inside a visit, with what it costs and what is paid.",
         "properties": {
           "appointment_date": {
             "format": "date",
@@ -8693,6 +8693,19 @@
           "appointment_status": {
             "title": "Appointment Status",
             "type": "string"
+          },
+          "balance_paise": {
+            "default": 0,
+            "description": "Still due; only a completed consultation owes anything",
+            "minimum": 0.0,
+            "title": "Balance Paise",
+            "type": "integer"
+          },
+          "collectable": {
+            "default": false,
+            "description": "True once the doctor has completed it; fees are collected after that",
+            "title": "Collectable",
+            "type": "boolean"
           },
           "consultation_status": {
             "anyOf": [
@@ -8712,6 +8725,20 @@
           "doctor_name_en": {
             "title": "Doctor Name En",
             "type": "string"
+          },
+          "fee_paise": {
+            "default": 0,
+            "description": "The doctor's consultation fee",
+            "minimum": 0.0,
+            "title": "Fee Paise",
+            "type": "integer"
+          },
+          "paid_paise": {
+            "default": 0,
+            "description": "Payments recorded against it, reversed ones excluded",
+            "minimum": 0.0,
+            "title": "Paid Paise",
+            "type": "integer"
           },
           "token_number": {
             "anyOf": [
@@ -8736,7 +8763,7 @@
         "type": "object"
       },
       "VisitDetail": {
-        "description": "A visit with its consultations and the balance still due on it.",
+        "description": "A visit with its consultations, its payments and the balance still due on it.",
         "properties": {
           "cancel_reason": {
             "anyOf": [
@@ -8844,9 +8871,21 @@
             "title": "Patient Urn",
             "type": "string"
           },
+          "payments": {
+            "items": {
+              "$ref": "#/components/schemas/VisitPayment"
+            },
+            "title": "Payments",
+            "type": "array"
+          },
           "status": {
             "title": "Status",
             "type": "string"
+          },
+          "total_paid_paise": {
+            "minimum": 0.0,
+            "title": "Total Paid Paise",
+            "type": "integer"
           },
           "version_id": {
             "title": "Version Id",
@@ -8869,9 +8908,82 @@
           "opened_at",
           "version_id",
           "consultations",
+          "payments",
+          "total_paid_paise",
           "outstanding_paise"
         ],
         "title": "VisitDetail",
+        "type": "object"
+      },
+      "VisitDueOut": {
+        "description": "A consultation fee still owed on a visit that was closed with a balance (RF-23).",
+        "properties": {
+          "appointment_id": {
+            "title": "Appointment Id",
+            "type": "integer"
+          },
+          "balance_paise": {
+            "title": "Balance Paise",
+            "type": "integer"
+          },
+          "close_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Close Reason"
+          },
+          "doctor_name_en": {
+            "title": "Doctor Name En",
+            "type": "string"
+          },
+          "fee_paise": {
+            "title": "Fee Paise",
+            "type": "integer"
+          },
+          "paid_paise": {
+            "title": "Paid Paise",
+            "type": "integer"
+          },
+          "patient_id": {
+            "title": "Patient Id",
+            "type": "integer"
+          },
+          "patient_name": {
+            "title": "Patient Name",
+            "type": "string"
+          },
+          "patient_urn": {
+            "title": "Patient Urn",
+            "type": "string"
+          },
+          "visit_date": {
+            "format": "date",
+            "title": "Visit Date",
+            "type": "string"
+          },
+          "visit_id": {
+            "title": "Visit Id",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "visit_id",
+          "appointment_id",
+          "patient_id",
+          "patient_urn",
+          "patient_name",
+          "doctor_name_en",
+          "visit_date",
+          "fee_paise",
+          "paid_paise",
+          "balance_paise"
+        ],
+        "title": "VisitDueOut",
         "type": "object"
       },
       "VisitListResponse": {
@@ -8883,7 +8995,7 @@
           },
           "visits": {
             "items": {
-              "$ref": "#/components/schemas/VisitRead"
+              "$ref": "#/components/schemas/VisitSummary"
             },
             "title": "Visits",
             "type": "array"
@@ -8896,9 +9008,75 @@
         "title": "VisitListResponse",
         "type": "object"
       },
-      "VisitRead": {
-        "description": "A visit as listed to reception and admin.",
+      "VisitPayment": {
+        "description": "A payment recorded against a consultation in the visit.",
         "properties": {
+          "amount_paise": {
+            "title": "Amount Paise",
+            "type": "integer"
+          },
+          "appointment_id": {
+            "title": "Appointment Id",
+            "type": "integer"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "created_by_username": {
+            "title": "Created By Username",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "is_reversed": {
+            "title": "Is Reversed",
+            "type": "boolean"
+          },
+          "payment_method": {
+            "title": "Payment Method",
+            "type": "string"
+          },
+          "receipt_number": {
+            "title": "Receipt Number",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "appointment_id",
+          "receipt_number",
+          "amount_paise",
+          "payment_method",
+          "is_reversed",
+          "created_at",
+          "created_by_username"
+        ],
+        "title": "VisitPayment",
+        "type": "object"
+      },
+      "VisitStatus": {
+        "description": "Reception visit lifecycle: opened at check-in, closed or cancelled at checkout (RF-10).",
+        "enum": [
+          "OPEN",
+          "CLOSED",
+          "CANCELLED"
+        ],
+        "title": "VisitStatus",
+        "type": "string"
+      },
+      "VisitSummary": {
+        "description": "A visit in a list: who was seen, whether it is ready for checkout, and what is due.",
+        "properties": {
+          "active_consultations": {
+            "description": "Consultations still waiting or in progress",
+            "minimum": 0.0,
+            "title": "Active Consultations",
+            "type": "integer"
+          },
           "cancel_reason": {
             "anyOf": [
               {
@@ -8967,6 +9145,18 @@
             ],
             "title": "Closed By User Id"
           },
+          "completed_consultations": {
+            "minimum": 0.0,
+            "title": "Completed Consultations",
+            "type": "integer"
+          },
+          "doctors": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Doctors",
+            "type": "array"
+          },
           "id": {
             "title": "Id",
             "type": "integer"
@@ -8978,6 +9168,11 @@
           },
           "opened_by_user_id": {
             "title": "Opened By User Id",
+            "type": "integer"
+          },
+          "outstanding_paise": {
+            "minimum": 0.0,
+            "title": "Outstanding Paise",
             "type": "integer"
           },
           "patient_id": {
@@ -9015,20 +9210,14 @@
           "status",
           "opened_by_user_id",
           "opened_at",
-          "version_id"
+          "version_id",
+          "doctors",
+          "completed_consultations",
+          "active_consultations",
+          "outstanding_paise"
         ],
-        "title": "VisitRead",
+        "title": "VisitSummary",
         "type": "object"
-      },
-      "VisitStatus": {
-        "description": "Reception visit lifecycle: opened at check-in, closed or cancelled at checkout (RF-10).",
-        "enum": [
-          "OPEN",
-          "CLOSED",
-          "CANCELLED"
-        ],
-        "title": "VisitStatus",
-        "type": "string"
       },
       "VitalObservationInput": {
         "description": "Payload to record or update vitals for a clinical encounter.",
@@ -11131,6 +11320,58 @@
           }
         },
         "summary": "List Pending Dues",
+        "tags": [
+          "billing"
+        ]
+      }
+    },
+    "/api/billing/receipts/today": {
+      "get": {
+        "description": "Payments recorded today (IST), newest first, so the desk can reprint and tally the drawer.\n\nReception gets today only; the full searchable ledger stays admin-only (owner decision 11).",
+        "operationId": "list_todays_receipts_api_billing_receipts_today_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/PaymentOut"
+                  },
+                  "title": "Response List Todays Receipts Api Billing Receipts Today Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "List Todays Receipts",
+        "tags": [
+          "billing"
+        ]
+      }
+    },
+    "/api/billing/visit-dues": {
+      "get": {
+        "description": "List consultation fees still owed on visits that were closed with a balance (RF-23).",
+        "operationId": "list_visit_dues_api_billing_visit_dues_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/VisitDueOut"
+                  },
+                  "title": "Response List Visit Dues Api Billing Visit Dues Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "List Visit Dues",
         "tags": [
           "billing"
         ]
@@ -15568,6 +15809,18 @@
               ],
               "description": "Filter by visit date",
               "title": "Visit Date"
+            }
+          },
+          {
+            "description": "Only open visits where a doctor completed a consultation and none is still waiting or in progress",
+            "in": "query",
+            "name": "ready_for_checkout",
+            "required": false,
+            "schema": {
+              "default": false,
+              "description": "Only open visits where a doctor completed a consultation and none is still waiting or in progress",
+              "title": "Ready For Checkout",
+              "type": "boolean"
             }
           },
           {

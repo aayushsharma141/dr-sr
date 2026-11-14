@@ -623,6 +623,31 @@ MATRIX: list[MatrixRow] = [
             "doctor_b": 403,
         },
     ),
+    # RF-23: dues of closed visits and today's receipts (reception sees today only).
+    MatrixRow(
+        method="GET",
+        path="/api/billing/visit-dues",
+        body_factory=None,
+        expected={
+            "anonymous": 401,
+            "admin": 200,
+            "reception": 200,
+            "doctor_a": 403,
+            "doctor_b": 403,
+        },
+    ),
+    MatrixRow(
+        method="GET",
+        path="/api/billing/receipts/today",
+        body_factory=None,
+        expected={
+            "anonymous": 401,
+            "admin": 200,
+            "reception": 200,
+            "doctor_a": 403,
+            "doctor_b": 403,
+        },
+    ),
     MatrixRow(
         method="POST",
         path="/api/payments/{id}/reverse",

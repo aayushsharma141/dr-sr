@@ -1143,6 +1143,91 @@ export interface PendingDueOut {
   completed_sessions: number
 }
 
+// RF-23: visits (checkout) and dues of closed visits. Matches schemas/visits.py and billing.py.
+export type VisitStatus = 'OPEN' | 'CLOSED' | 'CANCELLED'
+
+export interface VisitConsultation {
+  appointment_id: number
+  doctor_id: number
+  doctor_name_en: string
+  token_number: number | null
+  appointment_status: string
+  consultation_status: ConsultationStatus | null
+  appointment_date: string
+  fee_paise: number
+  paid_paise: number
+  balance_paise: number
+  /** True once the doctor completed it; fees are collected only after that. */
+  collectable: boolean
+}
+
+export interface VisitPayment {
+  id: number
+  appointment_id: number
+  receipt_number: string
+  amount_paise: number
+  payment_method: PaymentMethod
+  is_reversed: boolean
+  created_at: string
+  created_by_username: string
+}
+
+export interface VisitRead {
+  id: number
+  patient_id: number
+  patient_urn: string
+  patient_name: string
+  visit_date: string
+  status: VisitStatus
+  opened_by_user_id: number
+  opened_at: string
+  closed_by_user_id: number | null
+  closed_at: string | null
+  close_reason: string | null
+  cancelled_by_user_id: number | null
+  cancelled_at: string | null
+  cancel_reason: string | null
+  version_id: number
+}
+
+export interface VisitSummary extends VisitRead {
+  doctors: string[]
+  completed_consultations: number
+  active_consultations: number
+  outstanding_paise: number
+}
+
+export interface VisitDetail extends VisitRead {
+  consultations: VisitConsultation[]
+  payments: VisitPayment[]
+  total_paid_paise: number
+  outstanding_paise: number
+}
+
+export interface VisitListResponse {
+  total: number
+  visits: VisitSummary[]
+}
+
+export interface VisitCloseRequest {
+  version_id: number
+  reason?: string | null
+}
+
+export interface VisitDueOut {
+  visit_id: number
+  appointment_id: number
+  patient_id: number
+  patient_urn: string
+  patient_name: string
+  doctor_name_en: string
+  visit_date: string
+  fee_paise: number
+  paid_paise: number
+  balance_paise: number
+  close_reason: string | null
+}
+
 export interface TimelineItemOut {
   id: string
   event_type: 'APPOINTMENT' | 'ENCOUNTER' | 'PRESCRIPTION' | 'TREATMENT_PLAN' | 'TREATMENT_SESSION' | 'PAYMENT'
