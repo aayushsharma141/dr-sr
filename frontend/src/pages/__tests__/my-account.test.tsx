@@ -134,10 +134,14 @@ describe('MyAccount Page', () => {
     expect(screen.getByLabelText(/Repeat new password/)).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Change password' })).toBeInTheDocument()
 
-    // Signed in computers
+    // Signed in computers: listing and signing out sessions are administrator permissions,
+    // so a doctor is told so, and the page never asks the server for them.
     expect(screen.getByText('Signed-in computers')).toBeInTheDocument()
-    expect(screen.getByText('Sign out others')).toBeInTheDocument()
-    expect(screen.getByText('This computer')).toBeInTheDocument()
+    expect(screen.getByText(/Only an administrator can see or sign out/)).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Sign out others' })).not.toBeInTheDocument()
+    expect(screen.queryByText('10.12.0.82')).not.toBeInTheDocument()
+    const calls = (fetch as unknown as ReturnType<typeof vi.fn>).mock.calls
+    expect(calls.some(([url]) => String(url).includes('/api/sessions'))).toBe(false)
 
     // Permissions
     expect(screen.getByText('What you may do')).toBeInTheDocument()
@@ -177,7 +181,53 @@ describe('MyAccount Page', () => {
     expect(screen.queryByText(/Dr\.? Adi Kumar/)).not.toBeInTheDocument()
   })
 
+  /** Make the cache and the mocked /api/auth/me and /api/sessions answer for this user. */
+  function signInAs(me: Me, sessions: ActiveSessionOut[] = mockSessions) {
+    queryClient.setQueryData(['me'], me)
+    queryClient.setQueryData(['sessions', { userId: me.id }], sessions)
+    const baseFetch = fetch as unknown as (url: string, init?: RequestInit) => Promise<unknown>
+    const json = (body: unknown) =>
+      Promise.resolve({
+        ok: true,
+        status: 200,
+        headers: new Headers({ 'content-type': 'application/json' }),
+        text: () => Promise.resolve(JSON.stringify(body)),
+      })
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockImplementation((url: string, init?: RequestInit) => {
+        if (url.includes('/api/auth/me')) return json(me)
+        if (url.includes('/api/sessions')) return json(sessions)
+        return baseFetch(url, init)
+      }),
+    )
+  }
+
+  const mockMeAdmin: Me = {
+    ...mockMeDoctor,
+    role: 'ADMIN',
+    full_name: 'Admin User',
+    doctor_id: null,
+    permissions: ['session:read', 'session:revoke', 'user:read'],
+  }
+
+  it('shows an administrator their real sign-ins and never a made-up row', async () => {
+    signInAs(mockMeAdmin, [])
+    render(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter>
+          <MyAccount />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    )
+
+    expect(await screen.findByText('No active sign-ins found.')).toBeInTheDocument()
+    expect(screen.queryByText('10.12.0.82')).not.toBeInTheDocument()
+    expect(screen.queryByText('Chrome on Windows')).not.toBeInTheDocument()
+  })
+
   it('asks in an in-app dialog before signing out other computers, and cancelling sends nothing', async () => {
+    signInAs(mockMeAdmin)
     const user = userEvent.setup()
     render(
       <QueryClientProvider client={queryClient}>
@@ -187,6 +237,7 @@ describe('MyAccount Page', () => {
       </QueryClientProvider>,
     )
 
+    expect(await screen.findByText('This computer')).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Sign out others' }))
     const dialog = await screen.findByRole('dialog')
     expect(within(dialog).getByText(/This computer stays signed in/)).toBeInTheDocument()

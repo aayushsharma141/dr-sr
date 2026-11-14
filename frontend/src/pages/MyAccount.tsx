@@ -23,8 +23,15 @@ export function MyAccount() {
   // Find linked doctor details if this is a doctor account
   const myDoctor = doctors?.find((d) => d.id === me?.doctor_id)
 
-  // Active sessions
-  const { data: sessions, refetch: refetchSessions } = useActiveSessions(me?.id ?? null)
+  // Active sessions. Listing and signing out sessions are administrator permissions on the
+  // server; staff without them are told so instead of seeing a list that cannot load.
+  const canSeeSessions = me?.permissions.includes('session:read') === true
+  const canRevokeSessions = me?.permissions.includes('session:revoke') === true
+  const {
+    data: sessions,
+    isError: sessionsFailed,
+    refetch: refetchSessions,
+  } = useActiveSessions(me?.id ?? null, { enabled: canSeeSessions && me?.id != null })
   const revokeSessionsMutation = useRevokeUserSessions()
   const changePasswordMutation = useChangePassword()
   const logoutMutation = useLogout()
@@ -252,14 +259,16 @@ export function MyAccount() {
                     Sign out anything you do not recognise
                   </p>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => setConfirmSignOutOpen(true)}
-                  disabled={revokeSessionsMutation.isPending}
-                  className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded text-xs font-semibold transition"
-                >
-                  {revokeSessionsMutation.isPending ? 'Signing out…' : 'Sign out others'}
-                </button>
+                {canRevokeSessions && (
+                  <button
+                    type="button"
+                    onClick={() => setConfirmSignOutOpen(true)}
+                    disabled={revokeSessionsMutation.isPending}
+                    className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded text-xs font-semibold transition"
+                  >
+                    {revokeSessionsMutation.isPending ? 'Signing out…' : 'Sign out others'}
+                  </button>
+                )}
               </div>
 
               {sessionNotice && (
@@ -274,6 +283,16 @@ export function MyAccount() {
                 </div>
               )}
 
+              {!canSeeSessions ? (
+                <p className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">
+                  Only an administrator can see or sign out the computers signed in as you. If you think
+                  someone else is using your account, change your password above and tell the administrator.
+                </p>
+              ) : sessionsFailed ? (
+                <p role="alert" className="rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800">
+                  Could not load the signed-in computers. Check the LAN connection and reload the page.
+                </p>
+              ) : (
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-xs">
                   <thead>
@@ -316,28 +335,15 @@ export function MyAccount() {
                       ))
                     ) : (
                       <tr>
-                        <td className="py-2.5 font-medium text-slate-800">
-                          Chrome on Windows
-                        </td>
-                        <td className="py-2.5 text-slate-600">
-                          Today
-                        </td>
-                        <td className="py-2.5 text-slate-600">
-                          just now
-                        </td>
-                        <td className="py-2.5 font-mono text-xs text-slate-600">
-                          10.12.0.82
-                        </td>
-                        <td className="py-2.5 text-right">
-                          <span className="inline-block px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800 border border-emerald-200">
-                            This computer
-                          </span>
+                        <td colSpan={5} className="py-3 text-slate-600">
+                          {sessions ? 'No active sign-ins found.' : 'Loading signed-in computers…'}
                         </td>
                       </tr>
                     )}
                   </tbody>
                 </table>
               </div>
+              )}
             </section>
           </div>
 

@@ -463,11 +463,12 @@ export function useRolePermissions() {
 }
 
 /** GET /sessions[?user_id]: active sessions, most recently active first. */
-export function useActiveSessions(userId?: number | null) {
+export function useActiveSessions(userId?: number | null, options?: { enabled?: boolean }) {
   const qs = userId ? `?user_id=${userId}` : ''
   return useQuery({
     queryKey: ['sessions', { userId: userId ?? null }],
     queryFn: () => apiFetch<ActiveSessionOut[]>(`/sessions${qs}`),
+    enabled: options?.enabled ?? true,
   })
 }
 
