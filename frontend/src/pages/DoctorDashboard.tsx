@@ -121,7 +121,8 @@ export function DoctorDashboard() {
   // Find logged in doctor record
   const myDoctor = Array.isArray(doctors) ? doctors.find((d) => d.id === me?.doctor_id) : undefined
   const doctorName = queue?.doctor_name || me?.full_name
-  const cabinCode = myDoctor?.cabin_code || 'Room 104'
+  // Only a cabin that is actually set on the doctor is shown; there is no default room.
+  const cabinCode = myDoctor?.cabin_code?.trim() || null
 
   // View state
   const [viewMode, setViewMode] = useState<ViewMode>('3ZONE')
@@ -160,7 +161,7 @@ export function DoctorDashboard() {
   const [followUpDays, setFollowUpDays] = useState<string | null>('7')
   const [toastMessage, setToastMessage] = useState<string | null>(null)
   const [unsavedFinishItem, setUnsavedFinishItem] = useState<DoctorQueueItem | null>(null)
-  const [finishError, setFinishError] = useState<{ item: DoctorQueueItem; message: string } | null>(null)
+  const [finishError, setFinishError] = useState<{ item: DoctorQueueItem; message: string; title?: string } | null>(null)
 
   // Kanban mode states & interactive controls
   const [kanbanSearch, setKanbanSearch] = useState('')
@@ -325,10 +326,16 @@ export function DoctorDashboard() {
             version_id: target.version_id,
           },
         })
-        setToastMessage(`Called Token ${formatToken(target.token_number)} (${target.patient_name}) → Room ${cabinCode}`)
-      } catch {
-        // Optimistic / fallback: select patient even if status mutation is in progress
-        setToastMessage(`Token ${formatToken(target.token_number)} called`)
+        setToastMessage(
+          `Called Token ${formatToken(target.token_number)} (${target.patient_name})${cabinCode ? ` → Cabin ${cabinCode}` : ''}`,
+        )
+      } catch (err: unknown) {
+        // The patient was not moved into consultation; say so rather than report success.
+        setFinishError({
+          item: target,
+          title: `Could not call Token ${formatToken(target.token_number)}`,
+          message: err instanceof Error ? err.message : 'The server did not accept the status change.',
+        })
       }
     } else {
       setToastMessage(`Selected Token ${formatToken(target.token_number)} (${target.patient_name})`)
@@ -661,8 +668,12 @@ export function DoctorDashboard() {
               <span>{patient.patient_gender}</span>
               <span>•</span>
               <span>📞 {patient.patient_mobile}</span>
-              <span>•</span>
-              <span className="font-semibold text-slate-700">Room {cabinCode}</span>
+              {cabinCode && (
+                <>
+                  <span>•</span>
+                  <span className="font-semibold text-slate-700">Cabin {cabinCode}</span>
+                </>
+              )}
             </div>
           </div>
 
@@ -1005,7 +1016,7 @@ export function DoctorDashboard() {
               {/* Room / Cabin Badge */}
               <div className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-800 shadow-2xs">
                 <span className="text-slate-500">Cabin:</span>
-                <span className="text-[#8E1C3D]">{cabinCode}</span>
+                <span className="text-[#8E1C3D]">{cabinCode ?? 'Not assigned'}</span>
               </div>
 
               {/* Current Active Token Indicator */}
@@ -1905,7 +1916,7 @@ export function DoctorDashboard() {
       </div>
       {finishError && (
         <div role="alert" className="fixed bottom-4 right-4 z-40 max-w-md rounded-xl border border-rose-300 bg-rose-50 p-4 text-sm text-rose-900 shadow-lg">
-          <p className="font-bold">Could not finish Token {formatToken(finishError.item.token_number)}</p>
+          <p className="font-bold">{finishError.title ?? `Could not finish Token ${formatToken(finishError.item.token_number)}`}</p>
           <p className="mt-1">{finishError.message}</p>
           <div className="mt-3 flex justify-end gap-2">
             <button type="button" onClick={() => setFinishError(null)} className="min-h-9 rounded-lg border border-rose-300 bg-white px-3 text-xs font-semibold text-rose-900 hover:bg-rose-100">

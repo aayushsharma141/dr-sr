@@ -296,6 +296,68 @@ describe('Doctor Dashboard 3-Zone Clinical Workspace and Kanban Cards', () => {
   })
 })
 
+describe('Doctor Dashboard: cabin and failed calls', () => {
+  afterEach(() => {
+    cleanup()
+    vi.restoreAllMocks()
+  })
+
+  function renderWith(cabin: string | null) {
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } })
+    const doctors = [{ ...mockDoctors[0], cabin_code: cabin }]
+    queryClient.setQueryData(['me'], mockMeDoctor)
+    queryClient.setQueryData(['doctors', { activeOnly: false }], doctors)
+    queryClient.setQueryData(['doctor-queue'], mockQueue)
+    const json = (body: unknown) =>
+      Promise.resolve({
+        ok: true,
+        status: 200,
+        headers: new Headers({ 'content-type': 'application/json' }),
+        text: () => Promise.resolve(JSON.stringify(body)),
+      })
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockImplementation((url: string, init?: RequestInit) => {
+        if (init?.method === 'PATCH') {
+          return Promise.resolve({
+            ok: false,
+            status: 409,
+            headers: new Headers({ 'content-type': 'application/json' }),
+            text: () => Promise.resolve(JSON.stringify({ code: 'invalid_transition', message: 'Patient is not checked in.' })),
+          })
+        }
+        if (url.includes('/api/auth/me')) return json(mockMeDoctor)
+        if (url.includes('/api/doctors')) return json(doctors)
+        if (url.includes('/api/doctor/queue')) return json(mockQueue)
+        return json([])
+      }),
+    )
+    render(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter>
+          <DoctorDashboard />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    )
+  }
+
+  it('never shows a default room when the doctor has no cabin', async () => {
+    renderWith(null)
+    expect(await screen.findByText('Not assigned')).toBeInTheDocument()
+    expect(screen.queryByText(/Room 104/)).not.toBeInTheDocument()
+  })
+
+  it('reports a failed call instead of saying the token was called', async () => {
+    const user = userEvent.setup()
+    renderWith('A')
+    await user.click(await screen.findByRole('button', { name: /Call Next Waiting/ }))
+
+    const alert = await screen.findByText(/^Could not call Token/)
+    expect(alert).toBeInTheDocument()
+    expect(screen.queryByText(/Token .* called$/)).not.toBeInTheDocument()
+  })
+})
+
 describe('allergyStatus', () => {
   it('never invents an allergy and tells "not recorded" apart from "none"', () => {
     expect(allergyStatus('')).toEqual({ kind: 'not_recorded', text: 'Not recorded' })
