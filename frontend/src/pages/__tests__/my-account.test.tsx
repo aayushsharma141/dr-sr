@@ -148,6 +148,35 @@ describe('MyAccount Page', () => {
     expect(screen.getByText('Security notes')).toBeInTheDocument()
   })
 
+  it('does not give non-doctor staff a "Dr." title', async () => {
+    const receptionMe: Me = { ...mockMeDoctor, role: 'RECEPTION', full_name: 'Adi Kumar', doctor_id: null }
+    queryClient.setQueryData(['me'], receptionMe)
+    const baseFetch = fetch as unknown as (url: string) => Promise<unknown>
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockImplementation((url: string) =>
+        url.includes('/api/auth/me')
+          ? Promise.resolve({
+              ok: true,
+              status: 200,
+              headers: new Headers({ 'content-type': 'application/json' }),
+              text: () => Promise.resolve(JSON.stringify(receptionMe)),
+            })
+          : baseFetch(url),
+      ),
+    )
+    render(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter>
+          <MyAccount />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    )
+
+    expect((await screen.findAllByText('Adi Kumar')).length).toBeGreaterThanOrEqual(1)
+    expect(screen.queryByText(/Dr\.? Adi Kumar/)).not.toBeInTheDocument()
+  })
+
   it('asks in an in-app dialog before signing out other computers, and cancelling sends nothing', async () => {
     const user = userEvent.setup()
     render(

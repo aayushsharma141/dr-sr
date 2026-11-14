@@ -355,7 +355,11 @@ export function MyAccount() {
                 </span>
                 <div className="min-w-0">
                   <div className="text-sm font-bold text-slate-900 truncate">
-                    {me?.full_name ? withDoctorTitle(me.full_name) : 'Staff Member'}
+                    {me?.full_name
+                      ? me.role === 'DOCTOR'
+                        ? withDoctorTitle(me.full_name)
+                        : me.full_name
+                      : 'Staff Member'}
                   </div>
                   <div className="text-xs text-slate-500">
                     {roleDisplay}
