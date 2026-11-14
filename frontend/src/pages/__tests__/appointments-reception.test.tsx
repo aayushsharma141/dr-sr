@@ -404,3 +404,78 @@ describe('AppointmentsReception Component', () => {
     expect(screen.queryByRole('button', { name: /mark arrived/i })).not.toBeInTheDocument()
   })
 })
+
+describe('AppointmentsReception check-in rules (RF-12)', () => {
+  afterEach(() => {
+    cleanup()
+    vi.restoreAllMocks()
+  })
+
+  function renderBoard(appointments: Appointment[]) {
+    const jsonResponse = (body: unknown) => ({
+      ok: true,
+      status: 200,
+      headers: new Headers({ 'content-type': 'application/json' }),
+      text: () => Promise.resolve(JSON.stringify(body)),
+    })
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockImplementation((url: string) => {
+        if (url.includes('/api/auth/me')) return Promise.resolve(jsonResponse(mockMe))
+        if (url.includes('/api/doctors')) return Promise.resolve(jsonResponse(mockDoctors))
+        if (url.includes('/api/appointments'))
+          return Promise.resolve(jsonResponse({ total: appointments.length, appointments }))
+        return Promise.reject(new Error(`Unhandled: ${url}`))
+      }),
+    )
+    render(
+      <QueryClientProvider
+        client={new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } })}
+      >
+        <MemoryRouter>
+          <AppointmentsReception />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    )
+  }
+
+  const booked = mockAppointments[0]
+
+  it('offers No-Show only while the patient is still booked', async () => {
+    renderBoard([
+      { ...booked, id: 10, patient_name: 'Booked Patient', token_number: null },
+      {
+        ...booked,
+        id: 11,
+        patient_name: 'Arrived Patient',
+        status: 'ARRIVED',
+        consultation_status: 'WAITING',
+        token_number: 2,
+      },
+    ])
+
+    await screen.findByText('Arrived Patient')
+
+    // The server refuses to mark a checked-in patient not arrived, so the button is not offered.
+    expect(screen.getAllByRole('button', { name: 'No-Show' })).toHaveLength(1)
+    expect(screen.getAllByRole('button', { name: 'Cancel' })).toHaveLength(2)
+  })
+
+  it('lets a patient marked not arrived be checked in late', async () => {
+    renderBoard([{ ...booked, status: 'NO_SHOW', token_number: null }])
+
+    await screen.findByText('Aarav Kumar')
+
+    expect(screen.getByRole('button', { name: 'Mark Arrived' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'No-Show' })).not.toBeInTheDocument()
+  })
+
+  it('shows a dash, never "null", for a booking that has no token yet', async () => {
+    renderBoard([{ ...booked, token_number: null }])
+
+    await screen.findByText('Aarav Kumar')
+
+    expect(screen.getAllByText('—').length).toBeGreaterThan(0)
+    expect(screen.queryByText(/null/i)).not.toBeInTheDocument()
+  })
+})

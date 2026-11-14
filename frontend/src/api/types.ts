@@ -734,6 +734,13 @@ export type AppointmentStatus =
   | 'DONE'
   | 'CANCELLED'
   | 'NO_SHOW'
+  | 'RESCHEDULED'
+
+/** Where the doctor's side of a checked-in appointment stands (RF-10). Empty until check-in. */
+export type ConsultationStatus = 'WAITING' | 'IN_CONSULTATION' | 'COMPLETED' | 'CANCELLED'
+
+/** How an appointment was made. Empty when it was not recorded. */
+export type AppointmentSource = 'PHONE' | 'WALK_IN'
 
 export interface Appointment {
   id: number
@@ -747,12 +754,19 @@ export interface Appointment {
   doctor_name_en: string
   doctor_name_hi: string | null
   appointment_date: string
-  token_number: number
+  /** Issued at check-in, so empty while the booking has not been checked in (RF-12). */
+  token_number: number | null
   status: AppointmentStatus
   status_updated_at: string
   check_in_at?: string | null
   cancellation_reason: string | null
   notes: string | null
+  source?: AppointmentSource | null
+  /** HH:MM:SS time the patient said they would come; display only. */
+  expected_time?: string | null
+  visit_id?: number | null
+  consultation_status?: ConsultationStatus | null
+  rescheduled_from_id?: number | null
   version_id: number
   created_at: string
   updated_at: string
@@ -764,6 +778,23 @@ export interface AppointmentCreate {
   doctor_id: number
   appointment_date: string
   notes?: string | null
+  source?: AppointmentSource | null
+  /** HH:MM or HH:MM:SS */
+  expected_time?: string | null
+  override_reason?: string | null
+}
+
+/** A walk-in: booked for today and checked in at once, with its token. */
+export interface WalkInCreate {
+  patient_id: number
+  department_id: number
+  doctor_id: number
+  notes?: string | null
+  override_reason?: string | null
+}
+
+export interface CheckInRequest {
+  version_id: number
 }
 
 export interface AppointmentStatusUpdate {
@@ -786,8 +817,9 @@ export interface DoctorQueueItem {
   patient_age: number
   patient_mobile: string
   patient_allergies: string
-  token_number: number
+  token_number: number | null
   status: AppointmentStatus
+  consultation_status?: ConsultationStatus | null
   status_updated_at: string
   notes: string | null
   version_id: number

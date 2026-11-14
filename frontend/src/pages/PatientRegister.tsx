@@ -10,7 +10,7 @@ import {
   useDepartments,
   useDepartmentDoctors,
   useBookAppointment,
-  useUpdateAppointmentStatus,
+  useWalkIn,
 } from '../api/queries'
 import { ApiError, apiFetch } from '../api/client'
 import { AppShell } from '../components/AppShell'
@@ -100,7 +100,7 @@ export function PatientRegister() {
   const updateMutation = useUpdatePatient()
   const uploadPhotoMutation = useUploadPatientPhoto()
   const bookAppointmentMutation = useBookAppointment()
-  const updateStatusMutation = useUpdateAppointmentStatus()
+  const walkInMutation = useWalkIn()
 
   // 12 Canonical demographic fields
   const [fullName, setFullName] = useState('')
@@ -147,6 +147,8 @@ export function PatientRegister() {
   const [photoRetrying, setPhotoRetrying] = useState(false)
   const [photoSavedNotice, setPhotoSavedNotice] = useState<string | null>(null)
   const [checkedIn, setCheckedIn] = useState(false)
+  // A booking for today was made but the patient is not checked in, so it has no token yet.
+  const [bookedForToday, setBookedForToday] = useState(false)
   // Edit mode: the record as last loaded (its version_id guards the save), and save state.
   const [baseline, setBaseline] = useState<PatientOut | null>(null)
   const [isConflict, setIsConflict] = useState(false)
@@ -363,6 +365,7 @@ export function PatientRegister() {
     setPhotoFailure(null)
     setPhotoSavedNotice(null)
     setCheckedIn(false)
+    setBookedForToday(false)
     setFullName('')
     setGuardianName('')
     setGender('M')
@@ -502,6 +505,7 @@ export function PatientRegister() {
     setPhotoFailure(null)
     setPhotoSavedNotice(null)
     setCheckedIn(false)
+    setBookedForToday(false)
 
     if (ageYears === '' || ageYears < 0) {
       setFormError('Please enter a valid age in years.')
@@ -562,44 +566,41 @@ export function PatientRegister() {
       // 3. Allocate Visit & Token if Department and Doctor selected
       let generatedToken: number | null = null
       let arrived = false
+      let booked = false
       if (selectedDepartmentId && selectedDoctorId) {
-        let appt: Awaited<ReturnType<typeof bookAppointmentMutation.mutateAsync>> | null = null
         try {
-          appt = await bookAppointmentMutation.mutateAsync({
-            patient_id: patient.id,
-            department_id: Number(selectedDepartmentId),
-            doctor_id: Number(selectedDoctorId),
-            appointment_date: istToday(),
-            notes: reasonForVisit.trim() || null,
-          })
-          generatedToken = appt.token_number
+          if (visitType === 'walk-in') {
+            // A walk-in is booked for today and checked in at once, with its token. It is all or
+            // nothing: when the server refuses, no token was issued and nothing was booked.
+            const appt = await walkInMutation.mutateAsync({
+              patient_id: patient.id,
+              department_id: Number(selectedDepartmentId),
+              doctor_id: Number(selectedDoctorId),
+              notes: reasonForVisit.trim() || null,
+            })
+            generatedToken = appt.token_number
+            arrived = true
+          } else {
+            // A booking for today. The token is issued when the patient arrives and is checked in.
+            await bookAppointmentMutation.mutateAsync({
+              patient_id: patient.id,
+              department_id: Number(selectedDepartmentId),
+              doctor_id: Number(selectedDoctorId),
+              appointment_date: istToday(),
+              notes: reasonForVisit.trim() || null,
+            })
+            booked = true
+          }
         } catch (visitErr) {
           warnings.push(
-            `Visit and queue token were not booked (${errorText(visitErr)}). Book them from Appointments.`,
+            `The visit and queue token were not created (${errorText(visitErr)}). Check them in from the Token Desk.`,
           )
-        }
-
-        // If Walk-in, mark Arrived immediately. Only a confirmed check-in is shown as checked in.
-        if (appt && visitType === 'walk-in') {
-          try {
-            await updateStatusMutation.mutateAsync({
-              id: appt.id,
-              body: {
-                status: 'ARRIVED',
-                version_id: appt.version_id,
-              },
-            })
-            arrived = true
-          } catch (arriveErr) {
-            warnings.push(
-              `Token #${appt.token_number} is booked but was not marked arrived (${errorText(arriveErr)}). Mark arrived from Appointments.`,
-            )
-          }
         }
       }
 
       setAllocatedToken(generatedToken)
       setCheckedIn(arrived)
+      setBookedForToday(booked)
 
       if (saveAndAddAnother) {
         const tokenMsg = generatedToken != null ? ` · Queue Token #${generatedToken}` : ''
@@ -853,6 +854,12 @@ export function PatientRegister() {
                   <span className="mt-1 block rounded bg-[#FBF5F7] px-2 py-0.5 text-xs font-bold text-[#5D0B26]">
                     {checkedIn ? 'Checked In (Arrived)' : 'Booked'}
                   </span>
+                </div>
+              )}
+              {bookedForToday && allocatedToken == null && (
+                <div className="rounded-xl border border-[#E4C8D1] bg-white p-4 text-center text-xs text-slate-600 shadow-xs">
+                  <span className="block font-bold text-[#5D0B26]">Booked for today</span>
+                  The queue token is issued when the patient arrives and is checked in at the Token Desk.
                 </div>
               )}
             </div>

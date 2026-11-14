@@ -1,5 +1,28 @@
 import { describe, expect, it } from 'vitest'
-import { istToday, withDoctorTitle } from '../format'
+import { formatToken, istToday, withDoctorTitle } from '../format'
+
+describe('formatToken', () => {
+  it('shows cabin letter and a two-digit serial when the doctor has a cabin code', () => {
+    expect(formatToken(5, 'A')).toBe('A-05')
+    expect(formatToken(14, 'B')).toBe('B-14')
+    expect(formatToken(105, 'C')).toBe('C-105')
+  })
+
+  it('stays #n without a cabin code', () => {
+    expect(formatToken(5)).toBe('#5')
+    expect(formatToken(5, null)).toBe('#5')
+    expect(formatToken(5, '  ')).toBe('#5')
+  })
+
+  it('is a dash, never "null", before the patient is checked in', () => {
+    expect(formatToken(null)).toBe('—')
+    expect(formatToken(undefined, 'A')).toBe('—')
+  })
+
+  it('keeps a token of zero rather than treating it as missing', () => {
+    expect(formatToken(0, 'A')).toBe('A-00')
+  })
+})
 
 describe('istToday', () => {
   it('moves to the next date at midnight IST, not midnight UTC', () => {

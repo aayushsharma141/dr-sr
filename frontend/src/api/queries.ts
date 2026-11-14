@@ -31,7 +31,9 @@ import type {
   AppointmentCreate,
   AppointmentListResponse,
   AppointmentStatusUpdate,
+  CheckInRequest,
   DoctorQueueResponse,
+  WalkInCreate,
   EncounterCreate,
   EncounterRead,
   EncounterSummary,
@@ -827,12 +829,15 @@ export function useUploadPatientPhoto() {
 // Appointments & Clinical Encounters (Phase 13)
 // ==============================================================================
 
-export function useAppointments(params?: {
-  appointment_date?: string
-  doctor_id?: number
-  patient_id?: number
-  status?: string
-}) {
+export function useAppointments(
+  params?: {
+    appointment_date?: string
+    doctor_id?: number
+    patient_id?: number
+    status?: string
+  },
+  options?: { enabled?: boolean },
+) {
   const q = new URLSearchParams()
   if (params?.appointment_date) q.set('appointment_date', params.appointment_date)
   if (params?.doctor_id) q.set('doctor_id', String(params.doctor_id))
@@ -843,6 +848,7 @@ export function useAppointments(params?: {
   return useQuery({
     queryKey: ['appointments', params],
     queryFn: () => apiFetch<AppointmentListResponse>(`/appointments${qs}`),
+    enabled: options?.enabled ?? true,
   })
 }
 
@@ -865,6 +871,35 @@ export function useBookAppointment() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['appointments'] })
       qc.invalidateQueries({ queryKey: ['doctor-queue'] })
+    },
+  })
+}
+
+/** Register a walk-in: a booking for today checked in at once, with its token (all or nothing). */
+export function useWalkIn() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (body: WalkInCreate) =>
+      apiFetch<Appointment>('/appointments/walk-in', { method: 'POST', body }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['appointments'] })
+      qc.invalidateQueries({ queryKey: ['doctor-queue'] })
+      qc.invalidateQueries({ queryKey: ['visits'] })
+    },
+  })
+}
+
+/** Check a booked patient in on arrival: opens or joins the visit and issues the token. */
+export function useCheckIn() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, body }: { id: number; body: CheckInRequest }) =>
+      apiFetch<Appointment>(`/appointments/${id}/check-in`, { method: 'POST', body }),
+    onSuccess: (data) => {
+      qc.setQueryData(['appointment', data.id], data)
+      qc.invalidateQueries({ queryKey: ['appointments'] })
+      qc.invalidateQueries({ queryKey: ['doctor-queue'] })
+      qc.invalidateQueries({ queryKey: ['visits'] })
     },
   })
 }

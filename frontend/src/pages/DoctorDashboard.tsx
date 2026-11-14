@@ -3,7 +3,7 @@ import { AppShell } from '../components/AppShell'
 import { DoctorDashboardUnfinishedCard } from '../components/DoctorDashboardUnfinishedCard'
 import { useDoctorQueue, useMe } from '../api/queries'
 import type { DoctorQueueItem } from '../api/types'
-import { withDoctorTitle } from '../format'
+import { formatToken, withDoctorTitle } from '../format'
 
 export function DoctorDashboard() {
   const { data: me } = useMe()
@@ -85,7 +85,7 @@ export function DoctorDashboard() {
                     <div>
                       <div className="flex items-center gap-2">
                         <span className="px-2 py-0.5 rounded bg-purple-100 text-purple-900 font-mono font-bold text-sm">
-                          Token #{item.token_number}
+                          Token {formatToken(item.token_number)}
                         </span>
                         <span className="font-bold text-lg text-neutral-900">{item.patient_name}</span>
                         <span className="text-xs font-mono text-neutral-500">({item.patient_urn})</span>
@@ -135,7 +135,7 @@ export function DoctorDashboard() {
                     >
                       <div className="flex items-start gap-4">
                         <div className="px-3 py-2 bg-amber-100 text-amber-950 rounded-lg text-center font-mono font-bold text-lg min-w-[60px]">
-                          #{item.token_number}
+                          {formatToken(item.token_number)}
                         </div>
                         <div>
                           <div className="flex items-center gap-2">
@@ -192,7 +192,7 @@ export function DoctorDashboard() {
                   {queue.booked.map((item) => (
                     <div key={item.id} className="p-4 flex justify-between items-center text-sm text-neutral-600">
                       <div className="flex items-center gap-3">
-                        <span className="font-mono font-semibold text-neutral-700">#{item.token_number}</span>
+                        <span className="font-mono font-semibold text-neutral-700">{formatToken(item.token_number)}</span>
                         <span className="font-medium text-neutral-900">{item.patient_name}</span>
                         <span className="text-xs font-mono text-neutral-600">({item.patient_urn})</span>
                       </div>
@@ -217,7 +217,7 @@ export function DoctorDashboard() {
                   {queue.completed.map((item) => (
                     <div key={item.id} className="p-4 flex justify-between items-center text-sm">
                       <div className="flex items-center gap-3">
-                        <span className="font-mono text-neutral-500">#{item.token_number}</span>
+                        <span className="font-mono text-neutral-500">{formatToken(item.token_number)}</span>
                         <span className="font-medium text-neutral-800">{item.patient_name}</span>
                         <span className="text-xs font-mono text-neutral-600">({item.patient_urn})</span>
                       </div>

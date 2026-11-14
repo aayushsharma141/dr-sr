@@ -158,6 +158,8 @@ def list_department_doctors(department_id: int, session: SessionDep) -> list[dic
             "name_hi": d.name_hi,
             "qualification": d.qualification,
             "default_fee_paise": d.default_fee_paise,
+            # The Token Desk prints the token as cabin letter plus serial (A-05).
+            "cabin_code": d.cabin_code,
         }
         for d in doctors
     ]

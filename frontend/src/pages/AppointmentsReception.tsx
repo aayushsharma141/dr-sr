@@ -13,7 +13,7 @@ import {
   useMe,
 } from '../api/queries'
 import type { Appointment, AppointmentStatus, DoctorOut } from '../api/types'
-import { istToday } from '../format'
+import { formatToken, istToday } from '../format'
 import { isVersionConflict } from '../api/client'
 import { IconTicket, IconUserPlus } from '../components/icons'
 
@@ -539,7 +539,7 @@ export function AppointmentsReception() {
                         <tr key={appt.id} className="hover:bg-neutral-50/80 transition-colors" style={{ transitionDelay: `${index * 50}ms` }}>
                           <td className="py-3 px-4 font-mono font-bold text-neutral-900 text-base">
                             <span className="inline-flex items-center px-2.5 py-1 rounded bg-neutral-100 text-neutral-900">
-                              #{appt.token_number}
+                              {formatToken(appt.token_number)}
                             </span>
                           </td>
                           <td className="py-3 px-4">
@@ -572,7 +572,8 @@ export function AppointmentsReception() {
                           <td className="py-3 px-4 text-right space-x-2">
                             {canManageAppointments ? (
                               <>
-                                {appt.status === 'BOOKED' && (
+                                {/* A patient marked not arrived can still check in late, the same day. */}
+                                {(appt.status === 'BOOKED' || appt.status === 'NO_SHOW') && (
                                   <button
                                     onClick={() => handleUpdateStatus(appt, 'ARRIVED')}
                                     disabled={updateStatusMutation.isPending}
@@ -589,12 +590,15 @@ export function AppointmentsReception() {
                                     >
                                       Cancel
                                     </button>
-                                    <button
-                                      onClick={() => handleUpdateStatus(appt, 'NO_SHOW')}
-                                      className="px-2 py-1 border border-neutral-300 hover:bg-neutral-100 text-neutral-700 rounded text-xs font-medium"
-                                    >
-                                      No-Show
-                                    </button>
+                                    {/* Once checked in, a patient can no longer be marked not arrived. */}
+                                    {appt.status === 'BOOKED' && (
+                                      <button
+                                        onClick={() => handleUpdateStatus(appt, 'NO_SHOW')}
+                                        className="px-2 py-1 border border-neutral-300 hover:bg-neutral-100 text-neutral-700 rounded text-xs font-medium"
+                                      >
+                                        No-Show
+                                      </button>
+                                    )}
                                   </>
                                 )}
                                 {appt.status === 'IN_CONSULTATION' && (
@@ -636,7 +640,7 @@ export function AppointmentsReception() {
               >
                 <div className="space-y-4">
                   <p className="text-xs text-neutral-600">
-                    Provide a cancellation reason for Token #{cancellingAppt.token_number} ({cancellingAppt.patient_name}).
+                    Provide a cancellation reason for {cancellingAppt.token_number != null ? `Token ${formatToken(cancellingAppt.token_number)}` : 'this booking'} ({cancellingAppt.patient_name}).
                   </p>
                   <textarea
                     data-autofocus
