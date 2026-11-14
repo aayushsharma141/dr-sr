@@ -56,9 +56,9 @@ def row_scope(
             return true()
         return false()
 
-    if (
-        family in (ScopeFamily.CLINICAL_WRITE, ScopeFamily.CLINICAL)
-        or str(family) in ("CLINICAL_WRITE", "CLINICAL")
+    if family in (ScopeFamily.CLINICAL_WRITE, ScopeFamily.CLINICAL) or str(family) in (
+        "CLINICAL_WRITE",
+        "CLINICAL",
     ):
         # D-03 & D-04: Clinical mutations scoped strictly to the owning doctor
         if role_str == Role.DOCTOR.value and principal.doctor_id is not None:
@@ -146,3 +146,51 @@ def get_scoped_or_404(
             )
 
     return row
+
+
+def other_doctors_record_ids(principal: Principal | None, rows: Any) -> list[int]:
+    """IDs of rows owned by a different doctor than the calling doctor (empty for other roles)."""
+    if principal is None or principal.doctor_id is None:
+        return []
+    role_str = principal.role.value if hasattr(principal.role, "value") else str(principal.role)
+    if role_str != Role.DOCTOR.value:
+        return []
+    return [
+        row.id for row in rows if row.doctor_id is not None and row.doctor_id != principal.doctor_id
+    ]
+
+
+def audit_cross_doctor_list_read(
+    session: Session,
+    principal: Principal,
+    patient_id: int,
+    source: str,
+    rows: Any,
+) -> None:
+    """Audit a doctor's list read that returned other doctors' clinical rows (BR-010, DWS-04).
+
+    get_scoped_or_404 audits single-record reads; a list query bypasses it, so list endpoints
+    call this once per request. Nothing is written when every row belongs to the caller.
+    """
+    ids = other_doctors_record_ids(principal, rows)
+    if not ids:
+        return
+
+    from kalyan_api.services import audit_service
+    from kalyan_api.services.audit_service import AuditAction
+
+    audit_service.record_audit_event(
+        session,
+        actor_user_id=principal.user_id,
+        action=AuditAction.CROSS_DOCTOR_CLINICAL_READ,
+        entity_type="Patient",
+        entity_id=patient_id,
+        details={
+            "source": source,
+            "actor_doctor_id": principal.doctor_id,
+            "patient_id": patient_id,
+            "record_ids": ids,
+        },
+        actor_username=principal.username,
+        actor_role=Role.DOCTOR.value,
+    )

@@ -120,6 +120,43 @@ Evidence is from source search of `frontend/src` and `backend/src/kalyan_api/mod
 
 Each task: one owner per file, Git checkpoint before the batch, definition of done from `AGENTS.md`, rebuild and check on `:8000`.
 
+### Status recheck, 2026-11-14 (read from `main` at `283edc7b`; code and CI only, no browser check)
+
+**Repository:** PR #28 is merged. Local `main` equals `origin/main`; the working tree is clean. CI on the last PR head was green (`backend`, `frontend`, `pytest`). The merge included my commits (`32d24aaf` patient-link fixes, `534dbae2` lint, `ae3bf973` lock file, `838ede1a` export filter). Other commits by someone else also landed: migration `0023` and `0024`, `FB-xx` fixes, and this plan file.
+
+| Item | State now | Evidence |
+|---|---|---|
+| SEC-01 plan↔encounter patient check | Done and merged | `routers/treatment_plans.py:99` |
+| SEC-02 audit script | Merged; **still not run on the hospital server database** | `backend/scripts/audit_patient_links.py` |
+| SEC-03 database constraints | Merged (`0022`). Migration `0023` (not mine, commit `82e73f58`) adds the same rule to payment→plan, payment→appointment, session→plan, vitals→encounter, follow-up→encounter, so the "not covered" list below is **out of date** | `migrations/versions/0023_…` |
+| SEC-04 timeline permissions | **Done.** Payments and plan prices need `PAYMENT_READ` (someone else; test `test_timeline_doctor_cannot_see_payments_or_prices`). **2026-11-14, IMPLEMENTED — NOT VERIFIED, uncommitted on branch `fix/timeline-scope-and-list-audit`:** a doctor now gets only their own appointments in the timeline, as the direct endpoints do, and the timeline audit also covers other doctors' treatment plans and sessions. Reception and Admin keep the redacted plan and session rows decided in BR-002 | `timeline.py:204-297`, `test_timeline_api.py:245` |
+| Decision 7 (doctor read scope) | In code, doctors read other doctors' records and each such read is audited (`scope.py`); strict silo is not what is built. Still needs the owner's sign-off | `core/scope.py:136` |
+| Codex: `openpyxl` / multipart missing from lock | Fixed | `ae3bf973` |
+| Codex: department export filter | Fixed, with test | `export_service.py:119` |
+| Codex: cross-doctor reads on list endpoints not audited | **Done 2026-11-14, IMPLEMENTED — NOT VERIFIED, uncommitted:** encounter, prescription and plan lists write one `CROSS_DOCTOR_CLINICAL_READ` row per request and stay silent for a doctor's own rows | `core/scope.py` `audit_cross_doctor_list_read`; `tests/test_cross_doctor_read_scope.py` |
+| Codex: `DepartmentsPage` has no route | **Open** (only the sidebar links to `/admin/departments`) | `router.tsx` has no match |
+| Codex: new consultation autosave is a no-op when `encounterId` is 0 | **Open by code** (`encounterId = id ? Number(id) : 0`); `FB-01` changed autosave but I did not retest | `ClinicalEncounterWorkspace.tsx:84` |
+| Codex: follow-up autosave re-creates | **Open by code** | `ClinicalEncounterWorkspace.tsx:270` |
+| Codex: dirty fields overwritten by an in-flight save | Not rechecked | — |
+| Codex: token page drops selected service; appointment type always books today | **Open** | `TokenGenerationPage.tsx:133-139` |
+| K-61 to K-64 (revisit fee, plans, invoices, receipt numbers) | **Not built** (no invoice or revisit in models; migrations stop at `0024`) | `models.py` |
+| UX-01 to UX-42 | **Not started**: no shared `components/ui`, no `?tab=` on the patient file, no header search | `PatientDetail.tsx:102` |
+| Leftover | Empty-ish scratch folder `…\scratchpad\verify_wt`; the hung `pg_dump` is gone | — |
+
+### Plan to apply (in this order; each step: checkpoint, one owner per file, tests first)
+
+| Step | Work | Needs from owner |
+|---|---|---|
+| 1 | **Run `audit_patient_links.py` on the hospital server database, then apply migrations `0022`–`0024` to it.** Take a backup first; migration stops if mismatches exist. Extend the script's `CHECKS` list (it was edited to include vitals and follow-ups) to match `0023`. | someone with server access, a maintenance window |
+| 2 | ~~**SEC-04 remainder**~~ **Done, uncommitted** (see table). Plans stay readable by all doctors, audited, per the DWS-04 policy in `core/scope.py`. If decision 7 becomes a strict silo, change `row_scope(CLINICAL_READ)` and the new tests together. | decision 7 (policy as built) |
+| 3 | ~~**Audit list endpoints**~~ **Done, uncommitted.** | decision 7 (policy as built) |
+| 4 | **Clinical autosave and follow-up update** (Codex P1/P2): persist a new draft before saving sections; update an existing follow-up instead of creating. Needs Vitest plus an API check; touches `ClinicalEncounterWorkspace.tsx`, which another editor changes often, so check mtimes first. | none |
+| 5 | **Route `DepartmentsPage`** at `/admin/departments` and add a test. | none |
+| 6 | **Token page honesty:** either send the selected service and chosen date, or remove those controls; depends on K-61/K-67 (what a check-in charges). | fee decisions |
+| 7 | **K-61 → K-62 → K-63 → K-64 → K-67** (revisit fee, plans, invoices, receipts, check-in charge). The large backend piece; UI steps UX-11/12/14/20/21 wait for it. | none (decisions are recorded in the K-plan) |
+| 8 | **UX-01 sign-off, then UX-02/03/04** (rules, tokens, shared parts, page moves). UX-10 (tabs in the URL) and UX-13 can start any time. | owner decisions 1–5 below |
+| 9 | **Verification:** per screen Vitest, API, persistence after reload, RBAC for three roles, full regression, check on `:8000`, then the day-flow walk and the Epson A4 print check. | — |
+
 ### Phase 0 — Safety blockers from the Foundational Bug Report (before any UI work)
 
 The report (2026-11-11) audited commit `2736a8ae` on `feature/reception-all-specialties`. That commit is **153 commits behind this branch** and does not contain fix `16cb067c` (BR-001, BR-002). Status below is for this branch, by reading the code; **no test was run for this plan**.
@@ -150,7 +187,7 @@ The report (2026-11-11) audited commit `2736a8ae` on `feature/reception-all-spec
 - The upgrade refuses to run, and changes nothing, if mismatched rows exist or the server is older than PostgreSQL 15.
 - Patient only. Doctor equality is **not** enforced (the report suggested it): no rule says a prescription's doctor must equal the encounter's doctor, and session takeover exists.
 - Evidence (2026-11-11, `kalyan_test`, synthetic rows): four of six new database tests failed before the migration and all pass after; full backend suite 1,106 passed, 1 skipped; migration-parity test passes; a manual run showed downgrade to `0021` removes all five constraints, upgrade over a mismatched row is refused with the row and schema left untouched, and upgrade succeeds once the row is removed. Status: IMPLEMENTED — NOT VERIFIED (no browser check; not applied to `kalyan_dev` or the server).
-- Not covered: session→plan, payment→plan, payment→appointment. The API checks these; the audit script reports them. Add constraints only if the owner wants them.
+- Not covered by `0022`: session→plan, payment→plan, payment→appointment. **Update 2026-11-14:** migration `0023` (another author) now covers these plus vitals and follow-ups.
 
 **Effect on the UI plan:** the patient file tabs are built on the timeline endpoint today. UX-12 (Money tab) and UX-13 (Treatment tab) must read from the billing and treatment-plan endpoints, which enforce permissions, not from the timeline. The reference lets a doctor open the Money tab; we do not copy that unless the owner decides so (decision 6).
 
@@ -219,7 +256,7 @@ The report (2026-11-11) audited commit `2736a8ae` on `feature/reception-all-spec
 3. **UX-40:** add header search (reverses a "leave" item in the K-plan)?
 4. **UX-22:** which page owns the live queue?
 5. **Control height:** keep our 44 px touch-size controls, or go denser (reference is 34 px) for mouse-only desk PCs?
-6. **Doctors and money (SEC-04):** may a doctor see a patient's payment amounts and receipts? Today the direct endpoints deny it and the timeline shows it.
+6. **Doctors and money (SEC-04):** *Settled in code on `main` (doctors cannot see payments or prices in the timeline); confirm that is what the owner wants.* Original question: may a doctor see a patient's payment amounts and receipts?
 7. **Doctors and other doctors' records (SEC-04):** the report assumes a strict silo; the 2026-11-05 direction was "read all, edit own", still waiting for sign-off from both consultants and the trust administrator. The timeline fix depends on which one holds.
 
 ## 6. Risks

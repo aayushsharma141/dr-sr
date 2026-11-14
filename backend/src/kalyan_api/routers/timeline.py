@@ -14,14 +14,14 @@ Doctor silo (D-03):
 import re
 
 from fastapi import APIRouter, Depends
-from sqlalchemy import select, true
+from sqlalchemy import false, select, true
 from sqlalchemy.orm import selectinload
 
 from kalyan_api.core.errors import ApiError
 from kalyan_api.core.permissions import Permission, Role
 from kalyan_api.core.policy import require
 from kalyan_api.core.principal import Principal, current_principal
-from kalyan_api.core.scope import ScopeFamily, row_scope
+from kalyan_api.core.scope import ScopeFamily, other_doctors_record_ids, row_scope
 from kalyan_api.db.session import SessionDep
 from kalyan_api.models import (
     Appointment,
@@ -71,6 +71,14 @@ def get_patient_timeline(
         .where(Appointment.patient_id == patient_id)
         .options(selectinload(Appointment.doctor))
     )
+    if principal.role == Role.DOCTOR:
+        # Same rule as GET /appointments and GET /appointments/{id}: a doctor sees only their own
+        # appointments. Other doctors' clinical rows below follow the audited read-all policy.
+        appt_stmt = appt_stmt.where(
+            Appointment.doctor_id == principal.doctor_id
+            if principal.doctor_id is not None
+            else false()
+        )
     appointments = session.execute(appt_stmt).scalars().all()
     for appt in appointments:
         doc_name = appt.doctor.name_en if appt.doctor else "Doctor"
@@ -177,29 +185,6 @@ def get_patient_timeline(
                 )
             )
 
-    # BR-010 / DWS-04: a doctor reading other doctors' clinical rows through the timeline
-    # must leave an audit trail, as a direct read does (core/scope.get_scoped_or_404).
-    # One summary row per timeline read, listing the other doctors' record IDs.
-    if can_see_clinical:
-        other_encounter_ids = [e.id for e in encounters if e.doctor_id != principal.doctor_id]
-        other_prescription_ids = [r.id for r in prescriptions if r.doctor_id != principal.doctor_id]
-        if other_encounter_ids or other_prescription_ids:
-            audit_service.record_audit_event(
-                session,
-                actor_user_id=principal.user_id,
-                action=AuditAction.CROSS_DOCTOR_CLINICAL_READ,
-                entity_type="Patient",
-                entity_id=patient_id,
-                details={
-                    "source": "patient_timeline",
-                    "actor_doctor_id": principal.doctor_id,
-                    "encounter_ids": other_encounter_ids,
-                    "prescription_ids": other_prescription_ids,
-                },
-                actor_username=principal.username,
-                actor_role=Role.DOCTOR.value,
-            )
-
     # 4. Treatment Plans
     can_see_billing = Permission.PAYMENT_READ in principal.permissions
     plan_stmt = (
@@ -292,6 +277,37 @@ def get_patient_timeline(
                 },
             )
         )
+
+    # BR-010 / DWS-04: a doctor reading other doctors' clinical rows through the timeline
+    # must leave an audit trail, as a direct read does (core/scope.get_scoped_or_404).
+    # One summary row per timeline read, written after every section is loaded.
+    def _audit_cross_doctor_reads() -> None:
+        if not can_see_clinical:
+            return
+        ids = {
+            "encounter_ids": other_doctors_record_ids(principal, encounters),
+            "prescription_ids": other_doctors_record_ids(principal, prescriptions),
+            "treatment_plan_ids": other_doctors_record_ids(principal, plans),
+            "session_ids": other_doctors_record_ids(principal, sessions),
+        }
+        if not any(ids.values()):
+            return
+        audit_service.record_audit_event(
+            session,
+            actor_user_id=principal.user_id,
+            action=AuditAction.CROSS_DOCTOR_CLINICAL_READ,
+            entity_type="Patient",
+            entity_id=patient_id,
+            details={
+                "source": "patient_timeline",
+                "actor_doctor_id": principal.doctor_id,
+                **ids,
+            },
+            actor_username=principal.username,
+            actor_role=Role.DOCTOR.value,
+        )
+
+    _audit_cross_doctor_reads()
 
     # 6. Payments and Reversals (only roles with PAYMENT_READ; barred from DOCTOR)
     if can_see_billing:
