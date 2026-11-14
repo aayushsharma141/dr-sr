@@ -51,6 +51,19 @@ export const router = createBrowserRouter([
         element: <ChangePassword />,
       },
       {
+        path: '/account',
+        lazy: async () => {
+          const { MyAccount } = await import('./pages/MyAccount')
+          return {
+            Component: MyAccount,
+          }
+        },
+      },
+      {
+        path: '/my-account',
+        element: <Navigate to="/account" replace />,
+      },
+      {
         path: '/',
         element: <RootRoute />,
       },
@@ -206,13 +219,9 @@ export const router = createBrowserRouter([
             },
           },
           {
+            // Pending dues now live in Billing & Payments; old links keep working.
             path: '/reception/dues',
-            lazy: async () => {
-              const { PendingDuesPage } = await import('./pages/PendingDuesPage')
-              return {
-                Component: PendingDuesPage,
-              }
-            },
+            element: <Navigate to="/reception/billing?tab=dues" replace />,
           },
         ],
       },

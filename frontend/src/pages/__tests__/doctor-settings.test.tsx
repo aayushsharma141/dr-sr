@@ -235,4 +235,43 @@ describe('DoctorSettings Page (K-60)', () => {
       expect((screen.getByLabelText(/Consultation Fee/i) as HTMLInputElement).value).toBe('700')
     })
   })
+
+  it('renders official prescription letterhead preview and consultation pace selector', async () => {
+    const mockFetch = vi.fn().mockImplementation((url: string) => {
+      if (url.includes('/api/auth/me')) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          headers: new Headers({ 'content-type': 'application/json' }),
+          text: () => Promise.resolve(JSON.stringify(mockDoctorMe)),
+        })
+      }
+      if (url.includes('/api/doctors')) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          headers: new Headers({ 'content-type': 'application/json' }),
+          text: () => Promise.resolve(JSON.stringify([mockDoctorProfile])),
+        })
+      }
+      return Promise.reject(new Error(`Unhandled: ${url}`))
+    })
+    vi.stubGlobal('fetch', mockFetch)
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter>
+          <DoctorSettings />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    )
+
+    await waitFor(() => {
+      expect(screen.getByText(/Official Prescription Letterhead & Seal Preview/i)).toBeInTheDocument()
+    })
+    expect(screen.getByText(/Target Consultation Pace/i)).toBeInTheDocument()
+    expect(screen.getByText(/Prescription Follow-Up Grace Validity/i)).toBeInTheDocument()
+    expect(screen.getByText(/SEAL PREVIEW \(NOT A SIGNATURE\)/)).toBeInTheDocument()
+    expect(screen.queryByText(/DIGITALLY SIGNED/i)).not.toBeInTheDocument()
+  })
 })

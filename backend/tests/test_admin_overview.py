@@ -125,6 +125,7 @@ def test_admin_overview_shape_and_backward_compatible_fields(
         "DONE",
         "CANCELLED",
         "NO_SHOW",
+        "RESCHEDULED",
     }
     assert set(body["collections_today"]) == {
         "payments_count",
@@ -238,6 +239,7 @@ def test_admin_overview_today_queue_registrations_and_ledger(
         "DONE": 2,
         "CANCELLED": 1,
         "NO_SHOW": 0,
+        "RESCHEDULED": 0,
     }
 
     doc_a = _doctor_row(after, doctor_a_user.doctor_id)

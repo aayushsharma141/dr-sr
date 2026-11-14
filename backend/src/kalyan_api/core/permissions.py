@@ -88,6 +88,10 @@ class Permission(StrEnum):
     PATIENT_IMPORT = "patient:import"
     PATIENT_EXPORT = "patient:export"
 
+    # RF-12: reception visits. Reception checks patients in and closes visits; Admin reads only.
+    VISIT_READ = "visit:read"
+    VISIT_WRITE = "visit:write"
+
 
 # Authoritative role-to-permissions catalog
 ROLE_PERMISSIONS: dict[Role, frozenset[Permission]] = {
@@ -126,6 +130,7 @@ ROLE_PERMISSIONS: dict[Role, frozenset[Permission]] = {
             Permission.PATIENT_CORRECT,
             Permission.PATIENT_IMPORT,
             Permission.PATIENT_EXPORT,
+            Permission.VISIT_READ,
         }
     ),
     Role.RECEPTION: frozenset(
@@ -145,6 +150,8 @@ ROLE_PERMISSIONS: dict[Role, frozenset[Permission]] = {
             Permission.PAYMENT_CREATE,
             Permission.RECEIPT_REPRINT,
             Permission.TIMELINE_READ,
+            Permission.VISIT_READ,
+            Permission.VISIT_WRITE,
         }
     ),
     Role.DOCTOR: frozenset(

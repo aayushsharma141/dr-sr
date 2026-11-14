@@ -238,6 +238,7 @@ def test_phase20_demographic_correction_and_snapshot_isolation(
         appointment_date=datetime.now(UTC).date(),
         token_number=1,
         status="ARRIVED",
+        consultation_status="WAITING",
         created_by_user_id=reception_user.id,
     )
     db_session.add(appt)
@@ -246,20 +247,6 @@ def test_phase20_demographic_correction_and_snapshot_isolation(
     rec_c: TestClient = login_client(reception_user)
     doc_c: TestClient = login_client(doctor_a_user)
     admin_c: TestClient = login_client(admin_user)
-
-    # 2.1 Issue Payment
-    pay_resp = rec_c.post(
-        "/api/payments",
-        json={
-            "patient_id": patient.id,
-            "appointment_id": appt.id,
-            "amount_paise": 45000,
-            "payment_method": "CASH",
-            "notes": "Consultation payment",
-        },
-    )
-    assert pay_resp.status_code == 201, pay_resp.text
-    payment_id = pay_resp.json()["id"]
 
     # 2.2 Create and Finalise Encounter
     enc_resp = doc_c.post(
@@ -286,6 +273,20 @@ def test_phase20_demographic_correction_and_snapshot_isolation(
     )
     assert fin_resp.status_code == 200, fin_resp.text
     assert fin_resp.json()["is_finalised"] is True
+
+    # 2.2b Collect payment: fees are taken only after the doctor completed the consultation
+    pay_resp = rec_c.post(
+        "/api/payments",
+        json={
+            "patient_id": patient.id,
+            "appointment_id": appt.id,
+            "amount_paise": 45000,
+            "payment_method": "CASH",
+            "notes": "Consultation payment",
+        },
+    )
+    assert pay_resp.status_code == 201, pay_resp.text
+    payment_id = pay_resp.json()["id"]
 
     # 2.3 Issue Prescription
     rx_resp = doc_c.post(

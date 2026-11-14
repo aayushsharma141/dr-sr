@@ -312,4 +312,43 @@ describe('Treatment Plan Workspace & Session Logger UI', () => {
     expect(capturedBody.clinical_notes).toBe('Session 3 completed. Pain localized to L5.')
     expect(capturedBody.vas_score).toBe(5)
   })
+
+  it('renders physiotherapy & rehabilitation center directory when no patient is specified', async () => {
+    const mockFetch = vi.fn().mockImplementation((url: string) => {
+      if (url.includes('/api/auth/me')) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          headers: new Headers({ 'content-type': 'application/json' }),
+          text: () => Promise.resolve(JSON.stringify(mockMeDoctor)),
+        })
+      }
+      if (url.includes('/api/patients')) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          headers: new Headers({ 'content-type': 'application/json' }),
+          text: () => Promise.resolve(JSON.stringify([mockPatient])),
+        })
+      }
+      return Promise.reject(new Error(`Unhandled: ${url}`))
+    })
+    vi.stubGlobal('fetch', mockFetch)
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter initialEntries={['/doctor/treatment-plans']}>
+          <Routes>
+            <Route path="/doctor/treatment-plans" element={<TreatmentPlanWorkspace />} />
+          </Routes>
+        </MemoryRouter>
+      </QueryClientProvider>,
+    )
+
+    await waitFor(() => {
+      expect(screen.getByText(/Physiotherapy & Rehabilitation Center/i)).toBeInTheDocument()
+    })
+    expect(screen.getByPlaceholderText(/Type URN/i)).toBeInTheDocument()
+    expect(screen.getByText(/Spine Rehabilitation \(Lumbar \/ Cervical\)/i)).toBeInTheDocument()
+  })
 })

@@ -31,7 +31,9 @@ import type {
   AppointmentCreate,
   AppointmentListResponse,
   AppointmentStatusUpdate,
+  CheckInRequest,
   DoctorQueueResponse,
+  WalkInCreate,
   EncounterCreate,
   EncounterRead,
   EncounterSummary,
@@ -107,6 +109,13 @@ import type {
   UserCreatedOut,
   UserOut,
   UserUpdate,
+} from './types'
+import type {
+  VisitCloseRequest,
+  VisitDetail,
+  VisitDueOut,
+  VisitListResponse,
+  VisitStatus,
 } from './types'
 
 export const queryClient = new QueryClient({
@@ -454,11 +463,12 @@ export function useRolePermissions() {
 }
 
 /** GET /sessions[?user_id]: active sessions, most recently active first. */
-export function useActiveSessions(userId?: number | null) {
+export function useActiveSessions(userId?: number | null, options?: { enabled?: boolean }) {
   const qs = userId ? `?user_id=${userId}` : ''
   return useQuery({
     queryKey: ['sessions', { userId: userId ?? null }],
     queryFn: () => apiFetch<ActiveSessionOut[]>(`/sessions${qs}`),
+    enabled: options?.enabled ?? true,
   })
 }
 
@@ -824,15 +834,20 @@ export function useUploadPatientPhoto() {
 
 
 // ==============================================================================
+export { useHealth, type HealthStatus } from './health'
+
 // Appointments & Clinical Encounters (Phase 13)
 // ==============================================================================
 
-export function useAppointments(params?: {
-  appointment_date?: string
-  doctor_id?: number
-  patient_id?: number
-  status?: string
-}) {
+export function useAppointments(
+  params?: {
+    appointment_date?: string
+    doctor_id?: number
+    patient_id?: number
+    status?: string
+  },
+  options?: { enabled?: boolean; refetchInterval?: number | false },
+) {
   const q = new URLSearchParams()
   if (params?.appointment_date) q.set('appointment_date', params.appointment_date)
   if (params?.doctor_id) q.set('doctor_id', String(params.doctor_id))
@@ -843,6 +858,9 @@ export function useAppointments(params?: {
   return useQuery({
     queryKey: ['appointments', params],
     queryFn: () => apiFetch<AppointmentListResponse>(`/appointments${qs}`),
+    enabled: options?.enabled ?? true,
+    // Reception and doctor screens share this list; poll so every workstation sees the same queue.
+    refetchInterval: options?.refetchInterval ?? 10000,
   })
 }
 
@@ -865,6 +883,35 @@ export function useBookAppointment() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['appointments'] })
       qc.invalidateQueries({ queryKey: ['doctor-queue'] })
+    },
+  })
+}
+
+/** Register a walk-in: a booking for today checked in at once, with its token (all or nothing). */
+export function useWalkIn() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (body: WalkInCreate) =>
+      apiFetch<Appointment>('/appointments/walk-in', { method: 'POST', body }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['appointments'] })
+      qc.invalidateQueries({ queryKey: ['doctor-queue'] })
+      qc.invalidateQueries({ queryKey: ['visits'] })
+    },
+  })
+}
+
+/** Check a booked patient in on arrival: opens or joins the visit and issues the token. */
+export function useCheckIn() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, body }: { id: number; body: CheckInRequest }) =>
+      apiFetch<Appointment>(`/appointments/${id}/check-in`, { method: 'POST', body }),
+    onSuccess: (data) => {
+      qc.setQueryData(['appointment', data.id], data)
+      qc.invalidateQueries({ queryKey: ['appointments'] })
+      qc.invalidateQueries({ queryKey: ['doctor-queue'] })
+      qc.invalidateQueries({ queryKey: ['visits'] })
     },
   })
 }
@@ -1341,6 +1388,10 @@ export function useRecordPayment() {
       queryClient.invalidateQueries({ queryKey: ['billing', 'pending-dues'] })
       queryClient.invalidateQueries({ queryKey: ['treatment-plans'] })
       queryClient.invalidateQueries({ queryKey: ['timeline', variables.patient_id] })
+      queryClient.invalidateQueries({ queryKey: ['visits'] })
+      queryClient.invalidateQueries({ queryKey: ['billing', 'visit-dues'] })
+      queryClient.invalidateQueries({ queryKey: ['billing', 'receipts-today'] })
+      queryClient.invalidateQueries({ queryKey: ['billing', 'ledger'] })
     },
   })
 }
@@ -1483,7 +1534,8 @@ export interface LedgerFilter {
   status: 'all' | 'active' | 'reversed'
 }
 
-export function useLedger(filter: LedgerFilter) {
+/** Full ledger search: Admin only (payment:reverse). Reception must not call it (403). */
+export function useLedger(filter: LedgerFilter, options: { enabled?: boolean } = {}) {
   return useQuery({
     queryKey: ['billing', 'ledger', filter],
     queryFn: () => {
@@ -1491,6 +1543,69 @@ export function useLedger(filter: LedgerFilter) {
       if (filter.q) params.set('q', filter.q)
       return apiFetch<PaymentOut[]>(`/api/billing/ledger?${params.toString()}`)
     },
+    enabled: options.enabled ?? true,
+  })
+}
+
+export interface VisitListFilter {
+  readyForCheckout?: boolean
+  visitDate?: string
+  status?: VisitStatus
+  limit?: number
+}
+
+/** GET /visits: reception and admin read. Ready for checkout = open, a completed consultation, none active. */
+export function useVisits(filter: VisitListFilter = {}) {
+  return useQuery({
+    queryKey: ['visits', 'list', filter],
+    queryFn: () => {
+      const params = new URLSearchParams({ limit: String(filter.limit ?? 100) })
+      if (filter.readyForCheckout) params.set('ready_for_checkout', 'true')
+      if (filter.visitDate) params.set('visit_date', filter.visitDate)
+      if (filter.status) params.set('status', filter.status)
+      return apiFetch<VisitListResponse>(`/api/visits?${params.toString()}`)
+    },
+  })
+}
+
+/** GET /visits/{id}: the visit with its consultations, payments and the balance still due. */
+export function useVisit(id: number | null | undefined) {
+  return useQuery({
+    queryKey: ['visits', 'detail', id],
+    queryFn: () => apiFetch<VisitDetail>(`/api/visits/${id}`),
+    enabled: typeof id === 'number' && id > 0,
+  })
+}
+
+/** POST /visits/{id}/close ("Patient Out"). A reason is required while money is still due. */
+export function useCloseVisit() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, body }: { id: number; body: VisitCloseRequest }) =>
+      apiFetch<VisitDetail>(`/api/visits/${id}/close`, { method: 'POST', body }),
+    onSuccess: (data) => {
+      queryClient.setQueryData(['visits', 'detail', data.id], data)
+      queryClient.invalidateQueries({ queryKey: ['visits', 'list'] })
+      queryClient.invalidateQueries({ queryKey: ['billing', 'visit-dues'] })
+      queryClient.invalidateQueries({ queryKey: ['timeline', data.patient_id] })
+    },
+  })
+}
+
+/** GET /billing/visit-dues: fees still owed on visits closed with a balance. */
+export function useVisitDues() {
+  return useQuery({
+    queryKey: ['billing', 'visit-dues'],
+    queryFn: () => apiFetch<VisitDueOut[]>('/api/billing/visit-dues'),
+  })
+}
+
+/** GET /billing/receipts/today: today's receipts (IST), the only ledger reception sees. */
+export function useReceiptsToday(enabled = true) {
+  return useQuery({
+    queryKey: ['billing', 'receipts-today'],
+    queryFn: () => apiFetch<PaymentOut[]>('/api/billing/receipts/today'),
+    enabled,
   })
 }
 

@@ -4,7 +4,7 @@ from kalyan_api.models import Department, Patient
 
 
 def test_book_appointment_lifecycle(login_client, reception_user, doctor_a_user, db_session):
-    """Reception books appointment for patient with doctor, receiving sequential tokens."""
+    """Reception books appointments for a doctor; the token is issued later, at check-in (RF-12)."""
     # 1. Create a patient
     patient = Patient(
         urn="KH-2026-8801",
@@ -39,7 +39,7 @@ def test_book_appointment_lifecycle(login_client, reception_user, doctor_a_user,
     )
     assert resp1.status_code == 201, resp1.text
     data1 = resp1.json()
-    assert data1["token_number"] == 1
+    assert data1["token_number"] is None
     assert data1["status"] == "BOOKED"
     assert data1["patient_urn"] == "KH-2026-8801"
     assert data1["doctor_id"] == doctor_id
@@ -71,7 +71,7 @@ def test_book_appointment_lifecycle(login_client, reception_user, doctor_a_user,
     )
     assert resp2.status_code == 201, resp2.text
     data2 = resp2.json()
-    assert data2["token_number"] == 2
+    assert data2["token_number"] is None
     assert data2["department_id"] == dept.id
 
     # 5. List appointments
@@ -83,7 +83,7 @@ def test_book_appointment_lifecycle(login_client, reception_user, doctor_a_user,
     # 6. Get single appointment
     get_resp = client.get(f"/api/appointments/{appt1_id}")
     assert get_resp.status_code == 200
-    assert get_resp.json()["token_number"] == 1
+    assert get_resp.json()["token_number"] is None
 
 
 def test_book_appointment_validations(login_client, reception_user, db_session):

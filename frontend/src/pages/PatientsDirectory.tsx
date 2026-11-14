@@ -211,6 +211,14 @@ export function PatientsDirectory() {
                         {p.district}
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap text-right space-x-2">
+                        {me?.role === 'DOCTOR' && (
+                          <Link
+                            to={`/doctor?patient_id=${p.id}`}
+                            className="inline-flex items-center px-2.5 py-1.5 text-xs font-semibold text-white bg-[#5D0B26] hover:bg-[#8E1C3D] rounded shadow-2xs min-h-[36px]"
+                          >
+                            Clinical Chart
+                          </Link>
+                        )}
                         <button
                           type="button"
                           onClick={() => navigate(`/reception/patients/${p.id}`)}

@@ -1,7 +1,7 @@
 """Unit and integration tests for appointment status workflow and doctor queue (APT-02)."""
 
 from kalyan_api import clock
-from kalyan_api.models import Appointment, AppointmentStatus, Patient
+from kalyan_api.models import Appointment, AppointmentStatus, ConsultationStatus, Patient
 
 
 def test_appointment_status_lifecycle(login_client, reception_user, doctor_a_user, db_session):
@@ -253,6 +253,7 @@ def test_doctor_queue_retrieval(login_client, reception_user, doctor_a_user, db_
         appointment_date=today,
         token_number=1,
         status=AppointmentStatus.ARRIVED.value,
+        consultation_status=ConsultationStatus.WAITING.value,
         created_by_user_id=reception_user.id,
     )
     # Appointment 2: Booked
@@ -354,6 +355,7 @@ def test_in_consultation_cancellation_lifecycle(
     appt2_id = book2.json()["id"]
     appt2 = db_session.get(Appointment, appt2_id)
     appt2.status = AppointmentStatus.IN_CONSULTATION.value
+    appt2.consultation_status = ConsultationStatus.IN_CONSULTATION.value
     db_session.flush()
 
     enc = ClinicalEncounter(

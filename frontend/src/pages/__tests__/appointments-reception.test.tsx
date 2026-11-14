@@ -403,4 +403,144 @@ describe('AppointmentsReception Component', () => {
     expect(screen.queryByRole('button', { name: /book new appointment/i })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /mark arrived/i })).not.toBeInTheDocument()
   })
+
+  it('renders OPD cabin pacing controls and emergency hold when logged in as DOCTOR', async () => {
+    const doctorMe: Me = {
+      ...mockMe,
+      role: 'DOCTOR',
+      username: 'doctor',
+      full_name: 'Dr. Madan Mohan Dwivedi',
+      permissions: ['appointment:read', 'appointment:write', 'prescription:read'],
+      doctor_id: 1,
+    }
+
+    const mockFetch = vi.fn().mockImplementation((url: string) => {
+      if (url.includes('/api/auth/me')) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          headers: new Headers({ 'content-type': 'application/json' }),
+          text: () => Promise.resolve(JSON.stringify(doctorMe)),
+        })
+      }
+      if (url.includes('/api/doctors')) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          headers: new Headers({ 'content-type': 'application/json' }),
+          text: () => Promise.resolve(JSON.stringify(mockDoctors)),
+        })
+      }
+      if (url.includes('/api/appointments')) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          headers: new Headers({ 'content-type': 'application/json' }),
+          text: () => Promise.resolve(JSON.stringify({ total: 1, appointments: mockAppointments })),
+        })
+      }
+      return Promise.reject(new Error(`Unhandled: ${url}`))
+    })
+    vi.stubGlobal('fetch', mockFetch)
+
+    const user = userEvent.setup()
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter>
+          <AppointmentsReception />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    )
+
+    await waitFor(() => {
+      expect(screen.getByText(/OPD Cabin Pacing & Doctor Schedule/i)).toBeInTheDocument()
+    })
+
+    // Pacing toggle buttons
+    const blockBtn = screen.getByRole('button', { name: /Mark emergency hold/i })
+    expect(blockBtn).toBeInTheDocument()
+    await user.click(blockBtn)
+
+    // The hold is only on this screen, and the page must say so rather than claim reception was told.
+    expect(screen.getByText(/marked on this screen only/i)).toBeInTheDocument()
+    expect(screen.getByText('NOT SENT')).toBeInTheDocument()
+    expect(screen.queryByText(/RECEPTION BLOCKED/)).not.toBeInTheDocument()
+    expect(screen.getByText(/Resume Normal Queue/i)).toBeInTheDocument()
+  })
+})
+
+describe('AppointmentsReception check-in rules (RF-12)', () => {
+  afterEach(() => {
+    cleanup()
+    vi.restoreAllMocks()
+  })
+
+  function renderBoard(appointments: Appointment[]) {
+    const jsonResponse = (body: unknown) => ({
+      ok: true,
+      status: 200,
+      headers: new Headers({ 'content-type': 'application/json' }),
+      text: () => Promise.resolve(JSON.stringify(body)),
+    })
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockImplementation((url: string) => {
+        if (url.includes('/api/auth/me')) return Promise.resolve(jsonResponse(mockMe))
+        if (url.includes('/api/doctors')) return Promise.resolve(jsonResponse(mockDoctors))
+        if (url.includes('/api/appointments'))
+          return Promise.resolve(jsonResponse({ total: appointments.length, appointments }))
+        return Promise.reject(new Error(`Unhandled: ${url}`))
+      }),
+    )
+    render(
+      <QueryClientProvider
+        client={new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } })}
+      >
+        <MemoryRouter>
+          <AppointmentsReception />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    )
+  }
+
+  const booked = mockAppointments[0]
+
+  it('offers No-Show only while the patient is still booked', async () => {
+    renderBoard([
+      { ...booked, id: 10, patient_name: 'Booked Patient', token_number: null },
+      {
+        ...booked,
+        id: 11,
+        patient_name: 'Arrived Patient',
+        status: 'ARRIVED',
+        consultation_status: 'WAITING',
+        token_number: 2,
+      },
+    ])
+
+    await screen.findByText('Arrived Patient')
+
+    // The server refuses to mark a checked-in patient not arrived, so the button is not offered.
+    expect(screen.getAllByRole('button', { name: 'No-Show' })).toHaveLength(1)
+    expect(screen.getAllByRole('button', { name: 'Cancel' })).toHaveLength(2)
+  })
+
+  it('lets a patient marked not arrived be checked in late', async () => {
+    renderBoard([{ ...booked, status: 'NO_SHOW', token_number: null }])
+
+    await screen.findByText('Aarav Kumar')
+
+    expect(screen.getByRole('button', { name: 'Mark Arrived' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'No-Show' })).not.toBeInTheDocument()
+  })
+
+  it('shows a dash, never "null", for a booking that has no token yet', async () => {
+    renderBoard([{ ...booked, token_number: null }])
+
+    await screen.findByText('Aarav Kumar')
+
+    expect(screen.getAllByText('—').length).toBeGreaterThan(0)
+    expect(screen.queryByText(/null/i)).not.toBeInTheDocument()
+  })
 })

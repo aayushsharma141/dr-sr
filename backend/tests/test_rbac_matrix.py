@@ -24,6 +24,7 @@ from support.matrix import (
     check_matrix_completeness,
 )
 
+from kalyan_api import clock as app_clock
 from kalyan_api.config import Settings
 from kalyan_api.core.permissions import Permission
 from kalyan_api.core.policy import require
@@ -44,6 +45,7 @@ from kalyan_api.models import (
     TreatmentPlan,
     TreatmentSession,
     User,
+    Visit,
 )
 
 FORBIDDEN_SECRET_KEYS: tuple[str, ...] = (
@@ -285,7 +287,8 @@ def test_rbac_matrix_cell(
                 patient_id=pat.id,
                 doctor_id=doc_a_id,
                 department_id=dept.id,
-                appointment_date=datetime.now(UTC).date(),
+                # Check-in only works on the IST date, which differs from the UTC date overnight.
+                appointment_date=app_clock.ist_today(),
                 token_number=1,
                 status="BOOKED",
                 created_by_user_id=admin_u.id,
@@ -757,6 +760,51 @@ def test_rbac_matrix_cell(
         )
         target_entity = tmpl
         resolved_path = row.path.replace("{doc_type}", "prescription")
+
+    elif "/api/visits" in row.path:
+        opener = make_user(db_session, test_settings, "ADMIN", f"adm_{uuid.uuid4().hex[:6]}")
+        pat = Patient(
+            urn=f"KH-2026-{uuid.uuid4().hex[:4]}",
+            full_name="Matrix Visit Patient",
+            guardian_name="Guardian",
+            gender="M",
+            age_years=30,
+            mobile="9876543210",
+            address="Ara",
+            district="Bhojpur",
+            state="Bihar",
+        )
+        db_session.add(pat)
+        db_session.flush()
+        visit = Visit(
+            patient_id=pat.id,
+            visit_date=app_clock.ist_today(),
+            status="OPEN",
+            opened_by_user_id=opener.id,
+        )
+        db_session.add(visit)
+        db_session.flush()
+        if row.path.endswith("/close"):
+            # Closing needs a completed consultation in the visit; cancelling needs none.
+            doc = Doctor(name_en=f"Dr. Visit {uuid.uuid4().hex[:6]}")
+            db_session.add(doc)
+            db_session.flush()
+            db_session.add(
+                Appointment(
+                    patient_id=pat.id,
+                    doctor_id=doc.id,
+                    appointment_date=app_clock.ist_today(),
+                    token_number=1,
+                    status="ARRIVED",
+                    consultation_status="COMPLETED",
+                    visit_id=visit.id,
+                    created_by_user_id=opener.id,
+                )
+            )
+            db_session.flush()
+        target_entity = visit
+        if "{id}" in row.path:
+            resolved_path = row.path.replace("{id}", str(visit.id))
 
     elif row.path == "/api/users/bulk-delete":
         make_user(
