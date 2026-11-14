@@ -13,6 +13,7 @@ from kalyan_api.models import (
     ClinicalEncounter,
     ClinicalTemplate,
     ClinicalTemplateResponse,
+    ConsultationStatus,
     Department,
     Doctor,
     Patient,
@@ -199,6 +200,7 @@ def seed_all():
             appointment_date=today,
             token_number=1,
             status=AppointmentStatus.ARRIVED.value,
+            consultation_status=ConsultationStatus.WAITING.value,
             check_in_at=now_ts,
             created_by_user_id=reception_user.id,
         )
@@ -218,6 +220,7 @@ def seed_all():
             appointment_date=today,
             token_number=2,
             status=AppointmentStatus.IN_CONSULTATION.value,
+            consultation_status=ConsultationStatus.IN_CONSULTATION.value,
             check_in_at=now_ts,
             created_by_user_id=reception_user.id,
         )
@@ -292,6 +295,7 @@ def seed_all():
             appointment_date=today,
             token_number=1,
             status=AppointmentStatus.ARRIVED.value,
+            consultation_status=ConsultationStatus.WAITING.value,
             check_in_at=now_ts,
             created_by_user_id=reception_user.id,
         )

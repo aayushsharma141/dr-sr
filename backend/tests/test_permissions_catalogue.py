@@ -121,6 +121,7 @@ def test_golden_role_permissions_snapshot() -> None:
                 Permission.PATIENT_CORRECT,
                 Permission.PATIENT_IMPORT,
                 Permission.PATIENT_EXPORT,
+                Permission.VISIT_READ,
             }
         ),
         Role.RECEPTION: frozenset(
@@ -140,6 +141,8 @@ def test_golden_role_permissions_snapshot() -> None:
                 Permission.PAYMENT_CREATE,
                 Permission.RECEIPT_REPRINT,
                 Permission.TIMELINE_READ,
+                Permission.VISIT_READ,
+                Permission.VISIT_WRITE,
             }
         ),
         Role.DOCTOR: frozenset(
@@ -165,6 +168,15 @@ def test_golden_role_permissions_snapshot() -> None:
         ),
     }
     assert ROLE_PERMISSIONS == expected
+
+
+def test_visits_are_reception_work_that_admin_may_only_read() -> None:
+    """RF-12 (owner decision 10): reception checks in and closes visits; admin is oversight only."""
+    assert {Permission.VISIT_READ, Permission.VISIT_WRITE} <= ROLE_PERMISSIONS[Role.RECEPTION]
+    assert Permission.VISIT_READ in ROLE_PERMISSIONS[Role.ADMIN]
+    assert Permission.VISIT_WRITE not in ROLE_PERMISSIONS[Role.ADMIN]
+    assert Permission.VISIT_READ not in ROLE_PERMISSIONS[Role.DOCTOR]
+    assert Permission.VISIT_WRITE not in ROLE_PERMISSIONS[Role.DOCTOR]
 
 
 def test_admin_does_not_have_patient_update() -> None:

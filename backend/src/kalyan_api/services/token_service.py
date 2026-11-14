@@ -8,11 +8,11 @@ Guarantees:
 
 from datetime import date
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
-from kalyan_api.models import DailyTokenSequence
+from kalyan_api.models import Appointment, DailyTokenSequence
 
 
 def generate_next_daily_token(
@@ -40,8 +40,23 @@ def generate_next_daily_token(
     )
     seq = session.execute(stmt_lock).scalar_one()
 
+    # The counter is the source of truth, but an appointment written without it (an import, a
+    # restore, direct SQL, a dev seed) can hold a token at or above it. Issuing that number again
+    # would break uq_appointments_doctor_date_token and turn a check-in into a server error, so
+    # never go below the highest token already in use. Tokens are never reused, even when the
+    # holder was cancelled. The counter row is locked, so racing check-ins still queue up here.
+    highest_used = (
+        session.scalar(
+            select(func.max(Appointment.token_number)).where(
+                Appointment.doctor_id == doctor_id,
+                Appointment.appointment_date == appointment_date,
+            )
+        )
+        or 0
+    )
+
     # Increment token
-    next_token = seq.last_token + 1
+    next_token = max(seq.last_token, highest_used) + 1
     seq.last_token = next_token
     session.flush()
 

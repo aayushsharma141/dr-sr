@@ -7,11 +7,11 @@ import {
   useDepartments,
   useDepartmentDoctors,
   useAppointments,
-  useBookAppointment,
-  useUpdateAppointmentStatus,
-  useFees,
+  useWalkIn,
+  useCheckIn,
   useMe,
 } from '../api/queries'
+import { ApiError } from '../api/client'
 import {
   IconCalendar,
   IconCheck,
@@ -25,8 +25,8 @@ import {
   IconWalk,
   IconX,
 } from '../components/icons'
-import type { PatientOut, DepartmentDoctorOut, FeeOut } from '../api/types'
-import { istToday } from '../format'
+import type { PatientOut, DepartmentDoctorOut } from '../api/types'
+import { formatToken, istToday } from '../format'
 
 export function TokenGenerationPage() {
   const { data: me } = useMe()
@@ -39,12 +39,13 @@ export function TokenGenerationPage() {
 
   const [selectedDepartmentId, setSelectedDepartmentId] = useState<number | ''>('')
   const [selectedDoctorId, setSelectedDoctorId] = useState<number | ''>('')
-  const [visitType, setVisitType] = useState<'walk-in' | 'appointment'>('walk-in')
-  const [selectedServiceId, setSelectedServiceId] = useState<string>('opd_consultation')
+  // null follows the patient: "booked" when they have a booking waiting today, else a walk-in.
+  const [visitTypeChoice, setVisitTypeChoice] = useState<'walk-in' | 'booked' | null>(null)
+  const [selectedBookingId, setSelectedBookingId] = useState<number | null>(null)
   const [remarks, setRemarks] = useState('')
 
   const [generatedTicket, setGeneratedTicket] = useState<{
-    tokenNumber: number
+    tokenLabel: string
     departmentName: string
     doctorName: string
     patientName: string
@@ -52,35 +53,70 @@ export function TokenGenerationPage() {
     date: string
   } | null>(null)
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
-  // Set when the token was booked but the walk-in check-in did not go through.
-  const [checkInError, setCheckInError] = useState<string | null>(null)
+  // Set when a walk-in was refused because the patient already has a booking with that doctor.
+  const [hasDuplicateBooking, setHasDuplicateBooking] = useState(false)
+
+  const today = istToday()
 
   // API Queries
   const { data: searchResults, isPending: isSearching } = usePatients(searchQuery, 8, 0)
   const { data: departments } = useDepartments()
-  const { data: departmentDoctors } = useDepartmentDoctors(
-    selectedDepartmentId ? Number(selectedDepartmentId) : null,
+  const { data: patientBookingsData } = useAppointments(
+    { appointment_date: today, patient_id: selectedPatient?.id },
+    { enabled: selectedPatient != null },
   )
-  const { data: fees } = useFees(true)
+
+  // Bookings for today that are still waiting for their patient. A patient marked "not arrived"
+  // who turns up late can still be checked in, so those count too.
+  const bookings = useMemo(
+    () =>
+      (patientBookingsData?.appointments ?? []).filter(
+        (a) =>
+          a.patient_id === selectedPatient?.id && (a.status === 'BOOKED' || a.status === 'NO_SHOW'),
+      ),
+    [patientBookingsData, selectedPatient],
+  )
+  const visitType = visitTypeChoice ?? (bookings.length > 0 ? 'booked' : 'walk-in')
+  const selectedBooking =
+    visitType === 'booked'
+      ? (bookings.find((b) => b.id === selectedBookingId) ??
+        (bookings.length === 1 ? bookings[0] : null))
+      : null
+
+  // The department and doctor come from the chosen booking, or from the selects for a walk-in.
+  const activeDepartmentId = selectedBooking
+    ? (selectedBooking.department_id ?? null)
+    : selectedDepartmentId
+      ? Number(selectedDepartmentId)
+      : null
+  const activeDoctorId = selectedBooking
+    ? selectedBooking.doctor_id
+    : selectedDoctorId
+      ? Number(selectedDoctorId)
+      : null
+  const { data: departmentDoctors } = useDepartmentDoctors(activeDepartmentId)
 
   const selectedDepartment = useMemo(() => {
-    return departments?.find((d) => d.id === Number(selectedDepartmentId))
-  }, [departments, selectedDepartmentId])
+    return departments?.find((d) => d.id === activeDepartmentId)
+  }, [departments, activeDepartmentId])
   const selectedDoctor = useMemo(() => {
-    return departmentDoctors?.find((d: DepartmentDoctorOut) => d.id === Number(selectedDoctorId))
-  }, [departmentDoctors, selectedDoctorId])
+    return departmentDoctors?.find((d: DepartmentDoctorOut) => d.id === activeDoctorId)
+  }, [departmentDoctors, activeDoctorId])
   const cabinCode = selectedDoctor?.cabin_code ?? undefined
 
-  // Query appointments for selected doctor on today's date to calculate live queue
-  const { data: appointmentsData } = useAppointments({
-    appointment_date: istToday(),
-    doctor_id: selectedDoctorId ? Number(selectedDoctorId) : undefined,
-  })
+  // Today's appointments for the doctor, to show who is waiting and which token comes next.
+  const { data: appointmentsData } = useAppointments(
+    { appointment_date: today, doctor_id: activeDoctorId ?? undefined },
+    { enabled: activeDoctorId != null },
+  )
 
   const queueStats = useMemo(() => {
     const list = appointmentsData?.appointments || []
-    const waiting = list.filter((a) => a.status === 'ARRIVED').length
-    const nextTokenNum = list.length + 1
+    const waiting = list.filter((a) =>
+      a.consultation_status ? a.consultation_status === 'WAITING' : a.status === 'ARRIVED',
+    ).length
+    // Tokens are issued at check-in, one after another, so the next one follows the highest so far.
+    const nextTokenNum = Math.max(0, ...list.map((a) => a.token_number ?? 0)) + 1
     return {
       waiting,
       nextTokenNum,
@@ -88,8 +124,9 @@ export function TokenGenerationPage() {
   }, [appointmentsData])
 
   // Mutations
-  const bookMutation = useBookAppointment()
-  const updateStatusMutation = useUpdateAppointmentStatus()
+  const walkInMutation = useWalkIn()
+  const checkInMutation = useCheckIn()
+  const isIssuing = walkInMutation.isPending || checkInMutation.isPending
 
   // Token letter prefix (e.g. 'P' for Physiotherapy, 'O' for Ophthalmology, 'G' for General)
   const tokenPrefix = useMemo(() => {
@@ -97,9 +134,17 @@ export function TokenGenerationPage() {
     return selectedDepartment.name_en.charAt(0).toUpperCase()
   }, [selectedDepartment])
 
+  // A booking that already holds a token keeps it; anything else gets the next one.
+  const previewTokenNumber = selectedBooking?.token_number ?? queueStats.nextTokenNum
+
   const handleSelectPatient = (patient: PatientOut) => {
     setSelectedPatient(patient)
     setSearchQuery('')
+    // A new patient has their own bookings, so start from what they have today.
+    setVisitTypeChoice(null)
+    setSelectedBookingId(null)
+    setHasDuplicateBooking(false)
+    setErrorMsg(null)
   }
 
   const handleClear = () => {
@@ -107,57 +152,55 @@ export function TokenGenerationPage() {
     setSearchQuery('')
     setSelectedDepartmentId('')
     setSelectedDoctorId('')
-    setVisitType('walk-in')
+    setVisitTypeChoice(null)
+    setSelectedBookingId(null)
     setRemarks('')
     setErrorMsg(null)
-    setCheckInError(null)
+    setHasDuplicateBooking(false)
     setGeneratedTicket(null)
   }
 
-  const handleGenerateToken = async () => {
+  // Check a booked patient in, or register a walk-in. Either one issues the token, opens or joins
+  // the patient's visit and puts them in the doctor's waiting list, all or nothing: when the
+  // server refuses, no token was issued and nothing was booked. No payment is taken here.
+  const handleIssueToken = async () => {
     setErrorMsg(null)
+    setHasDuplicateBooking(false)
     if (!selectedPatient) {
       setErrorMsg('Please select a patient or switch to New Patient.')
       return
     }
-    if (!selectedDepartmentId) {
-      setErrorMsg('Please select a hospital department.')
-      return
-    }
-    if (!selectedDoctorId) {
-      setErrorMsg('Please select a consulting doctor.')
-      return
-    }
 
     try {
-      const res = await bookMutation.mutateAsync({
-        patient_id: selectedPatient.id,
-        department_id: Number(selectedDepartmentId),
-        doctor_id: Number(selectedDoctorId),
-        appointment_date: istToday(),
-        notes: remarks.trim() || null,
-      })
-
-      setCheckInError(null)
-      if (visitType === 'walk-in') {
-        try {
-          await updateStatusMutation.mutateAsync({
-            id: res.id,
-            body: {
-              status: 'ARRIVED',
-              version_id: res.version_id,
-            },
-          })
-        } catch (statusErr) {
-          const reason = statusErr instanceof Error && statusErr.message ? statusErr.message : 'unknown error'
-          setCheckInError(
-            `Token #${res.token_number} is booked but the patient was not checked in (${reason}). Check them in from Appointments.`,
-          )
+      let issued
+      if (visitType === 'booked') {
+        if (!selectedBooking) {
+          setErrorMsg("Please choose which of today's bookings to check in.")
+          return
         }
+        issued = await checkInMutation.mutateAsync({
+          id: selectedBooking.id,
+          body: { version_id: selectedBooking.version_id },
+        })
+      } else {
+        if (!selectedDepartmentId) {
+          setErrorMsg('Please select a hospital department.')
+          return
+        }
+        if (!selectedDoctorId) {
+          setErrorMsg('Please select a consulting doctor.')
+          return
+        }
+        issued = await walkInMutation.mutateAsync({
+          patient_id: selectedPatient.id,
+          department_id: Number(selectedDepartmentId),
+          doctor_id: Number(selectedDoctorId),
+          notes: remarks.trim() || null,
+        })
       }
 
       setGeneratedTicket({
-        tokenNumber: res.token_number,
+        tokenLabel: formatToken(issued.token_number, cabinCode),
         departmentName: selectedDepartment?.name_en || 'Consultation',
         doctorName: selectedDoctor?.name_en || 'Clinician',
         patientName: selectedPatient.full_name,
@@ -165,10 +208,13 @@ export function TokenGenerationPage() {
         date: new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true }),
       })
     } catch (err: unknown) {
-      if (err instanceof Error) {
+      if (err instanceof ApiError && err.code === 'duplicate_appointment') {
+        setHasDuplicateBooking(true)
+        setErrorMsg('This patient already has a booking with this doctor today.')
+      } else if (err instanceof Error) {
         setErrorMsg(err.message)
       } else {
-        setErrorMsg('Failed to generate token and register visit.')
+        setErrorMsg('Failed to issue the token.')
       }
     }
   }
@@ -187,7 +233,7 @@ export function TokenGenerationPage() {
                 Token Desk
               </h1>
               <p className="text-xs text-slate-500">
-                Create a new patient, select department and doctor, and generate a queue token.
+                Check a patient in: pick a booking for today, or register a walk-in, and issue the queue token.
               </p>
             </div>
           </div>
@@ -237,16 +283,10 @@ export function TokenGenerationPage() {
                   Daily Token
                 </span>
                 <div className="font-mono text-3xl font-black text-emerald-800">
-                  #{generatedTicket.tokenNumber}
+                  {generatedTicket.tokenLabel}
                 </div>
               </div>
             </div>
-
-            {checkInError && (
-              <div role="alert" className="rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm font-semibold text-amber-950">
-                {checkInError}
-              </div>
-            )}
 
             <div className="flex flex-wrap items-center gap-3 pt-2 border-t border-emerald-200">
               <Link
@@ -272,9 +312,22 @@ export function TokenGenerationPage() {
         {errorMsg && (
           <div
             role="alert"
-            className="rounded-xl border border-red-300 bg-red-50 p-4 text-sm font-semibold text-red-900 shadow-xs"
+            className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-red-300 bg-red-50 p-4 text-sm font-semibold text-red-900 shadow-xs"
           >
-            {errorMsg}
+            <span>{errorMsg}</span>
+            {hasDuplicateBooking && (
+              <button
+                type="button"
+                onClick={() => {
+                  setVisitTypeChoice('booked')
+                  setErrorMsg(null)
+                  setHasDuplicateBooking(false)
+                }}
+                className="inline-flex min-h-9 items-center rounded-lg border border-red-300 bg-white px-3 text-xs font-bold text-red-900 hover:bg-red-100"
+              >
+                Check in their booking instead
+              </button>
+            )}
           </div>
         )}
 
@@ -420,66 +473,6 @@ export function TokenGenerationPage() {
               <h2 className="text-base font-bold text-slate-900">Visit Details</h2>
             </div>
 
-            {/* Department Select */}
-            <div>
-              <label
-                htmlFor="token-department"
-                className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1"
-              >
-                Department *
-              </label>
-              <div className="relative">
-                <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5 text-slate-500">
-                  <IconStethoscope className="h-4 w-4" />
-                </div>
-                <select
-                  id="token-department"
-                  value={selectedDepartmentId}
-                  onChange={(e) => {
-                    setSelectedDepartmentId(e.target.value ? Number(e.target.value) : '')
-                    setSelectedDoctorId('')
-                  }}
-                  className="w-full rounded-xl border border-slate-300 bg-white pl-10 pr-3.5 py-2.5 text-xs font-medium text-slate-900 shadow-2xs focus:border-emerald-700 focus:outline-none focus:ring-1 focus:ring-emerald-700 min-h-[44px]"
-                >
-                  <option value="">Select department</option>
-                  {departments?.map((d) => (
-                    <option key={d.id} value={d.id}>
-                      {d.name_en}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
-
-            {/* Doctor Select */}
-            <div>
-              <label
-                htmlFor="token-doctor"
-                className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1"
-              >
-                Doctor *
-              </label>
-              <div className="relative">
-                <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5 text-slate-500">
-                  <IconUserCheck className="h-4 w-4" />
-                </div>
-                <select
-                  id="token-doctor"
-                  value={selectedDoctorId}
-                  onChange={(e) => setSelectedDoctorId(e.target.value ? Number(e.target.value) : '')}
-                  disabled={!selectedDepartmentId}
-                  className="w-full rounded-xl border border-slate-300 bg-white pl-10 pr-3.5 py-2.5 text-xs font-medium text-slate-900 shadow-2xs focus:border-emerald-700 focus:outline-none focus:ring-1 focus:ring-emerald-700 min-h-[44px] disabled:bg-slate-100"
-                >
-                  <option value="">Select doctor</option>
-                  {departmentDoctors?.map((d: DepartmentDoctorOut) => (
-                    <option key={d.id} value={d.id}>
-                      {d.name_en} - {d.qualification || 'Clinician'}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
-
             {/* Visit Type */}
             <div>
               <span className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
@@ -488,7 +481,8 @@ export function TokenGenerationPage() {
               <div className="flex rounded-xl border border-slate-300 bg-slate-100/70 p-1 shadow-2xs">
                 <button
                   type="button"
-                  onClick={() => setVisitType('walk-in')}
+                  aria-pressed={visitType === 'walk-in'}
+                  onClick={() => setVisitTypeChoice('walk-in')}
                   className={`flex flex-1 items-center justify-center gap-1.5 rounded-lg py-2 text-xs font-bold transition-all ${visitType === 'walk-in'
                       ? 'border border-emerald-300 bg-white text-emerald-900 shadow-xs'
                       : 'text-slate-600 hover:text-slate-900'
@@ -499,66 +493,161 @@ export function TokenGenerationPage() {
                 </button>
                 <button
                   type="button"
-                  onClick={() => setVisitType('appointment')}
-                  className={`flex flex-1 items-center justify-center gap-1.5 rounded-lg py-2 text-xs font-bold transition-all ${visitType === 'appointment'
+                  aria-pressed={visitType === 'booked'}
+                  onClick={() => setVisitTypeChoice('booked')}
+                  className={`flex flex-1 items-center justify-center gap-1.5 rounded-lg py-2 text-xs font-bold transition-all ${visitType === 'booked'
                       ? 'border border-emerald-300 bg-white text-emerald-900 shadow-xs'
                       : 'text-slate-600 hover:text-slate-900'
                     }`}
                 >
                   <IconCalendar className="h-4 w-4 text-slate-500" />
-                  Appointment
+                  Booked appointment
+                  {bookings.length > 0 && (
+                    <span className="rounded-full bg-emerald-100 px-1.5 text-xs text-emerald-800">
+                      {bookings.length}
+                    </span>
+                  )}
                 </button>
               </div>
             </div>
 
-            {/* Consultation / Service */}
-            <div>
-              <label
-                htmlFor="consultation-service"
-                className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1"
-              >
-                Consultation / Service
-              </label>
-              <select
-                id="consultation-service"
-                value={selectedServiceId}
-                onChange={(e) => setSelectedServiceId(e.target.value)}
-                className="w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-xs font-medium text-slate-900 shadow-2xs focus:border-emerald-700 focus:outline-none focus:ring-1 focus:ring-emerald-700 min-h-[44px]"
-              >
-                <option value="opd_consultation">
-                  OPD Consultation - {selectedDoctor ? `₹${(selectedDoctor.default_fee_paise / 100).toFixed(2)}` : 'Doctor Fee'}
-                </option>
-                {fees?.map((f: FeeOut) => (
-                  <option key={f.id} value={f.id}>
-                    {f.name} - ₹{(f.fee_paise / 100).toFixed(2)}
-                  </option>
-                ))}
-              </select>
-            </div>
+            {visitType === 'booked' ? (
+              /* A booking made earlier, waiting for its patient */
+              <fieldset>
+                <legend className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
+                  Booking to check in *
+                </legend>
+                {!selectedPatient ? (
+                  <p className="rounded-xl border border-dashed border-slate-200 p-4 text-center text-xs text-slate-500">
+                    Select a patient to see their bookings for today.
+                  </p>
+                ) : bookings.length === 0 ? (
+                  <p className="rounded-xl border border-dashed border-slate-200 p-4 text-center text-xs text-slate-500">
+                    No booking for today. Switch to Walk-in to register one.
+                  </p>
+                ) : (
+                  <ul className="space-y-2">
+                    {bookings.map((booking) => (
+                      <li key={booking.id}>
+                        <label className="flex cursor-pointer items-center gap-3 rounded-xl border border-slate-300 bg-white p-3 text-xs shadow-2xs has-[:checked]:border-emerald-600 has-[:checked]:bg-emerald-50/60">
+                          <input
+                            type="radio"
+                            name="booking-to-check-in"
+                            checked={selectedBooking?.id === booking.id}
+                            onChange={() => setSelectedBookingId(booking.id)}
+                            className="h-4 w-4 accent-emerald-800"
+                          />
+                          <span className="flex-1">
+                            <span className="block font-bold text-slate-900">
+                              {booking.doctor_name_en}
+                            </span>
+                            <span className="block text-slate-500">
+                              {booking.expected_time
+                                ? `Expected ${booking.expected_time.slice(0, 5)}`
+                                : 'No time given'}
+                              {booking.status === 'NO_SHOW' ? ' · marked not arrived, late' : ''}
+                            </span>
+                          </span>
+                        </label>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </fieldset>
+            ) : (
+              <>
+                {/* Department Select */}
+                <div>
+                  <label
+                    htmlFor="token-department"
+                    className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1"
+                  >
+                    Department *
+                  </label>
+                  <div className="relative">
+                    <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5 text-slate-500">
+                      <IconStethoscope className="h-4 w-4" />
+                    </div>
+                    <select
+                      id="token-department"
+                      value={selectedDepartmentId}
+                      onChange={(e) => {
+                        setSelectedDepartmentId(e.target.value ? Number(e.target.value) : '')
+                        setSelectedDoctorId('')
+                      }}
+                      className="w-full rounded-xl border border-slate-300 bg-white pl-10 pr-3.5 py-2.5 text-xs font-medium text-slate-900 shadow-2xs focus:border-emerald-700 focus:outline-none focus:ring-1 focus:ring-emerald-700 min-h-[44px]"
+                    >
+                      <option value="">Select department</option>
+                      {departments?.map((d) => (
+                        <option key={d.id} value={d.id}>
+                          {d.name_en}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
 
-            {/* Informational Blue Banner */}
+                {/* Doctor Select */}
+                <div>
+                  <label
+                    htmlFor="token-doctor"
+                    className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1"
+                  >
+                    Doctor *
+                  </label>
+                  <div className="relative">
+                    <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5 text-slate-500">
+                      <IconUserCheck className="h-4 w-4" />
+                    </div>
+                    <select
+                      id="token-doctor"
+                      value={selectedDoctorId}
+                      onChange={(e) => setSelectedDoctorId(e.target.value ? Number(e.target.value) : '')}
+                      disabled={!selectedDepartmentId}
+                      className="w-full rounded-xl border border-slate-300 bg-white pl-10 pr-3.5 py-2.5 text-xs font-medium text-slate-900 shadow-2xs focus:border-emerald-700 focus:outline-none focus:ring-1 focus:ring-emerald-700 min-h-[44px] disabled:bg-slate-100"
+                    >
+                      <option value="">Select doctor</option>
+                      {departmentDoctors?.map((d: DepartmentDoctorOut) => (
+                        <option key={d.id} value={d.id}>
+                          {d.name_en} - {d.qualification || 'Clinician'}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              </>
+            )}
+
+            {/* Payment is not taken here: it is collected at checkout, after the consultation. */}
             <div className="rounded-xl border border-blue-200 bg-blue-50/70 p-3 text-xs text-blue-900 flex items-start gap-2">
               <span className="font-bold text-blue-700 mt-0.5">ⓘ</span>
-              <span>Consultation charge will be added to the visit billing.</span>
+              <span>
+                No payment is taken here. Fees are collected at checkout, after the consultation.
+                {selectedDoctor
+                  ? ` Consultation fee: ₹${(selectedDoctor.default_fee_paise / 100).toFixed(2)}.`
+                  : ''}
+              </span>
             </div>
 
-            {/* Remarks */}
-            <div>
-              <label
-                htmlFor="visit-remarks"
-                className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1"
-              >
-                Remarks (optional)
-              </label>
-              <textarea
-                id="visit-remarks"
-                rows={2}
-                value={remarks}
-                onChange={(e) => setRemarks(e.target.value)}
-                placeholder="Any specific note (e.g. referral, priority, etc.)"
-                className="w-full rounded-xl border border-slate-300 bg-white p-3 text-xs font-medium text-slate-900 placeholder-slate-400 shadow-2xs focus:border-emerald-700 focus:outline-none focus:ring-1 focus:ring-emerald-700"
-              />
-            </div>
+            {/* Remarks (a walk-in only: a booking already has its own notes) */}
+            {visitType === 'walk-in' && (
+              <div>
+                <label
+                  htmlFor="visit-remarks"
+                  className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1"
+                >
+                  Remarks (optional)
+                </label>
+                <textarea
+                  id="visit-remarks"
+                  rows={2}
+                  value={remarks}
+                  onChange={(e) => setRemarks(e.target.value)}
+                  placeholder="Any specific note (e.g. referral, priority, etc.)"
+                  className="w-full rounded-xl border border-slate-300 bg-white p-3 text-xs font-medium text-slate-900 placeholder-slate-400 shadow-2xs focus:border-emerald-700 focus:outline-none focus:ring-1 focus:ring-emerald-700"
+                />
+              </div>
+            )}
           </section>
 
           {/* COLUMN 3: Token Preview (lg:col-span-4) */}
@@ -568,7 +657,7 @@ export function TokenGenerationPage() {
               <div>
                 <h2 className="text-base font-bold text-slate-900">Token Preview</h2>
                 <p className="text-xs text-slate-500">
-                  This token will be generated for the selected doctor.
+                  This token is issued when the patient is checked in.
                 </p>
               </div>
             </div>
@@ -577,12 +666,17 @@ export function TokenGenerationPage() {
               departmentName={selectedDepartment?.name_en || 'Select department'}
               doctorName={selectedDoctor?.name_en || 'Select doctor'}
               tokenPrefix={tokenPrefix}
-              tokenNumber={queueStats.nextTokenNum}
+              tokenNumber={
+                activeDoctorId == null
+                  ? null
+                  : cabinCode
+                    ? formatToken(previewTokenNumber, cabinCode)
+                    : previewTokenNumber
+              }
               patientName={selectedPatient?.full_name || 'No patient selected'}
               patientUrn={selectedPatient?.urn || 'KH-YYYY-XXXX'}
               cabinCode={cabinCode}
               waitingCount={queueStats.waiting}
-              hasNextToken={queueStats.nextTokenNum != null}
             />
           </section>
         </div>
@@ -610,12 +704,18 @@ export function TokenGenerationPage() {
 
             <button
               type="button"
-              onClick={handleGenerateToken}
-              disabled={bookMutation.isPending || !selectedPatient || !selectedDoctorId}
+              onClick={handleIssueToken}
+              disabled={
+                isIssuing || !selectedPatient || (visitType === 'booked' ? !selectedBooking : !selectedDoctorId)
+              }
               className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-[#124832] px-6 text-sm font-bold text-white shadow-xs hover:bg-[#0D3822] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-800 disabled:opacity-50 cursor-pointer"
             >
               <IconTicket className="h-4 w-4" />
-              {bookMutation.isPending ? 'Generating...' : 'Generate Token & Register Visit'}
+              {isIssuing
+                ? 'Issuing...'
+                : visitType === 'booked'
+                  ? 'Check In & Issue Token'
+                  : 'Register Walk-in & Issue Token'}
             </button>
           </div>
         </div>

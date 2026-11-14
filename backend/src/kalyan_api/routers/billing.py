@@ -28,6 +28,7 @@ from kalyan_api.db.session import SessionDep
 from kalyan_api.models import (
     Appointment,
     ClinicSettings,
+    ConsultationStatus,
     Doctor,
     Patient,
     Payment,
@@ -40,6 +41,7 @@ from kalyan_api.schemas.billing import (
     PaymentOut,
     PaymentReversalCreate,
     PendingDueOut,
+    VisitDueOut,
 )
 from kalyan_api.services import audit_service, billing_service
 from kalyan_api.services.audit_service import AuditAction
@@ -164,6 +166,26 @@ def record_payment(
                 status_code=404,
                 code="appointment_not_found",
                 message="Appointment not found for patient.",
+            )
+        # Fees are collected after the consultation (RF-23, owner decision 6), and a cancelled
+        # consultation owes nothing. A booking that was never checked in is left as before.
+        if appt.consultation_status in (
+            ConsultationStatus.WAITING.value,
+            ConsultationStatus.IN_CONSULTATION.value,
+        ):
+            raise ApiError(
+                status_code=422,
+                code="consultation_in_progress",
+                message=(
+                    "Fees are collected after the consultation. "
+                    "The doctor has not completed it yet."
+                ),
+            )
+        if appt.consultation_status == ConsultationStatus.CANCELLED.value:
+            raise ApiError(
+                status_code=422,
+                code="consultation_cancelled",
+                message="This consultation was cancelled, so nothing is due for it.",
             )
         doctor = session.get(Doctor, appt.doctor_id)
         if doctor and doctor.default_fee_paise > 0:
@@ -331,6 +353,41 @@ def list_patient_payments(patient_id: int, session: SessionDep) -> list[PaymentO
 def list_pending_dues(session: SessionDep) -> list[PendingDueOut]:
     """List active treatment packages with outstanding pending balances (BIL-03)."""
     return billing_service.compute_pending_dues(session)
+
+
+@router.get(
+    "/billing/visit-dues",
+    response_model=list[VisitDueOut],
+    dependencies=[Depends(require(Permission.PAYMENT_READ))],
+)
+def list_visit_dues(session: SessionDep) -> list[VisitDueOut]:
+    """List consultation fees still owed on visits that were closed with a balance (RF-23)."""
+    return billing_service.compute_visit_dues(session)
+
+
+@router.get(
+    "/billing/receipts/today",
+    response_model=list[PaymentOut],
+    dependencies=[Depends(require(Permission.PAYMENT_READ))],
+)
+def list_todays_receipts(session: SessionDep) -> list[PaymentOut]:
+    """Payments recorded today (IST), newest first, so the desk can reprint and tally the drawer.
+
+    Reception gets today only; the full searchable ledger stays admin-only (owner decision 11).
+    """
+    start, end = clock.ist_day_bounds(clock.ist_today())
+    stmt = (
+        select(Payment)
+        .where(Payment.created_at >= start, Payment.created_at < end)
+        .options(
+            selectinload(Payment.patient),
+            selectinload(Payment.treatment_plan),
+            selectinload(Payment.created_by_user),
+            selectinload(Payment.reversed_by_user),
+        )
+        .order_by(Payment.created_at.desc(), Payment.id.desc())
+    )
+    return [_to_payment_out(p) for p in session.scalars(stmt)]
 
 
 @router.get(

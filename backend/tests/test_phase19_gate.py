@@ -27,6 +27,7 @@ from kalyan_api.models import (
     Appointment,
     AppointmentStatus,
     AuditLog,
+    ConsultationStatus,
     Department,
     Patient,
     User,
@@ -84,7 +85,7 @@ def test_phase19_clinical_consultation_end_to_end_gate(
     appt = Appointment(
         patient_id=patient.id,
         doctor_id=doctor_a_user.doctor_id,
-        appointment_date=date(2026, 11, 15),
+        appointment_date=clock.ist_today(),  # check-in only works on the appointment date
         token_number=101,
         status=AppointmentStatus.BOOKED.value,
         created_by_user_id=reception_user.id,
@@ -215,6 +216,7 @@ def test_phase19_clinical_consultation_end_to_end_gate(
         appointment_date=date(2026, 11, 16),
         token_number=102,
         status=AppointmentStatus.IN_CONSULTATION.value,
+        consultation_status=ConsultationStatus.IN_CONSULTATION.value,
         created_by_user_id=reception_user.id,
     )
     db_session.add(eye_appt)

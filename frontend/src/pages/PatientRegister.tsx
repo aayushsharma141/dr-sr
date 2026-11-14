@@ -7,38 +7,28 @@ import {
   useUploadPatientPhoto,
   useCheckDuplicate,
   useMe,
-  useDepartments,
-  useDepartmentDoctors,
-  useBookAppointment,
-  useUpdateAppointmentStatus,
 } from '../api/queries'
 import { ApiError, apiFetch } from '../api/client'
 import { AppShell } from '../components/AppShell'
 import { ConflictBanner } from '../components/ConflictBanner'
-import { QueueTicketPreview } from '../components/QueueTicketPreview'
 import { UnsavedChangesGuard } from '../components/UnsavedChangesGuard'
 import { PatientPhotoModal } from '../components/PatientPhotoModal'
 import {
   IconAlertCircle,
   IconAlertTriangle,
   IconCamera,
-  IconCalendar,
   IconCheck,
   IconDeviceFloppy,
   IconHeartRateMonitor,
   IconMapPin,
   IconPhone,
   IconRefresh,
-  IconStethoscope,
   IconTicket,
   IconTrash,
   IconUser,
-  IconUserCheck,
   IconUserPlus,
-  IconWalk,
 } from '../components/icons'
-import type { PatientCreate, PatientOut, PatientUpdate, DepartmentDoctorOut } from '../api/types'
-import { istToday } from '../format'
+import type { PatientCreate, PatientOut, PatientUpdate } from '../api/types'
 
 /** Shared field styling: one control height, one brand focus treatment, across both columns. */
 const LABEL_CLASS =
@@ -99,8 +89,6 @@ export function PatientRegister() {
   const registerMutation = useRegisterPatient()
   const updateMutation = useUpdatePatient()
   const uploadPhotoMutation = useUploadPatientPhoto()
-  const bookAppointmentMutation = useBookAppointment()
-  const updateStatusMutation = useUpdateAppointmentStatus()
 
   // 12 Canonical demographic fields
   const [fullName, setFullName] = useState('')
@@ -115,12 +103,6 @@ export function PatientRegister() {
   const [emergencyContact, setEmergencyContact] = useState('')
   const [allergies, setAllergies] = useState('None reported')
   const [notes, setNotes] = useState('')
-
-  // Optional Visit & Token fields
-  const [selectedDepartmentId, setSelectedDepartmentId] = useState<number | ''>('')
-  const [selectedDoctorId, setSelectedDoctorId] = useState<number | ''>('')
-  const [visitType, setVisitType] = useState<'walk-in' | 'appointment'>('walk-in')
-  const [reasonForVisit, setReasonForVisit] = useState('')
 
   // Photo state
   const [photoFile, setPhotoFile] = useState<File | null>(null)
@@ -138,7 +120,6 @@ export function PatientRegister() {
 
   // Feedback states
   const [createdPatient, setCreatedPatient] = useState<PatientOut | null>(null)
-  const [allocatedToken, setAllocatedToken] = useState<number | null>(null)
   const [quickSuccessNotice, setQuickSuccessNotice] = useState<string | null>(null)
   const [formError, setFormError] = useState<string | null>(null)
   // Steps after the patient record was saved that did not complete (photo, visit, check-in).
@@ -146,7 +127,6 @@ export function PatientRegister() {
   const [photoFailure, setPhotoFailure] = useState<{ patientId: number; fileName: string; message: string } | null>(null)
   const [photoRetrying, setPhotoRetrying] = useState(false)
   const [photoSavedNotice, setPhotoSavedNotice] = useState<string | null>(null)
-  const [checkedIn, setCheckedIn] = useState(false)
   // Edit mode: the record as last loaded (its version_id guards the save), and save state.
   const [baseline, setBaseline] = useState<PatientOut | null>(null)
   const [isConflict, setIsConflict] = useState(false)
@@ -193,10 +173,6 @@ export function PatientRegister() {
           emergencyContact.trim() ||
           allergies.trim() !== 'None reported' ||
           notes.trim() ||
-          selectedDepartmentId !== '' ||
-          selectedDoctorId !== '' ||
-          visitType !== 'walk-in' ||
-          reasonForVisit.trim() ||
           photoFile,
       )
     )
@@ -215,34 +191,8 @@ export function PatientRegister() {
     emergencyContact,
     allergies,
     notes,
-    selectedDepartmentId,
-    selectedDoctorId,
-    visitType,
-    reasonForVisit,
     photoFile,
   ])
-
-  // Queries for departments & doctors
-  const { data: departments } = useDepartments()
-  const { data: departmentDoctors } = useDepartmentDoctors(
-    selectedDepartmentId ? Number(selectedDepartmentId) : null,
-  )
-
-  const selectedDepartment = useMemo(() => {
-    return departments?.find((d) => d.id === Number(selectedDepartmentId))
-  }, [departments, selectedDepartmentId])
-
-  const selectedDoctor = useMemo(() => {
-    return departmentDoctors?.find((d: DepartmentDoctorOut) => d.id === Number(selectedDoctorId))
-  }, [departmentDoctors, selectedDoctorId])
-
-  // Extract cabin code from doctor data if available
-  const cabinCode = selectedDoctor?.cabin_code ?? undefined
-
-  const tokenPrefix = useMemo(() => {
-    if (!selectedDepartment) return 'G'
-    return selectedDepartment.name_en.charAt(0).toUpperCase()
-  }, [selectedDepartment])
 
   // Debounce duplicate check
   useEffect(() => {
@@ -362,7 +312,6 @@ export function PatientRegister() {
     setRegistrationWarnings([])
     setPhotoFailure(null)
     setPhotoSavedNotice(null)
-    setCheckedIn(false)
     setFullName('')
     setGuardianName('')
     setGender('M')
@@ -375,10 +324,6 @@ export function PatientRegister() {
     setEmergencyContact('')
     setAllergies('None reported')
     setNotes('')
-    setSelectedDepartmentId('')
-    setSelectedDoctorId('')
-    setVisitType('walk-in')
-    setReasonForVisit('')
     setPhotoFile(null)
     showPhotoPreview(null)
     setConfirmDifferentPatient(false)
@@ -501,7 +446,6 @@ export function PatientRegister() {
     setRegistrationWarnings([])
     setPhotoFailure(null)
     setPhotoSavedNotice(null)
-    setCheckedIn(false)
 
     if (ageYears === '' || ageYears < 0) {
       setFormError('Please enter a valid age in years.')
@@ -533,15 +477,13 @@ export function PatientRegister() {
       state: state.trim() || 'Bihar',
       emergency_contact: emergencyContact.trim() || null,
       allergies: allergies.trim() || 'None reported',
-      notes: notes.trim() || (reasonForVisit.trim() ? `Complaint: ${reasonForVisit.trim()}` : null),
+      notes: notes.trim() || null,
     }
 
     submittingRef.current = true
     try {
       // 1. Register Patient Demographics. A failure here means nothing was saved.
       const patient = await registerMutation.mutateAsync(payload)
-
-      const warnings: string[] = []
 
       // 2. Upload Photo if provided. The patient is already saved, so report and continue.
       if (photoFile) {
@@ -559,57 +501,10 @@ export function PatientRegister() {
         }
       }
 
-      // 3. Allocate Visit & Token if Department and Doctor selected
-      let generatedToken: number | null = null
-      let arrived = false
-      if (selectedDepartmentId && selectedDoctorId) {
-        let appt: Awaited<ReturnType<typeof bookAppointmentMutation.mutateAsync>> | null = null
-        try {
-          appt = await bookAppointmentMutation.mutateAsync({
-            patient_id: patient.id,
-            department_id: Number(selectedDepartmentId),
-            doctor_id: Number(selectedDoctorId),
-            appointment_date: istToday(),
-            notes: reasonForVisit.trim() || null,
-          })
-          generatedToken = appt.token_number
-        } catch (visitErr) {
-          warnings.push(
-            `Visit and queue token were not booked (${errorText(visitErr)}). Book them from Appointments.`,
-          )
-        }
-
-        // If Walk-in, mark Arrived immediately. Only a confirmed check-in is shown as checked in.
-        if (appt && visitType === 'walk-in') {
-          try {
-            await updateStatusMutation.mutateAsync({
-              id: appt.id,
-              body: {
-                status: 'ARRIVED',
-                version_id: appt.version_id,
-              },
-            })
-            arrived = true
-          } catch (arriveErr) {
-            warnings.push(
-              `Token #${appt.token_number} is booked but was not marked arrived (${errorText(arriveErr)}). Mark arrived from Appointments.`,
-            )
-          }
-        }
-      }
-
-      setAllocatedToken(generatedToken)
-      setCheckedIn(arrived)
-
       if (saveAndAddAnother) {
-        const tokenMsg = generatedToken != null ? ` · Queue Token #${generatedToken}` : ''
-        setQuickSuccessNotice(
-          `Registered ${patient.full_name} (${patient.urn})${tokenMsg}. Form reset for next patient.`,
-        )
+        setQuickSuccessNotice(`Registered ${patient.full_name} (${patient.urn}). Form reset for next patient.`)
         handleClear()
-        setRegistrationWarnings(warnings)
       } else {
-        setRegistrationWarnings(warnings)
         setCreatedPatient(patient)
       }
     } catch (err: unknown) {
@@ -680,8 +575,7 @@ export function PatientRegister() {
                   </>
                 ) : (
                   <>
-                    Register the patient, allocate the Universal Record Number (URN) and issue the
-                    doctor queue token.{' '}
+                    Register the patient and allocate the Universal Record Number (URN). The queue token is issued at the Token Desk.{' '}
                   </>
                 )}
                 <span className="font-semibold text-[#8E1C3D]">Fields marked * are required.</span>
@@ -704,7 +598,7 @@ export function PatientRegister() {
                 className="inline-flex min-h-10 items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3.5 text-xs font-semibold text-slate-700 shadow-2xs transition-colors hover:border-[#8E1C3D] hover:text-[#5D0B26]"
               >
                 <IconTicket className="h-4 w-4 text-[#8E1C3D]" />
-                Visit &amp; Token Desk
+                Token Desk
               </Link>
             )}
             <Link
@@ -842,19 +736,6 @@ export function PatientRegister() {
                 </div>
               </div>
 
-              {allocatedToken != null && (
-                <div className="rounded-xl border border-[#E4C8D1] bg-white p-4 text-center shadow-xs">
-                  <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
-                    Allocated Queue Token
-                  </span>
-                  <div className="font-mono text-3xl font-black text-[#8E1C3D]">
-                    #{allocatedToken}
-                  </div>
-                  <span className="mt-1 block rounded bg-[#FBF5F7] px-2 py-0.5 text-xs font-bold text-[#5D0B26]">
-                    {checkedIn ? 'Checked In (Arrived)' : 'Booked'}
-                  </span>
-                </div>
-              )}
             </div>
 
             <div className="flex flex-wrap items-center gap-3 border-t border-[#E4C8D1] pt-3">
@@ -869,6 +750,12 @@ export function PatientRegister() {
                 View Patient File &amp; Card
               </button>
               <Link
+                to="/reception/tokens"
+                className="inline-flex min-h-11 items-center justify-center rounded-lg border border-[#8E1C3D] bg-white px-4 text-sm font-semibold text-[#5D0B26] transition-colors hover:bg-[#FBF5F7] cursor-pointer"
+              >
+                Issue Queue Token at Token Desk
+              </Link>
+              <Link
                 to={`/reception/patients/${createdPatient.id}/print`}
                 className="inline-flex min-h-11 items-center justify-center rounded-lg border border-[#8E1C3D] bg-white px-4 text-sm font-semibold text-[#5D0B26] transition-colors hover:bg-[#FBF5F7] cursor-pointer"
               >
@@ -878,7 +765,6 @@ export function PatientRegister() {
                 type="button"
                 onClick={() => {
                   setCreatedPatient(null)
-                  setAllocatedToken(null)
                   handleClear()
                 }}
                 className="inline-flex min-h-11 items-center justify-center rounded-lg border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-50 cursor-pointer"
@@ -941,7 +827,7 @@ export function PatientRegister() {
             {/* ========================================================= */}
             {/* LEFT: identity, contact and clinical flags (8 of 12)      */}
             {/* ========================================================= */}
-            <div className={`space-y-5 ${isEditMode ? 'xl:col-span-12' : 'xl:col-span-8'}`}>
+            <div className="space-y-5 xl:col-span-12">
               {/* SECTION 1: Patient identity */}
               <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xs">
                 <SectionHeader
@@ -1311,163 +1197,6 @@ export function PatientRegister() {
               </section>
             </div>
 
-            {/* ========================================================= */}
-            {/* RIGHT: visit allocation and live token preview (4 of 12)  */}
-            {/* ========================================================= */}
-            {/* Editing an existing patient changes details only: no visit or token is booked. */}
-            {!isEditMode && (
-            <div className="space-y-5 xl:col-span-4">
-              {/* SECTION 4: Visit & queue */}
-              <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xs">
-                <SectionHeader
-                  index="4"
-                  title="Visit & Queue"
-                  hint="Optional — allocate today's token now"
-                  icon={<IconCalendar className="h-4 w-4" />}
-                />
-
-                <div className="space-y-4 p-5 sm:p-6">
-                  <div>
-                    <label htmlFor="visit-department" className={LABEL_CLASS}>
-                      Department *
-                    </label>
-                    <div className="relative">
-                      <span className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-slate-500">
-                        <IconStethoscope className="h-4 w-4" />
-                      </span>
-                      <select
-                        id="visit-department"
-                        value={selectedDepartmentId}
-                        onChange={(e) => {
-                          setSelectedDepartmentId(e.target.value ? Number(e.target.value) : '')
-                          setSelectedDoctorId('')
-                        }}
-                        className={`${INPUT_WITH_ICON_CLASS} pr-8`}
-                      >
-                        <option value="">Select department</option>
-                        {departments?.map((dept) => (
-                          <option key={dept.id} value={dept.id}>
-                            {dept.name_en}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                  </div>
-
-                  <div>
-                    <label htmlFor="visit-doctor" className={LABEL_CLASS}>
-                      Doctor *
-                    </label>
-                    <div className="relative">
-                      <span className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-slate-500">
-                        <IconUserCheck className="h-4 w-4" />
-                      </span>
-                      <select
-                        id="visit-doctor"
-                        value={selectedDoctorId}
-                        onChange={(e) => setSelectedDoctorId(e.target.value ? Number(e.target.value) : '')}
-                        disabled={!selectedDepartmentId}
-                        className={`${INPUT_WITH_ICON_CLASS} pr-8 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-500`}
-                      >
-                        <option value="">
-                          {selectedDepartmentId ? 'Select doctor' : 'Select a department first'}
-                        </option>
-                        {departmentDoctors?.map((doc: DepartmentDoctorOut) => (
-                          <option key={doc.id} value={doc.id}>
-                            {doc.name_en}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                  </div>
-
-                  <div>
-                    <span className={LABEL_CLASS}>Visit Type</span>
-                    <div className="flex gap-1 rounded-lg border border-slate-300 bg-slate-100/70 p-1">
-                      <button
-                        type="button"
-                        onClick={() => setVisitType('walk-in')}
-                        aria-pressed={visitType === 'walk-in'}
-                        className={`flex min-h-9 flex-1 items-center justify-center gap-1.5 rounded-md text-xs font-bold transition-colors ${
-                          visitType === 'walk-in'
-                            ? 'border border-[#C39A35] bg-white text-[#5D0B26] shadow-2xs'
-                            : 'border border-transparent text-slate-600 hover:text-[#5D0B26]'
-                        }`}
-                      >
-                        <IconWalk className="h-4 w-4" />
-                        Walk-in
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setVisitType('appointment')}
-                        aria-pressed={visitType === 'appointment'}
-                        className={`flex min-h-9 flex-1 items-center justify-center gap-1.5 rounded-md text-xs font-bold transition-colors ${
-                          visitType === 'appointment'
-                            ? 'border border-[#C39A35] bg-white text-[#5D0B26] shadow-2xs'
-                            : 'border border-transparent text-slate-600 hover:text-[#5D0B26]'
-                        }`}
-                      >
-                        <IconCalendar className="h-4 w-4" />
-                        Appointment
-                      </button>
-                    </div>
-                  </div>
-
-                  <div>
-                    <label htmlFor="reason-for-visit" className={LABEL_CLASS}>
-                      Reason for Visit
-                    </label>
-                    <textarea
-                      id="reason-for-visit"
-                      rows={2}
-                      value={reasonForVisit}
-                      onChange={(e) => setReasonForVisit(e.target.value)}
-                      placeholder="Main complaint / reason for visit…"
-                      className="w-full rounded-lg border border-slate-300 bg-white p-3 text-sm font-medium text-slate-900 shadow-2xs transition-colors placeholder:text-slate-400 hover:border-slate-400 focus:border-[#8E1C3D] focus:outline-none focus:ring-2 focus:ring-[#8E1C3D]/15"
-                    />
-                  </div>
-
-                  {/* Live summary of what will be booked */}
-                  <div className="rounded-lg border-l-2 border-[#C39A35] bg-[#FBF5F7] px-3 py-2">
-                    <p className="text-xs font-bold uppercase tracking-wider text-slate-500">
-                      Booking summary
-                    </p>
-                    <p className="truncate text-xs font-semibold text-[#5D0B26]">
-                      {selectedDepartment?.name_en || 'No department selected'}
-                    </p>
-                    <p className="truncate text-xs text-slate-600">
-                      {selectedDoctor?.name_en || 'No doctor selected'}
-                    </p>
-                  </div>
-                </div>
-              </section>
-
-              {/* SECTION 5: Token desk preview */}
-              <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xs">
-                <SectionHeader
-                  index="5"
-                  title="Token Desk"
-                  hint="Live ticket preview, printed on save"
-                  icon={<IconTicket className="h-4 w-4" />}
-                />
-
-                <div className="p-5 sm:p-6">
-                  <QueueTicketPreview
-                    departmentName={selectedDepartment?.name_en || 'General OPD'}
-                    doctorName={selectedDoctor?.name_en || 'Select doctor'}
-                    tokenPrefix={tokenPrefix}
-                    tokenNumber={allocatedToken}
-                    emptyLabel="Token on save"
-                    cabinCode={cabinCode}
-                    patientName={fullName.trim() || 'New Patient'}
-                    patientUrn={createdPatient?.urn || 'URN on save'}
-                    waitingCount={0}
-                    hasNextToken={allocatedToken != null}
-                  />
-                </div>
-              </section>
-            </div>
-            )}
           </div>
 
           {/* Bottom action bar */}

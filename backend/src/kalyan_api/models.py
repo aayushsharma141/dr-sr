@@ -578,6 +578,32 @@ class AppointmentStatus(StrEnum):
     DONE = "DONE"
     CANCELLED = "CANCELLED"
     NO_SHOW = "NO_SHOW"
+    # Replaced by a new linked appointment (RF-11); the old row keeps its history.
+    RESCHEDULED = "RESCHEDULED"
+
+
+class ConsultationStatus(StrEnum):
+    """Doctor-side consultation state of one appointment (RF-10)."""
+
+    WAITING = "WAITING"
+    IN_CONSULTATION = "IN_CONSULTATION"
+    COMPLETED = "COMPLETED"
+    CANCELLED = "CANCELLED"
+
+
+class AppointmentSource(StrEnum):
+    """How an appointment was made (RF-10)."""
+
+    PHONE = "PHONE"
+    WALK_IN = "WALK_IN"
+
+
+class VisitStatus(StrEnum):
+    """Reception visit lifecycle: opened at check-in, closed or cancelled at checkout (RF-10)."""
+
+    OPEN = "OPEN"
+    CLOSED = "CLOSED"
+    CANCELLED = "CANCELLED"
 
 
 class DailyTokenSequence(Base):
@@ -601,6 +627,74 @@ class DailyTokenSequence(Base):
     )
 
 
+class Visit(Base):
+    """A patient's visit at reception on one day, opened at check-in (RF-10)."""
+
+    __tablename__ = "visits"
+    __table_args__ = (
+        CheckConstraint("status IN ('OPEN', 'CLOSED', 'CANCELLED')", name="status_valid"),
+        CheckConstraint(
+            "status <> 'CLOSED' OR (closed_at IS NOT NULL AND closed_by_user_id IS NOT NULL)",
+            name="closed_fields_present",
+        ),
+        CheckConstraint(
+            "status <> 'CANCELLED' OR (cancelled_at IS NOT NULL"
+            " AND cancelled_by_user_id IS NOT NULL AND cancel_reason IS NOT NULL)",
+            name="cancelled_fields_present",
+        ),
+        # Target of fk_appointments_visit_patient (same-patient rule, as SEC-03).
+        UniqueConstraint("id", "patient_id", name="uq_visits_id_patient"),
+        # At most one OPEN visit per patient at any time.
+        Index(
+            "ix_visits_one_open_per_patient",
+            "patient_id",
+            unique=True,
+            postgresql_where=text("status = 'OPEN'"),
+        ),
+        Index("ix_visits_patient_date", "patient_id", "visit_date"),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    patient_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("patients.id", ondelete="RESTRICT"), nullable=False
+    )
+    visit_date: Mapped[date] = mapped_column(Date, nullable=False)
+    status: Mapped[str] = mapped_column(
+        String(16),
+        default=VisitStatus.OPEN.value,
+        server_default=text(f"'{VisitStatus.OPEN.value}'"),
+        nullable=False,
+    )
+    opened_by_user_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("users.id", ondelete="RESTRICT"), nullable=False
+    )
+    opened_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    closed_by_user_id: Mapped[int | None] = mapped_column(
+        BigInteger, ForeignKey("users.id", ondelete="RESTRICT"), nullable=True
+    )
+    closed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    close_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+    cancelled_by_user_id: Mapped[int | None] = mapped_column(
+        BigInteger, ForeignKey("users.id", ondelete="RESTRICT"), nullable=True
+    )
+    cancelled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    cancel_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+    version_id: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
+
+    __mapper_args__ = {"version_id_col": version_id}
+
+
 class Appointment(Base):
     """Per-doctor daily appointment booking with atomic token and status (APT-01, APT-02)."""
 
@@ -616,6 +710,19 @@ class Appointment(Base):
         UniqueConstraint("id", "patient_id", name="uq_appointments_id_patient"),
         Index("ix_appointments_doctor_date_status", "doctor_id", "appointment_date", "status"),
         Index("ix_appointments_patient_date", "patient_id", "appointment_date"),
+        # Same-patient rule for visit links (RF-10, as SEC-03).
+        ForeignKeyConstraint(
+            ["visit_id", "patient_id"],
+            ["visits.id", "visits.patient_id"],
+            name="fk_appointments_visit_patient",
+            ondelete="RESTRICT",
+        ),
+        CheckConstraint("source IS NULL OR source IN ('PHONE', 'WALK_IN')", name="source_valid"),
+        CheckConstraint(
+            "consultation_status IS NULL OR consultation_status IN"
+            " ('WAITING', 'IN_CONSULTATION', 'COMPLETED', 'CANCELLED')",
+            name="consultation_status_valid",
+        ),
     )
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
@@ -629,7 +736,8 @@ class Appointment(Base):
         BigInteger, ForeignKey("departments.id", ondelete="RESTRICT"), nullable=True, index=True
     )
     appointment_date: Mapped[date] = mapped_column(Date, nullable=False, index=True)
-    token_number: Mapped[int] = mapped_column(Integer, nullable=False)
+    # Issued at check-in, not at booking (RF-10). NULL until the patient checks in.
+    token_number: Mapped[int | None] = mapped_column(Integer, nullable=True)
     status: Mapped[str] = mapped_column(
         String(32),
         default=AppointmentStatus.BOOKED.value,
@@ -640,6 +748,15 @@ class Appointment(Base):
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
     check_in_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    visit_id: Mapped[int | None] = mapped_column(
+        BigInteger, ForeignKey("visits.id", ondelete="RESTRICT"), nullable=True, index=True
+    )
+    source: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    expected_time: Mapped[time | None] = mapped_column(Time, nullable=True)
+    rescheduled_from_id: Mapped[int | None] = mapped_column(
+        BigInteger, ForeignKey("appointments.id", ondelete="RESTRICT"), nullable=True
+    )
+    consultation_status: Mapped[str | None] = mapped_column(String(16), nullable=True)
     cancellation_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_by_user_id: Mapped[int] = mapped_column(

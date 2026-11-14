@@ -87,7 +87,11 @@ def get_patient_timeline(
                 id=f"APPOINTMENT-{appt.id}",
                 event_type="APPOINTMENT",
                 event_date=appt.created_at,
-                title=f"Token #{appt.token_number}: Appointment with {_doctor_title(doc_name)}",
+                title=(
+                    f"Token #{appt.token_number}: Appointment with {_doctor_title(doc_name)}"
+                    if appt.token_number is not None
+                    else f"Appointment with {_doctor_title(doc_name)}"
+                ),
                 subtitle=f"Status: {appt.status}",
                 summary=appt.notes,
                 badge=appt.status,

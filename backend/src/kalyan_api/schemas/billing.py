@@ -1,6 +1,6 @@
 """Pydantic schemas for payments, sequential receipts, reversals, and pending dues (Phase 15)."""
 
-from datetime import datetime
+from datetime import date, datetime
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -92,3 +92,19 @@ class PendingDueOut(BaseModel):
     balance_paise: int
     total_sessions: int
     completed_sessions: int
+
+
+class VisitDueOut(BaseModel):
+    """A consultation fee still owed on a visit that was closed with a balance (RF-23)."""
+
+    visit_id: int
+    appointment_id: int
+    patient_id: int
+    patient_urn: str
+    patient_name: str
+    doctor_name_en: str
+    visit_date: date
+    fee_paise: int
+    paid_paise: int
+    balance_paise: int
+    close_reason: str | None = None

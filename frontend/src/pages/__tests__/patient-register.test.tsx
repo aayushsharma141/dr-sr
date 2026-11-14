@@ -156,6 +156,73 @@ describe('Patient Registration Screen', () => {
     expect((capturedBody as any)?.mobile).toBe('9876543210')
   })
 
+  it('registers the patient only: no visit or token fields, no visit calls, and the Token Desk is a separate step', async () => {
+    const requests: string[] = []
+
+    const mockFetch = vi.fn().mockImplementation((url: string, init?: RequestInit) => {
+      requests.push(`${init?.method ?? 'GET'} ${url}`)
+      if (url.includes('/api/auth/me')) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          headers: new Headers({ 'content-type': 'application/json' }),
+          text: () => Promise.resolve(JSON.stringify(mockMe)),
+        })
+      }
+      if (url.includes('/api/patients/check-duplicate')) {
+        const noDup: DuplicateCheckResponse = { has_duplicate: false, matching_patient: null }
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          headers: new Headers({ 'content-type': 'application/json' }),
+          text: () => Promise.resolve(JSON.stringify(noDup)),
+        })
+      }
+      if (url.includes('/api/patients') && init?.method === 'POST') {
+        return Promise.resolve({
+          ok: true,
+          status: 201,
+          headers: new Headers({ 'content-type': 'application/json' }),
+          text: () => Promise.resolve(JSON.stringify(mockRegisteredPatient)),
+        })
+      }
+      return Promise.reject(new Error(`Unhandled: ${url}`))
+    })
+    vi.stubGlobal('fetch', mockFetch)
+
+    const user = userEvent.setup()
+    render(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter>
+          <PatientRegister />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    )
+
+    // No department, doctor or visit type on the registration form.
+    expect(screen.queryByLabelText(/Department/i)).not.toBeInTheDocument()
+    expect(screen.queryByLabelText(/Reason for Visit/i)).not.toBeInTheDocument()
+
+    await user.type(screen.getByLabelText(/Full Name \*/i), 'Aarav Kumar')
+    await user.type(screen.getByLabelText(/Father \/ Guardian/i), 'Suresh Kumar')
+    await user.type(screen.getByLabelText(/Mobile Number \*/i), '9876543210')
+    await user.type(screen.getByLabelText(/Age \(Years\)/i), '30')
+    await user.type(screen.getByLabelText(/Address \(Village/i), 'Main Bazaar, Ara')
+    await user.click(screen.getByRole('button', { name: /register patient/i }))
+
+    await waitFor(() => {
+      expect(screen.getByText('Registration Successful!')).toBeInTheDocument()
+    })
+
+    // Registration issues no queue token and touches no visit or appointment.
+    expect(screen.queryByText(/Allocated Queue Token/i)).not.toBeInTheDocument()
+    expect(requests.some((r) => /\/api\/(appointments|visits|encounters)/.test(r))).toBe(false)
+    expect(screen.getByRole('link', { name: /Issue Queue Token at Token Desk/i })).toHaveAttribute(
+      'href',
+      '/reception/tokens',
+    )
+  })
+
   it('shows duplicate warning when duplicate match is found and requires override check', async () => {
     const mockFetch = vi.fn().mockImplementation((url: string) => {
       if (url.includes('/api/auth/me')) {

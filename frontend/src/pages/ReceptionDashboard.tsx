@@ -140,7 +140,7 @@ export function ReceptionDashboard({ overview: initialOverview }: ReceptionDashb
         const matchName = appt.patient_name.toLowerCase().includes(q)
         const matchUrn = appt.patient_urn.toLowerCase().includes(q)
         const matchMobile = appt.patient_mobile ? appt.patient_mobile.includes(q) : false
-        const matchToken = String(appt.token_number).includes(q)
+        const matchToken = appt.token_number != null && String(appt.token_number).includes(q)
         if (!matchName && !matchUrn && !matchMobile && !matchToken) {
           return false
         }
@@ -643,7 +643,9 @@ export function ReceptionDashboard({ overview: initialOverview }: ReceptionDashb
                         {/* Token # */}
                         <td className="py-3.5 px-4 text-center">
                           <span className="inline-block px-2.5 py-1 rounded-md text-sm font-black bg-neutral-900 text-white font-mono shadow-2xs">
-                            #{String(appt.token_number).padStart(2, '0')}
+                            {appt.token_number == null
+                              ? '—'
+                              : `#${String(appt.token_number).padStart(2, '0')}`}
                           </span>
                         </td>
 
@@ -977,7 +979,7 @@ export function ReceptionDashboard({ overview: initialOverview }: ReceptionDashb
         >
           <div className="space-y-4">
             <p className="text-xs text-neutral-600">
-              Provide a valid operational cancellation reason for Token #{cancellingAppt.token_number} (
+              Provide a valid operational cancellation reason for {cancellingAppt.token_number != null ? `Token #${cancellingAppt.token_number}` : 'this booking'} (
               <strong>{cancellingAppt.patient_name}</strong>).
             </p>
 
@@ -1051,7 +1053,9 @@ export function ReceptionDashboard({ overview: initialOverview }: ReceptionDashb
               <div className="py-2">
                 <span className="text-xs text-neutral-500 uppercase">Token No</span>
                 <div className="text-4xl font-black text-neutral-900 tracking-tight">
-                  P-{String(printTokenAppt.token_number).padStart(3, '0')}
+                  {printTokenAppt.token_number == null
+                    ? '—'
+                    : `P-${String(printTokenAppt.token_number).padStart(3, '0')}`}
                 </div>
               </div>
 

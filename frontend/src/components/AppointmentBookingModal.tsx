@@ -24,9 +24,11 @@ export function AppointmentBookingModal({
   const [selectedDepartmentId, setSelectedDepartmentId] = useState<number | ''>('')
   const [selectedDoctorId, setSelectedDoctorId] = useState<number | ''>('')
   const [appointmentDate, setAppointmentDate] = useState(istToday)
+  const [expectedTime, setExpectedTime] = useState('')
   const [notes, setNotes] = useState('')
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
-  const [allocatedToken, setAllocatedToken] = useState<number | null>(null)
+  // The token is issued at check-in, so a booking is confirmed without one.
+  const [isBooked, setIsBooked] = useState(false)
 
   const { data: departments } = useDepartments()
   const { data: doctors } = useDepartmentDoctors(selectedDepartmentId || null)
@@ -58,14 +60,16 @@ export function AppointmentBookingModal({
     }
 
     try {
-      const res = await bookMutation.mutateAsync({
+      await bookMutation.mutateAsync({
         patient_id: selectedPatient.id,
         department_id: Number(selectedDepartmentId),
         doctor_id: Number(selectedDoctorId),
         appointment_date: appointmentDate,
+        expected_time: expectedTime || null,
+        source: 'PHONE',
         notes: notes.trim() || null,
       })
-      setAllocatedToken(res.token_number)
+      setIsBooked(true)
       if (onSuccess) onSuccess()
     } catch (err: unknown) {
       if (err instanceof Error) {
@@ -77,7 +81,7 @@ export function AppointmentBookingModal({
   }
 
   const handleClose = () => {
-    setAllocatedToken(null)
+    setIsBooked(false)
     setErrorMsg(null)
     onClose()
   }
@@ -91,25 +95,25 @@ export function AppointmentBookingModal({
       className="max-w-lg"
     >
       <div className="space-y-6">
-        {allocatedToken !== null ? (
+        {isBooked ? (
           <div className="space-y-4 text-center py-4">
             <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-green-100 text-green-800 mb-2">
               <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
               </svg>
             </div>
-            <h4 className="text-xl font-bold text-neutral-900">Appointment Confirmed!</h4>
+            <h4 className="text-xl font-bold text-neutral-900">Appointment Booked</h4>
             <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
-              <p className="text-xs uppercase font-bold text-red-800 tracking-wider">
-                Assigned Daily Token
-              </p>
-              <p className="text-4xl font-extrabold text-red-900 mt-1">
-                Token #{allocatedToken}
-              </p>
-              <p className="text-sm text-neutral-700 mt-2">
+              <p className="text-sm text-neutral-700">
                 Patient: <span className="font-semibold">{selectedPatient?.full_name}</span> ({selectedPatient?.urn})
               </p>
-              <p className="text-xs text-neutral-600">Date: {appointmentDate}</p>
+              <p className="text-xs text-neutral-600 mt-1">
+                Date: {appointmentDate}
+                {expectedTime ? ` · expected ${expectedTime}` : ''}
+              </p>
+              <p className="text-xs text-neutral-600 mt-3">
+                The queue token is issued when the patient arrives and is checked in at the Token Desk.
+              </p>
             </div>
             <button
               onClick={handleClose}
@@ -242,6 +246,20 @@ export function AppointmentBookingModal({
               />
             </div>
 
+            {/* Expected time: shown to spot late arrivals; the doctor still sees patients by token. */}
+            <div>
+              <label htmlFor="expected-time-input" className="block text-xs font-semibold text-neutral-700 uppercase mb-1">
+                Expected Time (Optional)
+              </label>
+              <input
+                id="expected-time-input"
+                type="time"
+                value={expectedTime}
+                onChange={(e) => setExpectedTime(e.target.value)}
+                className="w-full p-2 border border-neutral-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-red-800"
+              />
+            </div>
+
             {/* Notes */}
             <div>
               <label htmlFor="notes-input" className="block text-xs font-semibold text-neutral-700 uppercase mb-1">
@@ -270,7 +288,7 @@ export function AppointmentBookingModal({
                 disabled={bookMutation.isPending || !selectedPatient || !selectedDoctorId}
                 className="px-4 py-2 bg-red-900 text-white rounded text-sm font-medium hover:bg-red-800 disabled:opacity-50"
               >
-                {bookMutation.isPending ? 'Booking...' : 'Confirm & Allocate Token'}
+                {bookMutation.isPending ? 'Booking...' : 'Confirm Booking'}
               </button>
             </div>
           </form>

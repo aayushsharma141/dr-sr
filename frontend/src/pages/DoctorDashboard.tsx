@@ -11,7 +11,7 @@ import {
   useUpdateAppointmentStatus,
 } from '../api/queries'
 import type { DoctorQueueItem } from '../api/types'
-import { withDoctorTitle } from '../format'
+import { formatToken, withDoctorTitle } from '../format'
 
 type DoctorStatus = 'AVAILABLE' | 'IN_CONSULTATION' | 'ON_BREAK' | 'IN_OT'
 type ViewMode = '3ZONE' | 'KANBAN'
@@ -173,7 +173,7 @@ export function DoctorDashboard() {
         const matches =
           item.patient_name.toLowerCase().includes(q) ||
           item.patient_urn.toLowerCase().includes(q) ||
-          String(item.token_number).includes(q) ||
+          String(item.token_number ?? '').includes(q) ||
           (item.patient_mobile && item.patient_mobile.includes(q))
         if (!matches) return false
       }
@@ -289,13 +289,13 @@ export function DoctorDashboard() {
             version_id: target.version_id,
           },
         })
-        setToastMessage(`Called Token #${target.token_number} (${target.patient_name}) → Room ${cabinCode}`)
+        setToastMessage(`Called Token ${formatToken(target.token_number)} (${target.patient_name}) → Room ${cabinCode}`)
       } catch {
         // Optimistic / fallback: select patient even if status mutation is in progress
-        setToastMessage(`Token #${target.token_number} called`)
+        setToastMessage(`Token ${formatToken(target.token_number)} called`)
       }
     } else {
-      setToastMessage(`Selected Token #${target.token_number} (${target.patient_name})`)
+      setToastMessage(`Selected Token ${formatToken(target.token_number)} (${target.patient_name})`)
     }
     setTimeout(() => setToastMessage(null), 4000)
   }
@@ -306,10 +306,10 @@ export function DoctorDashboard() {
     let updated: number[]
     if (isHeld) {
       updated = labHoldIds.filter((id) => id !== item.id)
-      setToastMessage(`Resumed Token #${item.token_number} from Lab Hold`)
+      setToastMessage(`Resumed Token ${formatToken(item.token_number)} from Lab Hold`)
     } else {
       updated = [...labHoldIds, item.id]
-      setToastMessage(`Token #${item.token_number} placed on Lab Hold (Pending Diagnostics)`)
+      setToastMessage(`Token ${formatToken(item.token_number)} placed on Lab Hold (Pending Diagnostics)`)
     }
     setLabHoldIds(updated)
     try {
@@ -330,7 +330,7 @@ export function DoctorDashboard() {
           version_id: item.version_id,
         },
       })
-      setToastMessage(`Consultation finished for Token #${item.token_number}.`)
+      setToastMessage(`Consultation finished for Token ${formatToken(item.token_number)}.`)
       // Clear scratchpad
       setSoapNotes({ subjective: '', objective: '', assessment: '', plan: '' })
       setPrescribedMeds([])
@@ -404,7 +404,7 @@ export function DoctorDashboard() {
                   : 'bg-slate-900 text-white'
               }`}
             >
-              #{item.token_number}
+              {formatToken(item.token_number)}
             </span>
 
             {/* Priority & Type Badges */}
@@ -599,7 +599,7 @@ export function DoctorDashboard() {
           <div className="min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
               <span className="inline-flex items-center justify-center h-6 px-2 rounded-md font-mono font-bold text-xs bg-slate-900 text-white">
-                #{patient.token_number}
+                {formatToken(patient.token_number)}
               </span>
               <h3 className="text-base font-bold text-slate-900 truncate">
                 {patient.patient_name}
@@ -1015,7 +1015,7 @@ export function DoctorDashboard() {
               >
                 <span>Current Token:</span>
                 <span className="font-mono text-sm">
-                  {activeConsultationItem ? `#${activeConsultationItem.token_number}` : 'None'}
+                  {activeConsultationItem ? formatToken(activeConsultationItem.token_number) : 'None'}
                 </span>
               </div>
 
@@ -1265,7 +1265,7 @@ export function DoctorDashboard() {
                               {currentChartPatient.patient_urn}
                             </span>
                             <span className="rounded bg-purple-100 px-2 py-0.5 font-mono text-xs font-bold text-purple-900">
-                              Token #{currentChartPatient.token_number}
+                              Token {formatToken(currentChartPatient.token_number)}
                             </span>
                           </div>
                           <p className="text-xs text-slate-500 mt-1">
@@ -1695,7 +1695,7 @@ export function DoctorDashboard() {
                     <div className="flex items-center gap-2">
                       <span className="h-2.5 w-2.5 rounded-full bg-purple-600 animate-pulse" />
                       <span className="font-semibold">
-                        Selected Patient: <strong className="font-bold">Token #{currentChartPatient.token_number} · {currentChartPatient.patient_name}</strong> ({currentChartPatient.patient_urn})
+                        Selected Patient: <strong className="font-bold">Token {formatToken(currentChartPatient.token_number)} · {currentChartPatient.patient_name}</strong> ({currentChartPatient.patient_urn})
                       </span>
                     </div>
                     <button

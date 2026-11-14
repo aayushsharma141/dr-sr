@@ -50,6 +50,7 @@ def _setup_patient_and_appointment(
         appointment_date=datetime.now(UTC).date(),
         token_number=1,
         status="ARRIVED",
+        consultation_status="WAITING",
         created_by_user_id=reception_user.id,
     )
     session.add(appt)
@@ -74,7 +75,39 @@ def test_issuance_captures_snapshots_and_retains_after_correction(
     doc_c: TestClient = login_client(doctor_a_user)
     admin_c: TestClient = login_client(admin_user)
 
-    # 1. Issue Payment via Reception
+    # 1. Issue Encounter via Doctor
+    enc_resp = doc_c.post(
+        "/api/encounters",
+        json={
+            "patient_id": patient.id,
+            "appointment_id": appt.id,
+            "symptoms": "Knee joint pain",
+            "clinical_notes": "Mild swelling right knee",
+            "diagnosis": "Right Knee Osteoarthritis",
+        },
+    )
+    assert enc_resp.status_code == 201, enc_resp.text
+    enc_data = enc_resp.json()
+    encounter_id = enc_data["id"]
+
+    assert enc_data["patient_name"] == patient.full_name
+    assert enc_data["patient_urn"] == patient.urn
+    assert enc_data["patient_mobile"] == patient.mobile
+    assert enc_data["patient_address"] == patient.address
+
+    # The doctor finalises the encounter, which completes the consultation.
+    fin_resp = doc_c.post(
+        f"/api/encounters/{encounter_id}/finalise",
+        json={
+            "symptoms": "Knee joint pain",
+            "diagnosis": "Right Knee Osteoarthritis",
+            "clinical_notes": "Mild swelling right knee",
+            "finalise_notes": "Consultation concluded",
+        },
+    )
+    assert fin_resp.status_code == 200, fin_resp.text
+
+    # 2. Issue Payment via Reception: fees are taken only after the consultation is completed
     pay_resp = rec_c.post(
         "/api/payments",
         json={
@@ -94,26 +127,6 @@ def test_issuance_captures_snapshots_and_retains_after_correction(
     assert pay_data["patient_urn"] == patient.urn
     assert pay_data["patient_mobile"] == patient.mobile
     assert pay_data["patient_address"] == patient.address
-
-    # 2. Issue Encounter via Doctor
-    enc_resp = doc_c.post(
-        "/api/encounters",
-        json={
-            "patient_id": patient.id,
-            "appointment_id": appt.id,
-            "symptoms": "Knee joint pain",
-            "clinical_notes": "Mild swelling right knee",
-            "diagnosis": "Right Knee Osteoarthritis",
-        },
-    )
-    assert enc_resp.status_code == 201, enc_resp.text
-    enc_data = enc_resp.json()
-    encounter_id = enc_data["id"]
-
-    assert enc_data["patient_name"] == patient.full_name
-    assert enc_data["patient_urn"] == patient.urn
-    assert enc_data["patient_mobile"] == patient.mobile
-    assert enc_data["patient_address"] == patient.address
 
     # 3. Issue Prescription via Doctor
     rx_resp = doc_c.post(
@@ -209,8 +222,32 @@ def test_payment_snapshot_tamper_protection(
     patient, appt = _setup_patient_and_appointment(db_session, reception_user, doctor_a_user, uid)
     rec_c: TestClient = login_client(reception_user)
     admin_c: TestClient = login_client(admin_user)
+    doc_c: TestClient = login_client(doctor_a_user)
 
-    # Record payment
+    # The doctor opens and finalises the encounter, which completes the consultation.
+    enc_resp = doc_c.post(
+        "/api/encounters",
+        json={
+            "patient_id": patient.id,
+            "appointment_id": appt.id,
+            "symptoms": "Fever",
+            "clinical_notes": "Mild cough",
+            "diagnosis": "Viral fever",
+        },
+    )
+    assert enc_resp.status_code == 201, enc_resp.text
+    fin_resp = doc_c.post(
+        f"/api/encounters/{enc_resp.json()['id']}/finalise",
+        json={
+            "symptoms": "Fever",
+            "diagnosis": "Viral fever",
+            "clinical_notes": "Mild cough",
+            "finalise_notes": "Consultation concluded",
+        },
+    )
+    assert fin_resp.status_code == 200, fin_resp.text
+
+    # Record payment after the consultation is completed
     p_resp = rec_c.post(
         "/api/payments",
         json={

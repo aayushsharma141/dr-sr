@@ -4,9 +4,11 @@
 from datetime import date
 
 import pytest
+from conftest import check_in_appointment
 from sqlalchemy import text
 from sqlalchemy.exc import DBAPIError
 
+from kalyan_api import clock
 from kalyan_api.models import Appointment, AppointmentStatus, ClinicalEncounter, Patient
 
 
@@ -33,6 +35,7 @@ def test_draft_consultation_save_and_update(login_client, doctor_a_user, db_sess
         status=AppointmentStatus.BOOKED.value,
         created_by_user_id=doctor_a_user.id,
     )
+    check_in_appointment(appt)  # a doctor only starts a consultation for a checked-in patient
     db_session.add(appt)
     db_session.flush()
 
@@ -162,7 +165,7 @@ def test_appointment_check_in_sets_check_in_at(
     appt = Appointment(
         patient_id=patient.id,
         doctor_id=doctor_a_user.doctor_id,
-        appointment_date=date(2026, 11, 10),
+        appointment_date=clock.ist_today(),  # check-in only works on the appointment date
         token_number=15,
         status=AppointmentStatus.BOOKED.value,
         created_by_user_id=reception_user.id,

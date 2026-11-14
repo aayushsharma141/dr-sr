@@ -9,6 +9,7 @@ Guarantees:
 import uuid
 from collections.abc import Callable
 from dataclasses import dataclass
+from datetime import timedelta
 from typing import Any
 
 from conftest import TEST_PASSWORD
@@ -17,6 +18,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 from test_route_policies import _policies, walk_routes
 
+from kalyan_api import clock
 from kalyan_api.config import Settings
 from kalyan_api.models import User
 
@@ -251,6 +253,40 @@ def _patch_appointment_status_payload(target: Any = None) -> dict[str, Any]:
         "status": "ARRIVED",
         "version_id": ver,
     }
+
+
+def _version_payload(target: Any = None) -> dict[str, Any]:
+    ver = target.version_id if target and hasattr(target, "version_id") else 1
+    return {"version_id": ver}
+
+
+def _walk_in_payload(target: Any = None) -> dict[str, Any]:
+    return {
+        "patient_id": getattr(target, "patient_id", 1),
+        "doctor_id": getattr(target, "doctor_id", 1),
+        "department_id": getattr(target, "department_id", 1),
+        "notes": "Matrix walk-in",
+    }
+
+
+def _reschedule_payload(target: Any = None) -> dict[str, Any]:
+    ver = target.version_id if target and hasattr(target, "version_id") else 1
+    return {
+        "version_id": ver,
+        "appointment_date": (clock.ist_today() + timedelta(days=7)).isoformat(),
+        "reason": "Matrix reschedule",
+    }
+
+
+def _close_visit_payload(target: Any = None) -> dict[str, Any]:
+    ver = target.version_id if target and hasattr(target, "version_id") else 1
+    # A reason is accepted whether or not money is due, so the cell does not depend on fees.
+    return {"version_id": ver, "reason": "Matrix visit close"}
+
+
+def _cancel_visit_payload(target: Any = None) -> dict[str, Any]:
+    ver = target.version_id if target and hasattr(target, "version_id") else 1
+    return {"version_id": ver, "reason": "Matrix visit cancel"}
 
 
 def _create_encounter_payload(target: Any = None) -> dict[str, Any]:
@@ -578,6 +614,31 @@ MATRIX: list[MatrixRow] = [
     MatrixRow(
         method="GET",
         path="/api/billing/pending-dues",
+        body_factory=None,
+        expected={
+            "anonymous": 401,
+            "admin": 200,
+            "reception": 200,
+            "doctor_a": 403,
+            "doctor_b": 403,
+        },
+    ),
+    # RF-23: dues of closed visits and today's receipts (reception sees today only).
+    MatrixRow(
+        method="GET",
+        path="/api/billing/visit-dues",
+        body_factory=None,
+        expected={
+            "anonymous": 401,
+            "admin": 200,
+            "reception": 200,
+            "doctor_a": 403,
+            "doctor_b": 403,
+        },
+    ),
+    MatrixRow(
+        method="GET",
+        path="/api/billing/receipts/today",
         body_factory=None,
         expected={
             "anonymous": 401,
@@ -1071,12 +1132,99 @@ MATRIX: list[MatrixRow] = [
         method="PATCH",
         path="/api/appointments/{id}/status",
         body_factory=_patch_appointment_status_payload,
+        # The payload asks for ARRIVED, which is a check-in and so reception work (RF-12, owner
+        # decision 10). The treating doctor used to be allowed; now they get 403.
         expected={
             "anonymous": 401,
             "admin": 403,
             "reception": 200,
-            "doctor_a": 200,
+            "doctor_a": 403,
             "doctor_b": 404,
+        },
+    ),
+    # RF-12: check-in, walk-in, reschedule and reception visits.
+    MatrixRow(
+        method="POST",
+        path="/api/appointments/walk-in",
+        body_factory=_walk_in_payload,
+        expected={
+            "anonymous": 401,
+            "admin": 403,
+            "reception": 201,
+            "doctor_a": 403,
+            "doctor_b": 403,
+        },
+    ),
+    MatrixRow(
+        method="POST",
+        path="/api/appointments/{id}/check-in",
+        body_factory=_version_payload,
+        expected={
+            "anonymous": 401,
+            "admin": 403,
+            "reception": 200,
+            "doctor_a": 403,
+            "doctor_b": 403,
+        },
+    ),
+    MatrixRow(
+        method="POST",
+        path="/api/appointments/{id}/reschedule",
+        body_factory=_reschedule_payload,
+        expected={
+            "anonymous": 401,
+            "admin": 403,
+            "reception": 201,
+            "doctor_a": 403,
+            "doctor_b": 404,
+        },
+    ),
+    MatrixRow(
+        method="GET",
+        path="/api/visits",
+        body_factory=None,
+        expected={
+            "anonymous": 401,
+            "admin": 200,
+            "reception": 200,
+            "doctor_a": 403,
+            "doctor_b": 403,
+        },
+    ),
+    MatrixRow(
+        method="GET",
+        path="/api/visits/{id}",
+        body_factory=None,
+        expected={
+            "anonymous": 401,
+            "admin": 200,
+            "reception": 200,
+            "doctor_a": 403,
+            "doctor_b": 403,
+        },
+    ),
+    MatrixRow(
+        method="POST",
+        path="/api/visits/{id}/close",
+        body_factory=_close_visit_payload,
+        expected={
+            "anonymous": 401,
+            "admin": 403,
+            "reception": 200,
+            "doctor_a": 403,
+            "doctor_b": 403,
+        },
+    ),
+    MatrixRow(
+        method="POST",
+        path="/api/visits/{id}/cancel",
+        body_factory=_cancel_visit_payload,
+        expected={
+            "anonymous": 401,
+            "admin": 403,
+            "reception": 200,
+            "doctor_a": 403,
+            "doctor_b": 403,
         },
     ),
     MatrixRow(
