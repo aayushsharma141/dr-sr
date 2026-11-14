@@ -972,6 +972,8 @@ export function useCreateEncounter() {
         body,
       }),
     onSuccess: (data) => {
+      // The workspace opens this record next; seeding the cache avoids a second load.
+      qc.setQueryData(['encounter', data.id], data)
       qc.invalidateQueries({ queryKey: ['patient-encounters', data.patient_id] })
       qc.invalidateQueries({ queryKey: ['doctor-queue'] })
       qc.invalidateQueries({ queryKey: ['appointments'] })
@@ -1044,10 +1046,12 @@ export function useAddAddendum() {
 }
 
 // Phase 19: Universal Consultation Workspace Hooks
-export function useSaveEncounterDraft(id: number) {
+// The save hooks take the encounter id with each call, not when the hook is created: a new
+// consultation gets its id during the first save, and later saves in that same call must use it.
+export function useSaveEncounterDraft() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (body: EncounterUpdate) =>
+    mutationFn: ({ id, body }: { id: number; body: EncounterUpdate }) =>
       apiFetch<EncounterRead>(`/encounters/${id}`, {
         method: 'PATCH',
         body,
@@ -1089,15 +1093,15 @@ export function useEncounterVitals(encounterId: number) {
   })
 }
 
-export function useSaveVitals(encounterId: number) {
+export function useSaveVitals() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (body: VitalObservationInput) =>
+    mutationFn: ({ encounterId, body }: { encounterId: number; body: VitalObservationInput }) =>
       apiFetch<VitalObservationResponse>(`/encounters/${encounterId}/vitals`, {
         method: 'PUT',
         body,
       }),
-    onSuccess: (data) => {
+    onSuccess: (data, { encounterId }) => {
       qc.setQueryData(['encounter-vitals', encounterId], data)
     },
   })
@@ -1120,15 +1124,15 @@ export function useEncounterTemplateResponse(encounterId: number) {
   })
 }
 
-export function useSaveEncounterTemplateResponse(encounterId: number) {
+export function useSaveEncounterTemplateResponse() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (body: TemplateResponseInput) =>
+    mutationFn: ({ encounterId, body }: { encounterId: number; body: TemplateResponseInput }) =>
       apiFetch<TemplateResponseRead>(`/encounters/${encounterId}/template-response`, {
         method: 'PUT',
         body,
       }),
-    onSuccess: (data) => {
+    onSuccess: (data, { encounterId }) => {
       qc.setQueryData(['encounter-template-response', encounterId], data)
     },
   })
@@ -1196,15 +1200,16 @@ export function useEncounterFollowUp(encounterId: number) {
   })
 }
 
-export function useCreateFollowUp(encounterId: number) {
+/** The server keeps one follow-up per encounter and has no update call, so this is sent once. */
+export function useCreateFollowUp() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (body: FollowUpRecommendationCreate) =>
+    mutationFn: ({ encounterId, body }: { encounterId: number; body: FollowUpRecommendationCreate }) =>
       apiFetch<DoctorFollowUpResponse>(`/encounters/${encounterId}/follow-up`, {
         method: 'POST',
         body,
       }),
-    onSuccess: (data) => {
+    onSuccess: (data, { encounterId }) => {
       qc.setQueryData(['encounter-follow-up', encounterId], data)
     },
   })

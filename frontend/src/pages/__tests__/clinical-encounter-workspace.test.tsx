@@ -434,13 +434,31 @@ describe('Clinical Encounter Workspace Test Suite', () => {
       const jumpRail = screen.getByTestId('jump-navigation-rail')
       expect(jumpRail).toBeInTheDocument()
 
-      // Verify all 6 continuous section anchors exist
-      expect(screen.getByRole('button', { name: /1\. Chief Complaints & HPI/i })).toBeInTheDocument()
-      expect(screen.getByRole('button', { name: /2\. Vital Signs & Biometrics/i })).toBeInTheDocument()
-      expect(screen.getByRole('button', { name: /3\. Specialty Assessment/i })).toBeInTheDocument()
-      expect(screen.getByRole('button', { name: /4\. Diagnosis & Impressions/i })).toBeInTheDocument()
-      expect(screen.getByRole('button', { name: /5\. Prescriptions & Medications/i })).toBeInTheDocument()
-      expect(screen.getByRole('button', { name: /6\. Follow-up Recommendation/i })).toBeInTheDocument()
+      // All 6 section tabs exist, in page order, each pointing at a section that is on the page
+      const tabs = within(jumpRail).getAllByRole('button')
+      expect(tabs.map((tab) => tab.textContent)).toEqual([
+        '1Complaints',
+        '2Vitals',
+        '3Assessment',
+        '4Diagnosis',
+        '5Prescription',
+        '6Follow-up',
+      ])
+      const sectionIds = [
+        'section-complaints',
+        'section-vitals',
+        'section-specialty',
+        'section-diagnosis',
+        'section-prescriptions',
+        'section-followup',
+      ]
+      const sections = sectionIds.map((id) => screen.getByTestId(id))
+      // Sections appear in the same order as the tabs.
+      for (let i = 1; i < sections.length; i += 1) {
+        expect(
+          sections[i - 1].compareDocumentPosition(sections[i]) & Node.DOCUMENT_POSITION_FOLLOWING,
+        ).toBeTruthy()
+      }
     })
 
     it('renders persistent side panel with previous encounter card and selective copy buttons', async () => {
@@ -454,7 +472,7 @@ describe('Clinical Encounter Workspace Test Suite', () => {
       // Prior encounter card
       const priorCard = await screen.findByTestId('prior-encounter-card')
       expect(priorCard).toBeInTheDocument()
-      expect(screen.getByText(/Previous Consultation Card/i)).toBeInTheDocument()
+      expect(within(priorCard).getByRole('heading', { name: 'Previous Consultation' })).toBeInTheDocument()
 
       // Shows prior findings
       expect(screen.getByText(/Prior: Acute lower back stiffness/i)).toBeInTheDocument()
@@ -839,6 +857,274 @@ describe('Clinical Encounter Workspace Test Suite', () => {
       expect(clinicalReasonInput).toBeInTheDocument()
 
       expect(screen.getByText(/omitted from reception booking queues/i)).toBeInTheDocument()
+    })
+  })
+
+  // =========================================================================
+  // Saving a consultation: nothing the doctor enters is lost
+  // =========================================================================
+  describe('saving a consultation', () => {
+    const json = (status: number, body: unknown) =>
+      Promise.resolve({
+        ok: status >= 200 && status < 300,
+        status,
+        headers: new Headers({ 'content-type': 'application/json' }),
+        text: () => Promise.resolve(JSON.stringify(body)),
+      })
+
+    type Call = { url: string; method: string; body: any }
+    function calls(mockFetch: ReturnType<typeof vi.fn>): Call[] {
+      return mockFetch.mock.calls.map(([url, init]) => {
+        const req = init as RequestInit | undefined
+        return {
+          url: String(url),
+          method: (req?.method ?? 'GET').toUpperCase(),
+          body: req?.body ? JSON.parse(String(req.body)) : undefined,
+        }
+      })
+    }
+
+    function renderAt(path: string) {
+      return render(
+        <QueryClientProvider client={queryClient}>
+          <MemoryRouter initialEntries={[path]}>
+            <Routes>
+              <Route path="/doctor/encounters/new" element={<ClinicalEncounterWorkspace />} />
+              <Route path="/doctor/encounters/:id" element={<ClinicalEncounterWorkspace />} />
+              <Route path="/doctor" element={<div>Doctor Dashboard</div>} />
+            </Routes>
+          </MemoryRouter>
+        </QueryClientProvider>,
+      )
+    }
+
+    it('opens the appointment encounter when a consultation starts from the queue, and saves vitals to it', async () => {
+      const base = setupDefaultFetchMocks()
+      const mockFetch = vi.fn().mockImplementation((url: string, init?: RequestInit) => {
+        if (String(url) === '/api/encounters' && init?.method === 'POST') {
+          // DWS-01: the server returns the appointment's encounter (here an existing draft)
+          return json(200, mockEncounterPhysio)
+        }
+        return base(url, init)
+      })
+      vi.stubGlobal('fetch', mockFetch)
+
+      renderAt('/doctor/encounters/new?patient_id=101&appointment_id=5')
+
+      // The draft already on the server is shown, not a blank unsaved form
+      expect(await screen.findByText(/Consultation draft/i)).toBeInTheDocument()
+      expect(document.getElementById('diagnosis-input')).toHaveValue('Lumbar Radiculopathy')
+      const opens = calls(mockFetch).filter((c) => c.url === '/api/encounters' && c.method === 'POST')
+      expect(opens).toHaveLength(1)
+      expect(opens[0].body).toMatchObject({ patient_id: 101, appointment_id: 5 })
+
+      const weight = screen.getByLabelText(/Weight \(kg\)/i)
+      fireEvent.change(weight, { target: { value: '72' } })
+      fireEvent.blur(weight)
+
+      await waitFor(() => {
+        const put = calls(mockFetch).find((c) => c.method === 'PUT' && c.url.includes('/vitals'))
+        expect(put?.url).toBe('/api/encounters/10/vitals')
+        expect(put?.body).toMatchObject({ weight_kg: 72 })
+      })
+      expect(calls(mockFetch).some((c) => c.url.includes('/encounters/0'))).toBe(false)
+    })
+
+    it('says why a consultation cannot be opened instead of showing a form that cannot save', async () => {
+      const base = setupDefaultFetchMocks()
+      const mockFetch = vi.fn().mockImplementation((url: string, init?: RequestInit) => {
+        if (String(url) === '/api/encounters' && init?.method === 'POST') {
+          return json(422, {
+            code: 'not_checked_in',
+            message: 'The patient has not been checked in for this appointment. Ask reception to check them in first.',
+          })
+        }
+        return base(url, init)
+      })
+      vi.stubGlobal('fetch', mockFetch)
+
+      renderAt('/doctor/encounters/new?patient_id=101&appointment_id=5')
+
+      const alert = await screen.findByRole('alert')
+      expect(alert).toHaveTextContent(/has not been checked in/i)
+      expect(within(alert).getByRole('link', { name: /Back to consultation queue/i })).toBeInTheDocument()
+      expect(screen.queryByLabelText(/Chief Complaints & Symptoms/i)).not.toBeInTheDocument()
+    })
+
+    it('creates a consultation without an appointment on its first save and sends later saves to it', async () => {
+      const created = { ...mockEncounterPhysio, id: 77, appointment_id: null, symptoms: '', clinical_notes: '', diagnosis: '' }
+      const base = setupDefaultFetchMocks({ encounter: created })
+      const mockFetch = vi.fn().mockImplementation((url: string, init?: RequestInit) => {
+        if (String(url) === '/api/encounters' && init?.method === 'POST') {
+          const body = JSON.parse(String(init.body))
+          return json(201, { ...created, symptoms: body.symptoms, clinical_notes: body.clinical_notes, diagnosis: body.diagnosis })
+        }
+        return base(url, init)
+      })
+      vi.stubGlobal('fetch', mockFetch)
+
+      renderAt('/doctor/encounters/new?patient_id=101')
+
+      const symptomsInput = await screen.findByLabelText(/Chief Complaints & Symptoms/i)
+      fireEvent.change(symptomsInput, { target: { value: 'Knee pain for 3 days' } })
+      const weight = screen.getByLabelText(/Weight \(kg\)/i)
+      fireEvent.change(weight, { target: { value: '64' } })
+      fireEvent.blur(weight)
+
+      await waitFor(() => {
+        const put = calls(mockFetch).find((c) => c.method === 'PUT' && c.url.includes('/vitals'))
+        expect(put?.url).toBe('/api/encounters/77/vitals')
+        expect(put?.body).toMatchObject({ weight_kg: 64 })
+      })
+      const creates = calls(mockFetch).filter((c) => c.url === '/api/encounters' && c.method === 'POST')
+      expect(creates).toHaveLength(1)
+      expect(creates[0].body).toMatchObject({ patient_id: 101, symptoms: 'Knee pain for 3 days' })
+      expect(creates[0].body.appointment_id ?? null).toBeNull()
+
+      // The form keeps what was typed; the record loaded from the server does not replace it
+      expect(screen.getByLabelText(/Chief Complaints & Symptoms/i)).toHaveValue('Knee pain for 3 days')
+      expect(screen.getByLabelText(/Weight \(kg\)/i)).toHaveValue(64)
+
+      // The next edit updates the same record
+      fireEvent.change(screen.getByLabelText(/Chief Complaints & Symptoms/i), {
+        target: { value: 'Knee pain for 3 days, worse on stairs' },
+      })
+      fireEvent.blur(screen.getByLabelText(/Chief Complaints & Symptoms/i))
+      await waitFor(() => {
+        const patch = calls(mockFetch).find((c) => c.method === 'PATCH')
+        expect(patch?.url).toBe('/api/encounters/77')
+        expect(patch?.body).toMatchObject({ symptoms: 'Knee pain for 3 days, worse on stairs', version_id: 1 })
+      })
+      expect(calls(mockFetch).filter((c) => c.url === '/api/encounters' && c.method === 'POST')).toHaveLength(1)
+      expect(calls(mockFetch).some((c) => c.url.includes('/encounters/0'))).toBe(false)
+    })
+
+    it('keeps what the doctor types while a save is in flight, and saves it next with the new version', async () => {
+      const base = setupDefaultFetchMocks()
+      const patchBodies: any[] = []
+      let releaseFirst: () => void = () => {}
+      const mockFetch = vi.fn().mockImplementation((url: string, init?: RequestInit) => {
+        if (String(url) === '/api/encounters/10' && init?.method === 'PATCH') {
+          const body = JSON.parse(String(init.body))
+          patchBodies.push(body)
+          const reply = () => json(200, { ...mockEncounterPhysio, ...body, version_id: body.version_id + 1 })
+          if (patchBodies.length === 1) {
+            return new Promise((resolve) => {
+              releaseFirst = () => resolve(reply())
+            })
+          }
+          return reply()
+        }
+        return base(url, init)
+      })
+      vi.stubGlobal('fetch', mockFetch)
+
+      renderWorkspace(10)
+
+      const input = await screen.findByLabelText(/Chief Complaints & Symptoms/i)
+      fireEvent.change(input, { target: { value: 'Neck pain' } })
+      fireEvent.blur(input)
+      await waitFor(() => expect(patchBodies).toHaveLength(1))
+
+      // The doctor keeps typing while the first save is still on its way
+      fireEvent.change(input, { target: { value: 'Neck pain, worse at night' } })
+      fireEvent.blur(input)
+      releaseFirst()
+
+      await waitFor(() => expect(patchBodies).toHaveLength(2))
+      expect(screen.getByLabelText(/Chief Complaints & Symptoms/i)).toHaveValue('Neck pain, worse at night')
+      expect(patchBodies[0]).toMatchObject({ symptoms: 'Neck pain', version_id: 1 })
+      // The queued save carries the version the first save returned: no false conflict
+      expect(patchBodies[1]).toMatchObject({ symptoms: 'Neck pain, worse at night', version_id: 2 })
+      await waitFor(() => {
+        expect(screen.getByTestId('auto-save-pill')).toHaveTextContent(/Saved to server at/i)
+      })
+      expect(screen.queryByText(/modified in another session/i)).not.toBeInTheDocument()
+    })
+
+    it('saves pending vitals before finalising and sends the follow-up once', async () => {
+      const base = setupDefaultFetchMocks()
+      const mockFetch = vi.fn().mockImplementation((url: string, init?: RequestInit) => {
+        const u = String(url)
+        if (u === '/api/encounters/10/follow-up' && init?.method === 'POST') {
+          const body = JSON.parse(String(init.body))
+          return json(201, {
+            id: 3,
+            encounter_id: 10,
+            patient_id: 101,
+            recommended_date: body.recommended_date,
+            recommended_doctor_id: body.recommended_doctor_id ?? 1,
+            clinical_reason: body.clinical_reason ?? null,
+            status: 'PENDING',
+          })
+        }
+        if (u === '/api/encounters/10/finalise') {
+          return json(200, { ...mockEncounterPhysio, is_finalised: true, finalised_at: '2026-11-15T10:00:00Z', version_id: 3 })
+        }
+        return base(url, init)
+      })
+      vi.stubGlobal('fetch', mockFetch)
+
+      renderWorkspace(10)
+
+      // Typed, but the 3-second auto-save has not run yet
+      const weight = await screen.findByLabelText(/Weight \(kg\)/i)
+      fireEvent.change(weight, { target: { value: '70' } })
+      fireEvent.change(screen.getByLabelText(/Recommended Review Date/i), { target: { value: '2026-12-01' } })
+      expect(screen.getByTestId('follow-up-save-note')).toHaveTextContent(/sent to reception when you finalise/i)
+
+      const header = screen.getByTestId('sticky-clinical-header')
+      fireEvent.click(within(header).getByRole('button', { name: /Finalise Consultation/i }))
+      fireEvent.click(await screen.findByRole('button', { name: /Yes, Lock & Finalise/i }))
+      expect(await screen.findByText(/Finalised & Locked/)).toBeInTheDocument()
+
+      const log = calls(mockFetch)
+      const vitalsAt = log.findIndex((c) => c.method === 'PUT' && c.url === '/api/encounters/10/vitals')
+      const followUpAt = log.findIndex((c) => c.method === 'POST' && c.url === '/api/encounters/10/follow-up')
+      const finaliseAt = log.findIndex((c) => c.url === '/api/encounters/10/finalise')
+      expect(vitalsAt).toBeGreaterThan(-1)
+      expect(log[vitalsAt].body).toMatchObject({ weight_kg: 70 })
+      expect(followUpAt).toBeGreaterThan(vitalsAt)
+      expect(log[followUpAt].body).toMatchObject({ recommended_date: '2026-12-01' })
+      expect(finaliseAt).toBeGreaterThan(followUpAt)
+      // Finalise carries the version the flush returned
+      expect(log[finaliseAt].body).toMatchObject({ version_id: 2 })
+      expect(log.filter((c) => c.url.endsWith('/follow-up') && c.method === 'POST')).toHaveLength(1)
+    })
+
+    it('does not send the follow-up on auto-save, so a second save cannot hit "follow-up already exists"', async () => {
+      const mockFetch = setupDefaultFetchMocks()
+      vi.stubGlobal('fetch', mockFetch)
+
+      renderWorkspace(10)
+
+      const input = await screen.findByLabelText(/Chief Complaints & Symptoms/i)
+      fireEvent.change(screen.getByLabelText(/Recommended Review Date/i), { target: { value: '2026-12-01' } })
+      fireEvent.change(input, { target: { value: 'Shoulder pain' } })
+      fireEvent.blur(input)
+      await waitFor(() => {
+        expect(screen.getByTestId('auto-save-pill')).toHaveTextContent(/Saved to server at/i)
+      })
+      fireEvent.change(input, { target: { value: 'Shoulder pain, right' } })
+      fireEvent.blur(input)
+      await waitFor(() => expect(calls(mockFetch).filter((c) => c.method === 'PATCH')).toHaveLength(2))
+      expect(calls(mockFetch).some((c) => c.method === 'POST' && c.url.endsWith('/follow-up'))).toBe(false)
+    })
+
+    it('warns on Finalise that medicines not yet authorised will not be saved', async () => {
+      const mockFetch = setupDefaultFetchMocks()
+      vi.stubGlobal('fetch', mockFetch)
+
+      renderWorkspace(10)
+
+      await userEvent.click(await screen.findByRole('button', { name: /Add Medication Item/i }))
+      await userEvent.type(screen.getByPlaceholderText(/e\.g\. Paracetamol/i), 'Paracetamol')
+
+      const header = screen.getByTestId('sticky-clinical-header')
+      fireEvent.click(within(header).getByRole('button', { name: /Finalise Consultation/i }))
+      expect(await screen.findByTestId('unauthorised-medicines-warning')).toHaveTextContent(
+        /1 medicine is in\s+Prescription but not authorised/i,
+      )
     })
   })
 })

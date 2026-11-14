@@ -88,28 +88,28 @@ export function QuickPhraseBar({ departmentCode, onSelectPhrase }: QuickPhraseBa
   }
 
   return (
-    <div className="space-y-2 mb-3">
-      <div className="flex items-center justify-between">
-        <span className="text-xs font-medium text-slate-700 flex items-center gap-1.5">
-          <IconNotes size={14} className="text-teal-700" />
-          <span>Quick Symptoms & Complaints (Click to insert):</span>
+    <div className="mb-4 space-y-2">
+      <div className="flex items-center justify-between gap-3">
+        <span className="flex items-center gap-1.5 text-xs font-semibold text-slate-600">
+          <IconNotes size={14} className="text-slate-500" aria-hidden="true" />
+          <span>Quick phrases — click to add</span>
         </span>
 
         {!isAdding && (
           <button
             type="button"
             onClick={() => setIsAdding(true)}
-            className="inline-flex items-center gap-1 text-xs font-semibold text-teal-700 hover:text-teal-900 bg-teal-50 hover:bg-teal-100 border border-teal-200/80 px-2 py-0.5 rounded-md transition-colors"
+            className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-100 hover:text-slate-900"
             title="Add a custom quick phrase for one-click re-use"
           >
-            <IconPlus size={13} stroke={2.2} />
+            <IconPlus size={13} stroke={2.2} aria-hidden="true" />
             <span>Add Custom Phrase</span>
           </button>
         )}
       </div>
 
       {isAdding && (
-        <div className="flex items-center gap-2 p-2 bg-teal-50/70 border border-teal-200 rounded-lg">
+        <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 p-2">
           <input
             type="text"
             aria-label="New quick phrase text"
@@ -123,23 +123,24 @@ export function QuickPhraseBar({ departmentCode, onSelectPhrase }: QuickPhraseBa
                 setIsAdding(false)
               }
             }}
-            placeholder="Type doctor's common phrase (e.g. Lumbar spine spasm)..."
-            className="flex-1 text-xs px-2.5 py-1.5 bg-white border border-slate-300 rounded focus:ring-1 focus:ring-teal-600 focus:outline-none"
+            placeholder="Type a phrase you use often (e.g. Lumbar spine spasm)..."
+            className="flex-1 rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-sm focus:border-[#8E1C3D] focus:outline-none focus:ring-2 focus:ring-[#8E1C3D]/15"
             autoFocus
           />
           <button
             type="button"
             onClick={handleAddCustomPhrase}
-            className="px-2.5 py-1.5 bg-teal-700 hover:bg-teal-800 text-white rounded text-xs font-semibold inline-flex items-center gap-1 shadow-2xs"
+            className="inline-flex items-center gap-1 rounded-md bg-slate-800 px-2.5 py-1.5 text-xs font-semibold text-white hover:bg-slate-900"
           >
-            <IconCheck size={14} />
+            <IconCheck size={14} aria-hidden="true" />
             <span>Save</span>
           </button>
           <button
             type="button"
             onClick={() => setIsAdding(false)}
-            className="p-1.5 text-slate-500 hover:text-slate-700 rounded text-xs"
+            className="rounded-md p-1.5 text-slate-500 hover:bg-slate-100 hover:text-slate-700"
             title="Cancel"
+            aria-label="Cancel adding phrase"
           >
             <IconX size={14} />
           </button>
@@ -153,7 +154,7 @@ export function QuickPhraseBar({ departmentCode, onSelectPhrase }: QuickPhraseBa
             key={phrase}
             type="button"
             onClick={() => onSelectPhrase(phrase)}
-            className="text-xs px-2.5 py-1 bg-white hover:bg-teal-50 text-slate-700 hover:text-teal-900 border border-slate-200 hover:border-teal-300 rounded-md font-normal transition-all shadow-2xs text-left"
+            className="rounded-full border border-slate-200 bg-white px-3 py-1 text-left text-xs text-slate-700 transition-colors hover:border-slate-300 hover:bg-slate-50 hover:text-slate-900"
           >
             + {phrase}
           </button>
@@ -162,15 +163,21 @@ export function QuickPhraseBar({ departmentCode, onSelectPhrase }: QuickPhraseBa
         {customPhrases.map((phrase) => (
           <span
             key={phrase}
-            onClick={() => onSelectPhrase(phrase)}
-            className="group cursor-pointer inline-flex items-center gap-1 text-xs px-2.5 py-1 bg-teal-50 hover:bg-teal-100 text-teal-900 border border-teal-200 rounded-md font-medium transition-all shadow-2xs"
+            className="inline-flex items-center rounded-full border border-slate-300 bg-slate-100 text-xs text-slate-800"
           >
-            <span>+ {phrase}</span>
+            <button
+              type="button"
+              onClick={() => onSelectPhrase(phrase)}
+              className="rounded-l-full py-1 pl-3 pr-1.5 text-left hover:text-slate-950"
+            >
+              + {phrase}
+            </button>
             <button
               type="button"
               onClick={(e) => handleDeleteCustomPhrase(phrase, e)}
-              className="opacity-40 group-hover:opacity-100 text-teal-700 hover:text-red-700 p-0.5 rounded"
+              className="mr-1 rounded-full p-0.5 text-slate-500 hover:bg-slate-200 hover:text-red-700"
               title="Remove quick phrase"
+              aria-label={`Remove quick phrase: ${phrase}`}
             >
               <IconX size={11} stroke={2.5} />
             </button>

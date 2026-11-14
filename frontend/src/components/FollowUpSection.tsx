@@ -1,5 +1,6 @@
 import type { DoctorOut } from '../api/types'
 import { istToday } from '../format'
+import { IconCalendarTime } from './icons'
 
 export interface FollowUpSectionProps {
   recommendedDate: string
@@ -38,9 +39,9 @@ export function FollowUpSection({
           <button
             type="button"
             onClick={onBookNow}
-            className="px-3.5 py-1.5 border border-[#8E1C3D] text-[#8E1C3D] rounded text-xs font-semibold hover:bg-[#8E1C3D]/5 flex items-center gap-1.5 transition-colors"
+            className="px-3.5 py-1.5 border border-[#8E1C3D] text-[#8E1C3D] rounded-lg text-xs font-semibold hover:bg-[#8E1C3D]/5 flex items-center gap-1.5 transition-colors"
           >
-            <span>📅</span>
+            <IconCalendarTime size={15} aria-hidden="true" />
             Book Follow-up Appointment
           </button>
         )}
