@@ -47,6 +47,7 @@ from kalyan_api.routers.timeline import router as timeline_router
 from kalyan_api.routers.treatment_plans import router as treatment_plans_router
 from kalyan_api.routers.treatment_sessions import router as treatment_sessions_router
 from kalyan_api.routers.users import router as users_router
+from kalyan_api.routers.visits import router as visits_router
 from kalyan_api.routers.vitals import router as vitals_router
 
 logger = logging.getLogger("kalyan_api.main")
@@ -168,6 +169,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(exports_router, prefix="/api")
     app.include_router(appointments_router, prefix="/api")
     app.include_router(doctor_router, prefix="/api")
+    app.include_router(visits_router, prefix="/api")
     app.include_router(encounters_router, prefix="/api")
     app.include_router(templates_router, prefix="/api")
     app.include_router(admin_templates_router, prefix="/api")

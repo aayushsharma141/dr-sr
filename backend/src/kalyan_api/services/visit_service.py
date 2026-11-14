@@ -36,7 +36,14 @@ def lock_open_visit(session: Session, patient_id: int) -> Visit | None:
 
 
 def open_or_join_visit(session: Session, patient_id: int, opened_by_user_id: int) -> Visit:
-    """Return today's OPEN visit for the patient, opening one if there is none.
+    """Return today's OPEN visit for the patient, opening one if there is none."""
+    return join_or_open_visit(session, patient_id, opened_by_user_id)[0]
+
+
+def join_or_open_visit(
+    session: Session, patient_id: int, opened_by_user_id: int
+) -> tuple[Visit, bool]:
+    """Return (visit, opened): today's OPEN visit for the patient, and whether this call opened it.
 
     The patient row is locked first, so two desks checking in the same patient at once cannot
     both open a visit. An OPEN visit left over from an earlier day is not joined: reception must
@@ -63,7 +70,7 @@ def open_or_join_visit(session: Session, patient_id: int, opened_by_user_id: int
                 ),
                 details={"visit_id": visit.id, "visit_date": visit.visit_date.isoformat()},
             )
-        return visit
+        return visit, False
 
     visit = Visit(
         patient_id=patient_id,
@@ -73,7 +80,7 @@ def open_or_join_visit(session: Session, patient_id: int, opened_by_user_id: int
     )
     session.add(visit)
     session.flush()
-    return visit
+    return visit, True
 
 
 def visit_consultations(session: Session, visit_id: int) -> list[Appointment]:

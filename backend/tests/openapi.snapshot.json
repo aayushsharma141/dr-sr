@@ -432,6 +432,19 @@
             "title": "Doctor Id",
             "type": "integer"
           },
+          "expected_time": {
+            "anyOf": [
+              {
+                "format": "time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Time the patient said they would come; shown to spot late arrivals (RF-12)",
+            "title": "Expected Time"
+          },
           "notes": {
             "anyOf": [
               {
@@ -463,6 +476,17 @@
             "exclusiveMinimum": 0.0,
             "title": "Patient Id",
             "type": "integer"
+          },
+          "source": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AppointmentSource"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "How the appointment was made (RF-12); empty when unknown"
           }
         },
         "required": [
@@ -527,6 +551,17 @@
             ],
             "title": "Check In At"
           },
+          "consultation_status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Consultation Status"
+          },
           "created_at": {
             "format": "date-time",
             "title": "Created At",
@@ -562,6 +597,18 @@
             ],
             "title": "Doctor Name Hi"
           },
+          "expected_time": {
+            "anyOf": [
+              {
+                "format": "time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expected Time"
+          },
           "id": {
             "title": "Id",
             "type": "integer"
@@ -593,6 +640,28 @@
             "title": "Patient Urn",
             "type": "string"
           },
+          "rescheduled_from_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rescheduled From Id"
+          },
+          "source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source"
+          },
           "status": {
             "title": "Status",
             "type": "string"
@@ -603,8 +672,15 @@
             "type": "string"
           },
           "token_number": {
-            "title": "Token Number",
-            "type": "integer"
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Token Number"
           },
           "updated_at": {
             "format": "date-time",
@@ -614,6 +690,17 @@
           "version_id": {
             "title": "Version Id",
             "type": "integer"
+          },
+          "visit_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Visit Id"
           }
         },
         "required": [
@@ -625,7 +712,6 @@
           "doctor_id",
           "doctor_name_en",
           "appointment_date",
-          "token_number",
           "status",
           "status_updated_at",
           "version_id",
@@ -634,6 +720,15 @@
         ],
         "title": "AppointmentRead",
         "type": "object"
+      },
+      "AppointmentSource": {
+        "description": "How an appointment was made (RF-10).",
+        "enum": [
+          "PHONE",
+          "WALK_IN"
+        ],
+        "title": "AppointmentSource",
+        "type": "string"
       },
       "AppointmentStatus": {
         "description": "Appointment workflow status (APT-02).",
@@ -1728,6 +1823,22 @@
           "new_password"
         ],
         "title": "ChangePasswordRequest",
+        "type": "object"
+      },
+      "CheckInRequest": {
+        "description": "Payload to check a booked patient in on arrival (RF-12).",
+        "properties": {
+          "version_id": {
+            "description": "Optimistic locking version ID",
+            "exclusiveMinimum": 0.0,
+            "title": "Version Id",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "version_id"
+        ],
+        "title": "CheckInRequest",
         "type": "object"
       },
       "ClinicSettingsOut": {
@@ -2931,6 +3042,17 @@
       "DoctorQueueItem": {
         "description": "Item in doctor consultation queue.",
         "properties": {
+          "consultation_status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Consultation Status"
+          },
           "id": {
             "title": "Id",
             "type": "integer"
@@ -2984,8 +3106,15 @@
             "type": "string"
           },
           "token_number": {
-            "title": "Token Number",
-            "type": "integer"
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Token Number"
           },
           "version_id": {
             "title": "Version Id",
@@ -3001,7 +3130,6 @@
           "patient_age",
           "patient_mobile",
           "patient_allergies",
-          "token_number",
           "status",
           "status_updated_at",
           "version_id"
@@ -6699,6 +6827,55 @@
         "title": "ReceptionOverviewResponse",
         "type": "object"
       },
+      "RescheduleRequest": {
+        "description": "Payload to move a booking to another date, or to change its expected time (RF-12).",
+        "properties": {
+          "appointment_date": {
+            "description": "New date; today or later",
+            "format": "date",
+            "title": "Appointment Date",
+            "type": "string"
+          },
+          "expected_time": {
+            "anyOf": [
+              {
+                "format": "time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "New expected time, if any",
+            "title": "Expected Time"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Why it was moved",
+            "title": "Reason"
+          },
+          "version_id": {
+            "description": "Optimistic locking version ID",
+            "exclusiveMinimum": 0.0,
+            "title": "Version Id",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "version_id",
+          "appointment_date"
+        ],
+        "title": "RescheduleRequest",
+        "type": "object"
+      },
       "ResolveDuplicatesRequest": {
         "additionalProperties": false,
         "description": "Batch duplicate decision submission.",
@@ -8448,6 +8625,411 @@
         "title": "ValidationSummaryResponse",
         "type": "object"
       },
+      "VisitCancelRequest": {
+        "description": "Payload to cancel a visit in which nobody was seen.",
+        "properties": {
+          "reason": {
+            "description": "Why the visit is cancelled",
+            "maxLength": 500,
+            "minLength": 1,
+            "title": "Reason",
+            "type": "string"
+          },
+          "version_id": {
+            "description": "Optimistic locking version ID",
+            "exclusiveMinimum": 0.0,
+            "title": "Version Id",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "version_id",
+          "reason"
+        ],
+        "title": "VisitCancelRequest",
+        "type": "object"
+      },
+      "VisitCloseRequest": {
+        "description": "Payload to close a visit at checkout (\"Patient Out\").",
+        "properties": {
+          "reason": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Required when money is still due; the balance moves to Pending Dues",
+            "title": "Reason"
+          },
+          "version_id": {
+            "description": "Optimistic locking version ID",
+            "exclusiveMinimum": 0.0,
+            "title": "Version Id",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "version_id"
+        ],
+        "title": "VisitCloseRequest",
+        "type": "object"
+      },
+      "VisitConsultation": {
+        "description": "One doctor's consultation inside a visit.",
+        "properties": {
+          "appointment_date": {
+            "format": "date",
+            "title": "Appointment Date",
+            "type": "string"
+          },
+          "appointment_id": {
+            "title": "Appointment Id",
+            "type": "integer"
+          },
+          "appointment_status": {
+            "title": "Appointment Status",
+            "type": "string"
+          },
+          "consultation_status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Consultation Status"
+          },
+          "doctor_id": {
+            "title": "Doctor Id",
+            "type": "integer"
+          },
+          "doctor_name_en": {
+            "title": "Doctor Name En",
+            "type": "string"
+          },
+          "token_number": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Token Number"
+          }
+        },
+        "required": [
+          "appointment_id",
+          "doctor_id",
+          "doctor_name_en",
+          "appointment_status",
+          "appointment_date"
+        ],
+        "title": "VisitConsultation",
+        "type": "object"
+      },
+      "VisitDetail": {
+        "description": "A visit with its consultations and the balance still due on it.",
+        "properties": {
+          "cancel_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cancel Reason"
+          },
+          "cancelled_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cancelled At"
+          },
+          "cancelled_by_user_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cancelled By User Id"
+          },
+          "close_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Close Reason"
+          },
+          "closed_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Closed At"
+          },
+          "closed_by_user_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Closed By User Id"
+          },
+          "consultations": {
+            "items": {
+              "$ref": "#/components/schemas/VisitConsultation"
+            },
+            "title": "Consultations",
+            "type": "array"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "opened_at": {
+            "format": "date-time",
+            "title": "Opened At",
+            "type": "string"
+          },
+          "opened_by_user_id": {
+            "title": "Opened By User Id",
+            "type": "integer"
+          },
+          "outstanding_paise": {
+            "description": "Consultation fees of completed consultations not yet covered by payments linked to those appointments (interim, until invoices exist)",
+            "minimum": 0.0,
+            "title": "Outstanding Paise",
+            "type": "integer"
+          },
+          "patient_id": {
+            "title": "Patient Id",
+            "type": "integer"
+          },
+          "patient_name": {
+            "title": "Patient Name",
+            "type": "string"
+          },
+          "patient_urn": {
+            "title": "Patient Urn",
+            "type": "string"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "version_id": {
+            "title": "Version Id",
+            "type": "integer"
+          },
+          "visit_date": {
+            "format": "date",
+            "title": "Visit Date",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "patient_id",
+          "patient_urn",
+          "patient_name",
+          "visit_date",
+          "status",
+          "opened_by_user_id",
+          "opened_at",
+          "version_id",
+          "consultations",
+          "outstanding_paise"
+        ],
+        "title": "VisitDetail",
+        "type": "object"
+      },
+      "VisitListResponse": {
+        "description": "Filtered visit list.",
+        "properties": {
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          },
+          "visits": {
+            "items": {
+              "$ref": "#/components/schemas/VisitRead"
+            },
+            "title": "Visits",
+            "type": "array"
+          }
+        },
+        "required": [
+          "total",
+          "visits"
+        ],
+        "title": "VisitListResponse",
+        "type": "object"
+      },
+      "VisitRead": {
+        "description": "A visit as listed to reception and admin.",
+        "properties": {
+          "cancel_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cancel Reason"
+          },
+          "cancelled_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cancelled At"
+          },
+          "cancelled_by_user_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cancelled By User Id"
+          },
+          "close_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Close Reason"
+          },
+          "closed_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Closed At"
+          },
+          "closed_by_user_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Closed By User Id"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "opened_at": {
+            "format": "date-time",
+            "title": "Opened At",
+            "type": "string"
+          },
+          "opened_by_user_id": {
+            "title": "Opened By User Id",
+            "type": "integer"
+          },
+          "patient_id": {
+            "title": "Patient Id",
+            "type": "integer"
+          },
+          "patient_name": {
+            "title": "Patient Name",
+            "type": "string"
+          },
+          "patient_urn": {
+            "title": "Patient Urn",
+            "type": "string"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "version_id": {
+            "title": "Version Id",
+            "type": "integer"
+          },
+          "visit_date": {
+            "format": "date",
+            "title": "Visit Date",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "patient_id",
+          "patient_urn",
+          "patient_name",
+          "visit_date",
+          "status",
+          "opened_by_user_id",
+          "opened_at",
+          "version_id"
+        ],
+        "title": "VisitRead",
+        "type": "object"
+      },
+      "VisitStatus": {
+        "description": "Reception visit lifecycle: opened at check-in, closed or cancelled at checkout (RF-10).",
+        "enum": [
+          "OPEN",
+          "CLOSED",
+          "CANCELLED"
+        ],
+        "title": "VisitStatus",
+        "type": "string"
+      },
       "VitalObservationInput": {
         "description": "Payload to record or update vitals for a clinical encounter.",
         "properties": {
@@ -8709,6 +9291,62 @@
           "updated_at"
         ],
         "title": "VitalObservationResponse",
+        "type": "object"
+      },
+      "WalkInCreate": {
+        "description": "Payload to register a walk-in: a booking for today that is checked in at once (RF-12).",
+        "properties": {
+          "department_id": {
+            "description": "Configured department/specialty ID",
+            "exclusiveMinimum": 0.0,
+            "title": "Department Id",
+            "type": "integer"
+          },
+          "doctor_id": {
+            "description": "Target doctor ID",
+            "exclusiveMinimum": 0.0,
+            "title": "Doctor Id",
+            "type": "integer"
+          },
+          "notes": {
+            "anyOf": [
+              {
+                "maxLength": 1000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Reception notes",
+            "title": "Notes"
+          },
+          "override_reason": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Reason of at least 5 characters to override a duplicate booking (BR-006)",
+            "title": "Override Reason"
+          },
+          "patient_id": {
+            "description": "Target patient ID",
+            "exclusiveMinimum": 0.0,
+            "title": "Patient Id",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "patient_id",
+          "doctor_id",
+          "department_id"
+        ],
+        "title": "WalkInCreate",
         "type": "object"
       }
     }
@@ -9692,7 +10330,7 @@
         ]
       },
       "post": {
-        "description": "Book a per-doctor daily appointment with atomic token generation (APT-01).",
+        "description": "Book a per-doctor daily appointment with atomic token generation (APT-01).\n\nStill issues the token at booking. RF-12 slice 2 moves that to check-in.",
         "operationId": "book_appointment_api_appointments_post",
         "requestBody": {
           "content": {
@@ -9754,6 +10392,48 @@
         ]
       }
     },
+    "/api/appointments/walk-in": {
+      "post": {
+        "description": "Register a walk-in: a booking for today checked in at once, with its token (RF-12).",
+        "operationId": "register_walk_in_api_appointments_walk_in_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WalkInCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AppointmentRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Register Walk In",
+        "tags": [
+          "appointments"
+        ]
+      }
+    },
     "/api/appointments/{id}": {
       "get": {
         "description": "Retrieve an appointment by ID.",
@@ -9792,6 +10472,112 @@
           }
         },
         "summary": "Get Appointment",
+        "tags": [
+          "appointments"
+        ]
+      }
+    },
+    "/api/appointments/{id}/check-in": {
+      "post": {
+        "description": "Check a booked patient in on arrival: visit, token and waiting list (RF-12).",
+        "operationId": "check_in_appointment_api_appointments__id__check_in_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "title": "Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CheckInRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AppointmentRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Check In Appointment",
+        "tags": [
+          "appointments"
+        ]
+      }
+    },
+    "/api/appointments/{id}/reschedule": {
+      "post": {
+        "description": "Move a booking to another date, keeping the old one in history (RF-12).\n\nReturns the new booking (201). A time-only change on the same date edits the booking in\nplace and returns it (200).",
+        "operationId": "reschedule_appointment_api_appointments__id__reschedule_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "title": "Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RescheduleRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AppointmentRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Reschedule Appointment",
         "tags": [
           "appointments"
         ]
@@ -14721,6 +15507,256 @@
         "summary": "Unlock Existing User",
         "tags": [
           "users"
+        ]
+      }
+    },
+    "/api/visits": {
+      "get": {
+        "description": "List visits, newest first.",
+        "operationId": "list_visits_api_visits_get",
+        "parameters": [
+          {
+            "description": "Filter by patient ID",
+            "in": "query",
+            "name": "patient_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by patient ID",
+              "title": "Patient Id"
+            }
+          },
+          {
+            "description": "Filter by status",
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/VisitStatus"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by status",
+              "title": "Status"
+            }
+          },
+          {
+            "description": "Filter by visit date",
+            "in": "query",
+            "name": "visit_date",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by visit date",
+              "title": "Visit Date"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 100,
+              "maximum": 500,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VisitListResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Visits",
+        "tags": [
+          "visits"
+        ]
+      }
+    },
+    "/api/visits/{id}": {
+      "get": {
+        "description": "Fetch a visit with its consultations and the balance still due on it.",
+        "operationId": "get_visit_api_visits__id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "title": "Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VisitDetail"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Visit",
+        "tags": [
+          "visits"
+        ]
+      }
+    },
+    "/api/visits/{id}/cancel": {
+      "post": {
+        "description": "Cancel a visit in which nobody was seen; every consultation must already be cancelled.",
+        "operationId": "cancel_visit_api_visits__id__cancel_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "title": "Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VisitCancelRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VisitDetail"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Cancel Visit",
+        "tags": [
+          "visits"
+        ]
+      }
+    },
+    "/api/visits/{id}/close": {
+      "post": {
+        "description": "Close the visit at checkout (\"Patient Out\"); a reason is needed while money is due.",
+        "operationId": "close_visit_api_visits__id__close_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "title": "Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VisitCloseRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VisitDetail"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Close Visit",
+        "tags": [
+          "visits"
         ]
       }
     }

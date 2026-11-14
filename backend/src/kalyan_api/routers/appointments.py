@@ -2,9 +2,8 @@
 
 from datetime import date
 
-from fastapi import APIRouter, Depends, Query, Request
+from fastapi import APIRouter, Depends, Query, Request, Response
 from sqlalchemy import select
-from sqlalchemy.orm import Session
 
 from kalyan_api import clock
 from kalyan_api.core.errors import ApiError, require_version
@@ -17,38 +16,30 @@ from kalyan_api.core.principal import (
     get_current_settings,
 )
 from kalyan_api.db.session import SessionDep
-from kalyan_api.models import Appointment, AppointmentStatus, Department, Doctor, Patient
+from kalyan_api.models import Appointment, AppointmentStatus, Doctor
 from kalyan_api.schemas.appointments import (
     AppointmentCreate,
     AppointmentListResponse,
     AppointmentRead,
     AppointmentStatusUpdate,
+    CheckInRequest,
     DoctorQueueItem,
     DoctorQueueResponse,
+    RescheduleRequest,
+    WalkInCreate,
 )
-from kalyan_api.services import audit_service, token_service
+from kalyan_api.services import audit_service, booking_service
 from kalyan_api.services.appointment_service import validate_status_transition
 from kalyan_api.services.audit_service import AuditAction
 
+# The booking locks moved to booking_service (RF-12); other routers and tests import them from here.
+from kalyan_api.services.booking_service import (  # noqa: F401
+    lock_department_for_booking,
+    lock_doctor_for_booking,
+)
+
 router = APIRouter(prefix="/appointments", tags=["appointments"])
 doctor_router = APIRouter(prefix="/doctor", tags=["doctor"])
-
-
-def lock_doctor_for_booking(session: Session, doctor_id: int) -> Doctor | None:
-    """Lock the doctor row, as assign_doctor_departments does, so membership changes are awaited."""
-    return session.scalar(select(Doctor).where(Doctor.id == doctor_id).with_for_update())
-
-
-def lock_department_for_booking(session: Session, department_id: int) -> Department | None:
-    """Read the department under a row lock, so a concurrent deactivation cannot slip past.
-
-    Deactivation locks the same row, so either this read waits for it and sees is_active=False,
-    or the deactivation waits for this booking to commit. Without the lock, a booking can read
-    the department as active while it is being deactivated and still insert the appointment.
-    """
-    return session.scalar(
-        select(Department).where(Department.id == department_id).with_for_update()
-    )
 
 
 def _to_read_schema(appt: Appointment) -> AppointmentRead:
@@ -70,10 +61,79 @@ def _to_read_schema(appt: Appointment) -> AppointmentRead:
         check_in_at=appt.check_in_at,
         cancellation_reason=appt.cancellation_reason,
         notes=appt.notes,
+        source=appt.source,
+        expected_time=appt.expected_time,
+        visit_id=appt.visit_id,
+        consultation_status=appt.consultation_status,
+        rescheduled_from_id=appt.rescheduled_from_id,
         version_id=appt.version_id,
         created_at=appt.created_at,
         updated_at=appt.updated_at,
     )
+
+
+def _record_booking_created(
+    session, ctx, appt: Appointment, override_text: str | None = None
+) -> None:
+    """Audit the creation of a booking; the keys of the original row are kept as they were."""
+    after: dict[str, object] = {
+        "patient_id": appt.patient_id,
+        "patient_urn": appt.patient.urn,
+        "doctor_id": appt.doctor_id,
+        "department_id": appt.department_id,
+        "appointment_date": appt.appointment_date.isoformat(),
+        "token_number": appt.token_number,
+        "status": appt.status,
+    }
+    if appt.source:
+        after["source"] = appt.source
+    if appt.expected_time:
+        after["expected_time"] = appt.expected_time.isoformat()
+    if appt.rescheduled_from_id:
+        after["rescheduled_from_id"] = appt.rescheduled_from_id
+    if override_text:
+        after["override_reason"] = override_text
+    audit_service.record(
+        session,
+        ctx,
+        action=AuditAction.APPOINTMENT_CREATED,
+        entity_type="appointment",
+        entity_id=appt.id,
+        after=after,
+    )
+
+
+def _record_check_in(session, ctx, result: booking_service.CheckInResult, before: dict) -> None:
+    """Audit a check-in, and the visit it opened when it opened one."""
+    appt = result.appointment
+    audit_service.record(
+        session,
+        ctx,
+        action=AuditAction.APPOINTMENT_CHECKED_IN,
+        entity_type="appointment",
+        entity_id=appt.id,
+        before=before,
+        after={
+            "status": appt.status,
+            "consultation_status": appt.consultation_status,
+            "token_number": appt.token_number,
+            "visit_id": appt.visit_id,
+            "version_id": appt.version_id,
+        },
+    )
+    if result.visit_opened:
+        audit_service.record(
+            session,
+            ctx,
+            action=AuditAction.VISIT_OPENED,
+            entity_type="visit",
+            entity_id=result.visit.id,
+            after={
+                "patient_id": result.visit.patient_id,
+                "visit_date": result.visit.visit_date.isoformat(),
+                "opened_by_appointment_id": appt.id,
+            },
+        )
 
 
 @router.post(
@@ -89,130 +149,152 @@ def book_appointment(
     principal: Principal = Depends(current_principal),
     settings=Depends(get_current_settings),
 ) -> AppointmentRead:
-    """Book a per-doctor daily appointment with atomic token generation (APT-01)."""
-    # 1. Validate active patient exists and lock row to serialize concurrent bookings (FB-03)
-    patient = session.get(Patient, payload.patient_id, with_for_update=True)
-    if not patient or not patient.is_active:
-        raise ApiError(
-            status_code=404,
-            code="patient_not_found",
-            message="Patient not found or inactive.",
-        )
+    """Book a per-doctor daily appointment with atomic token generation (APT-01).
 
-    # 2. Validate active doctor exists
-    doctor = lock_doctor_for_booking(session, payload.doctor_id)
-    if not doctor or not doctor.is_active:
-        raise ApiError(
-            status_code=404,
-            code="doctor_not_found",
-            message="Doctor not found or inactive.",
-        )
-
-    # 3. Verify that the selected doctor belongs to the requested active department.
-    department = lock_department_for_booking(session, payload.department_id)
-    if department is None:
-        raise ApiError(
-            status_code=422,
-            code="department_not_found",
-            message="Selected department does not exist.",
-        )
-    if not department.is_active:
-        raise ApiError(
-            status_code=422,
-            code="department_inactive",
-            message="Selected department is inactive and cannot accept new appointments.",
-        )
-    if department not in doctor.departments:
-        raise ApiError(
-            status_code=422,
-            code="doctor_department_mismatch",
-            message="Selected doctor is not assigned to the selected department.",
-        )
-
-    # 4. Enforce duplicate same-day booking prevention (BR-006)
-    active_statuses = [
-        AppointmentStatus.BOOKED.value,
-        AppointmentStatus.ARRIVED.value,
-        AppointmentStatus.IN_CONSULTATION.value,
-        AppointmentStatus.DONE.value,
-    ]
-    existing_appt = session.scalar(
-        select(Appointment).where(
-            Appointment.patient_id == payload.patient_id,
-            Appointment.doctor_id == payload.doctor_id,
-            Appointment.appointment_date == payload.appointment_date,
-            Appointment.status.in_(active_statuses),
-        )
-    )
-    if existing_appt is not None:
-        override = (payload.override_reason or "").strip()
-        if len(override) < 5:
-            raise ApiError(
-                status_code=409,
-                code="duplicate_appointment",
-                message=(
-                    "Patient already has an active appointment with this doctor on this date. "
-                    "An override reason of at least 5 characters is required."
-                ),
-                details={
-                    "existing_appointment_id": existing_appt.id,
-                    "existing_token_number": existing_appt.token_number,
-                    "existing_status": existing_appt.status,
-                },
-            )
-
-    # 5. Generate sequential token for (doctor_id, appointment_date)
-    token_num = token_service.generate_next_daily_token(
-        session, payload.doctor_id, payload.appointment_date
-    )
-
-    # 6. Create appointment
-    override_text = (payload.override_reason or "").strip() or None
-    final_notes = payload.notes
-    if override_text:
-        final_notes = (
-            f"{final_notes} | [Override: {override_text}]"
-            if final_notes
-            else f"[Override: {override_text}]"
-        )
-
-    appt = Appointment(
+    Still issues the token at booking. RF-12 slice 2 moves that to check-in.
+    """
+    appt = booking_service.create_booking(
+        session,
+        principal,
         patient_id=payload.patient_id,
         doctor_id=payload.doctor_id,
         department_id=payload.department_id,
         appointment_date=payload.appointment_date,
-        token_number=token_num,
-        status=AppointmentStatus.BOOKED.value,
-        notes=final_notes,
-        created_by_user_id=principal.user_id,
+        notes=payload.notes,
+        override_reason=payload.override_reason,
+        source=payload.source,
+        expected_time=payload.expected_time,
+        issue_token=True,
     )
-    session.add(appt)
-    session.flush()
+    override_text = (payload.override_reason or "").strip() or None
+    _record_booking_created(session, build_audit_context(request, principal), appt, override_text)
+    return _to_read_schema(appt)
 
-    # 7. Audit creation
+
+@router.post(
+    "/walk-in",
+    response_model=AppointmentRead,
+    status_code=201,
+    dependencies=[Depends(require(Permission.VISIT_WRITE))],
+)
+def register_walk_in(
+    payload: WalkInCreate,
+    request: Request,
+    session: SessionDep,
+    principal: Principal = Depends(current_principal),
+) -> AppointmentRead:
+    """Register a walk-in: a booking for today checked in at once, with its token (RF-12)."""
+    result = booking_service.walk_in(
+        session,
+        principal,
+        patient_id=payload.patient_id,
+        doctor_id=payload.doctor_id,
+        department_id=payload.department_id,
+        notes=payload.notes,
+        override_reason=payload.override_reason,
+    )
     ctx = build_audit_context(request, principal)
-    audit_after = {
-        "patient_id": appt.patient_id,
-        "patient_urn": patient.urn,
-        "doctor_id": appt.doctor_id,
-        "department_id": payload.department_id,
-        "appointment_date": appt.appointment_date.isoformat(),
-        "token_number": appt.token_number,
-        "status": appt.status,
-    }
-    if override_text:
-        audit_after["override_reason"] = override_text
+    appt = result.appointment
+    override_text = (payload.override_reason or "").strip() or None
+    # The booking was created with status BOOKED and no token; record it as it was created.
+    _record_booking_created(session, ctx, appt, override_text)
+    _record_check_in(session, ctx, result, before={"status": AppointmentStatus.BOOKED.value})
+    return _to_read_schema(appt)
 
+
+@router.post(
+    "/{id}/check-in",
+    response_model=AppointmentRead,
+    dependencies=[Depends(require(Permission.VISIT_WRITE))],
+)
+def check_in_appointment(
+    id: int,
+    payload: CheckInRequest,
+    request: Request,
+    session: SessionDep,
+    principal: Principal = Depends(current_principal),
+) -> AppointmentRead:
+    """Check a booked patient in on arrival: visit, token and waiting list (RF-12)."""
+    appt = booking_service.lock_appointment(session, id)
+    if not appt:
+        raise ApiError(
+            status_code=404, code="appointment_not_found", message="Appointment not found."
+        )
+    require_version(appt, payload.version_id, label="appointment")
+    before = {"status": appt.status, "version_id": appt.version_id}
+
+    result = booking_service.check_in(session, appt, principal)
+    _record_check_in(session, build_audit_context(request, principal), result, before=before)
+    return _to_read_schema(appt)
+
+
+@router.post(
+    "/{id}/reschedule",
+    response_model=AppointmentRead,
+    status_code=201,
+    dependencies=[Depends(require(Permission.APPOINTMENT_WRITE))],
+)
+def reschedule_appointment(
+    id: int,
+    payload: RescheduleRequest,
+    request: Request,
+    response: Response,
+    session: SessionDep,
+    principal: Principal = Depends(current_principal),
+) -> AppointmentRead:
+    """Move a booking to another date, keeping the old one in history (RF-12).
+
+    Returns the new booking (201). A time-only change on the same date edits the booking in
+    place and returns it (200).
+    """
+    appt = booking_service.lock_appointment(session, id)
+    if not appt or (
+        principal.role == Role.DOCTOR
+        and principal.doctor_id is not None
+        and appt.doctor_id != principal.doctor_id
+    ):
+        raise ApiError(
+            status_code=404, code="appointment_not_found", message="Appointment not found."
+        )
+    require_version(appt, payload.version_id, label="appointment")
+    before = {
+        "status": appt.status,
+        "appointment_date": appt.appointment_date.isoformat(),
+        "expected_time": appt.expected_time.isoformat() if appt.expected_time else None,
+    }
+
+    old, new = booking_service.reschedule(
+        session,
+        appt,
+        principal,
+        new_date=payload.appointment_date,
+        new_time=payload.expected_time,
+    )
+
+    ctx = build_audit_context(request, principal)
+    after = {
+        "status": old.status,
+        "appointment_date": old.appointment_date.isoformat(),
+        "expected_time": old.expected_time.isoformat() if old.expected_time else None,
+    }
+    if new is not None:
+        after["new_appointment_id"] = new.id
+        after["new_appointment_date"] = new.appointment_date.isoformat()
     audit_service.record(
         session,
         ctx,
-        action=AuditAction.APPOINTMENT_CREATED,
+        action=AuditAction.APPOINTMENT_RESCHEDULED,
         entity_type="appointment",
-        entity_id=appt.id,
-        after=audit_after,
+        entity_id=old.id,
+        before=before,
+        after=after,
+        reason=(payload.reason or "").strip() or None,
     )
-
-    return _to_read_schema(appt)
+    if new is None:
+        response.status_code = 200
+        return _to_read_schema(old)
+    _record_booking_created(session, ctx, new)
+    return _to_read_schema(new)
 
 
 @router.get(
