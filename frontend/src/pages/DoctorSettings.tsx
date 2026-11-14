@@ -253,7 +253,7 @@ export function DoctorSettings() {
                 </div>
                 <div className="text-right">
                   <span className="text-xs font-bold text-slate-700 block">NABH Registered LAN OPD</span>
-                  <span className="text-[11px] text-slate-500 font-mono">LAN ID: #KH-LAN-01</span>
+                  <span className="text-xs text-slate-500 font-mono">LAN ID: #KH-LAN-01</span>
                 </div>
               </div>
 
@@ -270,12 +270,12 @@ export function DoctorSettings() {
               </div>
 
               <div className="border-t border-dashed border-slate-300 pt-3 flex justify-between items-end">
-                <div className="text-[11px] text-slate-500">
+                <div className="text-xs text-slate-500">
                   <span>Target consult pace: {consultationPace} mins · Follow-up validity: {followUpValidity} days</span>
                 </div>
                 <div className="text-center border border-slate-300 rounded p-2 bg-white shadow-2xs">
-                  <span className="text-[10px] font-mono block text-emerald-800 font-bold">DIGITALLY SIGNED</span>
-                  <span className="text-[9px] text-slate-400 block font-mono">Kalyan Hospital LAN</span>
+                  <span className="text-xs font-mono block text-emerald-800 font-bold">DIGITALLY SIGNED</span>
+                  <span className="text-xs text-slate-500 block font-mono">Kalyan Hospital LAN</span>
                 </div>
               </div>
             </div>

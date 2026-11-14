@@ -409,19 +409,19 @@ export function DoctorDashboard() {
 
             {/* Priority & Type Badges */}
             {isUrgent ? (
-              <span className="inline-flex items-center gap-1 rounded bg-rose-100 px-2 py-0.5 text-[10px] font-bold text-rose-800">
+              <span className="inline-flex items-center gap-1 rounded bg-rose-100 px-2 py-0.5 text-xs font-bold text-rose-800">
                 🚨 Emergency
               </span>
             ) : isFollowup ? (
-              <span className="inline-flex items-center gap-1 rounded bg-indigo-100 px-2 py-0.5 text-[10px] font-semibold text-indigo-800">
+              <span className="inline-flex items-center gap-1 rounded bg-indigo-100 px-2 py-0.5 text-xs font-semibold text-indigo-800">
                 🔄 Follow-up
               </span>
             ) : context === 'booked' ? (
-              <span className="inline-flex items-center gap-1 rounded bg-sky-100 px-2 py-0.5 text-[10px] font-semibold text-sky-800">
+              <span className="inline-flex items-center gap-1 rounded bg-sky-100 px-2 py-0.5 text-xs font-semibold text-sky-800">
                 📅 Scheduled
               </span>
             ) : (
-              <span className="inline-flex items-center gap-1 rounded bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-700">
+              <span className="inline-flex items-center gap-1 rounded bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-700">
                 🚶 Walk-in
               </span>
             )}
@@ -429,24 +429,24 @@ export function DoctorDashboard() {
 
           {/* Status Badge */}
           {context === 'in_consultation' ? (
-            <span className="flex items-center gap-1.5 text-[11px] font-bold text-purple-700">
+            <span className="flex items-center gap-1.5 text-xs font-bold text-purple-700">
               <span className="h-2 w-2 rounded-full bg-purple-600 animate-pulse" />
               In Consult
             </span>
           ) : context === 'lab_hold' ? (
-            <span className="flex items-center gap-1 text-[11px] font-semibold text-amber-700">
+            <span className="flex items-center gap-1 text-xs font-semibold text-amber-700">
               🧪 Lab Hold
             </span>
           ) : context === 'waiting' ? (
-            <span className="flex items-center gap-1 text-[11px] font-medium text-emerald-700">
+            <span className="flex items-center gap-1 text-xs font-medium text-emerald-700">
               🟢 Ready
             </span>
           ) : context === 'completed' ? (
-            <span className="flex items-center gap-1 text-[11px] font-medium text-emerald-700">
+            <span className="flex items-center gap-1 text-xs font-medium text-emerald-700">
               ✓ Seen
             </span>
           ) : (
-            <span className="text-[11px] font-medium text-slate-400">Booked</span>
+            <span className="text-xs font-medium text-slate-500">Booked</span>
           )}
         </div>
 
@@ -456,7 +456,7 @@ export function DoctorDashboard() {
             <h4 className="font-bold text-sm text-slate-900 group-hover:text-[#8E1C3D] transition-colors truncate">
               {item.patient_name}
             </h4>
-            <span className="text-[11px] font-mono text-slate-500 shrink-0">
+            <span className="text-xs font-mono text-slate-500 shrink-0">
               ({item.patient_urn})
             </span>
           </div>
@@ -470,7 +470,7 @@ export function DoctorDashboard() {
           </div>
 
           {/* Vitals Summary */}
-          <div className="mt-2 flex items-center gap-2 text-[11px] bg-slate-50 px-2 py-1 rounded border border-slate-100 font-medium text-slate-700">
+          <div className="mt-2 flex items-center gap-2 text-xs bg-slate-50 px-2 py-1 rounded border border-slate-100 font-medium text-slate-700">
             <span>Vitals: 120/80 mmHg</span>
             <span>•</span>
             <span>Pulse 74</span>
@@ -480,7 +480,7 @@ export function DoctorDashboard() {
 
           {/* Critical Allergies Alert */}
           {item.patient_allergies && item.patient_allergies !== 'None reported' && (
-            <div className="mt-2 rounded bg-rose-50 px-2 py-1 text-[11px] font-bold text-rose-800 border border-rose-200">
+            <div className="mt-2 rounded bg-rose-50 px-2 py-1 text-xs font-bold text-rose-800 border border-rose-200">
               ⚠️ Allergies: {item.patient_allergies}
             </div>
           )}
@@ -608,7 +608,7 @@ export function DoctorDashboard() {
                 ({patient.patient_urn})
               </span>
               {labHoldIds.includes(patient.id) && (
-                <span className="rounded bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-amber-900">
+                <span className="rounded bg-amber-100 px-2 py-0.5 text-xs font-bold text-amber-900">
                   🧪 Lab Hold
                 </span>
               )}
@@ -653,37 +653,37 @@ export function DoctorDashboard() {
             <div className="flex items-center justify-between gap-2">
               <div className="flex items-center gap-2">
                 <span className="text-base">🚨</span>
-                <span className="font-bold uppercase tracking-wider text-rose-900 text-[11px]">
+                <span className="font-bold uppercase tracking-wider text-rose-900 text-xs">
                   Critical Clinical Alert
                 </span>
               </div>
-              <span className="text-[10px] font-bold bg-rose-200/80 px-2 py-0.5 rounded text-rose-900">
+              <span className="text-xs font-bold bg-rose-200/80 px-2 py-0.5 rounded text-rose-900">
                 DRUG ALLERGY WARNING
               </span>
             </div>
             <div className="mt-1.5 font-bold text-rose-900">
               Drug Allergies: {patient.patient_allergies || 'Penicillin (RED)'}
             </div>
-            <div className="mt-1 text-[11px] text-rose-800">
+            <div className="mt-1 text-xs text-rose-800">
               Chronic: Hypertension · Type 2 Diabetes Mellitus
             </div>
 
             {/* Nurse Triage Vitals */}
             <div className="mt-2.5 grid grid-cols-2 sm:grid-cols-4 gap-2 pt-2 border-t border-rose-200/60 text-xs text-rose-950 font-medium">
               <div className="bg-white/80 p-1.5 rounded">
-                <span className="text-[10px] text-slate-500 block">BP</span>
+                <span className="text-xs text-slate-500 block">BP</span>
                 <span className="font-bold">120/80 mmHg</span>
               </div>
               <div className="bg-white/80 p-1.5 rounded">
-                <span className="text-[10px] text-slate-500 block">Pulse</span>
+                <span className="text-xs text-slate-500 block">Pulse</span>
                 <span className="font-bold">74 bpm</span>
               </div>
               <div className="bg-white/80 p-1.5 rounded">
-                <span className="text-[10px] text-slate-500 block">Temp</span>
+                <span className="text-xs text-slate-500 block">Temp</span>
                 <span className="font-bold">98.4 °F</span>
               </div>
               <div className="bg-white/80 p-1.5 rounded">
-                <span className="text-[10px] text-slate-500 block">SpO2</span>
+                <span className="text-xs text-slate-500 block">SpO2</span>
                 <span className="font-bold">98% Air</span>
               </div>
             </div>
@@ -703,7 +703,7 @@ export function DoctorDashboard() {
               <label className="text-xs font-bold uppercase tracking-wider text-slate-700">
                 Clinical Notes / SOAP
               </label>
-              <span className="text-[11px] text-slate-400">Zero-click instant scratchpad</span>
+              <span className="text-xs text-slate-500">Zero-click instant scratchpad</span>
             </div>
 
             {/* Quick Symptom Macros */}
@@ -713,7 +713,7 @@ export function DoctorDashboard() {
                   key={macro}
                   type="button"
                   onClick={() => handleAddSymptomMacro(macro)}
-                  className="rounded-full bg-slate-100 px-2.5 py-0.5 text-[11px] font-semibold text-slate-700 hover:bg-[#8E1C3D]/10 hover:text-[#8E1C3D] transition"
+                  className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-semibold text-slate-700 hover:bg-[#8E1C3D]/10 hover:text-[#8E1C3D] transition"
                 >
                   + {macro}
                 </button>
@@ -722,10 +722,10 @@ export function DoctorDashboard() {
 
             <div className="space-y-2">
               <div>
-                <span className="block text-[11px] font-semibold text-slate-600 mb-0.5">
+                <span className="block text-xs font-semibold text-slate-600 mb-0.5">
                   S — Subjective / Chief Complaint:
                 </span>
-                <textarea
+                <textarea aria-label="Subjective / chief complaint"
                   rows={2}
                   value={soapNotes.subjective}
                   onChange={(e) => setSoapNotes({ ...soapNotes, subjective: e.target.value })}
@@ -735,10 +735,10 @@ export function DoctorDashboard() {
               </div>
 
               <div>
-                <span className="block text-[11px] font-semibold text-slate-600 mb-0.5">
+                <span className="block text-xs font-semibold text-slate-600 mb-0.5">
                   O — Objective / Examination:
                 </span>
-                <textarea
+                <textarea aria-label="Objective / examination"
                   rows={2}
                   value={soapNotes.objective}
                   onChange={(e) => setSoapNotes({ ...soapNotes, objective: e.target.value })}
@@ -748,10 +748,10 @@ export function DoctorDashboard() {
               </div>
 
               <div>
-                <span className="block text-[11px] font-semibold text-slate-600 mb-0.5">
+                <span className="block text-xs font-semibold text-slate-600 mb-0.5">
                   A — Assessment / Diagnosis:
                 </span>
-                <input
+                <input aria-label="Assessment / diagnosis"
                   type="text"
                   value={soapNotes.assessment}
                   onChange={(e) => setSoapNotes({ ...soapNotes, assessment: e.target.value })}
@@ -771,7 +771,7 @@ export function DoctorDashboard() {
               <div className="divide-y divide-slate-100 max-h-32 overflow-y-auto">
                 {pastEncounters.map((enc) => (
                   <div key={enc.id} className="py-1.5 text-xs">
-                    <div className="flex items-center justify-between text-slate-500 text-[11px]">
+                    <div className="flex items-center justify-between text-slate-500 text-xs">
                       <span>
                         {new Date(enc.encounter_date).toLocaleDateString('en-GB', {
                           day: '2-digit',
@@ -788,17 +788,17 @@ export function DoctorDashboard() {
                 ))}
               </div>
             ) : (
-              <p className="text-xs text-slate-400 italic">No prior recorded encounters.</p>
+              <p className="text-xs text-slate-500 italic">No prior recorded encounters.</p>
             )}
 
             {pastPrescriptions && pastPrescriptions.length > 0 && (
               <div className="mt-2 pt-2 border-t border-slate-100">
-                <span className="text-[11px] font-bold text-slate-600 uppercase tracking-wide">
+                <span className="text-xs font-bold text-slate-600 uppercase tracking-wide">
                   Past Prescriptions ({pastPrescriptions.length})
                 </span>
                 <div className="mt-1 space-y-1">
                   {pastPrescriptions.slice(0, 2).map((rx) => (
-                    <div key={rx.id} className="text-[11px] text-slate-600 bg-slate-50 p-1.5 rounded">
+                    <div key={rx.id} className="text-xs text-slate-600 bg-slate-50 p-1.5 rounded">
                       Rx #{rx.id} · {new Date(rx.created_at).toLocaleDateString('en-GB')}
                     </div>
                   ))}
@@ -821,7 +821,7 @@ export function DoctorDashboard() {
                       `/doctor/prescriptions/new?patient_id=${patient.patient_id}&appointment_id=${patient.id}`
                     )
                   }
-                  className="text-[11px] font-semibold text-[#8E1C3D] hover:underline"
+                  className="text-xs font-semibold text-[#8E1C3D] hover:underline"
                 >
                   Full Rx ↗
                 </button>
@@ -848,7 +848,7 @@ export function DoctorDashboard() {
                       }`}
                     >
                       <span className="truncate">{med.name}</span>
-                      <span className="text-[10px] text-slate-500 shrink-0 font-mono">
+                      <span className="text-xs text-slate-500 shrink-0 font-mono">
                         {isAdded ? '✓' : `+`}
                       </span>
                     </button>
@@ -1001,7 +1001,7 @@ export function DoctorDashboard() {
 
               {/* Room / Cabin Badge */}
               <div className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-800 shadow-2xs">
-                <span className="text-slate-400">Cabin:</span>
+                <span className="text-slate-500">Cabin:</span>
                 <span className="text-[#8E1C3D]">{cabinCode}</span>
               </div>
 
@@ -1095,26 +1095,26 @@ export function DoctorDashboard() {
             {/* Queue summary figures (Waiting, Scheduled, Completed) */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4" aria-label="Queue summary">
               <div className="rounded-xl border border-amber-200 bg-amber-50/70 p-4 shadow-2xs">
-                <p className="text-[11px] font-bold uppercase tracking-wider text-amber-900">Waiting</p>
+                <p className="text-xs font-bold uppercase tracking-wider text-amber-900">Waiting</p>
                 <p className="mt-1 text-2xl font-bold tabular-nums text-amber-950">{waitingPatients.length}</p>
-                <p className="text-[10px] text-amber-700 mt-0.5">Checked-in at reception</p>
+                <p className="text-xs text-amber-700 mt-0.5">Checked-in at reception</p>
               </div>
               <div className="rounded-xl border border-purple-200 bg-purple-50/70 p-4 shadow-2xs">
-                <p className="text-[11px] font-bold uppercase tracking-wider text-purple-900">In Consult</p>
+                <p className="text-xs font-bold uppercase tracking-wider text-purple-900">In Consult</p>
                 <p className="mt-1 text-2xl font-bold tabular-nums text-purple-950">
                   {queue.in_consultation.length}
                 </p>
-                <p className="text-[10px] text-purple-700 mt-0.5">Active consultation</p>
+                <p className="text-xs text-purple-700 mt-0.5">Active consultation</p>
               </div>
               <div className="rounded-xl border border-blue-200 bg-blue-50/70 p-4 shadow-2xs">
-                <p className="text-[11px] font-bold uppercase tracking-wider text-blue-900">Scheduled</p>
+                <p className="text-xs font-bold uppercase tracking-wider text-blue-900">Scheduled</p>
                 <p className="mt-1 text-2xl font-bold tabular-nums text-blue-950">{queue.booked.length}</p>
-                <p className="text-[10px] text-blue-700 mt-0.5">Booked for today</p>
+                <p className="text-xs text-blue-700 mt-0.5">Booked for today</p>
               </div>
               <div className="rounded-xl border border-emerald-200 bg-emerald-50/70 p-4 shadow-2xs">
-                <p className="text-[11px] font-bold uppercase tracking-wider text-emerald-900">Completed</p>
+                <p className="text-xs font-bold uppercase tracking-wider text-emerald-900">Completed</p>
                 <p className="mt-1 text-2xl font-bold tabular-nums text-emerald-950">{queue.completed.length}</p>
-                <p className="text-[10px] text-emerald-700 mt-0.5">Seen today</p>
+                <p className="text-xs text-emerald-700 mt-0.5">Seen today</p>
               </div>
             </div>
 
@@ -1133,7 +1133,7 @@ export function DoctorDashboard() {
                         <h2 className="text-sm font-bold text-slate-900">
                           Live Queue ({waitingPatients.length + (activeConsultationItem ? 1 : 0) + labHoldPatients.length})
                         </h2>
-                        <p className="text-[11px] text-slate-500">Synced in real-time with reception</p>
+                        <p className="text-xs text-slate-500">Synced in real-time with reception</p>
                       </div>
 
                       {/* One-click Call Next button */}
@@ -1177,10 +1177,10 @@ export function DoctorDashboard() {
                       <div>
                         <div className="mb-2 flex items-center justify-between text-xs font-bold uppercase tracking-wider text-slate-700">
                           <span>Waiting Room ({waitingPatients.length})</span>
-                          <span className="text-[10px] text-emerald-700 normal-case font-semibold">Ready for consult</span>
+                          <span className="text-xs text-emerald-700 normal-case font-semibold">Ready for consult</span>
                         </div>
                         {waitingPatients.length === 0 ? (
-                          <div className="rounded-lg border border-dashed border-slate-200 p-6 text-center text-xs text-slate-400">
+                          <div className="rounded-lg border border-dashed border-slate-200 p-6 text-center text-xs text-slate-500">
                             Waiting room is currently empty.
                           </div>
                         ) : (
@@ -1195,7 +1195,7 @@ export function DoctorDashboard() {
                         <div>
                           <div className="mb-2 flex items-center justify-between text-xs font-bold uppercase tracking-wider text-slate-700">
                             <span>Scheduled Bookings ({queue.booked.length})</span>
-                            <span className="text-[10px] text-slate-400 normal-case">Not yet checked in</span>
+                            <span className="text-xs text-slate-500 normal-case">Not yet checked in</span>
                           </div>
                           <div className="space-y-2.5">
                             {queue.booked.map((item) => renderKanbanCard(item, 'booked'))}
@@ -1228,7 +1228,7 @@ export function DoctorDashboard() {
                               </div>
                             </div>
                           </div>
-                          <span className="inline-block rounded bg-rose-100 px-2 py-0.5 text-[10px] font-bold text-rose-900 shrink-0">
+                          <span className="inline-block rounded bg-rose-100 px-2 py-0.5 text-xs font-bold text-rose-900 shrink-0">
                             RED FLAG
                           </span>
                         </div>
@@ -1236,19 +1236,19 @@ export function DoctorDashboard() {
                         {/* Nurse Triage Vitals Strip */}
                         <div className="mt-3 grid grid-cols-2 sm:grid-cols-4 gap-2 pt-2 border-t border-rose-200/60 text-xs text-rose-950 font-medium">
                           <div className="bg-white/80 p-1.5 rounded">
-                            <span className="text-[10px] text-slate-500 block">Blood Pressure</span>
+                            <span className="text-xs text-slate-500 block">Blood Pressure</span>
                             <span className="font-bold">120/80 mmHg</span>
                           </div>
                           <div className="bg-white/80 p-1.5 rounded">
-                            <span className="text-[10px] text-slate-500 block">Pulse</span>
+                            <span className="text-xs text-slate-500 block">Pulse</span>
                             <span className="font-bold">74 bpm</span>
                           </div>
                           <div className="bg-white/80 p-1.5 rounded">
-                            <span className="text-[10px] text-slate-500 block">Temp</span>
+                            <span className="text-xs text-slate-500 block">Temp</span>
                             <span className="font-bold">98.4 °F</span>
                           </div>
                           <div className="bg-white/80 p-1.5 rounded">
-                            <span className="text-[10px] text-slate-500 block">SpO2</span>
+                            <span className="text-xs text-slate-500 block">SpO2</span>
                             <span className="font-bold">98% Room Air</span>
                           </div>
                         </div>
@@ -1294,7 +1294,7 @@ export function DoctorDashboard() {
                             <label className="text-xs font-bold uppercase tracking-wider text-slate-700">
                               Clinical Notes / SOAP
                             </label>
-                            <span className="text-[11px] text-slate-400">Zero-click instant scratchpad</span>
+                            <span className="text-xs text-slate-500">Zero-click instant scratchpad</span>
                           </div>
 
                           {/* Quick Symptom Macros */}
@@ -1304,7 +1304,7 @@ export function DoctorDashboard() {
                                 key={macro}
                                 type="button"
                                 onClick={() => handleAddSymptomMacro(macro)}
-                                className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-semibold text-slate-700 hover:bg-[#8E1C3D]/10 hover:text-[#8E1C3D] transition"
+                                className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700 hover:bg-[#8E1C3D]/10 hover:text-[#8E1C3D] transition"
                               >
                                 + {macro}
                               </button>
@@ -1313,10 +1313,10 @@ export function DoctorDashboard() {
 
                           <div className="space-y-2.5">
                             <div>
-                              <span className="block text-[11px] font-semibold text-slate-600 mb-0.5">
+                              <span className="block text-xs font-semibold text-slate-600 mb-0.5">
                                 S — Subjective / Chief Complaint:
                               </span>
-                              <textarea
+                              <textarea aria-label="Subjective / chief complaint"
                                 rows={2}
                                 value={soapNotes.subjective}
                                 onChange={(e) => setSoapNotes({ ...soapNotes, subjective: e.target.value })}
@@ -1326,10 +1326,10 @@ export function DoctorDashboard() {
                             </div>
 
                             <div>
-                              <span className="block text-[11px] font-semibold text-slate-600 mb-0.5">
+                              <span className="block text-xs font-semibold text-slate-600 mb-0.5">
                                 O — Objective / Clinical Examination:
                               </span>
-                              <textarea
+                              <textarea aria-label="Objective / clinical examination"
                                 rows={2}
                                 value={soapNotes.objective}
                                 onChange={(e) => setSoapNotes({ ...soapNotes, objective: e.target.value })}
@@ -1339,10 +1339,10 @@ export function DoctorDashboard() {
                             </div>
 
                             <div>
-                              <span className="block text-[11px] font-semibold text-slate-600 mb-0.5">
+                              <span className="block text-xs font-semibold text-slate-600 mb-0.5">
                                 A — Assessment / Working Diagnosis:
                               </span>
-                              <input
+                              <input aria-label="Assessment / working diagnosis"
                                 type="text"
                                 value={soapNotes.assessment}
                                 onChange={(e) => setSoapNotes({ ...soapNotes, assessment: e.target.value })}
@@ -1362,7 +1362,7 @@ export function DoctorDashboard() {
                             <div className="divide-y divide-slate-100 max-h-40 overflow-y-auto">
                               {pastEncounters.map((enc) => (
                                 <div key={enc.id} className="py-2 text-xs">
-                                  <div className="flex items-center justify-between text-slate-500 text-[11px]">
+                                  <div className="flex items-center justify-between text-slate-500 text-xs">
                                     <span>
                                       {new Date(enc.encounter_date).toLocaleDateString('en-GB', {
                                         day: '2-digit',
@@ -1379,19 +1379,19 @@ export function DoctorDashboard() {
                               ))}
                             </div>
                           ) : (
-                            <p className="text-xs text-slate-400 italic">
+                            <p className="text-xs text-slate-500 italic">
                               No prior recorded encounters for this patient.
                             </p>
                           )}
 
                           {pastPrescriptions && pastPrescriptions.length > 0 && (
                             <div className="mt-2 pt-2 border-t border-slate-100">
-                              <span className="text-[11px] font-bold text-slate-600 uppercase tracking-wide">
+                              <span className="text-xs font-bold text-slate-600 uppercase tracking-wide">
                                 Past Prescriptions ({pastPrescriptions.length})
                               </span>
                               <div className="mt-1 space-y-1">
                                 {pastPrescriptions.slice(0, 2).map((rx) => (
-                                  <div key={rx.id} className="text-[11px] text-slate-600 bg-slate-50 p-1.5 rounded">
+                                  <div key={rx.id} className="text-xs text-slate-600 bg-slate-50 p-1.5 rounded">
                                     Rx #{rx.id} · {new Date(rx.created_at).toLocaleDateString('en-GB')}
                                   </div>
                                 ))}
@@ -1402,7 +1402,7 @@ export function DoctorDashboard() {
                       </div>
                     </div>
                   ) : (
-                    <div className="rounded-xl border border-dashed border-slate-300 bg-white p-12 text-center text-slate-400">
+                    <div className="rounded-xl border border-dashed border-slate-300 bg-white p-12 text-center text-slate-500">
                       Select a patient from the Live Queue to display their clinical chart.
                     </div>
                   )}
@@ -1418,7 +1418,7 @@ export function DoctorDashboard() {
                         <h3 className="text-sm font-bold text-slate-900">
                           Rapid Orders & Checkout
                         </h3>
-                        <p className="text-[11px] text-slate-500">Fast action bar for OPD speed</p>
+                        <p className="text-xs text-slate-500">Fast action bar for OPD speed</p>
                       </div>
 
                       {/* One-Click E-Prescription Favorites */}
@@ -1434,7 +1434,7 @@ export function DoctorDashboard() {
                                 `/doctor/prescriptions/new?patient_id=${currentChartPatient.patient_id}&appointment_id=${currentChartPatient.id}`
                               )
                             }
-                            className="text-[11px] font-semibold text-[#8E1C3D] hover:underline"
+                            className="text-xs font-semibold text-[#8E1C3D] hover:underline"
                           >
                             Full RX ↗
                           </button>
@@ -1461,7 +1461,7 @@ export function DoctorDashboard() {
                                 }`}
                               >
                                 <span className="truncate">{med.name}</span>
-                                <span className="text-[10px] text-slate-500 shrink-0 font-mono">
+                                <span className="text-xs text-slate-500 shrink-0 font-mono">
                                   {isAdded ? '✓ Added' : `+ ${med.dosage}`}
                                 </span>
                               </button>
@@ -1639,7 +1639,7 @@ export function DoctorDashboard() {
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 bg-white p-3 rounded-xl border border-slate-200 shadow-2xs">
                   {/* Search input */}
                   <div className="relative flex-1 max-w-md">
-                    <span className="pointer-events-none absolute left-3 top-2.5 text-slate-400">
+                    <span className="pointer-events-none absolute left-3 top-2.5 text-slate-500">
                       🔍
                     </span>
                     <input
@@ -1654,7 +1654,7 @@ export function DoctorDashboard() {
                       <button
                         type="button"
                         onClick={() => setKanbanSearch('')}
-                        className="absolute right-2.5 top-2 text-xs text-slate-400 hover:text-slate-600"
+                        className="absolute right-2.5 top-2 text-xs text-slate-500 hover:text-slate-600"
                       >
                         ✕
                       </button>
@@ -1760,7 +1760,7 @@ export function DoctorDashboard() {
                           </span>
                         </div>
                         {filterKanbanItems(waitingPatients).length === 0 ? (
-                          <div className="p-6 text-center text-xs text-slate-400 bg-white/60 rounded-lg border border-dashed border-amber-200">
+                          <div className="p-6 text-center text-xs text-slate-500 bg-white/60 rounded-lg border border-dashed border-amber-200">
                             {kanbanSearch || kanbanFilter !== 'ALL'
                               ? 'No matching waiting patients'
                               : 'No waiting patients in queue'}
@@ -1800,7 +1800,7 @@ export function DoctorDashboard() {
                           </span>
                         </div>
                         {filterKanbanItems(queue.in_consultation).length === 0 ? (
-                          <div className="p-6 text-center text-xs text-slate-400 bg-white/60 rounded-lg border border-dashed border-purple-200">
+                          <div className="p-6 text-center text-xs text-slate-500 bg-white/60 rounded-lg border border-dashed border-purple-200">
                             No active consultation
                           </div>
                         ) : (
@@ -1838,7 +1838,7 @@ export function DoctorDashboard() {
                           </span>
                         </div>
                         {filterKanbanItems(labHoldPatients).length === 0 ? (
-                          <div className="p-6 text-center text-xs text-slate-400 bg-white/60 rounded-lg border border-dashed border-amber-200">
+                          <div className="p-6 text-center text-xs text-slate-500 bg-white/60 rounded-lg border border-dashed border-amber-200">
                             No tokens on diagnostics hold
                           </div>
                         ) : (
@@ -1876,7 +1876,7 @@ export function DoctorDashboard() {
                           </span>
                         </div>
                         {filterKanbanItems(queue.booked).length === 0 ? (
-                          <div className="p-6 text-center text-xs text-slate-400 bg-white/60 rounded-lg border border-dashed border-blue-200">
+                          <div className="p-6 text-center text-xs text-slate-500 bg-white/60 rounded-lg border border-dashed border-blue-200">
                             No further bookings today
                           </div>
                         ) : (
@@ -1914,7 +1914,7 @@ export function DoctorDashboard() {
                           </span>
                         </div>
                         {filterKanbanItems(queue.completed).length === 0 ? (
-                          <div className="p-6 text-center text-xs text-slate-400 bg-white/60 rounded-lg border border-dashed border-emerald-200">
+                          <div className="p-6 text-center text-xs text-slate-500 bg-white/60 rounded-lg border border-dashed border-emerald-200">
                             None completed yet
                           </div>
                         ) : (

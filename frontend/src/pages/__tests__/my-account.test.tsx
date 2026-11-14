@@ -1,4 +1,5 @@
-import { cleanup, render, screen } from '@testing-library/react'
+import { cleanup, render, screen, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { MemoryRouter } from 'react-router'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
@@ -145,5 +146,26 @@ describe('MyAccount Page', () => {
 
     // Security notes
     expect(screen.getByText('Security notes')).toBeInTheDocument()
+  })
+
+  it('asks in an in-app dialog before signing out other computers, and cancelling sends nothing', async () => {
+    const user = userEvent.setup()
+    render(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter>
+          <MyAccount />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    )
+
+    await user.click(screen.getByRole('button', { name: 'Sign out others' }))
+    const dialog = await screen.findByRole('dialog')
+    expect(within(dialog).getByText(/This computer stays signed in/)).toBeInTheDocument()
+
+    await user.click(within(dialog).getByRole('button', { name: 'Keep them signed in' }))
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+
+    const calls = (fetch as unknown as ReturnType<typeof vi.fn>).mock.calls
+    expect(calls.some(([, init]) => (init as RequestInit | undefined)?.method === 'POST')).toBe(false)
   })
 })

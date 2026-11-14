@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react'
 import { useNavigate } from 'react-router'
 import { AppShell } from '../components/AppShell'
+import { Modal } from '../components/Modal'
 import {
   useActiveSessions,
   useChangePassword,
@@ -34,6 +35,7 @@ export function MyAccount() {
   const [repeatPassword, setRepeatPassword] = useState('')
   const [passwordNotice, setPasswordNotice] = useState<{ tone: 'ok' | 'error'; message: string } | null>(null)
   const [sessionNotice, setSessionNotice] = useState<{ tone: 'ok' | 'error'; message: string } | null>(null)
+  const [confirmSignOutOpen, setConfirmSignOutOpen] = useState(false)
 
   const handleSignOut = async () => {
     try {
@@ -82,20 +84,17 @@ export function MyAccount() {
 
   const handleSignOutOthers = async () => {
     if (!me?.id) return
-    const confirmed = window.confirm(
-      'Sign out all other signed-in computers? Your current session will remain active.'
-    )
-    if (!confirmed) return
-
     setSessionNotice(null)
     try {
       await revokeSessionsMutation.mutateAsync({
         id: me.id,
         payload: { reason: 'User requested sign-out of all other computers via My Account.' },
       })
+      setConfirmSignOutOpen(false)
       setSessionNotice({ tone: 'ok', message: 'All other computers signed out successfully.' })
       await refetchSessions()
     } catch (err: unknown) {
+      setConfirmSignOutOpen(false)
       setSessionNotice({
         tone: 'error',
         message: err instanceof ApiError ? err.message : 'Failed to sign out other sessions.',
@@ -223,12 +222,12 @@ export function MyAccount() {
                   </div>
                 </div>
 
-                <p className="text-[11px] text-slate-500">
+                <p className="text-xs text-slate-500">
                   At least 12 characters, mixing words, digits and a symbol.
                 </p>
 
                 <div className="pt-2 flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-t border-slate-100">
-                  <p className="text-[11px] text-slate-500 italic">
+                  <p className="text-xs text-slate-500 italic">
                     Every other signed-in computer will be signed out.
                   </p>
                   <button
@@ -255,7 +254,7 @@ export function MyAccount() {
                 </div>
                 <button
                   type="button"
-                  onClick={handleSignOutOthers}
+                  onClick={() => setConfirmSignOutOpen(true)}
                   disabled={revokeSessionsMutation.isPending}
                   className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded text-xs font-semibold transition"
                 >
@@ -278,7 +277,7 @@ export function MyAccount() {
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-xs">
                   <thead>
-                    <tr className="border-b border-slate-200 text-[11px] uppercase tracking-wider text-slate-500">
+                    <tr className="border-b border-slate-200 text-xs uppercase tracking-wider text-slate-500">
                       <th className="pb-2 font-semibold">Computer</th>
                       <th className="pb-2 font-semibold">Signed in</th>
                       <th className="pb-2 font-semibold">Last seen</th>
@@ -299,16 +298,16 @@ export function MyAccount() {
                           <td className="py-2.5 text-slate-600">
                             {sess.is_current ? 'just now' : 'active'}
                           </td>
-                          <td className="py-2.5 font-mono text-[11px] text-slate-600">
+                          <td className="py-2.5 font-mono text-xs text-slate-600">
                             {sess.ip_address || '127.0.0.1'}
                           </td>
                           <td className="py-2.5 text-right">
                             {sess.is_current ? (
-                              <span className="inline-block px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-100 text-emerald-800 border border-emerald-200">
+                              <span className="inline-block px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800 border border-emerald-200">
                                 This computer
                               </span>
                             ) : (
-                              <span className="inline-block px-2 py-0.5 rounded-full text-[10px] font-semibold bg-slate-100 text-slate-600">
+                              <span className="inline-block px-2 py-0.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-600">
                                 Other
                               </span>
                             )}
@@ -326,11 +325,11 @@ export function MyAccount() {
                         <td className="py-2.5 text-slate-600">
                           just now
                         </td>
-                        <td className="py-2.5 font-mono text-[11px] text-slate-600">
+                        <td className="py-2.5 font-mono text-xs text-slate-600">
                           10.12.0.82
                         </td>
                         <td className="py-2.5 text-right">
-                          <span className="inline-block px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-100 text-emerald-800 border border-emerald-200">
+                          <span className="inline-block px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800 border border-emerald-200">
                             This computer
                           </span>
                         </td>
@@ -361,7 +360,7 @@ export function MyAccount() {
                   <div className="text-xs text-slate-500">
                     {roleDisplay}
                   </div>
-                  <div className="text-[11px] font-mono text-slate-400">
+                  <div className="text-xs font-mono text-slate-500">
                     @{me?.username}
                   </div>
                 </div>
@@ -400,7 +399,7 @@ export function MyAccount() {
                 </div>
               </div>
 
-              <p className="mt-4 text-[11px] text-slate-500 bg-slate-50 p-2.5 rounded border border-slate-100">
+              <p className="mt-4 text-xs text-slate-500 bg-slate-50 p-2.5 rounded border border-slate-100">
                 Only an administrator can change a name, role or department. Ask them if something is wrong.
               </p>
             </section>
@@ -419,17 +418,17 @@ export function MyAccount() {
                   me.permissions.map((perm) => (
                     <span
                       key={perm}
-                      className="inline-block px-2 py-0.5 rounded bg-slate-100 font-mono text-[11px] text-slate-700 border border-slate-200"
+                      className="inline-block px-2 py-0.5 rounded bg-slate-100 font-mono text-xs text-slate-700 border border-slate-200"
                     >
                       {perm}
                     </span>
                   ))
                 ) : (
-                  <span className="font-mono text-xs text-slate-400">Default permissions assigned</span>
+                  <span className="font-mono text-xs text-slate-500">Default permissions assigned</span>
                 )}
               </div>
 
-              <p className="mt-3 text-[11px] text-slate-500">
+              <p className="mt-3 text-xs text-slate-500">
                 Enforced on the central hospital server for every request.
               </p>
             </section>
@@ -454,6 +453,39 @@ export function MyAccount() {
           </div>
         </div>
       </div>
+      <Modal
+        open={confirmSignOutOpen}
+        variant="destructive"
+        title="Sign out other computers?"
+        onClose={() => setConfirmSignOutOpen(false)}
+        busy={revokeSessionsMutation.isPending}
+        className="max-w-md"
+      >
+        <div className="space-y-4">
+          <p className="text-sm text-slate-700">
+            Every other computer signed in as you will be signed out. This computer stays signed in.
+          </p>
+          <div className="flex justify-end gap-2">
+            <button
+              type="button"
+              onClick={() => setConfirmSignOutOpen(false)}
+              disabled={revokeSessionsMutation.isPending}
+              className="min-h-9 rounded-lg border border-slate-300 bg-white px-3 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+            >
+              Keep them signed in
+            </button>
+            <button
+              type="button"
+              data-autofocus
+              onClick={handleSignOutOthers}
+              disabled={revokeSessionsMutation.isPending}
+              className="min-h-9 rounded-lg bg-red-800 px-3 text-sm font-semibold text-white hover:bg-red-900 disabled:opacity-50"
+            >
+              {revokeSessionsMutation.isPending ? 'Signing out…' : 'Sign out others'}
+            </button>
+          </div>
+        </div>
+      </Modal>
     </AppShell>
   )
 }

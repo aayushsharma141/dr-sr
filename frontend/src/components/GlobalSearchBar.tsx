@@ -101,7 +101,7 @@ export function GlobalSearchBar({ role }: GlobalSearchBarProps) {
   return (
     <div ref={containerRef} className="relative w-full max-w-md lg:max-w-lg">
       <div className="relative flex items-center">
-        <span className="pointer-events-none absolute left-3 text-slate-400" aria-hidden="true">
+        <span className="pointer-events-none absolute left-3 text-slate-500" aria-hidden="true">
           <IconSearch className="h-4 w-4" />
         </span>
         <input
@@ -134,13 +134,13 @@ export function GlobalSearchBar({ role }: GlobalSearchBarProps) {
                 setIsOpen(false)
                 inputRef.current?.focus()
               }}
-              className="rounded p-0.5 text-slate-400 hover:text-slate-600 focus-visible:outline focus-visible:outline-1 focus-visible:outline-[#8E1C3D]"
+              className="rounded p-0.5 text-slate-500 hover:text-slate-600 focus-visible:outline focus-visible:outline-1 focus-visible:outline-[#8E1C3D]"
               aria-label="Clear search"
             >
               ✕
             </button>
           ) : (
-            <kbd className="hidden sm:inline-block rounded border border-slate-200 bg-white px-1.5 py-0.5 text-[10px] font-mono font-medium text-slate-400 shadow-2xs">
+            <kbd className="hidden sm:inline-block rounded border border-slate-200 bg-white px-1.5 py-0.5 text-xs font-mono font-medium text-slate-500 shadow-2xs">
               /
             </kbd>
           )}
@@ -160,7 +160,7 @@ export function GlobalSearchBar({ role }: GlobalSearchBarProps) {
             </div>
           ) : (
             <div className="divide-y divide-slate-100">
-              <div className="px-2 py-1 text-[11px] font-bold uppercase tracking-wider text-slate-400">
+              <div className="px-2 py-1 text-xs font-bold uppercase tracking-wider text-slate-500">
                 Patients ({results.length})
               </div>
               {results.map((patient) => {
@@ -196,17 +196,17 @@ export function GlobalSearchBar({ role }: GlobalSearchBarProps) {
                           <span className="truncate text-xs sm:text-sm font-semibold text-slate-900 group-hover:text-[#8E1C3D]">
                             {patient.full_name}
                           </span>
-                          <span className="shrink-0 rounded bg-slate-100 px-1.5 py-0.2 text-[10px] font-mono font-medium text-slate-700">
+                          <span className="shrink-0 rounded bg-slate-100 px-1.5 py-0.2 text-xs font-mono font-medium text-slate-700">
                             {patient.urn}
                           </span>
                         </div>
-                        <div className="flex items-center gap-2 text-[11px] text-slate-500">
+                        <div className="flex items-center gap-2 text-xs text-slate-500">
                           {patient.age_years != null && <span>{patient.age_years} yrs</span>}
                           {patient.gender && <span>• {patient.gender}</span>}
                           {patient.mobile && <span>• 📞 {patient.mobile}</span>}
                         </div>
                         {patient.allergies && patient.allergies !== 'None reported' && (
-                          <div className="mt-0.5 text-[10px] font-bold text-red-600">
+                          <div className="mt-0.5 text-xs font-bold text-red-600">
                             ⚠️ Allergies: {patient.allergies}
                           </div>
                         )}
@@ -219,12 +219,12 @@ export function GlobalSearchBar({ role }: GlobalSearchBarProps) {
                           type="button"
                           onClick={(e) => handleStartConsult(patient.id, e)}
                           title="Start Clinical Consultation"
-                          className="rounded bg-[#8E1C3D] px-2 py-1 text-[11px] font-semibold text-white shadow-2xs hover:bg-[#721530]"
+                          className="rounded bg-[#8E1C3D] px-2 py-1 text-xs font-semibold text-white shadow-2xs hover:bg-[#721530]"
                         >
                           Consult
                         </button>
                       )}
-                      <span className="text-slate-400 group-hover:text-slate-700">→</span>
+                      <span className="text-slate-500 group-hover:text-slate-700">→</span>
                     </div>
                   </div>
                 )

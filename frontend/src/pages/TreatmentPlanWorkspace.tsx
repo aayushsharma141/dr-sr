@@ -344,7 +344,7 @@ export function TreatmentPlanWorkspace() {
             >
               ← Back to Queue
             </Link>
-            <span className="text-gray-300">|</span>
+            <span className="text-gray-500">|</span>
             <span className="text-sm font-semibold text-gray-700">Patient:</span>
             {activePatient ? (
               <div className="flex items-center gap-2">
@@ -431,14 +431,14 @@ export function TreatmentPlanWorkspace() {
                   placeholder="Type URN (e.g. KH-26-P-...), patient name, or mobile number to select..."
                   className="w-full rounded-xl border border-teal-300 bg-white py-3 pl-11 pr-10 text-sm text-gray-900 shadow-sm placeholder:text-gray-400 focus:border-teal-600 focus:ring-2 focus:ring-teal-600/20"
                 />
-                <span className="absolute left-3.5 top-3.5 text-base text-teal-600" aria-hidden="true">
+                <span className="absolute left-3.5 top-3.5 text-base text-teal-700" aria-hidden="true">
                   🔍
                 </span>
                 {patientSearch && (
                   <button
                     type="button"
                     onClick={() => setPatientSearch('')}
-                    className="absolute right-3 top-3 text-xs font-semibold text-gray-400 hover:text-gray-600 px-2 py-1"
+                    className="absolute right-3 top-3 text-xs font-semibold text-gray-500 hover:text-gray-600 px-2 py-1"
                   >
                     Clear
                   </button>
@@ -451,7 +451,7 @@ export function TreatmentPlanWorkspace() {
               <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm space-y-3">
                 <h2 className="text-sm font-bold text-gray-900 flex items-center justify-between">
                   <span>Matching Patients ({searchResults.length})</span>
-                  {isSearching && <span className="text-xs text-gray-400">Searching...</span>}
+                  {isSearching && <span className="text-xs text-gray-500">Searching...</span>}
                 </h2>
                 {searchResults.length === 0 && !isSearching ? (
                   <p className="text-sm text-gray-500 py-3">No patients found matching "{patientSearch}".</p>

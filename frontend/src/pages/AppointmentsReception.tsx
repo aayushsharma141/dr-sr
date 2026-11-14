@@ -498,14 +498,14 @@ export function AppointmentsReception() {
                 {emergencyHold && (
                   <div className="rounded-lg bg-rose-50 border border-rose-200 p-2.5 text-xs text-rose-900 font-medium flex items-center justify-between">
                     <span>⚠️ Cabin Hold is active. Reception screen displays warning not to dispatch next walk-in token.</span>
-                    <span className="font-mono text-[11px] font-bold">RECEPTION BLOCKED</span>
+                    <span className="font-mono text-xs font-bold">RECEPTION BLOCKED</span>
                   </div>
                 )}
 
                 {delayMinutes && (
                   <div className="rounded-lg bg-amber-50 border border-amber-200 p-2.5 text-xs text-amber-900 font-medium flex items-center justify-between">
                     <span>📢 Waiting Hall TV display updated: "Consultation running approximately {delayMinutes} minutes behind schedule."</span>
-                    <span className="font-mono text-[11px] font-bold">HALL TV NOTIFIED</span>
+                    <span className="font-mono text-xs font-bold">HALL TV NOTIFIED</span>
                   </div>
                 )}
               </div>
