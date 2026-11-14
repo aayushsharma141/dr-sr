@@ -5,6 +5,7 @@ import { Link, useLocation, useNavigate } from 'react-router'
 import { useLatestIntegrityRun } from '../api/integrity'
 import { useLogout } from '../api/queries'
 import { useServerLink, type ServerLink } from '../api/serverStatus'
+import { GlobalSearchBar } from './GlobalSearchBar'
 import { countBySeverity, groupFindings } from '../admin/integrity'
 import type { Role } from '../api/types'
 import {
@@ -725,6 +726,42 @@ export function AppShell({ name, role, children }: AppShellProps) {
     )
   }
 
+  const renderSidebarFooter = (isDrawer: boolean) => {
+    const iconOnly = !isDrawer && sidebarCollapsed
+    const isAccountActive = location.pathname === '/account'
+    return (
+      <div className="shrink-0 border-t border-white/15">
+        <div className="px-2 pt-2">
+          <Link
+            to="/account"
+            onClick={() => isDrawer && setMobileOpen(false)}
+            aria-current={isAccountActive ? 'page' : undefined}
+            title="My account · Profile, password, sessions"
+            className={`group relative flex min-h-10 items-center gap-3 rounded-lg px-3 py-2 text-xs font-semibold transition-colors ${
+              iconOnly ? 'justify-center' : ''
+            } ${
+              isAccountActive
+                ? 'bg-white text-[#5D0B26] font-bold shadow-xs'
+                : 'text-rose-100 hover:bg-white/10 hover:text-white'
+            }`}
+          >
+            <svg className="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+            </svg>
+            <span className={iconOnly ? 'sr-only' : 'truncate'}>My account</span>
+            {isAccountActive && (
+              <span
+                aria-hidden="true"
+                className="absolute left-0 top-1.5 bottom-1.5 w-1 rounded-r bg-[#C39A35]"
+              />
+            )}
+          </Link>
+        </div>
+        {renderConnectionStatus(isDrawer)}
+      </div>
+    )
+  }
+
   const renderAdminSidebar = (isDrawer = false) => {
     const cls = sidebarClasses(isDrawer)
     const iconOnly = !isDrawer && sidebarCollapsed
@@ -870,7 +907,7 @@ export function AppShell({ name, role, children }: AppShellProps) {
           })}
         </nav>
 
-        {renderConnectionStatus(isDrawer)}
+        {renderSidebarFooter(isDrawer)}
       </aside>
     )
   }
@@ -988,7 +1025,7 @@ export function AppShell({ name, role, children }: AppShellProps) {
           })}
         </nav>
 
-        {renderConnectionStatus(isDrawer)}
+        {renderSidebarFooter(isDrawer)}
       </aside>
     )
   }
@@ -1049,6 +1086,11 @@ export function AppShell({ name, role, children }: AppShellProps) {
             </span>
           </div>
 
+          {/* Middle section: Global search across all tabs */}
+          <div className="flex-1 max-w-md xl:max-w-xl mx-2 sm:mx-6 hidden sm:block">
+            <GlobalSearchBar role={role} />
+          </div>
+
           {/* Right section: Location | Clock | LAN | User Pill | Sign Out */}
           <div className="flex shrink-0 items-center gap-2 sm:gap-3">
             {/* Short location; the full address is on hover and on every printed letterhead. */}
@@ -1094,9 +1136,13 @@ export function AppShell({ name, role, children }: AppShellProps) {
 
             <div className="hidden sm:block h-4 w-px bg-slate-200 shrink-0" aria-hidden="true" />
 
-            {/* Signed-in staff identity: plain text, not a pill, so it doesn't read as a second button beside Sign out. */}
-            <div className="hidden sm:flex items-center gap-2 text-xs" title={`Signed in as ${name}`}>
-              <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-rose-50 text-rose-700" aria-hidden="true">
+            {/* Signed-in staff identity: links to My account */}
+            <Link
+              to="/account"
+              className="hidden sm:flex items-center gap-2 text-xs hover:bg-slate-50 p-1.5 rounded-lg transition"
+              title={`My account · Signed in as ${name}`}
+            >
+              <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-rose-50 text-rose-700 font-bold" aria-hidden="true">
                 <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                 </svg>
@@ -1105,7 +1151,7 @@ export function AppShell({ name, role, children }: AppShellProps) {
                 <span className="block text-slate-600">Signed in · {roleLabel}</span>
                 <span className="block max-w-44 truncate font-semibold text-slate-900">{name}</span>
               </span>
-            </div>
+            </Link>
 
             {/* Sign out button (preserves minimum 44px min-h-11 touch target) */}
             <button

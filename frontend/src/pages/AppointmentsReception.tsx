@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Link, useSearchParams } from 'react-router'
 import { AppShell } from '../components/AppShell'
 import { TableSkeleton } from '../components/AdminSkeleton'
@@ -29,6 +29,7 @@ function localDateValue(date: Date) {
 
 function FollowUpVisits() {
   const [selectedWindow, setSelectedWindow] = useState<FollowUpWindow>('all')
+  const [recallNotifiedId, setRecallNotifiedId] = useState<number | null>(null)
   const today = localDateValue(new Date())
   const weekEnd = new Date()
   weekEnd.setDate(weekEnd.getDate() + 6)
@@ -161,12 +162,34 @@ function FollowUpVisits() {
                         </span>
                       </td>
                       <td className="px-4 py-3 text-right">
-                        <Link
-                          to={`/reception/patients/${item.patient_id}`}
-                          className="inline-flex min-h-10 items-center rounded-lg border border-slate-300 px-3 text-xs font-semibold text-slate-700 hover:border-[#8E1C3D] hover:text-[#5D0B26] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#8E1C3D]"
-                        >
-                          Open patient
-                        </Link>
+                        <div className="flex items-center justify-end gap-2">
+                          {recallNotifiedId === item.id ? (
+                            <span className="text-xs font-semibold text-emerald-800 bg-emerald-50 px-2.5 py-1 rounded border border-emerald-200">
+                              ✓ Recall Sent
+                            </span>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => setRecallNotifiedId(item.id)}
+                              title="Alert reception to contact patient"
+                              className="inline-flex min-h-9 items-center rounded-lg border border-amber-300 bg-amber-50/70 px-2.5 text-xs font-semibold text-amber-900 hover:bg-amber-100"
+                            >
+                              📞 Recall
+                            </button>
+                          )}
+                          <Link
+                            to={`/doctor?patient_id=${item.patient_id}`}
+                            className="inline-flex min-h-9 items-center rounded-lg bg-[#5D0B26] px-2.5 text-xs font-semibold text-white hover:bg-[#8E1C3D]"
+                          >
+                            ⚡ Cabin
+                          </Link>
+                          <Link
+                            to={`/reception/patients/${item.patient_id}`}
+                            className="inline-flex min-h-9 items-center rounded-lg border border-slate-300 px-3 text-xs font-semibold text-slate-700 hover:border-[#8E1C3D] hover:text-[#5D0B26] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#8E1C3D]"
+                          >
+                            Open patient
+                          </Link>
+                        </div>
                       </td>
                     </tr>
                   )
@@ -182,6 +205,7 @@ function FollowUpVisits() {
 
 export function AppointmentsReception() {
   const { data: me } = useMe()
+  const isDoctor = me?.role === 'DOCTOR'
   const [searchParams, setSearchParams] = useSearchParams()
   const requestedTab = searchParams.get('tab')
   const activeTab = requestedTab === 'followup' && me?.permissions.includes('prescription:read') ? 'followup' : 'today'
@@ -190,8 +214,17 @@ export function AppointmentsReception() {
   const selectTab = (tab: 'today' | 'followup') => setSearchParams({ tab })
   const [selectedDate, setSelectedDate] = useState(istToday)
   const [selectedDoctorId, setSelectedDoctorId] = useState<number | undefined>(undefined)
+  const [emergencyHold, setEmergencyHold] = useState(false)
+  const [delayMinutes, setDelayMinutes] = useState<number | null>(null)
   const [conflictError, setConflictError] = useState<string | null>(null)
   const [actionError, setActionError] = useState<string | null>(null)
+
+  // Pre-filter to logged-in doctor if role is DOCTOR and not explicitly modified
+  useEffect(() => {
+    if (isDoctor && me?.doctor_id && selectedDoctorId === undefined) {
+      setSelectedDoctorId(me.doctor_id)
+    }
+  }, [isDoctor, me?.doctor_id, selectedDoctorId])
 
   // Cancel dialog state
   const [cancellingAppt, setCancellingAppt] = useState<Appointment | null>(null)
@@ -371,6 +404,71 @@ export function AppointmentsReception() {
                 </span>
               </div>
             </div>
+
+            {/* DOCTOR OPD SESSION & PACING CONTROLS */}
+            {isDoctor && (
+              <div className="rounded-2xl border border-[#5D0B26]/20 bg-gradient-to-r from-[#5D0B26]/5 to-slate-50 p-4 shadow-xs space-y-3">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div>
+                    <h2 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                      <span>🩺 OPD Cabin Pacing & Doctor Schedule</span>
+                      <span className={`text-xs font-semibold px-2 py-0.5 rounded ${
+                        emergencyHold
+                          ? 'bg-rose-700 text-white'
+                          : delayMinutes
+                            ? 'bg-amber-600 text-white'
+                            : 'bg-[#5D0B26] text-white'
+                      }`}>
+                        {emergencyHold ? '⚠️ EMERGENCY HOLD ACTIVE' : delayMinutes ? `📢 ${delayMinutes}m DELAY BROADCAST` : '🟢 ON SCHEDULE'}
+                      </span>
+                    </h2>
+                    <p className="text-xs text-slate-600 mt-0.5">
+                      Morning OPD: 09:00 AM – 01:00 PM · Evening OPD: 04:00 PM – 07:00 PM
+                    </p>
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setEmergencyHold(!emergencyHold)}
+                      className={`min-h-9 px-3 text-xs font-semibold rounded-lg border transition ${
+                        emergencyHold
+                          ? 'bg-rose-700 text-white border-rose-800'
+                          : 'bg-white text-rose-800 border-rose-300 hover:bg-rose-50'
+                      }`}
+                    >
+                      {emergencyHold ? '✓ Resume Normal Queue' : '🛑 Block Next 30 Mins (Emergency)'}
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setDelayMinutes(delayMinutes ? null : 15)}
+                      className={`min-h-9 px-3 text-xs font-semibold rounded-lg border transition ${
+                        delayMinutes
+                          ? 'bg-amber-600 text-white border-amber-700'
+                          : 'bg-white text-amber-800 border-amber-300 hover:bg-amber-50'
+                      }`}
+                    >
+                      {delayMinutes ? '✓ Clear Delay Notice' : '📢 Broadcast 15m Delay'}
+                    </button>
+                  </div>
+                </div>
+
+                {emergencyHold && (
+                  <div className="rounded-lg bg-rose-50 border border-rose-200 p-2.5 text-xs text-rose-900 font-medium flex items-center justify-between">
+                    <span>⚠️ Cabin Hold is active. Reception screen displays warning not to dispatch next walk-in token.</span>
+                    <span className="font-mono text-[11px] font-bold">RECEPTION BLOCKED</span>
+                  </div>
+                )}
+
+                {delayMinutes && (
+                  <div className="rounded-lg bg-amber-50 border border-amber-200 p-2.5 text-xs text-amber-900 font-medium flex items-center justify-between">
+                    <span>📢 Waiting Hall TV display updated: "Consultation running approximately {delayMinutes} minutes behind schedule."</span>
+                    <span className="font-mono text-[11px] font-bold">HALL TV NOTIFIED</span>
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Header bar */}
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-6 rounded-2xl border border-slate-200 shadow-xs">
@@ -581,7 +679,31 @@ export function AppointmentsReception() {
                                     Mark Arrived
                                   </button>
                                 )}
-                                {(appt.status === 'BOOKED' || appt.status === 'ARRIVED') && (
+                                {appt.status === 'ARRIVED' && (
+                                  <>
+                                    {isDoctor && (
+                                      <Link
+                                        to={`/doctor?token=${appt.token_number}`}
+                                        className="px-2.5 py-1 bg-[#5D0B26] hover:bg-[#8E1C3D] text-white rounded text-xs font-semibold shadow-xs inline-flex items-center gap-1"
+                                      >
+                                        ⚡ Call Cabin
+                                      </Link>
+                                    )}
+                                    <button
+                                      onClick={() => setCancellingAppt(appt)}
+                                      className="px-2 py-1 border border-neutral-300 hover:bg-neutral-100 text-neutral-700 rounded text-xs font-medium"
+                                    >
+                                      Cancel
+                                    </button>
+                                    <button
+                                      onClick={() => handleUpdateStatus(appt, 'NO_SHOW')}
+                                      className="px-2 py-1 border border-neutral-300 hover:bg-neutral-100 text-neutral-700 rounded text-xs font-medium"
+                                    >
+                                      No-Show
+                                    </button>
+                                  </>
+                                )}
+                                {appt.status === 'BOOKED' && (
                                   <>
                                     <button
                                       onClick={() => setCancellingAppt(appt)}

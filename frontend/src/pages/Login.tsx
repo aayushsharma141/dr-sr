@@ -4,13 +4,7 @@ import { useLogin, useSetupStatus } from '../api/queries'
 import { ApiError } from '../api/client'
 import { ROLE_HOME } from '../auth/roles'
 import { TakeoverSessionModal, type ActiveSessionInfo } from '../components/TakeoverSessionModal'
-import {
-  IconEye,
-  IconEyeOff,
-  IconLock,
-  IconLogin,
-  IconUser,
-} from '../components/icons'
+import { IconEye, IconEyeOff, IconLock, IconLogin, IconUser } from '../components/icons'
 
 type LoginNotice = {
   title: string
@@ -197,7 +191,9 @@ export function Login() {
               <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#6D021A]">
                 Sri Vashishtha Kalyan Trust
               </p>
-              <p className="text-xl font-bold tracking-tight text-[#2B000B]">Kalyan Hospital</p>
+              <p className="text-xl font-bold tracking-tight text-[#2B000B]">
+                Kalyan Hospital
+              </p>
               <p className="text-xs text-[#71717A]">Hospital Management Workspace</p>
             </div>
           </div>

@@ -403,4 +403,66 @@ describe('AppointmentsReception Component', () => {
     expect(screen.queryByRole('button', { name: /book new appointment/i })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /mark arrived/i })).not.toBeInTheDocument()
   })
+
+  it('renders OPD cabin pacing controls and emergency hold when logged in as DOCTOR', async () => {
+    const doctorMe: Me = {
+      ...mockMe,
+      role: 'DOCTOR',
+      username: 'doctor',
+      full_name: 'Dr. Madan Mohan Dwivedi',
+      permissions: ['appointment:read', 'appointment:write', 'prescription:read'],
+      doctor_id: 1,
+    }
+
+    const mockFetch = vi.fn().mockImplementation((url: string) => {
+      if (url.includes('/api/auth/me')) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          headers: new Headers({ 'content-type': 'application/json' }),
+          text: () => Promise.resolve(JSON.stringify(doctorMe)),
+        })
+      }
+      if (url.includes('/api/doctors')) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          headers: new Headers({ 'content-type': 'application/json' }),
+          text: () => Promise.resolve(JSON.stringify(mockDoctors)),
+        })
+      }
+      if (url.includes('/api/appointments')) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          headers: new Headers({ 'content-type': 'application/json' }),
+          text: () => Promise.resolve(JSON.stringify({ total: 1, appointments: mockAppointments })),
+        })
+      }
+      return Promise.reject(new Error(`Unhandled: ${url}`))
+    })
+    vi.stubGlobal('fetch', mockFetch)
+
+    const user = userEvent.setup()
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter>
+          <AppointmentsReception />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    )
+
+    await waitFor(() => {
+      expect(screen.getByText(/OPD Cabin Pacing & Doctor Schedule/i)).toBeInTheDocument()
+    })
+
+    // Pacing toggle buttons
+    const blockBtn = screen.getByRole('button', { name: /Block Next 30 Mins \(Emergency\)/i })
+    expect(blockBtn).toBeInTheDocument()
+    await user.click(blockBtn)
+
+    expect(screen.getByText(/Cabin Hold is active/i)).toBeInTheDocument()
+    expect(screen.getByText(/Resume Normal Queue/i)).toBeInTheDocument()
+  })
 })

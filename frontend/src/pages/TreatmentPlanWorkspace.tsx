@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { useParams, useSearchParams, Link } from 'react-router'
+import { useState, useEffect } from 'react'
+import { useParams, useSearchParams, Link, useNavigate } from 'react-router'
 import { AppShell } from '../components/AppShell'
 import { SessionLoggerModal } from '../components/SessionLoggerModal'
 import { SessionAddendumModal } from '../components/SessionAddendumModal'
@@ -7,6 +7,7 @@ import { Modal } from '../components/Modal'
 import { VasTrendChart } from '../components/VasTrendChart'
 import {
   usePatient,
+  usePatients,
   usePatientTreatmentPlans,
   useTreatmentPlan,
   useTreatmentSessions,
@@ -14,12 +15,13 @@ import {
   useUpdateTreatmentPlan,
   useMe,
 } from '../api/queries'
-import type { TreatmentPlanOut, TreatmentSessionOut } from '../api/types'
+import type { PatientOut, TreatmentPlanOut, TreatmentSessionOut } from '../api/types'
 import { withDoctorTitle } from '../format'
 
 export function TreatmentPlanWorkspace() {
   const { id } = useParams<{ id?: string }>()
-  const [searchParams] = useSearchParams()
+  const [searchParams, setSearchParams] = useSearchParams()
+  const navigate = useNavigate()
   const { data: me } = useMe()
 
   const routePlanId = id ? Number(id) : 0
@@ -30,9 +32,24 @@ export function TreatmentPlanWorkspace() {
   // If specific plan ID loaded from route
   const { data: routePlan } = useTreatmentPlan(routePlanId)
 
+  // Directory Patient Search State
+  const [patientSearch, setPatientSearch] = useState('')
+  const [debouncedSearch, setDebouncedSearch] = useState('')
+  const [manualPatient, setManualPatient] = useState<PatientOut | null>(null)
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(patientSearch.trim())
+    }, 250)
+    return () => clearTimeout(timer)
+  }, [patientSearch])
+
+  const { data: searchResults = [], isPending: isSearching } = usePatients(debouncedSearch, 8)
+
   // Resolve target patient ID
-  const effectivePatientId = routePlan?.patient_id || paramPatientId || 0
+  const effectivePatientId = routePlan?.patient_id || manualPatient?.id || paramPatientId || 0
   const { data: patient } = usePatient(effectivePatientId)
+  const activePatient = patient || manualPatient
   const { data: patientPlans, refetch: refetchPlans } = usePatientTreatmentPlans(effectivePatientId)
 
   // Determine active plan to display
@@ -327,12 +344,25 @@ export function TreatmentPlanWorkspace() {
             >
               ← Back to Queue
             </Link>
-            <span className="text-gray-600">|</span>
+            <span className="text-gray-300">|</span>
             <span className="text-sm font-semibold text-gray-700">Patient:</span>
-            {patient ? (
-              <span className="font-bold text-gray-900">
-                {patient.full_name} ({patient.urn}) · {patient.age_years}y / {patient.gender}
-              </span>
+            {activePatient ? (
+              <div className="flex items-center gap-2">
+                <span className="font-bold text-gray-900">
+                  {activePatient.full_name} ({activePatient.urn}) · {activePatient.age_years}y / {activePatient.gender}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setManualPatient(null)
+                    setSearchParams({})
+                    navigate('/doctor/treatment-plans')
+                  }}
+                  className="text-xs text-teal-700 hover:text-teal-900 underline font-medium ml-1"
+                >
+                  Switch Patient
+                </button>
+              </div>
             ) : (
               <span className="text-sm text-gray-500 italic">No patient selected</span>
             )}
@@ -363,8 +393,149 @@ export function TreatmentPlanWorkspace() {
           </div>
         )}
 
+        {/* Directory Launchpad when no patient is chosen */}
+        {effectivePatientId === 0 && (
+          <div className="space-y-6">
+            <div className="rounded-xl border border-teal-200 bg-gradient-to-r from-teal-50/70 to-white p-6 shadow-xs">
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div>
+                  <h1 className="text-xl font-bold text-teal-950 flex items-center gap-2">
+                    <span>⚡ Physiotherapy & Rehabilitation Center</span>
+                    <span className="text-xs font-normal bg-teal-100 text-teal-800 px-2.5 py-0.5 rounded-full border border-teal-300">
+                      भौतिक चिकित्सा
+                    </span>
+                  </h1>
+                  <p className="mt-1 text-sm text-teal-800/90 max-w-2xl">
+                    Search any registered patient to manage multi-session packages, review VAS pain progress,
+                    and log daily modalities with immutable timestamps.
+                  </p>
+                </div>
+                <div className="flex items-center gap-2 self-start md:self-auto">
+                  <div className="rounded-lg bg-white border border-teal-200 px-3 py-2 text-center shadow-xs">
+                    <span className="block text-xs text-gray-500 font-semibold uppercase">Modalities</span>
+                    <span className="text-sm font-bold text-teal-900">IFT · TENS · Traction · US</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Patient Search Input */}
+              <div className="mt-5 relative max-w-2xl">
+                <label htmlFor="rehab-patient-search" className="sr-only">
+                  Search patient by URN, Name, or Mobile
+                </label>
+                <input
+                  id="rehab-patient-search"
+                  type="search"
+                  value={patientSearch}
+                  onChange={(e) => setPatientSearch(e.target.value)}
+                  placeholder="Type URN (e.g. KH-26-P-...), patient name, or mobile number to select..."
+                  className="w-full rounded-xl border border-teal-300 bg-white py-3 pl-11 pr-10 text-sm text-gray-900 shadow-sm placeholder:text-gray-400 focus:border-teal-600 focus:ring-2 focus:ring-teal-600/20"
+                />
+                <span className="absolute left-3.5 top-3.5 text-base text-teal-600" aria-hidden="true">
+                  🔍
+                </span>
+                {patientSearch && (
+                  <button
+                    type="button"
+                    onClick={() => setPatientSearch('')}
+                    className="absolute right-3 top-3 text-xs font-semibold text-gray-400 hover:text-gray-600 px-2 py-1"
+                  >
+                    Clear
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Live Search Results */}
+            {patientSearch && (
+              <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm space-y-3">
+                <h2 className="text-sm font-bold text-gray-900 flex items-center justify-between">
+                  <span>Matching Patients ({searchResults.length})</span>
+                  {isSearching && <span className="text-xs text-gray-400">Searching...</span>}
+                </h2>
+                {searchResults.length === 0 && !isSearching ? (
+                  <p className="text-sm text-gray-500 py-3">No patients found matching "{patientSearch}".</p>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    {searchResults.map((p) => (
+                      <div
+                        key={p.id}
+                        className="rounded-lg border border-gray-200 bg-gray-50/50 p-3 flex flex-col justify-between gap-3 hover:bg-teal-50/30 hover:border-teal-300 transition"
+                      >
+                        <div>
+                          <div className="flex items-center justify-between">
+                            <span className="font-bold text-sm text-gray-900">{p.full_name}</span>
+                            <span className="font-mono text-xs font-semibold text-teal-800 bg-teal-50 px-2 py-0.5 rounded border border-teal-200">
+                              {p.urn}
+                            </span>
+                          </div>
+                          <p className="text-xs text-gray-500 mt-1">
+                            {p.age_years}y / {p.gender} · Mobile: {p.mobile}
+                          </p>
+                        </div>
+                        <div className="flex gap-2">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setManualPatient(p)
+                              setSearchParams({ patient_id: String(p.id) })
+                            }}
+                            className="flex-1 rounded-md bg-teal-700 px-3 py-1.5 text-xs font-semibold text-white hover:bg-teal-800 shadow-xs"
+                          >
+                            Open Rehabilitation Plans
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setManualPatient(p)
+                              setShowNewPlanModal(true)
+                            }}
+                            className="rounded-md border border-teal-300 bg-white px-2.5 py-1.5 text-xs font-semibold text-teal-800 hover:bg-teal-50 shadow-xs"
+                          >
+                            + New Package
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Protocol Guidance Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-xs space-y-2">
+                <span className="text-xs font-bold text-teal-700 uppercase tracking-wider">Protocol 1</span>
+                <h3 className="font-bold text-sm text-gray-900">Spine Rehabilitation (Lumbar / Cervical)</h3>
+                <p className="text-xs text-gray-600">
+                  Standard 5–10 session protocol combining Interferential Therapy (IFT), lumbar/cervical traction,
+                  heat pack, and core stabilisation.
+                </p>
+              </div>
+
+              <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-xs space-y-2">
+                <span className="text-xs font-bold text-teal-700 uppercase tracking-wider">Protocol 2</span>
+                <h3 className="font-bold text-sm text-gray-900">Post-Op Orthopedic Rehab (Knee / Hip / Shoulder)</h3>
+                <p className="text-xs text-gray-600">
+                  Standard 10–15 session protocol focusing on therapeutic ultrasound, isometric quadriceps/rotator cuff
+                  strengthening, and passive/active ROM recovery.
+                </p>
+              </div>
+
+              <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-xs space-y-2">
+                <span className="text-xs font-bold text-teal-700 uppercase tracking-wider">Protocol 3</span>
+                <h3 className="font-bold text-sm text-gray-900">Chronic Pain & Arthropathy</h3>
+                <p className="text-xs text-gray-600">
+                  TENS neuromodulation, cryotherapy/thermotherapy, posture correction, and graded functional exercise
+                  with daily visual analog scale (VAS) score tracking.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Active Treatment Package Overview Card */}
-        {activePlan ? (
+        {effectivePatientId > 0 && activePlan ? (
           <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 space-y-5">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-gray-200 pb-4">
               <div>
@@ -449,18 +620,18 @@ export function TreatmentPlanWorkspace() {
               )}
             </div>
           </div>
-        ) : (
+        ) : null}
+
+        {effectivePatientId > 0 && !activePlan && (
           <div className="bg-white p-8 rounded-xl shadow-sm border border-gray-200 text-center space-y-3">
             <p className="text-gray-500 text-sm">No active treatment package found for this patient.</p>
-            {effectivePatientId > 0 && (
-              <button
-                type="button"
-                onClick={() => setShowNewPlanModal(true)}
-                className="px-5 py-2 text-sm font-semibold text-white bg-teal-700 hover:bg-teal-800 rounded-lg shadow transition"
-              >
-                Create New Treatment Package
-              </button>
-            )}
+            <button
+              type="button"
+              onClick={() => setShowNewPlanModal(true)}
+              className="px-5 py-2 text-sm font-semibold text-white bg-teal-700 hover:bg-teal-800 rounded-lg shadow transition"
+            >
+              Create New Treatment Package
+            </button>
           </div>
         )}
 

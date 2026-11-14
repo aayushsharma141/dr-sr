@@ -51,6 +51,19 @@ export const router = createBrowserRouter([
         element: <ChangePassword />,
       },
       {
+        path: '/account',
+        lazy: async () => {
+          const { MyAccount } = await import('./pages/MyAccount')
+          return {
+            Component: MyAccount,
+          }
+        },
+      },
+      {
+        path: '/my-account',
+        element: <Navigate to="/account" replace />,
+      },
+      {
         path: '/',
         element: <RootRoute />,
       },
