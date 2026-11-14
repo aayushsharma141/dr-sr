@@ -1,9 +1,9 @@
-import { cleanup, render, screen } from '@testing-library/react'
+import { cleanup, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { MemoryRouter } from 'react-router'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { DoctorDashboard } from '../DoctorDashboard'
+import { DoctorDashboard, allergyStatus } from '../DoctorDashboard'
 import type { DoctorOut, DoctorQueueResponse, Me } from '../../api/types'
 
 const mockMeDoctor: Me = {
@@ -179,8 +179,8 @@ describe('Doctor Dashboard 3-Zone Clinical Workspace and Kanban Cards', () => {
 
     // Zone 2: Active Patient Chart (Rahul Sharma)
     expect(screen.getByRole('heading', { name: 'Rahul Sharma', level: 3 })).toBeInTheDocument()
-    expect(screen.getByText(/Critical Clinical Alert/)).toBeInTheDocument()
-    expect(screen.getByText(/Drug Allergies: Penicillin \(RED\)/)).toBeInTheDocument()
+    expect(screen.getByText('Drug allergy recorded')).toBeInTheDocument()
+    expect(screen.getAllByText(/Penicillin \(RED\)/).length).toBeGreaterThanOrEqual(1)
     expect(screen.getByText(/Clinical Notes \/ SOAP/)).toBeInTheDocument()
     expect(screen.getByText(/\+ Fever, chills \(3 days\)/)).toBeInTheDocument()
 
@@ -247,5 +247,61 @@ describe('Doctor Dashboard 3-Zone Clinical Workspace and Kanban Cards', () => {
     expect(screen.getAllByText('Sunita Devi').length).toBeGreaterThanOrEqual(1)
     expect(screen.getAllByText('Clinical Notes / SOAP').length).toBeGreaterThanOrEqual(1)
     expect(screen.getAllByText(/Finish Consultation & Call Next/).length).toBeGreaterThanOrEqual(1)
+  })
+
+  it('shows no made-up vitals, conditions or allergies (patient safety)', async () => {
+    const user = userEvent.setup()
+    render(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter>
+          <DoctorDashboard />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    )
+
+    await screen.findByRole('heading', { name: 'Rahul Sharma', level: 3 })
+    // Nothing in the queue carries vitals or chronic conditions, so none may appear.
+    expect(screen.queryByText(/120\/80/)).not.toBeInTheDocument()
+    expect(screen.queryByText(/SpO2/)).not.toBeInTheDocument()
+    expect(screen.queryByText(/Hypertension|Diabetes/)).not.toBeInTheDocument()
+
+    // Sunita's record says "None reported": shown as recorded, with no red allergy warning.
+    await user.click(screen.getAllByText('Sunita Devi')[0])
+    await screen.findByRole('heading', { name: 'Sunita Devi', level: 3 })
+    expect(screen.getAllByText(/None reported/).length).toBeGreaterThanOrEqual(1)
+    expect(screen.queryByText('Drug allergy recorded')).not.toBeInTheDocument()
+  })
+
+  it('will not finish a consultation and throw away unsaved notes without asking', async () => {
+    const user = userEvent.setup()
+    render(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter>
+          <DoctorDashboard />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    )
+
+    await screen.findByRole('heading', { name: 'Rahul Sharma', level: 3 })
+    await user.type(screen.getAllByLabelText('Subjective / chief complaint')[0], 'Headache for 2 days')
+    await user.click(screen.getAllByRole('button', { name: /Finish Consultation & Call Next/ })[0])
+
+    const dialog = await screen.findByRole('dialog')
+    expect(within(dialog).getByText(/not part of the\s+patient record/)).toBeInTheDocument()
+    // No status change was sent while the notes are unsaved.
+    const calls = (fetch as unknown as ReturnType<typeof vi.fn>).mock.calls
+    expect(calls.some(([url]) => String(url).includes('/status'))).toBe(false)
+    // The notes are still there.
+    expect(screen.getAllByLabelText('Subjective / chief complaint')[0]).toHaveValue('Headache for 2 days')
+  })
+})
+
+describe('allergyStatus', () => {
+  it('never invents an allergy and tells "not recorded" apart from "none"', () => {
+    expect(allergyStatus('')).toEqual({ kind: 'not_recorded', text: 'Not recorded' })
+    expect(allergyStatus(null)).toEqual({ kind: 'not_recorded', text: 'Not recorded' })
+    expect(allergyStatus('None reported')).toEqual({ kind: 'none', text: 'None reported' })
+    expect(allergyStatus(' NKDA ').kind).toBe('none')
+    expect(allergyStatus('Sulfa drugs')).toEqual({ kind: 'recorded', text: 'Sulfa drugs' })
   })
 })

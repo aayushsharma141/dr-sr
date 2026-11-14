@@ -274,7 +274,7 @@ export function DoctorSettings() {
                   <span>Target consult pace: {consultationPace} mins · Follow-up validity: {followUpValidity} days</span>
                 </div>
                 <div className="text-center border border-slate-300 rounded p-2 bg-white shadow-2xs">
-                  <span className="text-xs font-mono block text-emerald-800 font-bold">DIGITALLY SIGNED</span>
+                  <span className="text-xs font-mono block text-emerald-800 font-bold">SEAL PREVIEW (NOT A SIGNATURE)</span>
                   <span className="text-xs text-slate-500 block font-mono">Kalyan Hospital LAN</span>
                 </div>
               </div>

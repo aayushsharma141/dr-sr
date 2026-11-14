@@ -271,6 +271,7 @@ describe('DoctorSettings Page (K-60)', () => {
     })
     expect(screen.getByText(/Target Consultation Pace/i)).toBeInTheDocument()
     expect(screen.getByText(/Prescription Follow-Up Grace Validity/i)).toBeInTheDocument()
-    expect(screen.getByText(/DIGITALLY SIGNED/i)).toBeInTheDocument()
+    expect(screen.getByText(/SEAL PREVIEW \(NOT A SIGNATURE\)/)).toBeInTheDocument()
+    expect(screen.queryByText(/DIGITALLY SIGNED/i)).not.toBeInTheDocument()
   })
 })

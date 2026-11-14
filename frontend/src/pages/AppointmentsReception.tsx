@@ -187,16 +187,16 @@ function FollowUpVisits() {
                         <div className="flex items-center justify-end gap-2">
                           {recallNotifiedId === item.id ? (
                             <span className="text-xs font-semibold text-emerald-800 bg-emerald-50 px-2.5 py-1 rounded border border-emerald-200">
-                              ✓ Recall Sent
+                              ✓ Marked to recall (this screen only)
                             </span>
                           ) : (
                             <button
                               type="button"
                               onClick={() => setRecallNotifiedId(item.id)}
-                              title="Alert reception to contact patient"
+                              title="Marks this patient on your screen only. Reception is not notified."
                               className="inline-flex min-h-9 items-center rounded-lg border border-amber-300 bg-amber-50/70 px-2.5 text-xs font-semibold text-amber-900 hover:bg-amber-100"
                             >
-                              📞 Recall
+                              📞 Mark to recall
                             </button>
                           )}
                           <Link
@@ -460,7 +460,7 @@ export function AppointmentsReception() {
                             ? 'bg-amber-600 text-white'
                             : 'bg-[#5D0B26] text-white'
                       }`}>
-                        {emergencyHold ? '⚠️ EMERGENCY HOLD ACTIVE' : delayMinutes ? `📢 ${delayMinutes}m DELAY BROADCAST` : '🟢 ON SCHEDULE'}
+                        {emergencyHold ? '⚠️ EMERGENCY HOLD (THIS SCREEN ONLY)' : delayMinutes ? `⏱ ${delayMinutes}m DELAY (THIS SCREEN ONLY)` : '🟢 ON SCHEDULE'}
                       </span>
                     </h2>
                     <p className="text-xs text-slate-600 mt-0.5">
@@ -478,7 +478,7 @@ export function AppointmentsReception() {
                           : 'bg-white text-rose-800 border-rose-300 hover:bg-rose-50'
                       }`}
                     >
-                      {emergencyHold ? '✓ Resume Normal Queue' : '🛑 Block Next 30 Mins (Emergency)'}
+                      {emergencyHold ? '✓ Resume Normal Queue' : '🛑 Mark emergency hold'}
                     </button>
 
                     <button
@@ -490,22 +490,22 @@ export function AppointmentsReception() {
                           : 'bg-white text-amber-800 border-amber-300 hover:bg-amber-50'
                       }`}
                     >
-                      {delayMinutes ? '✓ Clear Delay Notice' : '📢 Broadcast 15m Delay'}
+                      {delayMinutes ? '✓ Clear delay note' : '⏱ Note 15 min delay'}
                     </button>
                   </div>
                 </div>
 
                 {emergencyHold && (
                   <div className="rounded-lg bg-rose-50 border border-rose-200 p-2.5 text-xs text-rose-900 font-medium flex items-center justify-between">
-                    <span>⚠️ Cabin Hold is active. Reception screen displays warning not to dispatch next walk-in token.</span>
-                    <span className="font-mono text-xs font-bold">RECEPTION BLOCKED</span>
+                    <span>⚠️ Emergency hold is marked on this screen only. Reception has not been told: phone them to stop sending new walk-ins.</span>
+                    <span className="font-mono text-xs font-bold">NOT SENT</span>
                   </div>
                 )}
 
                 {delayMinutes && (
                   <div className="rounded-lg bg-amber-50 border border-amber-200 p-2.5 text-xs text-amber-900 font-medium flex items-center justify-between">
-                    <span>📢 Waiting Hall TV display updated: "Consultation running approximately {delayMinutes} minutes behind schedule."</span>
-                    <span className="font-mono text-xs font-bold">HALL TV NOTIFIED</span>
+                    <span>⏱ A delay of about {delayMinutes} minutes is noted on this screen only. Reception and the waiting-hall TV have not been told.</span>
+                    <span className="font-mono text-xs font-bold">NOT SENT</span>
                   </div>
                 )}
               </div>

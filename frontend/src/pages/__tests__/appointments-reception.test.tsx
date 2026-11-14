@@ -458,11 +458,14 @@ describe('AppointmentsReception Component', () => {
     })
 
     // Pacing toggle buttons
-    const blockBtn = screen.getByRole('button', { name: /Block Next 30 Mins \(Emergency\)/i })
+    const blockBtn = screen.getByRole('button', { name: /Mark emergency hold/i })
     expect(blockBtn).toBeInTheDocument()
     await user.click(blockBtn)
 
-    expect(screen.getByText(/Cabin Hold is active/i)).toBeInTheDocument()
+    // The hold is only on this screen, and the page must say so rather than claim reception was told.
+    expect(screen.getByText(/marked on this screen only/i)).toBeInTheDocument()
+    expect(screen.getByText('NOT SENT')).toBeInTheDocument()
+    expect(screen.queryByText(/RECEPTION BLOCKED/)).not.toBeInTheDocument()
     expect(screen.getByText(/Resume Normal Queue/i)).toBeInTheDocument()
   })
 })

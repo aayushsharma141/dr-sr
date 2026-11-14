@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, type DragEvent } from 'react'
 import { useNavigate } from 'react-router'
 import { AppShell } from '../components/AppShell'
+import { Modal } from '../components/Modal'
 import { DoctorDashboardUnfinishedCard } from '../components/DoctorDashboardUnfinishedCard'
 import {
   useDoctorQueue,
@@ -42,6 +43,39 @@ const DIAGNOSTIC_TESTS = [
 ]
 
 /** Play gentle waiting room chime tone using browser Web Audio API */
+/** Words reception types when the patient has no allergies; shown as recorded, never as a warning. */
+const NO_ALLERGY_ENTRIES = new Set(['none', 'none reported', 'nil', 'no', 'nkda', 'no known allergies', 'no known drug allergies'])
+
+/**
+ * Reads the allergy text exactly as recorded on the patient. Nothing is ever filled in:
+ * a blank record is "not recorded", which the doctor must ask about, not "no allergies".
+ */
+export function allergyStatus(raw: string | null | undefined): { kind: 'not_recorded' | 'none' | 'recorded'; text: string } {
+  const text = (raw ?? '').trim()
+  if (!text) return { kind: 'not_recorded', text: 'Not recorded' }
+  if (NO_ALLERGY_ENTRIES.has(text.toLowerCase().replace(/\.$/, ''))) return { kind: 'none', text }
+  return { kind: 'recorded', text }
+}
+
+/** Allergy line for the clinical sheet. Vitals and chronic conditions are not shown here: the queue does not carry them. */
+function AllergyBanner({ allergies }: { allergies: string | null | undefined }) {
+  const status = allergyStatus(allergies)
+  if (status.kind === 'recorded') {
+    return (
+      <div role="alert" className="rounded-lg border border-rose-300 bg-rose-50 p-3 text-xs text-rose-950 shadow-2xs">
+        <div className="font-bold uppercase tracking-wider text-rose-900">Drug allergy recorded</div>
+        <div className="mt-1 text-sm font-bold text-rose-900">{status.text}</div>
+      </div>
+    )
+  }
+  return (
+    <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-xs text-slate-700">
+      <span className="font-semibold">Allergies:</span>{' '}
+      {status.kind === 'none' ? status.text : 'Not recorded. Ask the patient before prescribing.'}
+    </div>
+  )
+}
+
 function playWaitingRoomChime() {
   try {
     const AudioContextClass =
@@ -125,6 +159,8 @@ export function DoctorDashboard() {
   const [orderedLabs, setOrderedLabs] = useState<string[]>([])
   const [followUpDays, setFollowUpDays] = useState<string | null>('7')
   const [toastMessage, setToastMessage] = useState<string | null>(null)
+  const [unsavedFinishItem, setUnsavedFinishItem] = useState<DoctorQueueItem | null>(null)
+  const [finishError, setFinishError] = useState<{ item: DoctorQueueItem; message: string } | null>(null)
 
   // Kanban mode states & interactive controls
   const [kanbanSearch, setKanbanSearch] = useState('')
@@ -321,7 +357,18 @@ export function DoctorDashboard() {
   }
 
   // Finish consultation & queue next
-  const handleFinishConsultation = async (item: DoctorQueueItem) => {
+  const hasUnsavedScratchpad =
+    Object.values(soapNotes).some((v) => v.trim() !== '') || prescribedMeds.length > 0 || orderedLabs.length > 0
+
+  const handleFinishConsultation = async (item: DoctorQueueItem, discardScratchpad = false) => {
+    // The scratchpad belongs to the patient on the chart and is never saved by this screen.
+    // Finishing that patient must not silently throw it away.
+    if (item.id === currentChartPatient?.id && hasUnsavedScratchpad && !discardScratchpad) {
+      setUnsavedFinishItem(item)
+      return
+    }
+    setUnsavedFinishItem(null)
+    setFinishError(null)
     try {
       await updateStatusMutation.mutateAsync({
         id: item.id,
@@ -331,10 +378,11 @@ export function DoctorDashboard() {
         },
       })
       setToastMessage(`Consultation finished for Token ${formatToken(item.token_number)}.`)
-      // Clear scratchpad
-      setSoapNotes({ subjective: '', objective: '', assessment: '', plan: '' })
-      setPrescribedMeds([])
-      setOrderedLabs([])
+      if (item.id === currentChartPatient?.id) {
+        setSoapNotes({ subjective: '', objective: '', assessment: '', plan: '' })
+        setPrescribedMeds([])
+        setOrderedLabs([])
+      }
 
       // If more patients are waiting, auto call next
       const remaining = waitingPatients.filter((p) => p.id !== item.id)
@@ -343,9 +391,12 @@ export function DoctorDashboard() {
       } else {
         setSelectedPatientId(null)
       }
-    } catch {
-      // If direct transition needs encounter finalisation
-      navigate(`/doctor/encounters/new?patient_id=${item.patient_id}&appointment_id=${item.id}`)
+    } catch (err: unknown) {
+      // Say why it failed; the doctor decides whether to open the consultation record.
+      setFinishError({
+        item,
+        message: err instanceof Error ? err.message : 'The server did not accept the status change.',
+      })
     }
   }
 
@@ -469,19 +520,10 @@ export function DoctorDashboard() {
             <span>📞 {item.patient_mobile}</span>
           </div>
 
-          {/* Vitals Summary */}
-          <div className="mt-2 flex items-center gap-2 text-xs bg-slate-50 px-2 py-1 rounded border border-slate-100 font-medium text-slate-700">
-            <span>Vitals: 120/80 mmHg</span>
-            <span>•</span>
-            <span>Pulse 74</span>
-            <span>•</span>
-            <span>SpO2 98%</span>
-          </div>
-
-          {/* Critical Allergies Alert */}
-          {item.patient_allergies && item.patient_allergies !== 'None reported' && (
+          {/* Allergies, exactly as recorded on the patient record */}
+          {allergyStatus(item.patient_allergies).kind === 'recorded' && (
             <div className="mt-2 rounded bg-rose-50 px-2 py-1 text-xs font-bold text-rose-800 border border-rose-200">
-              ⚠️ Allergies: {item.patient_allergies}
+              ⚠️ Allergies: {allergyStatus(item.patient_allergies).text}
             </div>
           )}
 
@@ -648,46 +690,7 @@ export function DoctorDashboard() {
 
         {/* Scrollable Clinical Sheet Body */}
         <div className="p-4 sm:p-5 space-y-4 max-h-[calc(100vh-250px)] overflow-y-auto">
-          {/* Critical Red Alert Banner */}
-          <div className="rounded-lg border border-rose-300 bg-rose-50 p-3 text-xs text-rose-950 shadow-2xs">
-            <div className="flex items-center justify-between gap-2">
-              <div className="flex items-center gap-2">
-                <span className="text-base">🚨</span>
-                <span className="font-bold uppercase tracking-wider text-rose-900 text-xs">
-                  Critical Clinical Alert
-                </span>
-              </div>
-              <span className="text-xs font-bold bg-rose-200/80 px-2 py-0.5 rounded text-rose-900">
-                DRUG ALLERGY WARNING
-              </span>
-            </div>
-            <div className="mt-1.5 font-bold text-rose-900">
-              Drug Allergies: {patient.patient_allergies || 'Penicillin (RED)'}
-            </div>
-            <div className="mt-1 text-xs text-rose-800">
-              Chronic: Hypertension · Type 2 Diabetes Mellitus
-            </div>
-
-            {/* Nurse Triage Vitals */}
-            <div className="mt-2.5 grid grid-cols-2 sm:grid-cols-4 gap-2 pt-2 border-t border-rose-200/60 text-xs text-rose-950 font-medium">
-              <div className="bg-white/80 p-1.5 rounded">
-                <span className="text-xs text-slate-500 block">BP</span>
-                <span className="font-bold">120/80 mmHg</span>
-              </div>
-              <div className="bg-white/80 p-1.5 rounded">
-                <span className="text-xs text-slate-500 block">Pulse</span>
-                <span className="font-bold">74 bpm</span>
-              </div>
-              <div className="bg-white/80 p-1.5 rounded">
-                <span className="text-xs text-slate-500 block">Temp</span>
-                <span className="font-bold">98.4 °F</span>
-              </div>
-              <div className="bg-white/80 p-1.5 rounded">
-                <span className="text-xs text-slate-500 block">SpO2</span>
-                <span className="font-bold">98% Air</span>
-              </div>
-            </div>
-          </div>
+          <AllergyBanner allergies={patient.patient_allergies} />
 
           {/* Chief Complaint */}
           {patient.notes && (
@@ -703,7 +706,7 @@ export function DoctorDashboard() {
               <label className="text-xs font-bold uppercase tracking-wider text-slate-700">
                 Clinical Notes / SOAP
               </label>
-              <span className="text-xs text-slate-500">Zero-click instant scratchpad</span>
+              <span className="text-xs font-semibold text-amber-800">Rough notes: not saved to the patient record</span>
             </div>
 
             {/* Quick Symptom Macros */}
@@ -1212,47 +1215,7 @@ export function DoctorDashboard() {
                 <div className="lg:col-span-5 space-y-4">
                   {currentChartPatient ? (
                     <div className="rounded-xl border border-slate-200 bg-white shadow-2xs overflow-hidden">
-                      {/* Critical Alert Banner (Drug Allergies & Triage Vitals) */}
-                      <div className="bg-rose-50 border-b border-rose-200 p-4">
-                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                          <div className="flex items-center gap-2">
-                            <span className="flex h-7 w-7 items-center justify-center rounded-full bg-rose-600 text-white font-bold text-xs shrink-0">
-                              !
-                            </span>
-                            <div>
-                              <div className="text-xs font-bold uppercase tracking-wide text-rose-900">
-                                Critical Clinical Alert
-                              </div>
-                              <div className="text-xs font-bold text-rose-700">
-                                Drug Allergies: {currentChartPatient.patient_allergies || 'None reported'}
-                              </div>
-                            </div>
-                          </div>
-                          <span className="inline-block rounded bg-rose-100 px-2 py-0.5 text-xs font-bold text-rose-900 shrink-0">
-                            RED FLAG
-                          </span>
-                        </div>
-
-                        {/* Nurse Triage Vitals Strip */}
-                        <div className="mt-3 grid grid-cols-2 sm:grid-cols-4 gap-2 pt-2 border-t border-rose-200/60 text-xs text-rose-950 font-medium">
-                          <div className="bg-white/80 p-1.5 rounded">
-                            <span className="text-xs text-slate-500 block">Blood Pressure</span>
-                            <span className="font-bold">120/80 mmHg</span>
-                          </div>
-                          <div className="bg-white/80 p-1.5 rounded">
-                            <span className="text-xs text-slate-500 block">Pulse</span>
-                            <span className="font-bold">74 bpm</span>
-                          </div>
-                          <div className="bg-white/80 p-1.5 rounded">
-                            <span className="text-xs text-slate-500 block">Temp</span>
-                            <span className="font-bold">98.4 °F</span>
-                          </div>
-                          <div className="bg-white/80 p-1.5 rounded">
-                            <span className="text-xs text-slate-500 block">SpO2</span>
-                            <span className="font-bold">98% Room Air</span>
-                          </div>
-                        </div>
-                      </div>
+                      <AllergyBanner allergies={currentChartPatient.patient_allergies} />
 
                       {/* Patient Identity Strip */}
                       <div className="p-4 sm:p-5 border-b border-slate-100 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
@@ -1294,7 +1257,7 @@ export function DoctorDashboard() {
                             <label className="text-xs font-bold uppercase tracking-wider text-slate-700">
                               Clinical Notes / SOAP
                             </label>
-                            <span className="text-xs text-slate-500">Zero-click instant scratchpad</span>
+                            <span className="text-xs font-semibold text-amber-800">Rough notes: not saved to the patient record</span>
                           </div>
 
                           {/* Quick Symptom Macros */}
@@ -1940,6 +1903,64 @@ export function DoctorDashboard() {
           </>
         )}
       </div>
+      {finishError && (
+        <div role="alert" className="fixed bottom-4 right-4 z-40 max-w-md rounded-xl border border-rose-300 bg-rose-50 p-4 text-sm text-rose-900 shadow-lg">
+          <p className="font-bold">Could not finish Token {formatToken(finishError.item.token_number)}</p>
+          <p className="mt-1">{finishError.message}</p>
+          <div className="mt-3 flex justify-end gap-2">
+            <button type="button" onClick={() => setFinishError(null)} className="min-h-9 rounded-lg border border-rose-300 bg-white px-3 text-xs font-semibold text-rose-900 hover:bg-rose-100">
+              Dismiss
+            </button>
+            <button
+              type="button"
+              onClick={() => handleStartConsultation(finishError.item)}
+              className="min-h-9 rounded-lg bg-[#5D0B26] px-3 text-xs font-semibold text-white hover:bg-[#8E1C3D]"
+            >
+              Open consultation record
+            </button>
+          </div>
+        </div>
+      )}
+
+      <Modal
+        open={unsavedFinishItem !== null}
+        variant="warning"
+        title="These notes are not saved"
+        onClose={() => setUnsavedFinishItem(null)}
+        busy={updateStatusMutation.isPending}
+        className="max-w-md"
+      >
+        <div className="space-y-4">
+          <p className="text-sm text-slate-700">
+            The notes, medicines and lab orders typed on this screen are rough notes only. They are not part of the
+            patient record. Open the consultation record to save them before finishing.
+          </p>
+          <div className="flex flex-wrap justify-end gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                const item = unsavedFinishItem
+                if (item) void handleFinishConsultation(item, true)
+              }}
+              className="min-h-9 rounded-lg border border-slate-300 bg-white px-3 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+            >
+              Discard notes and finish
+            </button>
+            <button
+              type="button"
+              data-autofocus
+              onClick={() => {
+                const item = unsavedFinishItem
+                setUnsavedFinishItem(null)
+                if (item) handleStartConsultation(item)
+              }}
+              className="min-h-9 rounded-lg bg-[#5D0B26] px-3 text-sm font-semibold text-white hover:bg-[#8E1C3D]"
+            >
+              Open consultation record
+            </button>
+          </div>
+        </div>
+      </Modal>
     </AppShell>
   )
 }
