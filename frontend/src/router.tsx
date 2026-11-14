@@ -206,13 +206,9 @@ export const router = createBrowserRouter([
             },
           },
           {
+            // Pending dues now live in Billing & Payments; old links keep working.
             path: '/reception/dues',
-            lazy: async () => {
-              const { PendingDuesPage } = await import('./pages/PendingDuesPage')
-              return {
-                Component: PendingDuesPage,
-              }
-            },
+            element: <Navigate to="/reception/billing?tab=dues" replace />,
           },
         ],
       },

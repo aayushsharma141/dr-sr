@@ -17,8 +17,30 @@ import { formatToken, istToday } from '../format'
 import { isVersionConflict } from '../api/client'
 import { IconTicket, IconUserPlus } from '../components/icons'
 
-
 type FollowUpWindow = 'all' | 'today' | 'week' | 'overdue'
+
+const STATUS_LABEL: Record<AppointmentStatus, string> = {
+  BOOKED: 'Booked',
+  ARRIVED: 'Waiting',
+  IN_CONSULTATION: 'With doctor',
+  DONE: 'Completed',
+  CANCELLED: 'Cancelled',
+  NO_SHOW: 'No-show',
+  RESCHEDULED: 'Rescheduled',
+}
+
+const STATUS_CLASS: Record<AppointmentStatus, string> = {
+  BOOKED: 'bg-blue-50 text-blue-800 ring-blue-200',
+  ARRIVED: 'bg-amber-50 text-amber-800 ring-amber-200',
+  IN_CONSULTATION: 'bg-purple-50 text-purple-800 ring-purple-200',
+  DONE: 'bg-emerald-50 text-emerald-800 ring-emerald-200',
+  CANCELLED: 'bg-slate-100 text-slate-700 ring-slate-200',
+  NO_SHOW: 'bg-slate-100 text-slate-700 ring-slate-200',
+  RESCHEDULED: 'bg-slate-100 text-slate-700 ring-slate-200',
+}
+
+const SECONDARY_BUTTON =
+  'min-h-9 rounded-lg border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50'
 
 function localDateValue(date: Date) {
   const year = date.getFullYear()
@@ -180,6 +202,63 @@ function FollowUpVisits() {
   )
 }
 
+/** The action a receptionist can take on one booking, given where the patient is now. */
+function RowActions({
+  appt,
+  busy,
+  onMarkArrived,
+  onMarkNoShow,
+  onCancel,
+}: {
+  appt: Appointment
+  busy: boolean
+  onMarkArrived: () => void
+  onMarkNoShow: () => void
+  onCancel: () => void
+}) {
+  switch (appt.status) {
+    case 'BOOKED':
+      return (
+        <div className="flex flex-wrap justify-end gap-2">
+          <button type="button" onClick={onMarkArrived} disabled={busy} className="min-h-9 rounded-lg bg-amber-600 px-3 text-xs font-semibold text-white shadow-xs hover:bg-amber-700 disabled:opacity-50">
+            Mark Arrived
+          </button>
+          <button type="button" onClick={onMarkNoShow} className={SECONDARY_BUTTON}>No-Show</button>
+          <button type="button" onClick={onCancel} className={SECONDARY_BUTTON}>Cancel</button>
+        </div>
+      )
+    case 'ARRIVED':
+      return (
+        <div className="flex justify-end">
+          <button type="button" onClick={onCancel} className={SECONDARY_BUTTON}>Cancel</button>
+        </div>
+      )
+    case 'NO_SHOW':
+      // A patient marked not arrived can still check in late, the same day.
+      return (
+        <div className="flex justify-end">
+          <button type="button" onClick={onMarkArrived} disabled={busy} className="min-h-9 rounded-lg bg-amber-600 px-3 text-xs font-semibold text-white shadow-xs hover:bg-amber-700 disabled:opacity-50">
+            Mark Arrived
+          </button>
+        </div>
+      )
+    case 'IN_CONSULTATION':
+      return <span className="text-xs font-semibold italic text-purple-700">With doctor</span>
+    case 'DONE':
+      return (
+        <Link
+          to={`/reception/billing?appointment_id=${appt.id}&patient_id=${appt.patient_id}`}
+          className="inline-flex min-h-9 items-center gap-1 rounded-lg border border-emerald-300 bg-emerald-50 px-3 text-xs font-bold text-emerald-900 hover:bg-emerald-100"
+        >
+          Billing &rarr;
+        </Link>
+      )
+    case 'CANCELLED':
+    case 'RESCHEDULED':
+      return <span className="text-xs text-slate-500">—</span>
+  }
+}
+
 export function AppointmentsReception() {
   const { data: me } = useMe()
   const [searchParams, setSearchParams] = useSearchParams()
@@ -217,10 +296,6 @@ export function AppointmentsReception() {
     setSelectedDate(d.toISOString().split('T')[0])
   }
 
-  const handleSetToday = () => {
-    setSelectedDate(istToday())
-  }
-
   const handleUpdateStatus = async (
     appt: Appointment,
     newStatus: AppointmentStatus,
@@ -251,35 +326,39 @@ export function AppointmentsReception() {
   }
 
   const appointments = appointmentsData?.appointments || []
-
-  // Compute metrics
-  const totalCount = appointments.length
-  const waitingCount = appointments.filter((a) => a.status === 'ARRIVED').length
-  const inConsultCount = appointments.filter((a) => a.status === 'IN_CONSULTATION').length
-  const doneCount = appointments.filter((a) => a.status === 'DONE').length
-
-  const getStatusBadge = (status: AppointmentStatus) => {
-    switch (status) {
-      case 'BOOKED':
-        return <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-100 text-blue-800">Booked</span>
-      case 'ARRIVED':
-        return <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-800">Arrived (Waiting)</span>
-      case 'IN_CONSULTATION':
-        return <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-purple-100 text-purple-800">In Consultation</span>
-      case 'DONE':
-        return <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-green-100 text-green-800">Completed</span>
-      case 'CANCELLED':
-        return <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-neutral-200 text-neutral-700">Cancelled</span>
-      case 'NO_SHOW':
-        return <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-neutral-200 text-neutral-700">No Show</span>
-    }
-  }
+  const countWith = (status: AppointmentStatus) => appointments.filter((a) => a.status === status).length
 
   return (
     <AppShell name={me?.full_name || 'Staff'} role={me?.role || 'RECEPTION'}>
-      <div className="space-y-6">
-        <h1 className="text-xl font-bold tracking-tight text-slate-900">Appointments</h1>
-        <div role="tablist" aria-label="Appointment workspace" className="flex flex-wrap gap-2 border-b border-slate-200 pb-2">
+      <div className="space-y-5">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h1 className="text-xl font-bold tracking-tight text-slate-900">Appointments</h1>
+            <p className="mt-0.5 text-sm text-slate-600">Today&apos;s bookings by doctor. Mark arrivals, no-shows and cancellations.</p>
+          </div>
+          {canManageAppointments ? (
+            <div className="flex flex-wrap gap-2">
+              <Link
+                to="/reception/patients/new"
+                className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-700 shadow-2xs hover:bg-slate-50"
+              >
+                <IconUserPlus className="h-4 w-4 text-emerald-800" />
+                New patient
+              </Link>
+              <Link
+                to="/reception/tokens"
+                className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-[#124832] px-4 text-sm font-semibold text-white shadow-xs hover:bg-[#0D3822]"
+              >
+                <IconTicket className="h-4 w-4" />
+                Token desk
+              </Link>
+            </div>
+          ) : (
+            <span className="rounded-lg bg-slate-100 px-3 py-2 text-xs font-semibold text-slate-600">Read-only schedule</span>
+          )}
+        </div>
+
+        <div role="tablist" aria-label="Appointment workspace" className="flex flex-wrap gap-2 border-b border-slate-200">
           <button
             type="button"
             role="tab"
@@ -287,9 +366,9 @@ export function AppointmentsReception() {
             aria-controls="appointments-panel-today"
             aria-selected={activeTab === 'today'}
             onClick={() => selectTab('today')}
-            className={`min-h-11 rounded-lg border-b-2 px-4 text-sm font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#8E1C3D] ${activeTab === 'today' ? 'border-[#C39A35] bg-white text-[#5D0B26]' : 'border-transparent text-slate-600 hover:bg-white hover:text-[#5D0B26]'}`}
+            className={`min-h-11 border-b-2 px-4 text-sm font-semibold ${activeTab === 'today' ? 'border-[#C39A35] text-[#5D0B26]' : 'border-transparent text-slate-600 hover:text-[#5D0B26]'}`}
           >
-            Today's Queue
+            Today&apos;s Queue
           </button>
           {canViewFollowUps && (
             <button
@@ -299,7 +378,7 @@ export function AppointmentsReception() {
               aria-controls="appointments-panel-followup"
               aria-selected={activeTab === 'followup'}
               onClick={() => selectTab('followup')}
-              className={`min-h-11 rounded-lg border-b-2 px-4 text-sm font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#8E1C3D] ${activeTab === 'followup' ? 'border-[#C39A35] bg-white text-[#5D0B26]' : 'border-transparent text-slate-600 hover:bg-white hover:text-[#5D0B26]'}`}
+              className={`min-h-11 border-b-2 px-4 text-sm font-semibold ${activeTab === 'followup' ? 'border-[#C39A35] text-[#5D0B26]' : 'border-transparent text-slate-600 hover:text-[#5D0B26]'}`}
             >
               Follow-ups
             </button>
@@ -307,7 +386,7 @@ export function AppointmentsReception() {
         </div>
 
         {activeTab === 'today' ? (
-          <div id="appointments-panel-today" role="tabpanel" aria-labelledby="appointments-tab-today" className="space-y-6">
+          <div id="appointments-panel-today" role="tabpanel" aria-labelledby="appointments-tab-today" className="space-y-4">
             {conflictError && (
               <ConflictBanner
                 onReload={() => {
@@ -323,299 +402,115 @@ export function AppointmentsReception() {
               </InlineAlert>
             )}
 
-            {/* CLINICAL OPD JOURNEY PIPELINE BANNER */}
-            <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-xs">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-2.5 pb-2 border-b border-slate-100">
-                <span className="text-xs font-bold uppercase tracking-wider text-slate-600">
-                  Hospital OPD Flow: Registration → Token → Waiting Hall → Consultation → Prescription → Billing &amp; Payment → Exit
-                </span>
-                <span className="self-start sm:self-auto rounded bg-emerald-100 px-2 py-0.5 text-xs font-bold text-emerald-800">
-                  Stage 4: Active Waiting Hall
-                </span>
-              </div>
-              <div className="flex flex-wrap items-center gap-1.5 text-xs font-medium text-slate-600">
-                <span className="inline-flex items-center gap-1 rounded-lg bg-slate-100 px-2.5 py-1 text-slate-700">
-                  1. Registration
-                </span>
-                <span className="text-slate-500">→</span>
-                <span className="inline-flex items-center gap-1 rounded-lg bg-slate-100 px-2.5 py-1 text-slate-700">
-                  2. Doctor Assignment
-                </span>
-                <span className="text-slate-500">→</span>
-                <span className="inline-flex items-center gap-1 rounded-lg bg-slate-100 px-2.5 py-1 text-slate-700">
-                  3. Token Generation
-                </span>
-                <span className="text-slate-500">→</span>
-                <span className="inline-flex items-center gap-1 rounded-lg bg-emerald-800 text-white font-bold px-3 py-1 shadow-2xs">
-                  4. Waiting Queue (Current)
-                </span>
-                <span className="text-slate-500">→</span>
-                <span className="inline-flex items-center gap-1 rounded-lg bg-slate-100 px-2.5 py-1 text-slate-700">
-                  5. Doctor Consultation
-                </span>
-                <span className="text-slate-500">→</span>
-                <span className="inline-flex items-center gap-1 rounded-lg bg-slate-100 px-2.5 py-1 text-slate-700">
-                  6. Documentation &amp; Rx
-                </span>
-                <span className="text-slate-500">→</span>
-                <span className="inline-flex items-center gap-1 rounded-lg bg-slate-100 px-2.5 py-1 text-slate-700">
-                  7. Reception Billing
-                </span>
-                <span className="text-slate-500">→</span>
-                <span className="inline-flex items-center gap-1 rounded-lg bg-slate-100 px-2.5 py-1 text-slate-700">
-                  8. Payment &amp; Receipt
-                </span>
-                <span className="text-slate-500">→</span>
-                <span className="inline-flex items-center gap-1 rounded-lg bg-slate-100 px-2.5 py-1 text-slate-700">
-                  9. Patient Exit
-                </span>
-              </div>
-            </div>
-
-            {/* Header bar */}
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-6 rounded-2xl border border-slate-200 shadow-xs">
+            {/* One toolbar: the day, the doctor, and the counts for that day. */}
+            <div className="flex flex-wrap items-end gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-xs">
               <div>
-                <h2 className="text-xl font-bold text-slate-900">
-                  OPD Waiting Queue &amp; Token Board
-                </h2>
-                <p className="text-xs text-slate-500 mt-1">
-                  Live token queue in waiting hall. Call patients to consulting room, track consultation, and hand off to billing.
-                </p>
-              </div>
-              {canManageAppointments ? (
-                <div className="flex flex-wrap items-center gap-2.5">
-                  <Link
-                    to="/reception/patients/new"
-                    className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-slate-300 bg-white px-4 text-sm font-bold text-slate-700 shadow-2xs hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-slate-400"
-                  >
-                    <IconUserPlus className="h-4 w-4 text-emerald-800" />
-                    New Patient Registration
-                  </Link>
-                  <Link
-                    to="/reception/tokens"
-                    className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-[#124832] px-5 text-sm font-bold text-white shadow-xs hover:bg-[#0D3822] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-800"
-                  >
-                    <IconTicket className="h-4 w-4" />
-                    Issue Queue Token (Fast Desk)
-                  </Link>
-                </div>
-              ) : (
-                <span className="rounded-lg bg-slate-100 px-3 py-2 text-xs font-semibold text-slate-600">Read-only schedule</span>
-              )}
-            </div>
-
-            {/* Date Filter & Metrics */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              {/* Date & Doctor Navigator */}
-              <div className="bg-white p-5 rounded-lg border border-neutral-200 space-y-4 shadow-xs">
-                <div>
-                  <label htmlFor="queue-date" className="block text-xs font-semibold text-neutral-600 uppercase mb-2">
-                    Queue Date
-                  </label>
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => handleDateShift(-1)}
-                      className="px-2 py-1.5 border border-neutral-300 rounded text-xs font-bold hover:bg-neutral-50"
-                      title="Previous Day"
-                    >
-                      &larr;
-                    </button>
-                    <input
-                      id="queue-date"
-                      type="date"
-                      value={selectedDate}
-                      onChange={(e) => setSelectedDate(e.target.value)}
-                      className="flex-1 p-1.5 border border-neutral-300 rounded text-sm text-center font-medium focus:outline-none focus:ring-1 focus:ring-red-800"
-                    />
-                    <button
-                      onClick={() => handleDateShift(1)}
-                      className="px-2 py-1.5 border border-neutral-300 rounded text-xs font-bold hover:bg-neutral-50"
-                      title="Next Day"
-                    >
-                      &rarr;
-                    </button>
-                    <button
-                      onClick={handleSetToday}
-                      className="px-2.5 py-1.5 bg-neutral-100 hover:bg-neutral-200 rounded text-xs font-semibold text-neutral-800"
-                    >
-                      Today
-                    </button>
-                  </div>
-                </div>
-
-                <div>
-                  <label htmlFor="doctor-filter" className="block text-xs font-semibold text-neutral-600 uppercase mb-2">
-                    Filter by Doctor
-                  </label>
-                  <select
-                    id="doctor-filter"
-                    value={selectedDoctorId ?? ''}
-                    onChange={(e) => setSelectedDoctorId(e.target.value ? Number(e.target.value) : undefined)}
-                    className="w-full p-2 border border-neutral-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-red-800"
-                  >
-                    <option value="">All Consulting Doctors</option>
-                    {doctors?.map((d: DoctorOut) => (
-                      <option key={d.id} value={d.id}>
-                        {d.name_en}
-                      </option>
-                    ))}
-                  </select>
+                <label htmlFor="queue-date" className="mb-1 block text-xs font-semibold uppercase text-slate-600">Date</label>
+                <div className="flex items-center gap-1.5">
+                  <button type="button" onClick={() => handleDateShift(-1)} className={SECONDARY_BUTTON} aria-label="Previous day">&larr;</button>
+                  <input
+                    id="queue-date"
+                    type="date"
+                    value={selectedDate}
+                    onChange={(e) => setSelectedDate(e.target.value)}
+                    className="min-h-9 rounded-lg border border-slate-300 px-2 text-sm text-slate-900 focus:outline-none focus:ring-1 focus:ring-[#8E1C3D]"
+                  />
+                  <button type="button" onClick={() => handleDateShift(1)} className={SECONDARY_BUTTON} aria-label="Next day">&rarr;</button>
+                  <button type="button" onClick={() => setSelectedDate(istToday())} className={SECONDARY_BUTTON}>Today</button>
                 </div>
               </div>
-
-              {/* Metrics summary */}
-              <div className="lg:col-span-2 grid grid-cols-2 sm:grid-cols-4 gap-4">
-                <div className="bg-white p-4 rounded-lg border border-neutral-200 shadow-xs flex flex-col justify-center">
-                  <span className="text-xs uppercase font-semibold text-neutral-500">Total Booked</span>
-                  <span className="text-2xl font-bold text-neutral-900 mt-1">{totalCount}</span>
-                </div>
-                <div className="bg-white p-4 rounded-lg border border-amber-200 bg-amber-50/30 shadow-xs flex flex-col justify-center">
-                  <span className="text-xs uppercase font-semibold text-amber-800">Waiting (Arrived)</span>
-                  <span className="text-2xl font-bold text-amber-900 mt-1">{waitingCount}</span>
-                </div>
-                <div className="bg-white p-4 rounded-lg border border-purple-200 bg-purple-50/30 shadow-xs flex flex-col justify-center">
-                  <span className="text-xs uppercase font-semibold text-purple-800">In Consultation</span>
-                  <span className="text-2xl font-bold text-purple-900 mt-1">{inConsultCount}</span>
-                </div>
-                <div className="bg-white p-4 rounded-lg border border-green-200 bg-green-50/30 shadow-xs flex flex-col justify-center">
-                  <span className="text-xs uppercase font-semibold text-green-800">Completed</span>
-                  <span className="text-2xl font-bold text-green-900 mt-1">{doneCount}</span>
-                </div>
+              <div>
+                <label htmlFor="doctor-filter" className="mb-1 block text-xs font-semibold uppercase text-slate-600">Doctor</label>
+                <select
+                  id="doctor-filter"
+                  value={selectedDoctorId ?? ''}
+                  onChange={(e) => setSelectedDoctorId(e.target.value ? Number(e.target.value) : undefined)}
+                  className="min-h-9 rounded-lg border border-slate-300 bg-white px-2 text-sm text-slate-900 focus:outline-none focus:ring-1 focus:ring-[#8E1C3D]"
+                >
+                  <option value="">All doctors</option>
+                  {doctors?.map((d: DoctorOut) => (
+                    <option key={d.id} value={d.id}>
+                      {d.name_en}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="ml-auto flex flex-wrap gap-x-5 gap-y-1 text-sm text-slate-700">
+                <span><strong>{appointments.length}</strong> booked</span>
+                <span><strong>{countWith('ARRIVED')}</strong> waiting</span>
+                <span><strong>{countWith('IN_CONSULTATION')}</strong> with doctor</span>
+                <span><strong>{countWith('DONE')}</strong> completed</span>
               </div>
             </div>
 
-            {/* Appointments Table */}
-            <div className="bg-white rounded-lg border border-neutral-200 shadow-xs overflow-hidden">
-              <div className="px-6 py-4 border-b border-neutral-200 flex justify-between items-center">
-                <h3 className="font-bold text-neutral-900">
-                  Appointments Schedule ({selectedDate})
-                </h3>
-                <span className="text-xs text-neutral-500 font-mono">
-                  {appointments.length} record{appointments.length === 1 ? '' : 's'}
-                </span>
-              </div>
-
+            <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xs">
               {isPending ? (
-                <TableSkeleton label="Loading appointments schedule..." rows={5} columns={6} />
+                <TableSkeleton label="Loading appointments schedule..." rows={5} columns={5} />
               ) : isError ? (
                 <div className="p-8 text-center text-red-700">Failed to load appointments: {error.message}</div>
               ) : appointments.length === 0 ? (
-                <div className="p-12 text-center text-slate-500 space-y-4">
-                  <p className="text-sm font-medium text-slate-600">No patients waiting in queue for this date and filter.</p>
+                <div className="space-y-4 p-12 text-center">
+                  <p className="text-sm font-medium text-slate-600">No bookings for this date and doctor.</p>
                   {canManageAppointments && (
-                    <div className="flex flex-wrap justify-center gap-3">
-                      <Link
-                        to="/reception/tokens"
-                        className="inline-flex min-h-10 items-center gap-2 rounded-xl bg-[#124832] px-4 text-xs font-bold text-white shadow-xs hover:bg-[#0D3822]"
-                      >
-                        <IconTicket className="h-4 w-4" />
-                        Issue Queue Token
-                      </Link>
-                      <Link
-                        to="/reception/patients/new"
-                        className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-slate-300 bg-white px-4 text-xs font-bold text-slate-700 hover:bg-slate-50"
-                      >
-                        <IconUserPlus className="h-4 w-4 text-emerald-800" />
-                        New Patient Registration
-                      </Link>
-                    </div>
+                    <Link to="/reception/patients/new" className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-slate-300 bg-white px-4 text-xs font-bold text-slate-700 hover:bg-slate-50">
+                      <IconUserPlus className="h-4 w-4 text-emerald-800" />
+                      New patient
+                    </Link>
                   )}
                 </div>
               ) : (
                 <div className="overflow-x-auto">
                   <table className="w-full text-left text-sm">
-                    <thead className="bg-neutral-50 text-neutral-600 font-semibold border-b border-neutral-200 text-xs uppercase tracking-wider">
+                    <thead className="border-b border-slate-200 bg-slate-50 text-xs font-semibold uppercase tracking-wider text-slate-600">
                       <tr>
-                        <th className="py-3 px-4">Token #</th>
-                        <th className="py-3 px-4">Patient</th>
-                        <th className="py-3 px-4">Doctor</th>
-                        <th className="py-3 px-4">Status</th>
-                        <th className="py-3 px-4">Remarks</th>
-                        <th className="py-3 px-4 text-right">Actions</th>
+                        <th scope="col" className="px-4 py-3">Token</th>
+                        <th scope="col" className="px-4 py-3">Patient</th>
+                        <th scope="col" className="px-4 py-3">Doctor</th>
+                        <th scope="col" className="px-4 py-3">Status</th>
+                        <th scope="col" className="px-4 py-3 text-right">Action</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-neutral-200">
-                      {appointments.map((appt, index) => (
-                        <tr key={appt.id} className="hover:bg-neutral-50/80 transition-colors" style={{ transitionDelay: `${index * 50}ms` }}>
-                          <td className="py-3 px-4 font-mono font-bold text-neutral-900 text-base">
-                            <span className="inline-flex items-center px-2.5 py-1 rounded bg-neutral-100 text-neutral-900">
+                    <tbody className="divide-y divide-slate-100">
+                      {appointments.map((appt) => (
+                        <tr key={appt.id} className="hover:bg-slate-50/80">
+                          <td className="px-4 py-3">
+                            <span className="inline-flex rounded bg-slate-100 px-2.5 py-1 font-mono text-sm font-bold text-slate-900">
                               {formatToken(appt.token_number)}
                             </span>
                           </td>
-                          <td className="py-3 px-4">
-                            <Link
-                              to={`/reception/patients/${appt.patient_id}`}
-                              className="font-bold text-red-950 hover:underline block"
-                            >
+                          <td className="px-4 py-3">
+                            <Link to={`/reception/patients/${appt.patient_id}`} className="block font-semibold text-[#5D0B26] hover:underline">
                               {appt.patient_name}
                             </Link>
-                            <div className="text-xs text-neutral-500 font-mono flex gap-2 mt-0.5">
+                            <span className="flex gap-2 font-mono text-xs text-slate-500">
                               <span>{appt.patient_urn}</span>
                               <span>&bull;</span>
                               <span>{appt.patient_mobile}</span>
-                            </div>
+                            </span>
                           </td>
-                          <td className="py-3 px-4">
-                            <span className="font-medium text-neutral-900">{appt.doctor_name_en}</span>
+                          <td className="px-4 py-3">
+                            <span className="font-medium text-slate-900">{appt.doctor_name_en}</span>
                             {appt.doctor_name_hi && (
-                              <span className="text-xs text-neutral-500 block font-hindi">
-                                {appt.doctor_name_hi}
-                              </span>
+                              <span className="block font-hindi text-xs text-slate-500">{appt.doctor_name_hi}</span>
                             )}
                           </td>
-                          <td className="py-3 px-4">
-                            {getStatusBadge(appt.status)}
+                          <td className="px-4 py-3">
+                            <span className={`inline-flex min-h-7 items-center rounded-full px-2.5 text-xs font-semibold ring-1 ring-inset ${STATUS_CLASS[appt.status]}`}>
+                              {STATUS_LABEL[appt.status]}
+                            </span>
+                            {appt.status === 'CANCELLED' && appt.cancellation_reason && (
+                              <span className="mt-1 block max-w-xs truncate text-xs text-slate-500">{appt.cancellation_reason}</span>
+                            )}
                           </td>
-                          <td className="py-3 px-4 text-xs text-neutral-500 max-w-xs truncate">
-                            {appt.notes || (appt.cancellation_reason ? `Reason: ${appt.cancellation_reason}` : '-')}
-                          </td>
-                          <td className="py-3 px-4 text-right space-x-2">
+                          <td className="px-4 py-3 text-right">
                             {canManageAppointments ? (
-                              <>
-                                {/* A patient marked not arrived can still check in late, the same day. */}
-                                {(appt.status === 'BOOKED' || appt.status === 'NO_SHOW') && (
-                                  <button
-                                    onClick={() => handleUpdateStatus(appt, 'ARRIVED')}
-                                    disabled={updateStatusMutation.isPending}
-                                    className="px-2.5 py-1 bg-amber-600 hover:bg-amber-700 text-white rounded text-xs font-semibold shadow-xs"
-                                  >
-                                    Mark Arrived
-                                  </button>
-                                )}
-                                {(appt.status === 'BOOKED' || appt.status === 'ARRIVED') && (
-                                  <>
-                                    <button
-                                      onClick={() => setCancellingAppt(appt)}
-                                      className="px-2 py-1 border border-neutral-300 hover:bg-neutral-100 text-neutral-700 rounded text-xs font-medium"
-                                    >
-                                      Cancel
-                                    </button>
-                                    {/* Once checked in, a patient can no longer be marked not arrived. */}
-                                    {appt.status === 'BOOKED' && (
-                                      <button
-                                        onClick={() => handleUpdateStatus(appt, 'NO_SHOW')}
-                                        className="px-2 py-1 border border-neutral-300 hover:bg-neutral-100 text-neutral-700 rounded text-xs font-medium"
-                                      >
-                                        No-Show
-                                      </button>
-                                    )}
-                                  </>
-                                )}
-                                {appt.status === 'IN_CONSULTATION' && (
-                                  <span className="text-xs text-purple-700 font-semibold italic">With Doctor</span>
-                                )}
-                                {appt.status === 'DONE' && (
-                                  <div className="inline-flex items-center gap-2">
-                                    <span className="text-xs text-green-700 font-semibold">&check; Consultation Done</span>
-                                    <Link
-                                      to={`/reception/billing?patient_id=${appt.patient_id}`}
-                                      className="inline-flex items-center gap-1 rounded-md bg-emerald-100 border border-emerald-300 px-2 py-0.5 text-xs font-bold text-emerald-950 hover:bg-emerald-200"
-                                    >
-                                      Reception Billing &rarr;
-                                    </Link>
-                                  </div>
-                                )}
-                              </>
+                              <RowActions
+                                appt={appt}
+                                busy={updateStatusMutation.isPending}
+                                onMarkArrived={() => handleUpdateStatus(appt, 'ARRIVED')}
+                                onMarkNoShow={() => handleUpdateStatus(appt, 'NO_SHOW')}
+                                onCancel={() => setCancellingAppt(appt)}
+                              />
                             ) : (
                               <span className="text-xs font-medium text-slate-500">View only</span>
                             )}
@@ -628,7 +523,6 @@ export function AppointmentsReception() {
               )}
             </div>
 
-            {/* Cancellation Reason Dialog */}
             {cancellingAppt && (
               <Modal
                 open
@@ -650,7 +544,7 @@ export function AppointmentsReception() {
                     placeholder="Reason for cancellation (e.g. Patient called to reschedule)..."
                     rows={3}
                     required
-                    className="w-full p-2 border border-neutral-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-red-800"
+                    className="w-full rounded border border-neutral-300 p-2 text-sm focus:outline-none focus:ring-1 focus:ring-red-800"
                   />
                   <div className="flex justify-end gap-2 pt-2">
                     <button
@@ -659,7 +553,7 @@ export function AppointmentsReception() {
                         setCancellingAppt(null)
                         setCancelReason('')
                       }}
-                      className="px-3 py-1.5 border border-neutral-300 rounded text-sm hover:bg-neutral-50"
+                      className="rounded border border-neutral-300 px-3 py-1.5 text-sm hover:bg-neutral-50"
                     >
                       Close
                     </button>
@@ -667,7 +561,7 @@ export function AppointmentsReception() {
                       type="button"
                       disabled={!cancelReason.trim() || updateStatusMutation.isPending}
                       onClick={() => handleUpdateStatus(cancellingAppt, 'CANCELLED', cancelReason.trim())}
-                      className="px-3 py-1.5 bg-red-700 hover:bg-red-800 text-white rounded text-sm font-medium disabled:opacity-50"
+                      className="rounded bg-red-700 px-3 py-1.5 text-sm font-medium text-white hover:bg-red-800 disabled:opacity-50"
                     >
                       Confirm Cancellation
                     </button>
@@ -685,7 +579,7 @@ export function AppointmentsReception() {
             <div role="alert" className="rounded-xl border border-amber-200 bg-amber-50 p-5 text-sm text-amber-900">
               Prescription follow-up information is available to the treating doctor only. Return to the token queue to continue.
               <button type="button" onClick={() => selectTab('today')} className="ml-2 font-semibold underline">
-                Open today's queue
+                Open today&apos;s queue
               </button>
             </div>
           )
