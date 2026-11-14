@@ -578,6 +578,8 @@ class AppointmentStatus(StrEnum):
     DONE = "DONE"
     CANCELLED = "CANCELLED"
     NO_SHOW = "NO_SHOW"
+    # Replaced by a new linked appointment (RF-11); the old row keeps its history.
+    RESCHEDULED = "RESCHEDULED"
 
 
 class ConsultationStatus(StrEnum):

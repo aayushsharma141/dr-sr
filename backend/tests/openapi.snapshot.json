@@ -643,7 +643,8 @@
           "IN_CONSULTATION",
           "DONE",
           "CANCELLED",
-          "NO_SHOW"
+          "NO_SHOW",
+          "RESCHEDULED"
         ],
         "title": "AppointmentStatus",
         "type": "string"
