@@ -145,6 +145,16 @@ export const router = createBrowserRouter([
             },
           },
           {
+            // Departments and doctor specialty assignment. Inside the ADMIN route group; the API also requires doctor:manage.
+            path: '/admin/departments',
+            lazy: async () => {
+              const { DepartmentsPage } = await import('./pages/admin/DepartmentsPage')
+              return {
+                Component: DepartmentsPage,
+              }
+            },
+          },
+          {
             path: '/admin/audit',
             lazy: async () => {
               const { AuditViewerPage } = await import('./pages/admin/AuditViewerPage')
