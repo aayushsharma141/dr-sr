@@ -289,6 +289,16 @@ def _priority_payload(target: Any = None) -> dict[str, Any]:
     return {"version_id": ver, "priority_level": "PRIORITY", "priority_reason": "Matrix elderly"}
 
 
+def _acknowledge_alert_payload(target: Any = None) -> dict[str, Any]:
+    ver = target.version_id if target and hasattr(target, "version_id") else 1
+    return {"version_id": ver}
+
+
+def _reassign_payload(target: Any = None) -> dict[str, Any]:
+    ver = target.version_id if target and hasattr(target, "version_id") else 1
+    return {"version_id": ver, "new_doctor_id": 1, "reason": "Matrix reassign"}
+
+
 def _reschedule_payload(target: Any = None) -> dict[str, Any]:
     ver = target.version_id if target and hasattr(target, "version_id") else 1
     return {
@@ -1208,6 +1218,30 @@ MATRIX: list[MatrixRow] = [
             "anonymous": 401,
             "admin": 403,
             "reception": 200,
+            "doctor_a": 403,
+            "doctor_b": 403,
+        },
+    ),
+    MatrixRow(
+        method="POST",
+        path="/api/appointments/{id}/acknowledge-alert",
+        body_factory=_acknowledge_alert_payload,
+        expected={
+            "anonymous": 401,
+            "admin": 403,
+            "reception": 403,
+            "doctor_a": 409,
+            "doctor_b": 404,
+        },
+    ),
+    MatrixRow(
+        method="POST",
+        path="/api/appointments/{id}/reassign",
+        body_factory=_reassign_payload,
+        expected={
+            "anonymous": 401,
+            "admin": 403,
+            "reception": 422,
             "doctor_a": 403,
             "doctor_b": 403,
         },

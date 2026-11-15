@@ -19,6 +19,11 @@ vi.mock('../../api/queries', () => ({
   }),
 }))
 
+// The doctor's emergency banner polls the queue; the shell test renders no alerts.
+vi.mock('../EmergencyAlertBanner', () => ({
+  EmergencyAlertBanner: () => null,
+}))
+
 vi.mock('../../api/health', () => ({
   useHealth: () => ({
     data: { status: 'ok', db: 'ok', setup_required: false },
@@ -72,6 +77,7 @@ describe('AppShell clinical navigation hierarchy', () => {
       'Dashboard',
       'Patient Records',
       'Appointments',
+      'Waiting Room',
       'Billing & Payments',
     ])
     expect(links.map((l) => l.getAttribute('href'))).toEqual([
@@ -79,6 +85,7 @@ describe('AppShell clinical navigation hierarchy', () => {
       '/reception',
       '/reception/patients',
       '/reception/appointments',
+      '/reception/waiting',
       // Opens Checkout, not the Dues tab.
       '/reception/billing',
     ])

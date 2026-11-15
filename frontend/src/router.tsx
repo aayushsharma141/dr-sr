@@ -266,6 +266,16 @@ export const router = createBrowserRouter([
               }
             },
           },
+          {
+            // Waiting Room (Phase 22, Wave 2): reception's queue-management workspace.
+            path: '/reception/waiting',
+            lazy: async () => {
+              const { WaitingRoom } = await import('./pages/WaitingRoom')
+              return {
+                Component: WaitingRoom,
+              }
+            },
+          },
         ],
       },
       {

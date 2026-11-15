@@ -334,6 +334,8 @@ RUNTIME_TABLE_GRANTS: dict[str, tuple[str, ...]] = {
     "visits": ("SELECT", "INSERT", "UPDATE"),
     # Classification history is append-only (OD-22-06, migration 0026).
     "consultation_priority_events": ("SELECT", "INSERT"),
+    # Bill lines are financial records and append-only (Phase 22, migration 0027, K-63).
+    "bill_items": ("SELECT", "INSERT"),
 }
 
 

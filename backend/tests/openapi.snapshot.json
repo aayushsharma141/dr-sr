@@ -1,6 +1,22 @@
 {
   "components": {
     "schemas": {
+      "AcknowledgeAlertRequest": {
+        "description": "Doctor acknowledges an emergency alert on their own consultation (OD-22-09).",
+        "properties": {
+          "version_id": {
+            "description": "Optimistic locking version ID",
+            "exclusiveMinimum": 0.0,
+            "title": "Version Id",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "version_id"
+        ],
+        "title": "AcknowledgeAlertRequest",
+        "type": "object"
+      },
       "ActionRequest": {
         "additionalProperties": false,
         "description": "Payload for lifecycle actions requiring optimistic concurrency validation.",
@@ -3279,6 +3295,18 @@
               }
             ],
             "title": "Priority Reason"
+          },
+          "priority_updated_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Priority Updated At"
           },
           "status": {
             "title": "Status",
@@ -6916,6 +6944,50 @@
           "version_id"
         ],
         "title": "PriorityUpdate",
+        "type": "object"
+      },
+      "ReassignRequest": {
+        "description": "Move a waiting patient to another doctor on the same visit (design \u00a75, QUE-10).\n\nThe old consultation is cancelled with this reason and a new WAITING consultation is\ncreated for the new doctor, with a token from that doctor's sequence.",
+        "properties": {
+          "new_department_id": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Required when the new doctor is not in the current department; must be one of the new doctor's departments (owner decision Q19)",
+            "title": "New Department Id"
+          },
+          "new_doctor_id": {
+            "description": "Doctor to move the patient to",
+            "exclusiveMinimum": 0.0,
+            "title": "New Doctor Id",
+            "type": "integer"
+          },
+          "reason": {
+            "description": "Why it was moved",
+            "maxLength": 500,
+            "minLength": 3,
+            "title": "Reason",
+            "type": "string"
+          },
+          "version_id": {
+            "description": "Optimistic locking version ID",
+            "exclusiveMinimum": 0.0,
+            "title": "Version Id",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "version_id",
+          "new_doctor_id",
+          "reason"
+        ],
+        "title": "ReassignRequest",
         "type": "object"
       },
       "RecentAdminActionOut": {
@@ -11101,6 +11173,59 @@
         ]
       }
     },
+    "/api/appointments/{id}/acknowledge-alert": {
+      "post": {
+        "description": "The assigned doctor acknowledges an emergency alert on their own consultation (OD-22-09).\n\nThe alert stays visible until this is called. The time and the doctor are kept.",
+        "operationId": "acknowledge_emergency_alert_api_appointments__id__acknowledge_alert_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "title": "Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AcknowledgeAlertRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AppointmentRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Acknowledge Emergency Alert",
+        "tags": [
+          "appointments"
+        ]
+      }
+    },
     "/api/appointments/{id}/check-in": {
       "post": {
         "description": "Check a booked patient in on arrival: visit, token and waiting list (RF-12).",
@@ -11202,6 +11327,59 @@
           }
         },
         "summary": "Update Priority",
+        "tags": [
+          "appointments"
+        ]
+      }
+    },
+    "/api/appointments/{id}/reassign": {
+      "post": {
+        "description": "Move a waiting patient to another doctor on the same visit (QUE-10, design \u00a75).\n\nReception only. The old consultation is kept as cancelled with the reason; the new one is\nreturned (201) with a token from the new doctor's sequence.",
+        "operationId": "reassign_appointment_api_appointments__id__reassign_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "title": "Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReassignRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AppointmentRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Reassign Appointment",
         "tags": [
           "appointments"
         ]

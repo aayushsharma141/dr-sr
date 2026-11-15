@@ -20,7 +20,7 @@ Booking (phone / walk-in) → arrival → new or existing patient → URN (new o
 ## 2. Owner decisions (frozen 2026-11-15)
 
 | ID | Decision |
-|----|----------|
+| ---- | ---------- |
 | OD-22-01 | Check-in & Token is the first reception tab. Order: Check-in & Token, Dashboard, Patient Records, Appointments, Waiting Room, Billing & Checkout, Receipts, Reports. |
 | OD-22-02 | Check-in page: two columns. Left = check-in form with New / Existing patient. Right = today's appointments with Check in, No-show, Cancel, Reschedule. |
 | OD-22-03 | Check-in fields: Name*, Age*, Phone*, Sex* (Male / Female / Other), Guardian, Referred By*, Consulting Doctor*, Address. A new patient is registered (permanent URN) and checked in in one step. |
@@ -44,7 +44,7 @@ Booking (phone / walk-in) → arrival → new or existing patient → URN (new o
 ## 3. What already exists (verified in code 2026-11-15)
 
 | Need | Exists today | Where |
-|------|--------------|-------|
+| ------ | -------------- | ------- |
 | Permanent URN, duplicate check | Yes | `patients` (unique urn), `/patients/check-duplicate` |
 | Visit per arrival, one OPEN per patient | Yes | `visits`, `visit_service.join_or_open_visit` |
 | Consultation per doctor inside a visit | Yes | `appointments` (visit_id, consultation_status) |
@@ -71,7 +71,7 @@ Booking (phone / walk-in) → arrival → new or existing patient → URN (new o
 `appointments` (one row = one consultation):
 
 | Column | Type | Rule |
-|--------|------|------|
+| -------- | ------ | ------ |
 | `visit_kind` | varchar(16) NULL | `NEW` / `FOLLOW_UP`; NULL for rows created before this phase |
 | `priority_level` | varchar(16) NOT NULL default `NORMAL` | `NORMAL` / `PRIORITY` / `EMERGENCY` |
 | `priority_reason` | text NULL | required (≥ 3 chars) unless NORMAL — CHECK constraint |
@@ -84,7 +84,7 @@ Booking (phone / walk-in) → arrival → new or existing patient → URN (new o
 `visits`:
 
 | Column | Type | Rule |
-|--------|------|------|
+| -------- | ------ | ------ |
 | `referral_source` | varchar(16) NULL | `SELF` / `DOCTOR` / `PERSONAL` / `ORGANIZATION` / `OTHER`; NULL only for visits opened before this phase |
 | `referrer_name` | varchar(120) NULL | required for DOCTOR, PERSONAL, ORGANIZATION — CHECK constraint |
 | `referral_recorded_by_user_id` | FK users NULL | |
@@ -149,7 +149,7 @@ is CLOSED.
 ## 6. Permissions
 
 | Action | Reception | Doctor | Admin |
-|--------|-----------|--------|-------|
+| -------- | ----------- | -------- | ------- |
 | Register patient / check in / walk-in | ✓ (`patient:create`, `visit:write`) | — | — |
 | Set or change classification, reason | ✓ (`visit:write`) | — | — |
 | Acknowledge emergency alert | — | own consultations | — |
@@ -199,7 +199,7 @@ Each task has one owner (this session unless reassigned) and is VERIFIED only pe
 is taken before each wave.
 
 | Task | Wave | Scope | Depends on |
-|------|------|-------|------------|
+| ------ | ------ | ------- | ------------ |
 | T22-01 | 1 | Migration 0026; model fields; priority event table | — |
 | T22-02 | 1 | Walk-in / check-in accept visit_kind, priority (+reason), referral; new-patient check-in endpoint (patient + visit + consultation + token in one transaction); `PATCH /appointments/{id}/priority` with history | T22-01 |
 | T22-03 | 1 | Check-in & Token page, two columns (OD-22-02/03/04/05/06/16) | T22-02 |
@@ -230,8 +230,35 @@ T22-01..T22-04 implemented on branch `fix/sidebar-daily-flow` (uncommitted; chec
 - NOT done on the owner's :8000 server: migration 0026 is not applied to `kalyan_dev`, the
   server is not restarted and `frontend/dist` is not rebuilt. All three must happen together;
   a new dist against the old server breaks check-in.
-- Known gap: the older `PATCH /appointments/{id}/status` → ARRIVED path still checks in without
-  a referral (no UI uses it). Close it in Wave 2.
+- Closed gap: the older `PATCH /appointments/{id}/status` → ARRIVED path now defaults referral to
+  Self, satisfying OD-22-16 and database constraints without inventing external data.
+
+## 8b. Wave 2 status (2026-11-15)
+
+Wave 2 backend implementation completed on branch `fix/sidebar-daily-flow` (checkpoint `stash@{0}` "checkpoint: before phase 22 wave 2"):
+
+- **Emergency Alert Acknowledgement (OD-22-09, T22-06):**
+  - Endpoint `POST /api/appointments/{id}/acknowledge-alert` implemented.
+  - Requires `doctor` role and ownership of the consultation (`principal.doctor_id == appt.doctor_id`).
+  - Sets `alert_acknowledged_at` and `alert_acknowledged_by_user_id`. Re-acknowledgement returns HTTP 409 `alert_already_acknowledged`.
+  - Appends immutable event to `consultation_priority_events` (`event="ACKNOWLEDGED"`) and records audit log (`APPOINTMENT_ALERT_ACKNOWLEDGED`).
+- **Doctor Reassignment on Same Visit (QUE-10, design §5, T22-05):**
+  - Endpoint `POST /api/appointments/{id}/reassign` implemented (HTTP 201).
+  - Reception only (`Permission.VISIT_WRITE`). Only permits reassigning consultations in `WAITING` status.
+  - Cancels existing consultation with reason and marks cancellation.
+  - Creates new consultation under the same `visit_id` with next sequential token from target doctor's daily sequence.
+  - Preserves priority level, priority reason, and emergency alerted timestamps across the reassigned consultation.
+- **Suggested Queue Ordering (OD-22-07, T22-05 / T22-06):**
+  - `_suggested_order_key` sorts waiting queue: EMERGENCY first by classification timestamp, then PRIORITY by token number, then NORMAL by token number.
+- **Status Path Arrival Default Referral (OD-22-16):**
+  - `PATCH /api/appointments/{id}/status` → `ARRIVED` automatically applies `SELF` referral when opening a visit, closing the Wave 1 gap.
+- **Verification & Matrix:**
+  - Automated tests in `backend/tests/test_phase22_wave2.py` (7 tests, all passing).
+  - RBAC matrix rows added for both new endpoints (`/acknowledge-alert`, `/reassign`).
+  - OpenAPI snapshot synchronized (`openapi.snapshot.json`).
+  - Full backend test suite passing: 1381 passed, 1 skipped (test_spa_serving).
+- **Still Open for Wave 2:**
+  - Wave 2 UI: Waiting Room kanban page (reception), Doctor dashboard alert banner, and Reassign modal/action.
 
 ## 9. Risks
 

@@ -36,6 +36,8 @@ import type {
   WalkInCreate,
   NewPatientCheckIn,
   PriorityUpdate,
+  ReassignRequest,
+  AcknowledgeAlertRequest,
   RescheduleRequest,
   EncounterCreate,
   EncounterRead,
@@ -950,6 +952,34 @@ export function useCheckInNewPatient() {
       qc.invalidateQueries({ queryKey: ['doctor-queue'] })
       qc.invalidateQueries({ queryKey: ['visits'] })
       qc.invalidateQueries({ queryKey: ['patients'] })
+    },
+  })
+}
+
+/** Doctor acknowledges an emergency alert on own consultation (OD-22-09). */
+export function useAcknowledgeAlert() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, body }: { id: number; body: AcknowledgeAlertRequest }) =>
+      apiFetch<Appointment>(`/appointments/${id}/acknowledge-alert`, { method: 'POST', body }),
+    onSuccess: (data) => {
+      qc.setQueryData(['appointment', data.id], data)
+      qc.invalidateQueries({ queryKey: ['doctor-queue'] })
+      qc.invalidateQueries({ queryKey: ['doctor-alerts'] })
+    },
+  })
+}
+
+/** Move a waiting patient to another doctor on the same visit (QUE-10). Reception only. */
+export function useReassignAppointment() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, body }: { id: number; body: ReassignRequest }) =>
+      apiFetch<Appointment>(`/appointments/${id}/reassign`, { method: 'POST', body }),
+    onSuccess: (data) => {
+      qc.setQueryData(['appointment', data.id], data)
+      qc.invalidateQueries({ queryKey: ['appointments'] })
+      qc.invalidateQueries({ queryKey: ['doctor-queue'] })
     },
   })
 }

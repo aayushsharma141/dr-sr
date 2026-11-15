@@ -6,6 +6,7 @@ import { Link, useLocation, useNavigate } from 'react-router'
 import { useLatestIntegrityRun } from '../api/integrity'
 import { useLogout } from '../api/queries'
 import { useServerLink, type ServerLink } from '../api/serverStatus'
+import { EmergencyAlertBanner } from './EmergencyAlertBanner'
 import { GlobalSearchBar } from './GlobalSearchBar'
 import { countBySeverity, groupFindings } from '../admin/integrity'
 import type { Role } from '../api/types'
@@ -175,6 +176,13 @@ const RECEPTION_NAVIGATION: NavigationItem[] = [
     description: 'Bookings by date and doctor: who is booked, waiting, not arrived or cancelled',
     path: '/reception/appointments',
     icon: 'calendar',
+  },
+  {
+    key: 'waiting-room',
+    label: 'Waiting Room',
+    description: 'Today’s queue by doctor: order the waiting patients, reassign or cancel a waiting consultation',
+    path: '/reception/waiting',
+    icon: 'activity',
   },
   {
     key: 'billing',
@@ -1081,6 +1089,7 @@ export function AppShell({ name, role, children }: AppShellProps) {
         <div className="flex min-w-0 flex-1 flex-col print:block">
           <main className="min-h-0 flex-1 overflow-y-auto print:overflow-visible px-4 pt-4 pb-6 sm:px-6 xl:px-8">
             <div className="mx-auto w-full max-w-[1720px] space-y-5">
+              {role === 'DOCTOR' && <EmergencyAlertBanner />}
               {children}
             </div>
           </main>

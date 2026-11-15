@@ -13,6 +13,8 @@ from sqlalchemy.orm import Session, selectinload
 
 from kalyan_api.models import (
     Appointment,
+    BillItem,
+    BillItemCategory,
     ConsultationStatus,
     Doctor,
     Patient,
@@ -46,8 +48,8 @@ def visit_charge_lines(
 ) -> dict[int, list[VisitChargeLine]]:
     """The consultation charges of each visit, in check-in order.
 
-    Interim rule until invoices exist (K-63, RF-14). Each COMPLETED consultation owes its
-    doctor's default fee, the fee the overpayment guard on POST /payments already uses.
+    Each COMPLETED consultation owes the fee saved on its bill line at check-in (OD-22-10). A
+    later change to the doctor's default fee does not change it (K-63, FEE-07).
     Payments linked to that appointment reduce it, reversed payments excluded, and never below
     zero. A consultation that was cancelled, or is still waiting or in progress, owes nothing
     yet. Treatment packages are not included; they stay in Pending Dues.
@@ -72,6 +74,20 @@ def visit_charge_lines(
     ).all()
 
     appointment_ids = [row[0] for row in rows]
+    # The fee is the consultation's bill line, saved at check-in (OD-22-10, K-63, FEE-07). Only a
+    # consultation with no line falls back to the doctor's current default fee, for rows that never
+    # went through check-in.
+    line_fee_by_appointment: dict[int, int] = {}
+    if appointment_ids:
+        line_fee_by_appointment = {
+            appointment_id: int(amount)
+            for appointment_id, amount in session.execute(
+                select(BillItem.appointment_id, BillItem.amount_paise).where(
+                    BillItem.appointment_id.in_(appointment_ids),
+                    BillItem.category == BillItemCategory.CONSULTATION.value,
+                )
+            )
+        }
     paid_by_appointment: dict[int, int] = {}
     if appointment_ids:
         paid_by_appointment = {
@@ -86,7 +102,8 @@ def visit_charge_lines(
             )
         }
 
-    for appointment_id, visit_id, doctor_id, doctor_name, status, fee_paise in rows:
+    for appointment_id, visit_id, doctor_id, doctor_name, status, doctor_default_fee in rows:
+        fee_paise = line_fee_by_appointment.get(appointment_id, doctor_default_fee)
         completed = status == ConsultationStatus.COMPLETED.value
         paid_paise = paid_by_appointment.get(appointment_id, 0)
         lines[visit_id].append(
@@ -103,6 +120,16 @@ def visit_charge_lines(
             )
         )
     return lines
+
+
+def consultation_fee_paise(session: Session, appointment_id: int) -> int | None:
+    """The fee saved on the consultation's bill line, or None when it has no line yet."""
+    return session.scalar(
+        select(BillItem.amount_paise).where(
+            BillItem.appointment_id == appointment_id,
+            BillItem.category == BillItemCategory.CONSULTATION.value,
+        )
+    )
 
 
 def visit_payments(session: Session, visit_id: int) -> list[Payment]:

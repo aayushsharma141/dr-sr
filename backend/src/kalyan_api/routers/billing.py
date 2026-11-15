@@ -45,6 +45,7 @@ from kalyan_api.schemas.billing import (
 )
 from kalyan_api.services import audit_service, billing_service
 from kalyan_api.services.audit_service import AuditAction
+from kalyan_api.services.billing_service import consultation_fee_paise
 from kalyan_api.services.receipt_service import (
     allocate_next_receipt_number,
     current_cycle_key,
@@ -187,14 +188,19 @@ def record_payment(
                 code="consultation_cancelled",
                 message="This consultation was cancelled, so nothing is due for it.",
             )
-        doctor = session.get(Doctor, appt.doctor_id)
-        if doctor and doctor.default_fee_paise > 0:
+        # The fee is the consultation's bill line (OD-22-10, FEE-07). A consultation with no line
+        # (a row that never went through check-in) falls back to the doctor's current fee.
+        fee_paise = consultation_fee_paise(session, appt.id)
+        if fee_paise is None:
+            doctor = session.get(Doctor, appt.doctor_id)
+            fee_paise = doctor.default_fee_paise if doctor else 0
+        if fee_paise > 0:
             paid_stmt = select(func.coalesce(func.sum(Payment.amount_paise), 0)).where(
                 Payment.appointment_id == appt.id,
                 Payment.is_reversed.is_(False),
             )
             already_paid: int = session.scalar(paid_stmt) or 0
-            remaining_balance = doctor.default_fee_paise - already_paid
+            remaining_balance = fee_paise - already_paid
             if payload.amount_paise > remaining_balance:
                 max_rupees = max(0, remaining_balance) / 100
                 attempted_rupees = payload.amount_paise / 100

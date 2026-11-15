@@ -10,6 +10,7 @@
 export {
   IconActivity,
   IconAlertCircle,
+  IconBell,
   IconAlertTriangle,
   IconArrowLeft,
   IconBone,

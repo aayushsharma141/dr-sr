@@ -11,6 +11,7 @@ RESCHEDULED, and creates a new linked one.
 
 from dataclasses import dataclass
 from datetime import date, time
+from decimal import Decimal
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session, lazyload
@@ -23,6 +24,9 @@ from kalyan_api.models import (
     Appointment,
     AppointmentSource,
     AppointmentStatus,
+    BillItem,
+    BillItemCategory,
+    BillItemSource,
     ConsultationPriorityEvent,
     ConsultationStatus,
     Department,
@@ -31,6 +35,7 @@ from kalyan_api.models import (
     PriorityEventType,
     PriorityLevel,
     Visit,
+    VisitStatus,
 )
 from kalyan_api.services import token_service, visit_service
 from kalyan_api.services.appointment_service import validate_booking_transition
@@ -353,6 +358,244 @@ def classify(
     return True
 
 
+def ensure_consultation_line(session: Session, appt: Appointment, principal: Principal) -> BillItem:
+    """Save the doctor's current fee as this consultation's bill line (OD-22-10, K-63, FEE-07).
+
+    Written once per consultation, at check-in or reassignment. Later changes to the doctor's
+    default fee never touch it. Requires appt.visit_id to be set.
+    """
+    if appt.visit_id is None:
+        raise ApiError(
+            status_code=500,
+            code="bill_line_without_visit",
+            message="A consultation must belong to a visit before it is billed.",
+        )
+    existing = session.scalar(
+        select(BillItem).where(
+            BillItem.appointment_id == appt.id,
+            BillItem.category == BillItemCategory.CONSULTATION.value,
+        )
+    )
+    if existing is not None:
+        return existing
+    doctor = session.get(Doctor, appt.doctor_id)
+    if doctor is None:
+        raise ApiError(status_code=404, code="doctor_not_found", message="Doctor not found.")
+    fee = doctor.default_fee_paise
+    line = BillItem(
+        visit_id=appt.visit_id,
+        patient_id=appt.patient_id,
+        appointment_id=appt.id,
+        category=BillItemCategory.CONSULTATION.value,
+        source=BillItemSource.SYSTEM.value,
+        description="Consultation fee",
+        quantity=Decimal("1"),
+        rate_paise=fee,
+        amount_paise=fee,
+        created_by_user_id=principal.user_id,
+    )
+    session.add(line)
+    session.flush()
+    return line
+
+
+def acknowledge_alert(session: Session, appt: Appointment, principal: Principal) -> None:
+    """The doctor acknowledges an emergency alert on their own consultation (OD-22-09).
+
+    The time and the acknowledging user are kept on the consultation, and an ACKNOWLEDGED row is
+    appended to the classification history. The alert itself stays until this is called.
+    """
+    if appt.priority_level != PriorityLevel.EMERGENCY.value or appt.emergency_alerted_at is None:
+        raise ApiError(
+            status_code=409,
+            code="no_emergency_alert",
+            message="There is no emergency alert on this consultation.",
+        )
+    if appt.alert_acknowledged_at is not None:
+        raise ApiError(
+            status_code=409,
+            code="alert_already_acknowledged",
+            message="This emergency alert has already been acknowledged.",
+        )
+    appt.alert_acknowledged_at = clock.utcnow()
+    appt.alert_acknowledged_by_user_id = principal.user_id
+    appt.version_id += 1
+    session.flush()
+    _record_priority_event(
+        session,
+        appt,
+        principal,
+        event=PriorityEventType.ACKNOWLEDGED,
+        from_level=PriorityLevel.EMERGENCY.value,
+        to_level=PriorityLevel.EMERGENCY.value,
+        reason=None,
+    )
+    session.flush()
+
+
+def _reassign_department(
+    session: Session,
+    appt: Appointment,
+    new_doctor: Doctor,
+    new_department_id: int | None,
+) -> int:
+    """Department for the reassigned consultation (owner decision Q19, 2026-11-15).
+
+    Any consulting doctor may receive the patient. The current department is kept when the new
+    doctor belongs to it; otherwise reception must choose one of the new doctor's departments.
+    The chosen department passes the same checks as a booking.
+    """
+    if new_department_id is None:
+        if appt.department_id is not None and appt.department_id in {
+            d.id for d in new_doctor.departments
+        }:
+            return appt.department_id
+        raise ApiError(
+            status_code=422,
+            code="department_required",
+            message=(
+                "The new doctor does not see this department. "
+                "Choose one of the new doctor's departments."
+            ),
+        )
+    department = lock_department_for_booking(session, new_department_id)
+    if department is None:
+        raise ApiError(
+            status_code=422,
+            code="department_not_found",
+            message="Selected department does not exist.",
+        )
+    if not department.is_active:
+        raise ApiError(
+            status_code=422,
+            code="department_inactive",
+            message="Selected department is inactive and cannot accept new appointments.",
+        )
+    if department not in new_doctor.departments:
+        raise ApiError(
+            status_code=422,
+            code="doctor_department_mismatch",
+            message="Selected doctor is not assigned to the selected department.",
+        )
+    return department.id
+
+
+def reassign_waiting(
+    session: Session,
+    appt: Appointment,
+    principal: Principal,
+    *,
+    new_doctor_id: int,
+    reason: str,
+    new_department_id: int | None = None,
+) -> Appointment:
+    """Move a waiting patient to any consulting doctor on the same visit (QUE-10, design §5).
+
+    The old consultation is cancelled with the reason and kept as history. The new doctor gets a
+    WAITING consultation on the same visit with a token from their own sequence. Classification
+    carries over (an emergency raises a fresh alert for the new doctor). The referral belongs to
+    the visit and does not change. The department follows _reassign_department. Returns the new
+    consultation.
+    """
+    if (
+        appt.status != AppointmentStatus.ARRIVED.value
+        or appt.consultation_status != ConsultationStatus.WAITING.value
+    ):
+        raise ApiError(
+            status_code=422,
+            code="reassign_not_waiting",
+            message="Only a patient who is waiting can be moved to another doctor.",
+        )
+    if new_doctor_id == appt.doctor_id:
+        raise ApiError(
+            status_code=422,
+            code="reassign_same_doctor",
+            message="The patient is already with this doctor.",
+        )
+    reason_text = _clean_text(reason)
+    if reason_text is None or len(reason_text) < 3:
+        raise ApiError(
+            status_code=422,
+            code="reassign_reason_required",
+            message="Enter a reason for moving the patient to another doctor.",
+        )
+    visit = session.get(Visit, appt.visit_id) if appt.visit_id is not None else None
+    if visit is None or visit.status != VisitStatus.OPEN.value:
+        raise ApiError(
+            status_code=422,
+            code="visit_not_open",
+            message="The visit is no longer open.",
+        )
+    new_doctor = lock_doctor_for_booking(session, new_doctor_id)
+    if new_doctor is None or not new_doctor.is_active:
+        raise ApiError(
+            status_code=404,
+            code="doctor_not_found",
+            message="Doctor not found or inactive.",
+        )
+    department_id = _reassign_department(session, appt, new_doctor, new_department_id)
+    duplicate = session.scalar(
+        select(Appointment).where(
+            Appointment.patient_id == appt.patient_id,
+            Appointment.doctor_id == new_doctor_id,
+            Appointment.appointment_date == appt.appointment_date,
+            Appointment.status.in_(ACTIVE_BOOKING_STATUSES),
+        )
+    )
+    if duplicate is not None:
+        raise ApiError(
+            status_code=409,
+            code="duplicate_appointment",
+            message="This patient already has a booking with that doctor today.",
+            details={"existing_appointment_id": duplicate.id},
+        )
+
+    token = token_service.generate_next_daily_token(
+        session, new_doctor_id, appt.appointment_date
+    )
+    now = clock.utcnow()
+    successor = Appointment(
+        patient_id=appt.patient_id,
+        doctor_id=new_doctor_id,
+        department_id=department_id,
+        appointment_date=appt.appointment_date,
+        token_number=token,
+        status=AppointmentStatus.ARRIVED.value,
+        status_updated_at=now,
+        check_in_at=appt.check_in_at or now,
+        visit_id=appt.visit_id,
+        source=appt.source,
+        expected_time=appt.expected_time,
+        consultation_status=ConsultationStatus.WAITING.value,
+        visit_kind=appt.visit_kind,
+        created_by_user_id=principal.user_id,
+    )
+    session.add(successor)
+    session.flush()
+    ensure_consultation_line(session, successor, principal)
+    if appt.priority_level != PriorityLevel.NORMAL.value:
+        _set_classification(successor, principal, appt.priority_level, appt.priority_reason)
+        session.flush()
+        _record_priority_event(
+            session,
+            successor,
+            principal,
+            event=PriorityEventType.CLASSIFIED,
+            from_level=None,
+            to_level=appt.priority_level,
+            reason=appt.priority_reason,
+        )
+        session.flush()
+
+    appt.status = AppointmentStatus.CANCELLED.value
+    appt.status_updated_at = now
+    appt.consultation_status = ConsultationStatus.CANCELLED.value
+    appt.cancellation_reason = reason_text
+    appt.version_id += 1
+    session.flush()
+    return successor
+
+
 def check_in(
     session: Session,
     appt: Appointment,
@@ -424,6 +667,7 @@ def check_in(
         _apply_check_in_details(appt, visit, principal, details, referrer_name)
     appt.version_id += 1
     session.flush()
+    ensure_consultation_line(session, appt, principal)
     if details is not None and details.priority_level != PriorityLevel.NORMAL.value:
         _record_priority_event(
             session,

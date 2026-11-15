@@ -23,7 +23,8 @@ Ordering notes:
 - [ ] **Phase 18: UI/UX Review Hardening** - Receipt printing from the app, native modal dialogs, non-blocking errors, 12px text and contrast floor, bundled Hindi font and language marking, form accessibility, webcam HTTPS decision, headless print verification.
 - [x] **Phase 19: Universal Consultation Workspace** - One consultation for Physiotherapy and Ophthalmology: real drafts with auto-save, new and follow-up encounters, versioned specialty templates, vitals, integrated prescription, follow-up recommendations, read-all edit-own access, one login at a time and a printed summary. (completed 2026-11-06)
 - [x] **Phase 20: Admin Data Governance & Asset Management** - Patient demographic correction with audit; CSV/XLSX import centre (8-stage staging pipeline: upload → inspect → map → validate → resolve → preview → commit → reconcile); controlled patient export (permission-checked, field-selective, audited); hospital identity and logo/asset CRUD with version history; bilingual print template management per document type (prescription, receipt, registration card); five-section Admin navigation reorganization (Hospital Configuration, Patient & Data Management, Users/Security/Governance, System & Maintenance). Uses existing RBAC; no new permission system. All existing admin pages preserved and reorganized, not removed. (completed 2026-11-08)
-- [ ] **Phase 21: Advanced Data Operations** (deferred) - Duplicate patient detection and merge workflow (high-risk FK cascade; dedicated transaction design); bulk archive and bulk delete for eligible records; extended data-edit permission controls; LAN workstation status monitoring. Depends on Phase 20 stable data foundation.
+- [ ] **Phase 22: Integrated OPD Workflow** - Check-in with Referred By and classification, emergency acknowledgement, same-visit reassignment, fee-snapshot bill lines, checkout and receipts (in progress; see phases/22-integrated-opd-workflow).
+- [ ] **Phase 23: Advanced Data Operations** (deferred; formerly numbered 22) - Duplicate patient detection and merge workflow (high-risk FK cascade; dedicated transaction design); bulk archive and bulk delete for eligible records; extended data-edit permission controls; LAN workstation status monitoring. Depends on Phase 20 stable data foundation.
 
 ## Phase Details
 
@@ -267,7 +268,8 @@ Phases execute in numeric order: 11 → 12 → 13 → 14 → 15 → 16 → 17 �
 | 19. Universal Consultation Workspace | 7/7 | Complete | 2026-11-06 |
 | 20. Admin Data Governance & Asset Management | 8/8 | Complete | 2026-11-08 |
 | 21. Build Takeover & System Stabilization | 0/2 | In progress | - |
-| 22. Advanced Data Operations | 0/0 | Deferred — depends on Phase 21 | - |
+| 22. Integrated OPD Workflow | 0/0 | In progress — Wave 1 built, Wave 2 backend done, Waves 2 UI and 3–5 open | - |
+| 23. Advanced Data Operations | 0/0 | Deferred — depends on Phase 21 | - |
 
 ---
 *Roadmap created: 2026-10-30*
@@ -321,7 +323,17 @@ Plans:
 
 ---
 
-### Phase 22: Advanced Data Operations
+### Phase 22: Integrated OPD Workflow
+
+**Goal**: Reception, waiting room, doctor and billing run as one OPD workflow on the existing patient, visit, consultation and payment chain: check-in with Referred By and classification, emergency acknowledgement, doctor-to-doctor reassignment on the same visit, bill lines with a fee snapshot, checkout and receipts. Specification and decisions live in `.planning/phases/22-integrated-opd-workflow/` (22-DESIGN.md, 22-UI-SPEC.md).
+
+**Depends on**: Phase 21 build takeover and stabilisation
+
+**Status**: Wave 1 built and deployed; Wave 2 backend done (screens open); Waves 3–5 not started.
+
+---
+
+### Phase 23: Advanced Data Operations
 
 **Goal**: Duplicate patient detection and merge workflow (high-risk FK cascade; dedicated transaction design); bulk archive and bulk delete for eligible records; extended data-edit permission controls; LAN workstation status monitoring.
 

@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router'
 import { AppShell } from '../components/AppShell'
 import { Modal } from '../components/Modal'
 import { DoctorDashboardUnfinishedCard } from '../components/DoctorDashboardUnfinishedCard'
+import { IconBell } from '../components/icons'
 import {
   useDoctorQueue,
   useDoctors,
@@ -565,7 +566,7 @@ export function DoctorDashboard() {
                 title="Call next into room and update display"
                 className="inline-flex items-center justify-center px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-lg text-xs font-semibold transition"
               >
-                <span>🔔 Call</span>
+                <span className="inline-flex items-center gap-1"><IconBell size={14} stroke={1.8} aria-hidden="true" />Call</span>
               </button>
             </div>
           )}
@@ -684,7 +685,7 @@ export function DoctorDashboard() {
               title="Call patient into cabin"
               className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 text-xs font-semibold shadow-2xs transition"
             >
-              <span>🔔 Call</span>
+              <span className="inline-flex items-center gap-1"><IconBell size={14} stroke={1.8} aria-hidden="true" />Call</span>
             </button>
             {isDrawer && (
               <button
@@ -1157,7 +1158,7 @@ export function DoctorDashboard() {
                         disabled={waitingPatients.length === 0}
                         className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#8E1C3D] hover:bg-[#721530] text-white text-xs font-bold shadow-2xs disabled:opacity-50 transition"
                       >
-                        <span>🔔 Call Next Waiting</span>
+                        <span className="inline-flex items-center gap-1"><IconBell size={14} stroke={1.8} aria-hidden="true" />Call Next Waiting</span>
                       </button>
                     </div>
 
@@ -1604,7 +1605,7 @@ export function DoctorDashboard() {
                       disabled={waitingPatients.length === 0}
                       className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#8E1C3D] hover:bg-[#721530] disabled:opacity-50 text-white rounded-lg text-xs font-bold shadow-2xs transition"
                     >
-                      <span>🔔 Call Next</span>
+                      <span className="inline-flex items-center gap-1"><IconBell size={14} stroke={1.8} aria-hidden="true" />Call Next</span>
                     </button>
                   </div>
                 </div>

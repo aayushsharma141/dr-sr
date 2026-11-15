@@ -137,6 +137,32 @@ class PriorityUpdate(BaseModel):
         return self
 
 
+class ReassignRequest(BaseModel):
+    """Move a waiting patient to another doctor on the same visit (design §5, QUE-10).
+
+    The old consultation is cancelled with this reason and a new WAITING consultation is
+    created for the new doctor, with a token from that doctor's sequence.
+    """
+
+    version_id: int = Field(..., gt=0, description="Optimistic locking version ID")
+    new_doctor_id: int = Field(..., gt=0, description="Doctor to move the patient to")
+    new_department_id: int | None = Field(
+        default=None,
+        gt=0,
+        description=(
+            "Required when the new doctor is not in the current department; must be one of the "
+            "new doctor's departments (owner decision Q19)"
+        ),
+    )
+    reason: str = Field(..., min_length=3, max_length=500, description="Why it was moved")
+
+
+class AcknowledgeAlertRequest(BaseModel):
+    """Doctor acknowledges an emergency alert on their own consultation (OD-22-09)."""
+
+    version_id: int = Field(..., gt=0, description="Optimistic locking version ID")
+
+
 class RescheduleRequest(BaseModel):
     """Payload to move a booking to another date, or to change its expected time (RF-12)."""
 
@@ -227,6 +253,7 @@ class DoctorQueueItem(BaseModel):
     priority_reason: str | None = None
     emergency_alerted_at: datetime | None = None
     alert_acknowledged_at: datetime | None = None
+    priority_updated_at: datetime | None = None
     check_in_at: datetime | None = None
     version_id: int
 

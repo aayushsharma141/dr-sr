@@ -22,9 +22,11 @@ from kalyan_api.models import (
     ConsultationStatus,
     Doctor,
     PriorityLevel,
+    ReferralSource,
     Visit,
 )
 from kalyan_api.schemas.appointments import (
+    AcknowledgeAlertRequest,
     AppointmentCreate,
     AppointmentListResponse,
     AppointmentRead,
@@ -35,6 +37,7 @@ from kalyan_api.schemas.appointments import (
     DoctorQueueResponse,
     NewPatientCheckIn,
     PriorityUpdate,
+    ReassignRequest,
     RescheduleRequest,
     WalkInCreate,
 )
@@ -61,6 +64,22 @@ def _check_in_details(payload: CheckInDetailsIn) -> booking_service.CheckInDetai
         priority_level=payload.priority_level.value,
         priority_reason=payload.priority_reason,
     )
+
+
+_SUGGESTED_RANK = {
+    PriorityLevel.EMERGENCY.value: 0,
+    PriorityLevel.PRIORITY.value: 1,
+    PriorityLevel.NORMAL.value: 2,
+}
+
+
+def _suggested_order_key(item: DoctorQueueItem) -> tuple[int, object, int]:
+    """Sort key for the waiting list: EMERGENCY first by when it was classified, then by token."""
+    rank = _SUGGESTED_RANK.get(item.priority_level, _SUGGESTED_RANK[PriorityLevel.NORMAL.value])
+    token = item.token_number or 0
+    if rank == 0:
+        return (0, item.priority_updated_at or item.status_updated_at, token)
+    return (rank, token, 0)
 
 
 def _to_read_schema(appt: Appointment, visit: Visit | None = None) -> AppointmentRead:
@@ -358,6 +377,114 @@ def update_priority(
 
 
 @router.post(
+    "/{id}/acknowledge-alert",
+    response_model=AppointmentRead,
+    dependencies=[Depends(require(Permission.DASHBOARD_DOCTOR))],
+)
+def acknowledge_emergency_alert(
+    id: int,
+    payload: AcknowledgeAlertRequest,
+    request: Request,
+    session: SessionDep,
+    principal: Principal = Depends(current_principal),
+) -> AppointmentRead:
+    """The assigned doctor acknowledges an emergency alert on their own consultation (OD-22-09).
+
+    The alert stays visible until this is called. The time and the doctor are kept.
+    """
+    if principal.role != Role.DOCTOR or principal.doctor_id is None:
+        raise ApiError(
+            status_code=403,
+            code="doctor_only",
+            message="Only doctors can acknowledge an emergency alert.",
+        )
+    appt = booking_service.lock_appointment(session, id)
+    if not appt or appt.doctor_id != principal.doctor_id:
+        raise ApiError(status_code=404, code="appointment_not_found", message="Appointment not found.")
+    require_version(appt, payload.version_id, label="appointment")
+    before = {
+        "alert_acknowledged_at": appt.alert_acknowledged_at.isoformat()
+        if appt.alert_acknowledged_at
+        else None,
+        "version_id": appt.version_id,
+    }
+    booking_service.acknowledge_alert(session, appt, principal)
+    audit_service.record(
+        session,
+        build_audit_context(request, principal),
+        action=AuditAction.APPOINTMENT_ALERT_ACKNOWLEDGED,
+        entity_type="appointment",
+        entity_id=appt.id,
+        before=before,
+        after={
+            "alert_acknowledged_at": appt.alert_acknowledged_at.isoformat(),
+            "version_id": appt.version_id,
+        },
+        reason=None,
+    )
+    return _to_read_schema(appt)
+
+
+@router.post(
+    "/{id}/reassign",
+    response_model=AppointmentRead,
+    status_code=201,
+    dependencies=[Depends(require(Permission.VISIT_WRITE))],
+)
+def reassign_appointment(
+    id: int,
+    payload: ReassignRequest,
+    request: Request,
+    session: SessionDep,
+    principal: Principal = Depends(current_principal),
+) -> AppointmentRead:
+    """Move a waiting patient to another doctor on the same visit (QUE-10, design §5).
+
+    Reception only. The old consultation is kept as cancelled with the reason; the new one is
+    returned (201) with a token from the new doctor's sequence.
+    """
+    appt = booking_service.lock_appointment(session, id)
+    if not appt:
+        raise ApiError(status_code=404, code="appointment_not_found", message="Appointment not found.")
+    require_version(appt, payload.version_id, label="appointment")
+    before = {
+        "status": appt.status,
+        "consultation_status": appt.consultation_status,
+        "doctor_id": appt.doctor_id,
+        "department_id": appt.department_id,
+        "token_number": appt.token_number,
+        "version_id": appt.version_id,
+    }
+    successor = booking_service.reassign_waiting(
+        session,
+        appt,
+        principal,
+        new_doctor_id=payload.new_doctor_id,
+        reason=payload.reason,
+        new_department_id=payload.new_department_id,
+    )
+    audit_service.record(
+        session,
+        build_audit_context(request, principal),
+        action=AuditAction.APPOINTMENT_REASSIGNED,
+        entity_type="appointment",
+        entity_id=appt.id,
+        before=before,
+        after={
+            "status": appt.status,
+            "consultation_status": appt.consultation_status,
+            "successor_appointment_id": successor.id,
+            "to_doctor_id": successor.doctor_id,
+            "to_department_id": successor.department_id,
+            "to_token_number": successor.token_number,
+            "version_id": appt.version_id,
+        },
+        reason=payload.reason.strip(),
+    )
+    return _to_read_schema(successor)
+
+
+@router.post(
     "/{id}/reschedule",
     response_model=AppointmentRead,
     status_code=201,
@@ -548,7 +675,12 @@ def update_appointment_status(
     before = {"status": appt.status, "version_id": payload.version_id}
 
     if payload.status == AppointmentStatus.ARRIVED:
-        result = booking_service.check_in(session, appt, principal)
+        # Referred By is required on every visit and defaults to Self (OD-22-16). This path has
+        # no desk form, so the visit is opened with the default instead of having no referral.
+        default_details = booking_service.CheckInDetails(
+            referral_source=ReferralSource.SELF.value
+        )
+        result = booking_service.check_in(session, appt, principal, default_details)
         _record_check_in(session, ctx, result, before=before)
     else:
         consultation_target = validate_status_update(
@@ -649,6 +781,7 @@ def get_doctor_queue(
             priority_reason=a.priority_reason,
             emergency_alerted_at=a.emergency_alerted_at,
             alert_acknowledged_at=a.alert_acknowledged_at,
+            priority_updated_at=a.priority_updated_at,
             check_in_at=a.check_in_at,
             version_id=a.version_id,
         )
@@ -660,6 +793,10 @@ def get_doctor_queue(
             booked.append(item)
         else:
             completed.append(item)
+
+    # Suggested order (OD-22-07): EMERGENCY by classification time, then PRIORITY, then NORMAL,
+    # each by token. The position is computed here and never stored; tokens never change.
+    waiting.sort(key=_suggested_order_key)
 
     total_active = len(in_consultation) + len(waiting) + len(booked)
 

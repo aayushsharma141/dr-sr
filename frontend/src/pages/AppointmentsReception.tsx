@@ -481,7 +481,7 @@ export function AppointmentsReception() {
                             ? 'bg-amber-600 text-white'
                             : 'bg-[#5D0B26] text-white'
                       }`}>
-                        {emergencyHold ? '⚠️ EMERGENCY HOLD (THIS SCREEN ONLY)' : delayMinutes ? `⏱ ${delayMinutes}m DELAY (THIS SCREEN ONLY)` : '🟢 ON SCHEDULE'}
+                        {emergencyHold ? '⚠️ ON HOLD (THIS SCREEN ONLY)' : delayMinutes ? `⏱ ${delayMinutes}m DELAY (THIS SCREEN ONLY)` : '🟢 ON SCHEDULE'}
                       </span>
                     </h2>
                     <p className="text-xs text-slate-600 mt-0.5">

@@ -11,6 +11,7 @@ Locked decisions:
 import re
 import uuid
 from datetime import date, datetime, time
+from decimal import Decimal
 from enum import StrEnum
 
 from sqlalchemy import (
@@ -914,6 +915,84 @@ class ConsultationPriorityEvent(Base):
     to_level: Mapped[str] = mapped_column(String(16), nullable=False)
     reason: Mapped[str | None] = mapped_column(Text, nullable=True)
     actor_user_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("users.id", ondelete="RESTRICT"), nullable=False
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+class BillItemCategory(StrEnum):
+    """Bill categories (OD-22-14). Only CONSULTATION is written so far (Phase 22, Wave 3)."""
+
+    CONSULTATION = "CONSULTATION"
+
+
+class BillItemSource(StrEnum):
+    """Who created a bill line: the doctor, reception, or the system (the check-in snapshot)."""
+
+    DOCTOR = "DOCTOR"
+    RECEPTION = "RECEPTION"
+    SYSTEM = "SYSTEM"
+
+
+class BillItem(Base):
+    """One charge line on a visit's bill (Phase 22, design §4, OD-22-10).
+
+    A consultation's line stores the doctor's fee at check-in. Later fee changes never alter it,
+    so an existing bill cannot change when a doctor's default fee is edited (K-63, FEE-07).
+    Rows are append-only for the application role (SELECT and INSERT only, migration 0027).
+    Amounts are integer paise.
+    """
+
+    __tablename__ = "bill_items"
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["visit_id", "patient_id"],
+            ["visits.id", "visits.patient_id"],
+            name="fk_bill_items_visit_patient",
+            ondelete="RESTRICT",
+        ),
+        ForeignKeyConstraint(
+            ["appointment_id", "patient_id"],
+            ["appointments.id", "appointments.patient_id"],
+            name="fk_bill_items_appointment_patient",
+            ondelete="RESTRICT",
+        ),
+        CheckConstraint(
+            "category IN ('CONSULTATION', 'PROCEDURE', 'PACKAGE', 'MEDICINE', 'ADDITIONAL')",
+            name="category_valid",
+        ),
+        CheckConstraint("source IN ('DOCTOR', 'RECEPTION', 'SYSTEM')", name="source_valid"),
+        CheckConstraint("quantity > 0", name="quantity_positive"),
+        CheckConstraint("rate_paise >= 0 AND amount_paise >= 0", name="amounts_nonnegative"),
+        CheckConstraint(
+            "category <> 'CONSULTATION' OR appointment_id IS NOT NULL",
+            name="consultation_has_appointment",
+        ),
+        Index("ix_bill_items_visit", "visit_id"),
+        # One consultation line per appointment: the snapshot is written once.
+        Index(
+            "uq_bill_items_consultation_appointment",
+            "appointment_id",
+            unique=True,
+            postgresql_where=text("category = 'CONSULTATION'"),
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    visit_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    patient_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    appointment_id: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    category: Mapped[str] = mapped_column(String(16), nullable=False)
+    source: Mapped[str] = mapped_column(String(16), nullable=False)
+    description: Mapped[str] = mapped_column(Text, nullable=False)
+    quantity: Mapped[Decimal] = mapped_column(
+        Numeric(10, 2), nullable=False, server_default=text("1")
+    )
+    rate_paise: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    amount_paise: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    created_by_user_id: Mapped[int] = mapped_column(
         BigInteger, ForeignKey("users.id", ondelete="RESTRICT"), nullable=False
     )
     created_at: Mapped[datetime] = mapped_column(

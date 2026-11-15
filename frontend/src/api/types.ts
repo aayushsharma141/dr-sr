@@ -848,6 +848,20 @@ export interface PriorityUpdate {
   version_id: number
 }
 
+/** Move a waiting patient to another doctor on the same visit (QUE-10, design §5). */
+export interface ReassignRequest {
+  version_id: number
+  new_doctor_id: number
+  /** Required when the new doctor is not in the current department (owner decision Q19). */
+  new_department_id?: number | null
+  reason: string
+}
+
+/** Doctor acknowledges an emergency alert on own consultation (OD-22-09). */
+export interface AcknowledgeAlertRequest {
+  version_id: number
+}
+
 export interface AppointmentStatusUpdate {
   status: AppointmentStatus
   version_id: number
