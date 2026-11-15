@@ -60,20 +60,46 @@ describe('AppShell clinical navigation hierarchy', () => {
     window.localStorage.clear()
   })
 
-  it('shows reception workflows without exposing clinical or admin-only modules', () => {
-    renderShell('RECEPTION', '/reception/appointments?tab=today')
+  it('lists reception tabs once each, Check-in & Token first, named like their pages', () => {
+    renderShell('RECEPTION', '/reception/appointments')
 
     const primaryNav = screen.getByRole('navigation', { name: 'Primary navigation' })
-    expect(within(primaryNav).getByRole('link', { name: 'Dashboard' })).toHaveAttribute('href', '/reception')
-    expect(within(primaryNav).getByRole('link', { name: 'Patient Registration' })).toHaveAttribute('href', '/reception/patients/new')
-    expect(within(primaryNav).getByRole('link', { name: 'Patient Records' })).toHaveAttribute('href', '/reception/patients')
+    const links = within(primaryNav).getAllByRole('link')
+    // Owner order of 2026-11-15 (OD-22-01). New patients register at check-in, so there is no
+    // separate Patient Registration tab; the full form opens from Patient Records.
+    expect(links.map((l) => l.textContent)).toEqual([
+      'Check-in & Token',
+      'Dashboard',
+      'Patient Records',
+      'Appointments',
+      'Billing & Payments',
+    ])
+    expect(links.map((l) => l.getAttribute('href'))).toEqual([
+      '/reception/tokens',
+      '/reception',
+      '/reception/patients',
+      '/reception/appointments',
+      // Opens Checkout, not the Dues tab.
+      '/reception/billing',
+    ])
+    expect(within(primaryNav).getByText('RECEPTION DESK')).toBeInTheDocument()
     expect(within(primaryNav).getByRole('link', { name: 'Appointments' })).toHaveAttribute('aria-current', 'page')
-    expect(within(primaryNav).getByRole('link', { name: 'Billing & Payments' })).toHaveAttribute('href', '/reception/dues')
+    expect(document.title).toBe('Appointments – Kalyan Hospital')
 
     expect(within(primaryNav).queryByRole('link', { name: 'Physiotherapy Treatment' })).not.toBeInTheDocument()
-    expect(within(primaryNav).queryByRole('link', { name: 'Follow-up & Visits' })).not.toBeInTheDocument()
-    expect(within(primaryNav).queryByRole('link', { name: 'Hospital Configuration' })).not.toBeInTheDocument()
-    expect(within(primaryNav).queryByRole('link', { name: 'User & Authority' })).not.toBeInTheDocument()
+    expect(within(primaryNav).queryByRole('link', { name: 'Follow-ups' })).not.toBeInTheDocument()
+  })
+
+  it('keeps Check-in & Token and Billing & Payments highlighted on their own pages', () => {
+    renderShell('RECEPTION', '/reception/tokens?patient_id=4&appointment_id=104')
+    let primaryNav = screen.getByRole('navigation', { name: 'Primary navigation' })
+    expect(within(primaryNav).getByRole('link', { name: 'Check-in & Token' })).toHaveAttribute('aria-current', 'page')
+    expect(document.title).toBe('Check-in & Token – Kalyan Hospital')
+    cleanup()
+
+    renderShell('RECEPTION', '/reception/billing?tab=dues')
+    primaryNav = screen.getByRole('navigation', { name: 'Primary navigation' })
+    expect(within(primaryNav).getByRole('link', { name: 'Billing & Payments' })).toHaveAttribute('aria-current', 'page')
   })
 
   it('keeps Patient Records active and names the page Edit Patient while a patient is edited', () => {
@@ -81,20 +107,78 @@ describe('AppShell clinical navigation hierarchy', () => {
 
     const primaryNav = screen.getByRole('navigation', { name: 'Primary navigation' })
     expect(within(primaryNav).getByRole('link', { name: 'Patient Records' })).toHaveAttribute('aria-current', 'page')
-    expect(within(primaryNav).getByRole('link', { name: 'Patient Registration' })).not.toHaveAttribute('aria-current')
     expect(document.title).toBe('Edit Patient – Kalyan Hospital')
   })
 
-  it('shows doctor clinical workflows and activates the follow-up deep link', () => {
+  it('keeps Patient Records active on the full registration form', () => {
+    renderShell('RECEPTION', '/reception/patients/new')
+
+    const primaryNav = screen.getByRole('navigation', { name: 'Primary navigation' })
+    expect(within(primaryNav).getByRole('link', { name: 'Patient Records' })).toHaveAttribute('aria-current', 'page')
+  })
+
+  it('gives a doctor one queue tab and activates Follow-ups on its page', () => {
     renderShell('DOCTOR', '/reception/appointments?tab=followup')
 
     const primaryNav = screen.getByRole('navigation', { name: 'Primary navigation' })
+    // No consultation is open and none is unfinished, so there is nothing to continue.
+    expect(within(primaryNav).getAllByRole('link').map((l) => l.textContent)).toEqual([
+      'My Queue',
+      'Follow-ups',
+      'Physiotherapy Treatment',
+      'Patient Records',
+      'My Settings',
+    ])
+    expect(within(primaryNav).getByRole('link', { name: 'My Queue' })).toHaveAttribute('href', '/doctor')
     expect(within(primaryNav).getByRole('link', { name: 'Physiotherapy Treatment' })).toHaveAttribute('href', '/doctor/treatment-plans')
-    expect(within(primaryNav).getByRole('link', { name: 'Follow-up & Visits' })).toHaveAttribute('href', '/reception/appointments?tab=followup')
-    expect(within(primaryNav).getByRole('link', { name: 'Follow-up & Visits' })).toHaveAttribute('aria-current', 'page')
+    expect(within(primaryNav).getByRole('link', { name: 'Follow-ups' })).toHaveAttribute('href', '/reception/appointments?tab=followup')
+    expect(within(primaryNav).getByRole('link', { name: 'Follow-ups' })).toHaveAttribute('aria-current', 'page')
+    expect(document.title).toBe('Follow-ups – Kalyan Hospital')
+    expect(within(primaryNav).queryByRole('link', { name: 'Appointments' })).not.toBeInTheDocument()
     expect(within(primaryNav).queryByRole('link', { name: 'Patient Registration' })).not.toBeInTheDocument()
     expect(within(primaryNav).queryByRole('link', { name: 'Billing & Payments' })).not.toBeInTheDocument()
-    expect(within(primaryNav).queryByRole('link', { name: 'User & Authority' })).not.toBeInTheDocument()
+  })
+
+  it('names the physiotherapy page like its tab', () => {
+    renderShell('DOCTOR', '/doctor/treatment-plans/7')
+    const primaryNav = screen.getByRole('navigation', { name: 'Primary navigation' })
+    expect(within(primaryNav).getByRole('link', { name: 'Physiotherapy Treatment' })).toHaveAttribute('aria-current', 'page')
+    expect(document.title).toBe('Physiotherapy Treatment – Kalyan Hospital')
+  })
+
+  it('shows Continue Consultation while a consultation is open', () => {
+    renderShell('DOCTOR', '/doctor/encounters/42')
+
+    const primaryNav = screen.getByRole('navigation', { name: 'Primary navigation' })
+    const consultation = within(primaryNav).getByRole('link', { name: 'Continue Consultation' })
+    expect(consultation).toHaveAttribute('href', '/doctor/encounters/42')
+    expect(consultation).toHaveAttribute('aria-current', 'page')
+    expect(within(primaryNav).getByRole('link', { name: 'My Queue' })).not.toHaveAttribute('aria-current')
+  })
+
+  it('links Continue Consultation to the newest unfinished draft from anywhere', async () => {
+    const drafts = [
+      { id: 7, patient_id: 1, patient_urn: 'KH-1', patient_name: 'Older Draft', started_at: '2026-11-14T09:00:00Z', is_finalised: false },
+      { id: 9, patient_id: 2, patient_urn: 'KH-2', patient_name: 'Newer Draft', started_at: '2026-11-15T09:00:00Z', is_finalised: false },
+    ]
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string) =>
+        url === '/api/encounters/unfinished'
+          ? new Response(JSON.stringify(drafts), { status: 200, headers: { 'content-type': 'application/json' } })
+          : new Response(JSON.stringify({ status: 'ok', db: 'ok' }), { status: 200 }),
+      ),
+    )
+    try {
+      renderShell('DOCTOR', '/doctor')
+      const primaryNav = screen.getByRole('navigation', { name: 'Primary navigation' })
+      const consultation = await within(primaryNav).findByRole('link', { name: /Continue Consultation/ })
+      expect(consultation).toHaveAttribute('href', '/doctor/encounters/9')
+      expect(consultation).toHaveTextContent('2')
+      expect(within(primaryNav).getByRole('link', { name: 'My Queue' })).toHaveAttribute('aria-current', 'page')
+    } finally {
+      vi.unstubAllGlobals()
+    }
   })
 
   it('shows administration destinations once in a single primary sidebar for ADMIN without duplicates', () => {
@@ -114,16 +198,18 @@ describe('AppShell clinical navigation hierarchy', () => {
     expect(within(primaryNav).queryByRole('link', { name: /Clinic Settings|Hospital Identity & Logo/ })).toBeNull()
     expect(within(primaryNav).getByRole('link', { name: 'Templates' })).toHaveAttribute('href', '/admin/templates')
     expect(within(primaryNav).getByRole('link', { name: 'Doctors & Fees' })).toHaveAttribute('href', '/admin/doctors')
+    expect(within(primaryNav).getByRole('link', { name: 'Departments' })).toHaveAttribute('href', '/admin/departments')
 
     // Section 2: Patient & Data Management
     expect(within(primaryNav).getByText('Patients')).toBeInTheDocument()
+    expect(within(primaryNav).getByRole('link', { name: 'Patient Records' })).toHaveAttribute('href', '/reception/patients')
     expect(within(primaryNav).getByRole('link', { name: 'Corrections' })).toHaveAttribute('href', '/admin/patients/correct')
     expect(within(primaryNav).queryByRole('link', { name: /Import Centre|Export Centre/ })).toBeNull()
 
     // Section 3: Billing & Finance
     expect(within(primaryNav).getByText('Finance')).toBeInTheDocument()
     expect(within(primaryNav).getByRole('link', { name: 'Receipts' })).toHaveAttribute('href', '/admin/billing')
-    expect(within(primaryNav).getByRole('link', { name: 'Dues' })).toHaveAttribute('href', '/reception/dues')
+    expect(within(primaryNav).getByRole('link', { name: 'Dues' })).toHaveAttribute('href', '/reception/billing?tab=dues')
 
     // Section 4: Users, Security & Governance
     expect(within(primaryNav).getByText('Users & Access')).toBeInTheDocument()
@@ -155,6 +241,24 @@ describe('AppShell clinical navigation hierarchy', () => {
     // Doctor/Reception specific items not exposed
     expect(within(primaryNav).queryByRole('link', { name: 'Patient Registration' })).not.toBeInTheDocument()
     expect(within(primaryNav).queryByRole('link', { name: 'Physiotherapy Treatment' })).not.toBeInTheDocument()
+  })
+
+  it('highlights the admin tab for pages outside /admin and for Departments', () => {
+    renderShell('ADMIN', '/reception/billing?tab=dues')
+    let primaryNav = screen.getByRole('navigation', { name: 'Primary navigation' })
+    expect(within(primaryNav).getByRole('link', { name: 'Dues' })).toHaveAttribute('aria-current', 'page')
+    cleanup()
+
+    renderShell('ADMIN', '/reception/patients/12')
+    primaryNav = screen.getByRole('navigation', { name: 'Primary navigation' })
+    expect(within(primaryNav).getByRole('link', { name: 'Patient Records' })).toHaveAttribute('aria-current', 'page')
+    cleanup()
+
+    renderShell('ADMIN', '/admin/departments')
+    primaryNav = screen.getByRole('navigation', { name: 'Primary navigation' })
+    expect(within(primaryNav).getByRole('link', { name: 'Departments' })).toHaveAttribute('aria-current', 'page')
+    expect(within(primaryNav).getByRole('link', { name: 'Doctors & Fees' })).not.toHaveAttribute('aria-current')
+    expect(document.title).toBe('Departments – Kalyan Hospital')
   })
 
   it('opens a keyboard-accessible mobile navigation drawer', async () => {

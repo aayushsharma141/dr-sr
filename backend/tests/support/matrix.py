@@ -266,7 +266,27 @@ def _walk_in_payload(target: Any = None) -> dict[str, Any]:
         "doctor_id": getattr(target, "doctor_id", 1),
         "department_id": getattr(target, "department_id", 1),
         "notes": "Matrix walk-in",
+        "referral_source": "SELF",
     }
+
+
+def _check_in_payload(target: Any = None) -> dict[str, Any]:
+    ver = target.version_id if target and hasattr(target, "version_id") else 1
+    return {"version_id": ver, "referral_source": "SELF", "visit_kind": "NEW"}
+
+
+def _new_patient_check_in_payload(target: Any = None) -> dict[str, Any]:
+    return {
+        "patient": _create_patient_payload(),
+        "doctor_id": getattr(target, "doctor_id", 1),
+        "department_id": getattr(target, "department_id", 1),
+        "referral_source": "SELF",
+    }
+
+
+def _priority_payload(target: Any = None) -> dict[str, Any]:
+    ver = target.version_id if target and hasattr(target, "version_id") else 1
+    return {"version_id": ver, "priority_level": "PRIORITY", "priority_reason": "Matrix elderly"}
 
 
 def _reschedule_payload(target: Any = None) -> dict[str, Any]:
@@ -1158,7 +1178,32 @@ MATRIX: list[MatrixRow] = [
     MatrixRow(
         method="POST",
         path="/api/appointments/{id}/check-in",
-        body_factory=_version_payload,
+        body_factory=_check_in_payload,
+        expected={
+            "anonymous": 401,
+            "admin": 403,
+            "reception": 200,
+            "doctor_a": 403,
+            "doctor_b": 403,
+        },
+    ),
+    # Phase 22: new-patient check-in and classification.
+    MatrixRow(
+        method="POST",
+        path="/api/appointments/walk-in/new-patient",
+        body_factory=_new_patient_check_in_payload,
+        expected={
+            "anonymous": 401,
+            "admin": 403,
+            "reception": 201,
+            "doctor_a": 403,
+            "doctor_b": 403,
+        },
+    ),
+    MatrixRow(
+        method="PATCH",
+        path="/api/appointments/{id}/priority",
+        body_factory=_priority_payload,
         expected={
             "anonymous": 401,
             "admin": 403,

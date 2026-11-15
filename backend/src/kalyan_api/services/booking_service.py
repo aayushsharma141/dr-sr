@@ -19,13 +19,17 @@ from kalyan_api import clock
 from kalyan_api.core.errors import ApiError
 from kalyan_api.core.principal import Principal
 from kalyan_api.models import (
+    REFERRAL_SOURCES_NEEDING_NAME,
     Appointment,
     AppointmentSource,
     AppointmentStatus,
+    ConsultationPriorityEvent,
     ConsultationStatus,
     Department,
     Doctor,
     Patient,
+    PriorityEventType,
+    PriorityLevel,
     Visit,
 )
 from kalyan_api.services import token_service, visit_service
@@ -196,11 +200,171 @@ class CheckInResult:
     visit_opened: bool
 
 
-def check_in(session: Session, appt: Appointment, principal: Principal) -> CheckInResult:
+@dataclass(frozen=True)
+class CheckInDetails:
+    """What reception confirms at the check-in desk (phase 22).
+
+    visit_kind is recorded on the consultation and never sets the fee (OD-22-05). The
+    classification never changes the token (OD-22-06/07). The referral belongs to the visit: it
+    is recorded by the check-in that opens the visit and left as it is when a second
+    consultation joins the same visit (OD-22-16).
+    """
+
+    referral_source: str
+    referrer_name: str | None = None
+    visit_kind: str | None = None
+    priority_level: str = PriorityLevel.NORMAL.value
+    priority_reason: str | None = None
+
+
+def _clean_text(value: str | None) -> str | None:
+    text_value = (value or "").strip()
+    return text_value or None
+
+
+def _record_priority_event(
+    session: Session,
+    appt: Appointment,
+    principal: Principal,
+    *,
+    event: PriorityEventType,
+    from_level: str | None,
+    to_level: str,
+    reason: str | None,
+) -> None:
+    session.add(
+        ConsultationPriorityEvent(
+            appointment_id=appt.id,
+            visit_id=appt.visit_id,
+            patient_id=appt.patient_id,
+            doctor_id=appt.doctor_id,
+            event=event.value,
+            from_level=from_level,
+            to_level=to_level,
+            reason=reason,
+            actor_user_id=principal.user_id,
+        )
+    )
+
+
+def _set_classification(
+    appt: Appointment, principal: Principal, level: str, reason: str | None
+) -> None:
+    """Write the classification fields. EMERGENCY raises a fresh alert for the doctor."""
+    now = clock.utcnow()
+    was_emergency = appt.priority_level == PriorityLevel.EMERGENCY.value
+    appt.priority_level = level
+    appt.priority_reason = reason if level != PriorityLevel.NORMAL.value else None
+    appt.priority_updated_at = now
+    appt.priority_updated_by_user_id = principal.user_id
+    if level == PriorityLevel.EMERGENCY.value:
+        if not was_emergency:
+            appt.emergency_alerted_at = now
+            appt.alert_acknowledged_at = None
+            appt.alert_acknowledged_by_user_id = None
+    else:
+        # The alert ends with the emergency; its acknowledgement stays in the history table.
+        appt.emergency_alerted_at = None
+        appt.alert_acknowledged_at = None
+        appt.alert_acknowledged_by_user_id = None
+
+
+def _require_classification_reason(level: str, reason: str | None) -> None:
+    if level != PriorityLevel.NORMAL.value and len(reason or "") < 3:
+        raise ApiError(
+            status_code=422,
+            code="priority_reason_required",
+            message="Enter a reason for marking the patient Priority or Emergency.",
+        )
+
+
+def _validated_referrer(details: CheckInDetails) -> str | None:
+    """The referrer's name, refused when the referral source needs one and it is missing."""
+    name = _clean_text(details.referrer_name)
+    if details.referral_source in REFERRAL_SOURCES_NEEDING_NAME and (name is None or len(name) < 2):
+        raise ApiError(
+            status_code=422,
+            code="referrer_name_required",
+            message="Enter the name of the referring doctor, person or organisation.",
+        )
+    return name
+
+
+def _apply_check_in_details(
+    appt: Appointment,
+    visit: Visit,
+    principal: Principal,
+    details: CheckInDetails,
+    referrer_name: str | None,
+) -> None:
+    """Set the desk's confirmations on the consultation (and a pre-phase-22 visit) before saving."""
+    # A visit opened before phase 22 has no referral yet; this check-in records it. A visit
+    # opened by this check-in already holds it, and any other visit keeps its own.
+    if visit.referral_source is None:
+        visit.referral_source = details.referral_source
+        visit.referrer_name = referrer_name
+        visit.referral_recorded_by_user_id = principal.user_id
+        visit.referral_recorded_at = clock.utcnow()
+
+    appt.visit_kind = details.visit_kind
+    if details.priority_level != PriorityLevel.NORMAL.value:
+        _set_classification(
+            appt, principal, details.priority_level, _clean_text(details.priority_reason)
+        )
+
+
+def classify(
+    session: Session, appt: Appointment, principal: Principal, level: str, reason: str | None
+) -> bool:
+    """Change a checked-in patient's classification; returns False when nothing changed.
+
+    Allowed while the patient waits or is with the doctor. The token and the consultation are
+    untouched; every change is appended to the classification history (OD-22-06).
+    """
+    if appt.consultation_status not in (
+        ConsultationStatus.WAITING.value,
+        ConsultationStatus.IN_CONSULTATION.value,
+    ):
+        raise ApiError(
+            status_code=422,
+            code="classification_closed",
+            message="Only a patient who is waiting or with the doctor can be reclassified.",
+        )
+    reason = _clean_text(reason)
+    _require_classification_reason(level, reason)
+    kept_reason = reason if level != PriorityLevel.NORMAL.value else None
+    if level == appt.priority_level and kept_reason == appt.priority_reason:
+        return False
+
+    from_level = appt.priority_level
+    _set_classification(appt, principal, level, reason)
+    appt.version_id += 1
+    session.flush()
+    _record_priority_event(
+        session,
+        appt,
+        principal,
+        event=PriorityEventType.CLASSIFIED,
+        from_level=from_level,
+        to_level=level,
+        reason=reason,
+    )
+    session.flush()
+    return True
+
+
+def check_in(
+    session: Session,
+    appt: Appointment,
+    principal: Principal,
+    details: CheckInDetails | None = None,
+) -> CheckInResult:
     """Check a booked patient in: ARRIVED, visit opened or joined, token issued, WAITING.
 
     Reception only, and only on the appointment date. A late arrival marked NO_SHOW checks in
-    the same way. No money is taken here; payment is collected at checkout.
+    the same way. No money is taken here; payment is collected at checkout. details carries
+    the visit type, classification and referral from the check-in desk (phase 22); the older
+    status-change path sends none.
     """
     validate_booking_transition(appt, AppointmentStatus.ARRIVED, principal)
 
@@ -232,8 +396,17 @@ def check_in(session: Session, appt: Appointment, principal: Principal) -> Check
                 },
             )
 
+    referrer_name = None
+    if details is not None:
+        referrer_name = _validated_referrer(details)
+        _require_classification_reason(details.priority_level, _clean_text(details.priority_reason))
+
     visit, visit_opened = visit_service.join_or_open_visit(
-        session, appt.patient_id, principal.user_id
+        session,
+        appt.patient_id,
+        principal.user_id,
+        referral_source=details.referral_source if details is not None else None,
+        referrer_name=referrer_name,
     )
     if appt.token_number is None:
         appt.token_number = token_service.generate_next_daily_token(
@@ -247,8 +420,21 @@ def check_in(session: Session, appt: Appointment, principal: Principal) -> Check
         appt.check_in_at = now
     appt.consultation_status = ConsultationStatus.WAITING.value
     appt.visit_id = visit.id
+    if details is not None:
+        _apply_check_in_details(appt, visit, principal, details, referrer_name)
     appt.version_id += 1
     session.flush()
+    if details is not None and details.priority_level != PriorityLevel.NORMAL.value:
+        _record_priority_event(
+            session,
+            appt,
+            principal,
+            event=PriorityEventType.CLASSIFIED,
+            from_level=None,
+            to_level=details.priority_level,
+            reason=appt.priority_reason,
+        )
+        session.flush()
     return CheckInResult(appointment=appt, visit=visit, visit_opened=visit_opened)
 
 
@@ -261,6 +447,7 @@ def walk_in(
     department_id: int,
     notes: str | None = None,
     override_reason: str | None = None,
+    details: CheckInDetails | None = None,
 ) -> CheckInResult:
     """Register a walk-in: a booking for today, checked in at once, in one transaction."""
     with session.begin_nested():
@@ -276,7 +463,7 @@ def walk_in(
             source=AppointmentSource.WALK_IN,
             issue_token=False,
         )
-        return check_in(session, appt, principal)
+        return check_in(session, appt, principal, details)
 
 
 def reschedule(

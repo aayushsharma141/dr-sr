@@ -400,7 +400,7 @@ export function TreatmentPlanWorkspace() {
               <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
                   <h1 className="text-xl font-bold text-teal-950 flex items-center gap-2">
-                    <span>⚡ Physiotherapy & Rehabilitation Center</span>
+                    <span>Physiotherapy Treatment</span>
                     <span className="text-xs font-normal bg-teal-100 text-teal-800 px-2.5 py-0.5 rounded-full border border-teal-300">
                       भौतिक चिकित्सा
                     </span>

@@ -154,7 +154,11 @@ describe('Administration Module Registry Invariants', () => {
     expect(findAdminModuleForPath('/admin/imports')).toBeNull()
     expect(findAdminModuleForPath('/admin/exports')).toBeNull()
     expect(findAdminModuleForPath('/admin/billing')?.module.id).toBe('billing-reversals')
-    expect(findAdminModuleForPath('/reception/dues')?.module.id).toBe('pending-dues')
+    // Dues is the Dues tab of Billing & Payments; the tab in the action path does not stop the match.
+    expect(findAdminModuleForPath('/reception/billing')?.module.id).toBe('pending-dues')
+    expect(findAdminModuleForPath('/admin/departments')?.module.id).toBe('departments')
+    expect(findAdminModuleForPath('/reception/patients')?.module.id).toBe('patient-records')
+    expect(findAdminModuleForPath('/reception/patients/12')?.module.id).toBe('patient-records')
     expect(findAdminModuleForPath('/admin/users')?.module.id).toBe('user-accounts')
     expect(findAdminModuleForPath('/admin/roles')?.module.id).toBe('roles-matrix')
     expect(findAdminModuleForPath('/admin/security')?.module.id).toBe('security-sessions')
@@ -245,12 +249,14 @@ describe('Administration Dashboard & Single Sidebar Layout', () => {
     expect(within(primaryNav).queryByRole('link', { name: /Hospital Identity & Logo/ })).toBeNull()
     expect(within(primaryNav).getByRole('link', { name: /Templates/ })).toHaveAttribute('href', '/admin/templates')
     expect(within(primaryNav).getByRole('link', { name: /Doctors & Fees/ })).toHaveAttribute('href', '/admin/doctors')
+    expect(within(primaryNav).getByRole('link', { name: 'Departments' })).toHaveAttribute('href', '/admin/departments')
 
+    expect(within(primaryNav).getByRole('link', { name: 'Patient Records' })).toHaveAttribute('href', '/reception/patients')
     expect(within(primaryNav).getByRole('link', { name: /Corrections/ })).toHaveAttribute('href', '/admin/patients/correct')
     expect(within(primaryNav).queryByRole('link', { name: /Import Centre|Export Centre/ })).toBeNull()
 
     expect(within(primaryNav).getByRole('link', { name: /Receipts/ })).toHaveAttribute('href', '/admin/billing')
-    expect(within(primaryNav).getByRole('link', { name: /Dues/ })).toHaveAttribute('href', '/reception/dues')
+    expect(within(primaryNav).getByRole('link', { name: /Dues/ })).toHaveAttribute('href', '/reception/billing?tab=dues')
 
     expect(within(primaryNav).getByRole('link', { name: /Users/ })).toHaveAttribute('href', '/admin/users')
     expect(within(primaryNav).getByRole('link', { name: /Roles/ })).toHaveAttribute('href', '/admin/roles')

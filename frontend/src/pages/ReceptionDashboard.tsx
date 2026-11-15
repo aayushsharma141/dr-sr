@@ -150,26 +150,6 @@ export function ReceptionDashboard({ overview: initialOverview }: ReceptionDashb
     })
   }, [allAppointments, statusFilter, doctorFilter, searchQuery, onlyDelayed])
 
-  // Check in a booked appointment
-  const handleCheckIn = async (appt: Appointment) => {
-    setConflictError(null)
-    try {
-      await updateStatusMutation.mutateAsync({
-        id: appt.id,
-        body: {
-          status: 'ARRIVED' as AppointmentStatus,
-          version_id: appt.version_id,
-        },
-      })
-    } catch (err: unknown) {
-      if (err instanceof Error) {
-        setConflictError(err.message)
-      } else {
-        setConflictError('Failed to check in patient.')
-      }
-    }
-  }
-
   // Cancel an appointment
   const handleConfirmCancel = async () => {
     if (!cancellingAppt || !cancelReason.trim()) return
@@ -248,7 +228,7 @@ export function ReceptionDashboard({ overview: initialOverview }: ReceptionDashb
             className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-neutral-900 hover:bg-neutral-800 text-white rounded-lg text-xs font-bold transition-colors shadow-2xs"
           >
             <IconTicket size={16} />
-            Generate Token
+            Check-in &amp; Token
           </Link>
 
           <Link
@@ -731,16 +711,14 @@ export function ReceptionDashboard({ overview: initialOverview }: ReceptionDashb
                         {/* Actions */}
                         <td className="py-3.5 px-4 text-right">
                           <div className="flex items-center justify-end gap-1.5">
-                            {/* Check-in for Booked */}
+                            {/* Check-in happens at Check-in & Token, with this booking already chosen */}
                             {appt.status === 'BOOKED' && (
-                              <button
-                                type="button"
-                                onClick={() => handleCheckIn(appt)}
-                                disabled={updateStatusMutation.isPending}
+                              <Link
+                                to={`/reception/tokens?patient_id=${appt.patient_id}&appointment_id=${appt.id}`}
                                 className="px-2.5 py-1 bg-amber-600 hover:bg-amber-700 text-white rounded-md text-xs font-bold transition-colors shadow-2xs"
                               >
                                 Check In
-                              </button>
+                              </Link>
                             )}
 
                             {/* Proceed to Billing for Done */}

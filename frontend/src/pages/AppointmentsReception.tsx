@@ -84,7 +84,7 @@ function FollowUpVisits() {
       <div className="flex flex-col gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-xs sm:flex-row sm:items-center sm:justify-between sm:p-5">
         <div>
           <h2 id="followups-heading" className="text-lg font-bold text-slate-900">
-            Follow-up & Visits
+            Prescription return dates
           </h2>
           <p className="mt-1 max-w-2xl text-sm text-slate-600">
             Return dates recorded on your prescriptions. These are clinical follow-up reminders,
@@ -225,18 +225,26 @@ function FollowUpVisits() {
   )
 }
 
+/** Check-in happens at Check-in & Token, which opens with this patient and booking chosen. */
+function CheckInLink({ appt }: { appt: Appointment }) {
+  return (
+    <Link
+      to={`/reception/tokens?patient_id=${appt.patient_id}&appointment_id=${appt.id}`}
+      className="inline-flex min-h-9 items-center rounded-lg bg-amber-600 px-3 text-xs font-semibold text-white shadow-xs hover:bg-amber-700"
+    >
+      Check In
+    </Link>
+  )
+}
+
 /** The action a receptionist can take on one booking, given where the patient is now. */
 function RowActions({
   appt,
-  busy,
-  onMarkArrived,
   onMarkNoShow,
   onCancel,
   showCallCabin = false,
 }: {
   appt: Appointment
-  busy: boolean
-  onMarkArrived: () => void
   onMarkNoShow: () => void
   onCancel: () => void
   /** A doctor viewing their own schedule can jump to the cabin for a waiting patient. */
@@ -246,9 +254,7 @@ function RowActions({
     case 'BOOKED':
       return (
         <div className="flex flex-wrap justify-end gap-2">
-          <button type="button" onClick={onMarkArrived} disabled={busy} className="min-h-9 rounded-lg bg-amber-600 px-3 text-xs font-semibold text-white shadow-xs hover:bg-amber-700 disabled:opacity-50">
-            Mark Arrived
-          </button>
+          <CheckInLink appt={appt} />
           <button type="button" onClick={onMarkNoShow} className={SECONDARY_BUTTON}>No-Show</button>
           <button type="button" onClick={onCancel} className={SECONDARY_BUTTON}>Cancel</button>
         </div>
@@ -271,9 +277,7 @@ function RowActions({
       // A patient marked not arrived can still check in late, the same day.
       return (
         <div className="flex justify-end">
-          <button type="button" onClick={onMarkArrived} disabled={busy} className="min-h-9 rounded-lg bg-amber-600 px-3 text-xs font-semibold text-white shadow-xs hover:bg-amber-700 disabled:opacity-50">
-            Mark Arrived
-          </button>
+          <CheckInLink appt={appt} />
         </div>
       )
     case 'IN_CONSULTATION':
@@ -298,10 +302,21 @@ export function AppointmentsReception() {
   const isDoctor = me?.role === 'DOCTOR'
   const [searchParams, setSearchParams] = useSearchParams()
   const requestedTab = searchParams.get('tab')
-  const activeTab = requestedTab === 'followup' && me?.permissions.includes('prescription:read') ? 'followup' : 'today'
   const canManageAppointments = me?.permissions.includes('appointment:write') === true
   const canViewFollowUps = me?.permissions.includes('prescription:read') === true
+  // Reception sees only Appointments here. A doctor arrives from the Follow-ups sidebar tab and
+  // can switch to Schedule (bookings by date); their live queue for today is My Queue.
+  const activeTab: 'today' | 'followup' =
+    canViewFollowUps && (requestedTab === 'followup' || (isDoctor && requestedTab !== 'today')) ? 'followup' : 'today'
   const selectTab = (tab: 'today' | 'followup') => setSearchParams({ tab })
+  const todayLabel = isDoctor ? 'Schedule' : 'Appointments'
+  const pageTitle = activeTab === 'followup' ? 'Follow-ups' : todayLabel
+  const pageDescription =
+    activeTab === 'followup'
+      ? 'Return dates recorded on your prescriptions.'
+      : isDoctor
+        ? 'Bookings by date and doctor. Your live queue for today is on My Queue.'
+        : 'Bookings by date and doctor: who is booked, waiting, not arrived or cancelled. Patients are checked in at Check-in & Token.'
   const [selectedDate, setSelectedDate] = useState(istToday)
   const [selectedDoctorId, setSelectedDoctorId] = useState<number | undefined>(undefined)
   const [emergencyHold, setEmergencyHold] = useState(false)
@@ -377,8 +392,8 @@ export function AppointmentsReception() {
       <div className="space-y-5">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h1 className="text-xl font-bold tracking-tight text-slate-900">Appointments</h1>
-            <p className="mt-0.5 text-sm text-slate-600">Today&apos;s bookings by doctor. Mark arrivals, no-shows and cancellations.</p>
+            <h1 className="text-xl font-bold tracking-tight text-slate-900">{pageTitle}</h1>
+            <p className="mt-0.5 text-sm text-slate-600">{pageDescription}</p>
           </div>
           {canManageAppointments ? (
             <div className="flex flex-wrap gap-2">
@@ -394,7 +409,7 @@ export function AppointmentsReception() {
                 className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-[#124832] px-4 text-sm font-semibold text-white shadow-xs hover:bg-[#0D3822]"
               >
                 <IconTicket className="h-4 w-4" />
-                Token desk
+                Check-in &amp; Token
               </Link>
             </div>
           ) : (
@@ -402,19 +417,9 @@ export function AppointmentsReception() {
           )}
         </div>
 
-        <div role="tablist" aria-label="Appointment workspace" className="flex flex-wrap gap-2 border-b border-slate-200">
-          <button
-            type="button"
-            role="tab"
-            id="appointments-tab-today"
-            aria-controls="appointments-panel-today"
-            aria-selected={activeTab === 'today'}
-            onClick={() => selectTab('today')}
-            className={`min-h-11 border-b-2 px-4 text-sm font-semibold ${activeTab === 'today' ? 'border-[#C39A35] text-[#5D0B26]' : 'border-transparent text-slate-600 hover:text-[#5D0B26]'}`}
-          >
-            Today&apos;s Queue
-          </button>
-          {canViewFollowUps && (
+        {/* Tabs only when there is a choice: reception has a single view here. */}
+        {canViewFollowUps && (
+          <div role="tablist" aria-label="Appointment workspace" className="flex flex-wrap gap-2 border-b border-slate-200">
             <button
               type="button"
               role="tab"
@@ -426,11 +431,27 @@ export function AppointmentsReception() {
             >
               Follow-ups
             </button>
-          )}
-        </div>
+            <button
+              type="button"
+              role="tab"
+              id="appointments-tab-today"
+              aria-controls="appointments-panel-today"
+              aria-selected={activeTab === 'today'}
+              onClick={() => selectTab('today')}
+              className={`min-h-11 border-b-2 px-4 text-sm font-semibold ${activeTab === 'today' ? 'border-[#C39A35] text-[#5D0B26]' : 'border-transparent text-slate-600 hover:text-[#5D0B26]'}`}
+            >
+              {todayLabel}
+            </button>
+          </div>
+        )}
 
         {activeTab === 'today' ? (
-          <div id="appointments-panel-today" role="tabpanel" aria-labelledby="appointments-tab-today" className="space-y-4">
+          <div
+            id="appointments-panel-today"
+            role={canViewFollowUps ? 'tabpanel' : undefined}
+            aria-labelledby={canViewFollowUps ? 'appointments-tab-today' : undefined}
+            className="space-y-4"
+          >
             {conflictError && (
               <ConflictBanner
                 onReload={() => {
@@ -615,8 +636,6 @@ export function AppointmentsReception() {
                             {canManageAppointments ? (
                               <RowActions
                                 appt={appt}
-                                busy={updateStatusMutation.isPending}
-                                onMarkArrived={() => handleUpdateStatus(appt, 'ARRIVED')}
                                 onMarkNoShow={() => handleUpdateStatus(appt, 'NO_SHOW')}
                                 onCancel={() => setCancellingAppt(appt)}
                                 showCallCabin={isDoctor}

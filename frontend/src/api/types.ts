@@ -742,6 +742,26 @@ export type ConsultationStatus = 'WAITING' | 'IN_CONSULTATION' | 'COMPLETED' | '
 /** How an appointment was made. Empty when it was not recorded. */
 export type AppointmentSource = 'PHONE' | 'WALK_IN'
 
+/** Visit type of one consultation (OD-22-05). Recorded only; it never sets the fee. */
+export type VisitKind = 'NEW' | 'FOLLOW_UP'
+
+/** Queue classification set by reception (OD-22-06). It never changes the token. */
+export type PriorityLevel = 'NORMAL' | 'PRIORITY' | 'EMERGENCY'
+
+/** Who referred the patient for this visit (OD-22-16). */
+export type ReferralSource = 'SELF' | 'DOCTOR' | 'PERSONAL' | 'ORGANIZATION' | 'OTHER'
+
+/** What reception confirms at the check-in desk (phase 22). */
+export interface CheckInDetails {
+  referral_source: ReferralSource
+  /** Required for DOCTOR, PERSONAL and ORGANIZATION. */
+  referrer_name?: string | null
+  visit_kind?: VisitKind | null
+  priority_level?: PriorityLevel
+  /** Required for PRIORITY and EMERGENCY. */
+  priority_reason?: string | null
+}
+
 export interface Appointment {
   id: number
   /** Department (specialty) chosen at booking; null for appointments booked before it existed. */
@@ -767,6 +787,15 @@ export interface Appointment {
   visit_id?: number | null
   consultation_status?: ConsultationStatus | null
   rescheduled_from_id?: number | null
+  visit_kind?: VisitKind | null
+  priority_level?: PriorityLevel
+  priority_reason?: string | null
+  priority_updated_at?: string | null
+  emergency_alerted_at?: string | null
+  alert_acknowledged_at?: string | null
+  /** The visit's Referred By; sent on check-in responses only. */
+  referral_source?: ReferralSource | null
+  referrer_name?: string | null
   version_id: number
   created_at: string
   updated_at: string
@@ -785,7 +814,7 @@ export interface AppointmentCreate {
 }
 
 /** A walk-in: booked for today and checked in at once, with its token. */
-export interface WalkInCreate {
+export interface WalkInCreate extends CheckInDetails {
   patient_id: number
   department_id: number
   doctor_id: number
@@ -793,7 +822,29 @@ export interface WalkInCreate {
   override_reason?: string | null
 }
 
-export interface CheckInRequest {
+export interface CheckInRequest extends CheckInDetails {
+  version_id: number
+}
+
+/** Register a first-time patient and check them in, in one transaction (OD-22-03). */
+export interface NewPatientCheckIn extends CheckInDetails {
+  patient: PatientCreate
+  department_id: number
+  doctor_id: number
+  notes?: string | null
+}
+
+/** Move a booking to another date, or change its expected time (RF-12). */
+export interface RescheduleRequest {
+  version_id: number
+  appointment_date: string
+  expected_time?: string | null
+  reason?: string | null
+}
+
+export interface PriorityUpdate {
+  priority_level: PriorityLevel
+  priority_reason?: string | null
   version_id: number
 }
 
@@ -822,6 +873,12 @@ export interface DoctorQueueItem {
   consultation_status?: ConsultationStatus | null
   status_updated_at: string
   notes: string | null
+  visit_kind?: VisitKind | null
+  priority_level?: PriorityLevel
+  priority_reason?: string | null
+  emergency_alerted_at?: string | null
+  alert_acknowledged_at?: string | null
+  check_in_at?: string | null
   version_id: number
 }
 

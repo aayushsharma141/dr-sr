@@ -16,19 +16,29 @@ from kalyan_api.core.principal import (
     get_current_settings,
 )
 from kalyan_api.db.session import SessionDep
-from kalyan_api.models import Appointment, AppointmentStatus, ConsultationStatus, Doctor
+from kalyan_api.models import (
+    Appointment,
+    AppointmentStatus,
+    ConsultationStatus,
+    Doctor,
+    PriorityLevel,
+    Visit,
+)
 from kalyan_api.schemas.appointments import (
     AppointmentCreate,
     AppointmentListResponse,
     AppointmentRead,
     AppointmentStatusUpdate,
+    CheckInDetailsIn,
     CheckInRequest,
     DoctorQueueItem,
     DoctorQueueResponse,
+    NewPatientCheckIn,
+    PriorityUpdate,
     RescheduleRequest,
     WalkInCreate,
 )
-from kalyan_api.services import audit_service, booking_service
+from kalyan_api.services import audit_service, booking_service, patient_service
 from kalyan_api.services.appointment_service import validate_status_update
 from kalyan_api.services.audit_service import AuditAction
 
@@ -42,8 +52,19 @@ router = APIRouter(prefix="/appointments", tags=["appointments"])
 doctor_router = APIRouter(prefix="/doctor", tags=["doctor"])
 
 
-def _to_read_schema(appt: Appointment) -> AppointmentRead:
-    """Format an Appointment entity to its read schema."""
+def _check_in_details(payload: CheckInDetailsIn) -> booking_service.CheckInDetails:
+    """The check-in desk's confirmations, as the booking service takes them (phase 22)."""
+    return booking_service.CheckInDetails(
+        referral_source=payload.referral_source.value,
+        referrer_name=payload.referrer_name,
+        visit_kind=payload.visit_kind.value if payload.visit_kind else None,
+        priority_level=payload.priority_level.value,
+        priority_reason=payload.priority_reason,
+    )
+
+
+def _to_read_schema(appt: Appointment, visit: Visit | None = None) -> AppointmentRead:
+    """Format an Appointment entity to its read schema; the visit adds its referral."""
     return AppointmentRead(
         id=appt.id,
         patient_id=appt.patient_id,
@@ -66,6 +87,14 @@ def _to_read_schema(appt: Appointment) -> AppointmentRead:
         visit_id=appt.visit_id,
         consultation_status=appt.consultation_status,
         rescheduled_from_id=appt.rescheduled_from_id,
+        visit_kind=appt.visit_kind,
+        priority_level=appt.priority_level,
+        priority_reason=appt.priority_reason,
+        priority_updated_at=appt.priority_updated_at,
+        emergency_alerted_at=appt.emergency_alerted_at,
+        alert_acknowledged_at=appt.alert_acknowledged_at,
+        referral_source=visit.referral_source if visit is not None else None,
+        referrer_name=visit.referrer_name if visit is not None else None,
         version_id=appt.version_id,
         created_at=appt.created_at,
         updated_at=appt.updated_at,
@@ -118,6 +147,11 @@ def _record_check_in(session, ctx, result: booking_service.CheckInResult, before
             "consultation_status": appt.consultation_status,
             "token_number": appt.token_number,
             "visit_id": appt.visit_id,
+            "visit_kind": appt.visit_kind,
+            "priority_level": appt.priority_level,
+            "priority_reason": appt.priority_reason,
+            "referral_source": result.visit.referral_source,
+            "referrer_name": result.visit.referrer_name,
             "version_id": appt.version_id,
         },
     )
@@ -193,6 +227,7 @@ def register_walk_in(
         department_id=payload.department_id,
         notes=payload.notes,
         override_reason=payload.override_reason,
+        details=_check_in_details(payload),
     )
     ctx = build_audit_context(request, principal)
     appt = result.appointment
@@ -200,7 +235,50 @@ def register_walk_in(
     # The booking was created with status BOOKED and no token; record it as it was created.
     _record_booking_created(session, ctx, appt, override_text)
     _record_check_in(session, ctx, result, before={"status": AppointmentStatus.BOOKED.value})
-    return _to_read_schema(appt)
+    return _to_read_schema(appt, result.visit)
+
+
+@router.post(
+    "/walk-in/new-patient",
+    response_model=AppointmentRead,
+    status_code=201,
+    # Registers the patient and checks them in: both rights, in one policy marker.
+    dependencies=[Depends(require(Permission.PATIENT_CREATE, Permission.VISIT_WRITE))],
+)
+def check_in_new_patient(
+    payload: NewPatientCheckIn,
+    request: Request,
+    session: SessionDep,
+    principal: Principal = Depends(current_principal),
+) -> AppointmentRead:
+    """Register a first-time patient and check them in, all or nothing (OD-22-03).
+
+    One transaction: permanent URN and patient record, today's visit, the consultation with
+    the chosen doctor and its token. If any step is refused, nothing is saved.
+    """
+    patient = patient_service.create_patient(session, payload.patient)
+    ctx = build_audit_context(request, principal)
+    audit_service.record(
+        session,
+        ctx,
+        AuditAction.PATIENT_REGISTERED,
+        "PATIENT",
+        str(patient.id),
+        after=patient_service.registration_audit_after(patient),
+    )
+    result = booking_service.walk_in(
+        session,
+        principal,
+        patient_id=patient.id,
+        doctor_id=payload.doctor_id,
+        department_id=payload.department_id,
+        notes=payload.notes,
+        details=_check_in_details(payload),
+    )
+    appt = result.appointment
+    _record_booking_created(session, ctx, appt)
+    _record_check_in(session, ctx, result, before={"status": AppointmentStatus.BOOKED.value})
+    return _to_read_schema(appt, result.visit)
 
 
 @router.post(
@@ -224,8 +302,58 @@ def check_in_appointment(
     require_version(appt, payload.version_id, label="appointment")
     before = {"status": appt.status, "version_id": appt.version_id}
 
-    result = booking_service.check_in(session, appt, principal)
+    result = booking_service.check_in(session, appt, principal, _check_in_details(payload))
     _record_check_in(session, build_audit_context(request, principal), result, before=before)
+    return _to_read_schema(appt, result.visit)
+
+
+@router.patch(
+    "/{id}/priority",
+    response_model=AppointmentRead,
+    dependencies=[Depends(require(Permission.VISIT_WRITE))],
+)
+def update_priority(
+    id: int,
+    payload: PriorityUpdate,
+    request: Request,
+    session: SessionDep,
+    principal: Principal = Depends(current_principal),
+) -> AppointmentRead:
+    """Mark a checked-in patient Normal, Priority or Emergency, with a reason (OD-22-06).
+
+    The token and the place in the consultation are untouched. Each change is kept in the
+    classification history and the audit log; Emergency raises an alert for the doctor.
+    """
+    appt = booking_service.lock_appointment(session, id)
+    if not appt:
+        raise ApiError(
+            status_code=404, code="appointment_not_found", message="Appointment not found."
+        )
+    require_version(appt, payload.version_id, label="appointment")
+    before = {
+        "priority_level": appt.priority_level,
+        "priority_reason": appt.priority_reason,
+        "version_id": appt.version_id,
+    }
+    changed = booking_service.classify(
+        session, appt, principal, payload.priority_level.value, payload.priority_reason
+    )
+    if changed:
+        audit_service.record(
+            session,
+            build_audit_context(request, principal),
+            action=AuditAction.APPOINTMENT_PRIORITY_CHANGED,
+            entity_type="appointment",
+            entity_id=appt.id,
+            before=before,
+            after={
+                "priority_level": appt.priority_level,
+                "priority_reason": appt.priority_reason,
+                "emergency": appt.priority_level == PriorityLevel.EMERGENCY.value,
+                "version_id": appt.version_id,
+            },
+            reason=appt.priority_reason,
+        )
     return _to_read_schema(appt)
 
 
@@ -516,6 +644,12 @@ def get_doctor_queue(
             consultation_status=a.consultation_status,
             status_updated_at=a.status_updated_at,
             notes=a.notes,
+            visit_kind=a.visit_kind,
+            priority_level=a.priority_level,
+            priority_reason=a.priority_reason,
+            emergency_alerted_at=a.emergency_alerted_at,
+            alert_acknowledged_at=a.alert_acknowledged_at,
+            check_in_at=a.check_in_at,
             version_id=a.version_id,
         )
         if a.consultation_status == ConsultationStatus.IN_CONSULTATION.value:

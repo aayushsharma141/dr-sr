@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useClinicBranding } from '../api/branding'
 import { useMyDepartments, type SpecialtyCode } from '../api/specialty'
+import { useMyUnfinishedConsultations } from '../api/consultations'
 import { Link, useLocation, useNavigate } from 'react-router'
 import { useLatestIntegrityRun } from '../api/integrity'
 import { useLogout } from '../api/queries'
@@ -14,6 +15,7 @@ import {
   findAdminModuleForPath,
 } from '../admin/modules'
 import {
+  IconBuildingHospital,
   IconChevronDown,
   IconDatabase,
   IconHistory,
@@ -22,6 +24,7 @@ import {
   IconLayoutSidebarLeftExpand,
   IconPrinter,
   IconReceipt,
+  IconReportMedical,
   IconServer,
   IconSettings,
   IconShieldCheck,
@@ -39,6 +42,8 @@ const ADMIN_MODULE_ICONS: Record<string, SidebarIcon> = {
   'hospital-settings': IconSettings,
   'print-templates': IconPrinter,
   'doctors-fees': IconStethoscope,
+  departments: IconBuildingHospital,
+  'patient-records': IconReportMedical,
   'patient-correct': IconUserEdit,
   'billing-reversals': IconReceipt,
   'pending-dues': IconWallet,
@@ -121,14 +126,8 @@ type NavigationIcon =
   | 'calendar'
   | 'calendar-check'
   | 'rupee'
-  | 'chart'
-  | 'database'
-  | 'users'
-  | 'backup'
+  | 'consultation'
   | 'settings'
-  | 'audit'
-  | 'shield'
-  | 'server'
 
 interface NavigationItem {
   key: string
@@ -138,76 +137,91 @@ interface NavigationItem {
   specialty?: SpecialtyCode
   path: string
   icon: NavigationIcon
-  roles: Role[]
-  activePaths?: string[]
-  sectionStart?: string
 }
 
-const ALL_ROLES: Role[] = ['ADMIN', 'RECEPTION', 'DOCTOR']
-const ADMIN_RECEPTION: Role[] = ['ADMIN', 'RECEPTION']
-const ADMIN_ONLY: Role[] = ['ADMIN']
-const DOCTOR_ONLY: Role[] = ['DOCTOR']
-
-const NAVIGATION: NavigationItem[] = [
+/*
+ * One menu per role, in the order of the working day. Each job has exactly one tab, and each
+ * tab's label is the title of the page it opens. The Administrator's menu is the module
+ * registry in admin/modules.ts, rendered by renderAdminSidebar.
+ */
+// Reception order set by the owner on 2026-11-15 (OD-22-01): Check-in & Token first. New
+// patients are registered at check-in; the full registration form opens from Check-in & Token
+// and Patient Records. Waiting Room, Receipts and Reports join as their pages are built.
+const RECEPTION_NAVIGATION: NavigationItem[] = [
+  {
+    key: 'check-in',
+    label: 'Check-in & Token',
+    description: 'Check in a new or existing patient, or a booking for today, and issue the token',
+    path: '/reception/tokens',
+    icon: 'ticket',
+  },
   {
     key: 'dashboard',
     label: 'Dashboard',
-    description: 'Role-specific clinic overview',
-    path: '',
+    description: "Today's overview: the queue, doctor workload and what needs attention",
+    path: '/reception',
     icon: 'dashboard',
-    roles: ALL_ROLES,
-  },
-  // Patient & Clinical Workflow
-  {
-    key: 'patient-registration',
-    label: 'Patient Registration',
-    description: 'Register a new patient and issue a URN',
-    path: '/reception/patients/new',
-    icon: 'user-plus',
-    roles: ['RECEPTION'],
-    sectionStart: 'PATIENT & CLINICAL WORKFLOW',
-  },
-  {
-    key: 'token-generation',
-    label: 'Token Desk',
-    description: 'Register visit and issue queue token',
-    path: '/reception/tokens',
-    icon: 'ticket',
-    roles: ['RECEPTION', 'ADMIN'],
   },
   {
     key: 'patient-records',
     label: 'Patient Records',
-    description: 'Search and inspect patient records',
+    description: 'Search, view, edit and print patient records; full registration form',
     path: '/reception/patients',
     icon: 'folder',
-    roles: ALL_ROLES,
-    sectionStart: 'PATIENT & CLINICAL WORKFLOW',
-  },
-  {
-    key: 'physiotherapy',
-    label: 'Physiotherapy Treatment',
-    description: 'Treatment plans and session records',
-    path: '/doctor/treatment-plans',
-    icon: 'activity',
-    roles: DOCTOR_ONLY,
-    specialty: 'PHYSIOTHERAPY',
   },
   {
     key: 'appointments',
     label: 'Appointments',
-    description: "Daily token schedule and waiting hall queue",
-    path: '/reception/appointments?tab=today',
-    icon: 'ticket',
-    roles: ALL_ROLES,
+    description: 'Bookings by date and doctor: who is booked, waiting, not arrived or cancelled',
+    path: '/reception/appointments',
+    icon: 'calendar',
+  },
+  {
+    key: 'billing',
+    label: 'Billing & Payments',
+    description: 'Collect fees at checkout, issue receipts, see dues and close visits',
+    path: '/reception/billing',
+    icon: 'rupee',
+  },
+]
+
+const DOCTOR_NAVIGATION: NavigationItem[] = [
+  {
+    key: 'my-queue',
+    label: 'My Queue',
+    description: 'Your patients for today: call the next one and start the consultation',
+    path: '/doctor',
+    icon: 'dashboard',
+  },
+  {
+    // Shown only while a consultation is open or one is left unfinished; see visibleItems.
+    key: 'consultation',
+    label: 'Continue Consultation',
+    description: 'Return to the consultation you have open or left unfinished',
+    path: '/doctor/encounters',
+    icon: 'consultation',
   },
   {
     key: 'followups',
-    label: 'Follow-up & Visits',
-    description: 'Prescription-directed clinical follow-ups',
+    label: 'Follow-ups',
+    description: 'Return dates recorded on your prescriptions',
     path: '/reception/appointments?tab=followup',
     icon: 'calendar-check',
-    roles: DOCTOR_ONLY,
+  },
+  {
+    key: 'physiotherapy',
+    label: 'Physiotherapy Treatment',
+    description: 'Treatment packages and session records',
+    path: '/doctor/treatment-plans',
+    icon: 'activity',
+    specialty: 'PHYSIOTHERAPY',
+  },
+  {
+    key: 'patient-records',
+    label: 'Patient Records',
+    description: 'Search and view patient records',
+    path: '/reception/patients',
+    icon: 'folder',
   },
   {
     key: 'doctor-settings',
@@ -215,93 +229,6 @@ const NAVIGATION: NavigationItem[] = [
     description: 'Personal consultation fee and preferences',
     path: '/doctor/settings',
     icon: 'settings',
-    roles: DOCTOR_ONLY,
-  },
-  {
-
-    key: 'billing',
-    label: 'Billing & Payments',
-    description: 'Patient checkout, collections, receipts and dues',
-    path: '/reception/dues',
-    icon: 'rupee',
-    roles: ADMIN_RECEPTION,
-    activePaths: ['/reception/dues', '/reception/billing'],
-  },
-  // Hospital Administration
-  {
-    key: 'hospital-configuration',
-    label: 'Hospital Configuration',
-    description: 'Clinic identity, address, contact details and consultation validity',
-    path: '/admin/settings',
-    icon: 'settings',
-    roles: ADMIN_ONLY,
-    activePaths: ['/admin/settings'],
-    sectionStart: 'HOSPITAL ADMINISTRATION',
-  },
-  {
-    key: 'doctor-clinical',
-    label: 'Doctor & Clinical Configuration',
-    description: 'Doctor records, registration details and fee schedules',
-    path: '/admin/doctors',
-    icon: 'database',
-    roles: ADMIN_ONLY,
-    activePaths: ['/admin/doctors', '/admin/departments'],
-  },
-  {
-    key: 'billing-financial',
-    label: 'Billing & Financial',
-    description: 'Receipt numbering cycle, fee schedules and payment reversals',
-    path: '/admin/billing',
-    icon: 'rupee',
-    roles: ADMIN_ONLY,
-    activePaths: ['/admin/billing'],
-  },
-  // System Administration
-  {
-    key: 'user-authority',
-    label: 'User & Authority',
-    description: 'Staff accounts, roles and permission matrix',
-    path: '/admin/users',
-    icon: 'users',
-    roles: ADMIN_ONLY,
-    activePaths: ['/admin/users', '/admin/roles'],
-    sectionStart: 'SYSTEM ADMINISTRATION',
-  },
-  {
-    key: 'security-access',
-    label: 'Security & Access',
-    description: 'Active sessions and security policy',
-    path: '/admin/security',
-    icon: 'shield',
-    roles: ADMIN_ONLY,
-    activePaths: ['/admin/security'],
-  },
-  {
-    key: 'audit-compliance',
-    label: 'Audit & Compliance',
-    description: 'Search immutable event audit trail',
-    path: '/admin/audit',
-    icon: 'audit',
-    roles: ADMIN_ONLY,
-    activePaths: ['/admin/audit'],
-  },
-  {
-    key: 'backup-data',
-    label: 'Backup, Restore & Data',
-    description: 'Backup archives, recovery and integrity checks',
-    path: '/admin/backups',
-    icon: 'backup',
-    roles: ADMIN_ONLY,
-    activePaths: ['/admin/backups', '/admin/integrity'],
-  },
-  {
-    key: 'system-health',
-    label: 'System Health & Maintenance',
-    description: 'Server revision, uptime and storage',
-    path: '/admin/system',
-    icon: 'server',
-    roles: ADMIN_ONLY,
-    activePaths: ['/admin/system'],
   },
 ]
 
@@ -311,38 +238,30 @@ function dashboardPath(role: Role) {
   return '/reception'
 }
 
-function navigationHref(item: NavigationItem, role: Role) {
-  return item.key === 'dashboard' ? dashboardPath(role) : item.path
-}
-
-function isNavigationItemActive(
-  item: NavigationItem,
-  pathname: string,
-  search: string,
-  role: Role,
-) {
-  if (item.key === 'dashboard') return pathname === dashboardPath(role)
-
-  if (item.key === 'appointments' || item.key === 'followups') {
-    if (pathname !== '/reception/appointments') return false
-    const tab = new URLSearchParams(search).get('tab') || 'today'
-    if (item.key === 'followups') return role === 'DOCTOR' && tab === 'followup'
-    return tab !== 'followup' || role !== 'DOCTOR'
+/** True when the page at `pathname` belongs to this sidebar item. */
+function isNavigationItemActive(item: NavigationItem, pathname: string) {
+  switch (item.key) {
+    case 'dashboard':
+      return pathname === item.path
+    case 'my-queue':
+      // A prescription is written from a patient in the queue.
+      return pathname === item.path || pathname.startsWith('/doctor/prescriptions/')
+    case 'patient-records':
+      // The full registration form opens from Patient Records (and from Check-in & Token).
+      return (
+        pathname === '/reception/patients' ||
+        pathname === '/reception/patients/new' ||
+        /^\/reception\/patients\/\d+(?:\/print|\/edit)?$/.test(pathname)
+      )
+    case 'appointments':
+    case 'followups':
+      // Reception sees only Appointments on this page and a doctor only Follow-ups.
+      return pathname === '/reception/appointments'
+    default: {
+      const base = item.path.split('?')[0]
+      return pathname === base || pathname.startsWith(`${base}/`)
+    }
   }
-
-  if (item.key === 'patient-registration') {
-    return pathname === '/reception/patients/new'
-  }
-
-  if (item.key === 'patient-records') {
-    return (
-      pathname === '/reception/patients' ||
-      /^\/reception\/patients\/\d+(?:\/print|\/edit)?$/.test(pathname)
-    )
-  }
-
-  const paths = item.activePaths ?? [item.path]
-  return paths.some((p) => pathname === p || pathname.startsWith(`${p}/`))
 }
 
 function NavIcon({ name }: { name: NavigationIcon }) {
@@ -422,62 +341,13 @@ function NavIcon({ name }: { name: NavigationIcon }) {
           <path d="M6 3h12M6 8h12M6 13l8.5 8M6 13h3a4 4 0 0 0 0-8" />
         </svg>
       )
-    case 'chart':
+    case 'consultation':
       return (
         <svg {...shared}>
-          <line x1="18" y1="20" x2="18" y2="10" />
-          <line x1="12" y1="20" x2="12" y2="4" />
-          <line x1="6" y1="20" x2="6" y2="14" />
-        </svg>
-      )
-    case 'database':
-      return (
-        <svg {...shared}>
-          <ellipse cx="12" cy="5" rx="9" ry="3" />
-          <path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3" />
-          <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5" />
-        </svg>
-      )
-    case 'users':
-      return (
-        <svg {...shared}>
-          <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
-          <circle cx="9" cy="7" r="4" />
-          <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
-          <path d="M16 3.13a4 4 0 0 1 0 7.75" />
-        </svg>
-      )
-    case 'backup':
-      return (
-        <svg {...shared}>
-          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-          <polyline points="17 8 12 3 7 8" />
-          <line x1="12" y1="3" x2="12" y2="15" />
-        </svg>
-      )
-    case 'audit':
-      return (
-        <svg {...shared}>
-          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-          <polyline points="14 2 14 8 20 8" />
-          <line x1="16" y1="13" x2="8" y2="13" />
-          <line x1="16" y1="17" x2="8" y2="17" />
-          <polyline points="10 9 9 9 8 9" />
-        </svg>
-      )
-    case 'shield':
-      return (
-        <svg {...shared}>
-          <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
-        </svg>
-      )
-    case 'server':
-      return (
-        <svg {...shared}>
-          <rect x="2" y="2" width="20" height="8" rx="2" ry="2" />
-          <rect x="2" y="14" width="20" height="8" rx="2" ry="2" />
-          <line x1="6" y1="6" x2="6.01" y2="6" />
-          <line x1="6" y1="18" x2="6.01" y2="18" />
+          <path d="M9 4H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2h-2" />
+          <rect x="9" y="2" width="6" height="4" rx="1" />
+          <line x1="9" y1="12" x2="15" y2="12" />
+          <line x1="9" y1="16" x2="13" y2="16" />
         </svg>
       )
     case 'settings':
@@ -508,13 +378,13 @@ type Crumb = { label: string; href?: string }
  * The path to the current page, in the same words as the sidebar and the page title.
  * The last crumb also names the browser tab, so every page is told apart in the tab bar.
  */
-function breadcrumbsFor(pathname: string, role: Role): Crumb[] {
-  const crumbs: Crumb[] = [{ label: 'Dashboard', href: dashboardPath(role) }]
+function breadcrumbsFor(pathname: string, search: string, role: Role): Crumb[] {
+  const crumbs: Crumb[] = [{ label: role === 'DOCTOR' ? 'My Queue' : 'Dashboard', href: dashboardPath(role) }]
 
   if (pathname === '/reception/patients/new') {
     crumbs.push({ label: 'Patient Registration' })
   } else if (pathname === '/reception/tokens') {
-    crumbs.push({ label: 'Token Desk' })
+    crumbs.push({ label: 'Check-in & Token' })
   } else if (pathname === '/reception/patients') {
     crumbs.push({ label: 'Patient Records' })
   } else if (/^\/reception\/patients\/\d+$/.test(pathname)) {
@@ -527,14 +397,13 @@ function breadcrumbsFor(pathname: string, role: Role): Crumb[] {
     crumbs.push({ label: 'Patient Records', href: '/reception/patients' })
     crumbs.push({ label: 'Edit Patient' })
   } else if (pathname === '/reception/appointments') {
-    crumbs.push({ label: 'Appointments' })
+    // Same tab rule as the page: a doctor sees Follow-ups unless they chose Schedule.
+    const tab = new URLSearchParams(search).get('tab')
+    crumbs.push({ label: role === 'DOCTOR' ? (tab === 'today' ? 'Schedule' : 'Follow-ups') : 'Appointments' })
   } else if (pathname === '/reception/billing') {
     crumbs.push({ label: 'Billing & Payments' })
-  } else if (pathname === '/reception/dues') {
-    crumbs.push({ label: 'Billing & Payments', href: '/reception/billing' })
-    crumbs.push({ label: 'Pending Dues' })
-  } else if (pathname === '/doctor/treatment-plans') {
-    crumbs.push({ label: 'Treatment Plans' })
+  } else if (pathname === '/doctor/treatment-plans' || /^\/doctor\/treatment-plans\/\d+$/.test(pathname)) {
+    crumbs.push({ label: 'Physiotherapy Treatment' })
   } else if (pathname === '/doctor/encounters/new') {
     crumbs.push({ label: 'New Consultation' })
   } else if (/^\/doctor\/encounters\/\d+$/.test(pathname)) {
@@ -635,20 +504,30 @@ export function AppShell({ name, role, children }: AppShellProps) {
   const roleLabel = role === 'ADMIN' ? 'Administrator' : role === 'RECEPTION' ? 'Reception' : 'Doctor'
 
   useEffect(() => {
-    const crumbs = breadcrumbsFor(location.pathname, role)
+    const crumbs = breadcrumbsFor(location.pathname, location.search, role)
     const page = crumbs[crumbs.length - 1].label
     document.title = `${page} – Kalyan Hospital`
-  }, [location.pathname, role])
+  }, [location.pathname, location.search, role])
+
+  // A doctor's open consultation, or the newest one left unfinished, gets its own sidebar link.
+  const unfinishedConsultations = useMyUnfinishedConsultations(role === 'DOCTOR')
+  const onConsultationPage = location.pathname.startsWith('/doctor/encounters/')
 
   const visibleItems = useMemo(() => {
     const codes = new Set(myDepartments.map((d) => d.code))
-    return NAVIGATION.filter(
-      (item) =>
-        item.roles.includes(role) &&
-        // Until the doctor's departments are known, keep every item rather than hide work.
-        (!item.specialty || role !== 'DOCTOR' || codes.size === 0 || codes.has(item.specialty)),
-    )
-  }, [role, myDepartments])
+    const menu = role === 'DOCTOR' ? DOCTOR_NAVIGATION : RECEPTION_NAVIGATION
+    return menu.filter((item) => {
+      if (item.key === 'consultation') return onConsultationPage || unfinishedConsultations.length > 0
+      // Until the doctor's departments are known, keep every item rather than hide work.
+      return !item.specialty || codes.size === 0 || codes.has(item.specialty)
+    })
+  }, [role, myDepartments, onConsultationPage, unfinishedConsultations.length])
+
+  const navigationHref = (item: NavigationItem) => {
+    if (item.key !== 'consultation') return item.path
+    if (onConsultationPage) return `${location.pathname}${location.search}`
+    return `/doctor/encounters/${unfinishedConsultations[0].id}`
+  }
 
   const handleSignOut = async () => {
     try {
@@ -765,10 +644,13 @@ export function AppShell({ name, role, children }: AppShellProps) {
   const renderAdminSidebar = (isDrawer = false) => {
     const cls = sidebarClasses(isDrawer)
     const iconOnly = !isDrawer && sidebarCollapsed
-    const moduleActive = (path: string | undefined) =>
-      path === '/admin'
-        ? location.pathname === '/admin'
-        : Boolean(path && (location.pathname === path || location.pathname.startsWith(`${path}/`)))
+    // A module path may carry a tab (Dues opens /reception/billing?tab=dues); the page decides the match.
+    const moduleActive = (path: string | undefined) => {
+      if (!path) return false
+      const base = path.split('?')[0]
+      if (base === '/admin') return location.pathname === '/admin'
+      return location.pathname === base || location.pathname.startsWith(`${base}/`)
+    }
     return (
       <aside
         aria-label="Primary navigation"
@@ -972,26 +854,23 @@ export function AppShell({ name, role, children }: AppShellProps) {
           className="flex-1 space-y-1 overflow-y-auto px-2 py-4 custom-scrollbar-dark"
         >
           {visibleItems.map((item, index) => {
-            const href = navigationHref(item, role)
-            const active = isNavigationItemActive(item, location.pathname, location.search, role)
-
+            const href = navigationHref(item)
+            const active = isNavigationItemActive(item, location.pathname)
+            // Reception's menu is all desk work, under one heading from the top. A doctor's first
+            // item is home; the rest follow the day's work under one heading.
             const sectionLabel =
-              index === 1
-                ? role === 'RECEPTION'
+              role === 'RECEPTION'
+                ? index === 0
                   ? 'RECEPTION DESK'
-                  : 'PATIENT & CLINICAL WORKFLOW'
-                : item.sectionStart && item.sectionStart !== 'PATIENT & CLINICAL WORKFLOW'
-                  ? item.sectionStart
                   : null
-
-            const isSectionDivider =
-              item.sectionStart && index > 1 && item.sectionStart !== visibleItems[index - 1]?.sectionStart
+                : index === 1
+                  ? 'PATIENT & CLINICAL WORKFLOW'
+                  : null
+            const draftCount = item.key === 'consultation' ? unfinishedConsultations.length : 0
+            const iconOnly = !isDrawer && sidebarCollapsed
 
             return (
               <div key={item.key}>
-                {isSectionDivider && (
-                  <div className={`mx-2 mb-2 mt-3 border-t border-white/15 ${cls.block}`} />
-                )}
                 {sectionLabel && (
                   <div
                     className={`pb-1.5 pt-2.5 text-xs font-bold uppercase tracking-wider text-rose-200 ${cls.block} px-3`}
@@ -1013,6 +892,15 @@ export function AppShell({ name, role, children }: AppShellProps) {
                   <span className={`truncate ${cls.inline}`}>
                     {item.label}
                   </span>
+                  {draftCount > 1 && (
+                    <span
+                      title={`${draftCount} unfinished consultations; this opens the newest. All of them are listed on My Queue.`}
+                      className={`shrink-0 rounded-full bg-amber-400 px-1.5 py-0.5 text-xs font-bold tabular-nums text-[#5D0B26] ${iconOnly ? 'absolute right-0.5 top-0.5' : `ml-auto ${cls.inline}`}`}
+                    >
+                      <span aria-hidden="true">{draftCount}</span>
+                      <span className="sr-only">, {draftCount} unfinished</span>
+                    </span>
+                  )}
                   {active && (
                     <span
                       aria-hidden="true"

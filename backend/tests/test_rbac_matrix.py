@@ -293,6 +293,10 @@ def test_rbac_matrix_cell(
                 status="BOOKED",
                 created_by_user_id=admin_u.id,
             )
+            if row.path.endswith("/priority"):
+                # Classification applies to a patient already waiting for the doctor.
+                appt.status = "ARRIVED"
+                appt.consultation_status = "WAITING"
             db_session.add(appt)
             db_session.flush()
             target_entity = appt

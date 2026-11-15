@@ -575,7 +575,7 @@ export function PatientRegister() {
                   </>
                 ) : (
                   <>
-                    Register the patient and allocate the Universal Record Number (URN). The queue token is issued at the Token Desk.{' '}
+                    Register the patient and allocate the Universal Record Number (URN). The queue token is issued at Check-in &amp; Token.{' '}
                   </>
                 )}
                 <span className="font-semibold text-[#8E1C3D]">Fields marked * are required.</span>
@@ -598,7 +598,7 @@ export function PatientRegister() {
                 className="inline-flex min-h-10 items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3.5 text-xs font-semibold text-slate-700 shadow-2xs transition-colors hover:border-[#8E1C3D] hover:text-[#5D0B26]"
               >
                 <IconTicket className="h-4 w-4 text-[#8E1C3D]" />
-                Token Desk
+                Check-in &amp; Token
               </Link>
             )}
             <Link
@@ -750,10 +750,10 @@ export function PatientRegister() {
                 View Patient File &amp; Card
               </button>
               <Link
-                to="/reception/tokens"
+                to={`/reception/tokens?patient_id=${createdPatient.id}`}
                 className="inline-flex min-h-11 items-center justify-center rounded-lg border border-[#8E1C3D] bg-white px-4 text-sm font-semibold text-[#5D0B26] transition-colors hover:bg-[#FBF5F7] cursor-pointer"
               >
-                Issue Queue Token at Token Desk
+                Check In &amp; Issue Token
               </Link>
               <Link
                 to={`/reception/patients/${createdPatient.id}/print`}
@@ -1009,7 +1009,7 @@ export function PatientRegister() {
 
                       <div className="sm:col-span-5">
                         <span className={LABEL_CLASS}>Sex *</span>
-                        {/* Segmented like Visit Type, so the two options never wrap in a narrow column. */}
+                        {/* Segmented, so Male / Female / Other stay on one line in a narrow column. */}
                         <div className="flex gap-1 rounded-lg border border-slate-300 bg-slate-100/70 p-1">
                           <label
                             className={`flex min-h-9 flex-1 cursor-pointer items-center justify-center gap-1.5 rounded-md text-xs font-bold transition-colors ${
@@ -1046,26 +1046,23 @@ export function PatientRegister() {
                             />
                             Female
                           </label>
-                          {/* Registration offers Male / Female only; a record already saved as Other keeps it. */}
-                          {baseline?.gender === 'O' && (
-                            <label
-                              className={`flex min-h-9 flex-1 cursor-pointer items-center justify-center gap-1.5 rounded-md text-xs font-bold transition-colors ${
-                                gender === 'O'
-                                  ? 'border border-[#C39A35] bg-white text-[#5D0B26] shadow-2xs'
-                                  : 'border border-transparent text-slate-600 hover:text-[#5D0B26]'
-                              }`}
-                            >
-                              <input
-                                type="radio"
-                                name="gender"
-                                value="O"
-                                checked={gender === 'O'}
-                                onChange={() => setGender('O')}
-                                className="h-4 w-4 shrink-0 accent-[#8E1C3D] focus:ring-[#8E1C3D]"
-                              />
-                              Other
-                            </label>
-                          )}
+                          <label
+                            className={`flex min-h-9 flex-1 cursor-pointer items-center justify-center gap-1.5 rounded-md text-xs font-bold transition-colors ${
+                              gender === 'O'
+                                ? 'border border-[#C39A35] bg-white text-[#5D0B26] shadow-2xs'
+                                : 'border border-transparent text-slate-600 hover:text-[#5D0B26]'
+                            }`}
+                          >
+                            <input
+                              type="radio"
+                              name="gender"
+                              value="O"
+                              checked={gender === 'O'}
+                              onChange={() => setGender('O')}
+                              className="h-4 w-4 shrink-0 accent-[#8E1C3D] focus:ring-[#8E1C3D]"
+                            />
+                            Other
+                          </label>
                         </div>
                       </div>
                     </div>

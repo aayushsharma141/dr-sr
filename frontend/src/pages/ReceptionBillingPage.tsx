@@ -334,14 +334,14 @@ export function ReceptionBillingPage() {
                 className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 shadow-2xs"
               >
                 <IconTicket className="h-4 w-4 text-emerald-800" />
-                Waiting Queue / OPD
+                Appointments
               </Link>
               <Link
                 to="/reception/tokens"
                 className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 shadow-2xs"
               >
                 <IconUser className="h-4 w-4 text-slate-500" />
-                Visit &amp; Token Desk
+                Check-in &amp; Token
               </Link>
             </div>
           )}
@@ -589,7 +589,7 @@ export function ReceptionBillingPage() {
                         </div>
                       ) : (
                         <div className="rounded-xl border border-dashed border-slate-200 p-6 text-center text-xs text-slate-500">
-                          Search above to select a patient, or click a patient from the Waiting Queue.
+                          Search above to select a patient, or open a patient from Appointments.
                         </div>
                       )}
                     </section>

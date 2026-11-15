@@ -121,10 +121,13 @@ describe('AppointmentsReception Component', () => {
     expect(screen.getByText('Aarav Kumar')).toBeInTheDocument()
     expect(screen.getByText('KH-2026-0001')).toBeInTheDocument()
     expect(screen.getAllByText('Dr. Madan Mohan Dwivedi')[0]).toBeInTheDocument()
-    expect(screen.getByText('Mark Arrived')).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Check In' })).toBeInTheDocument()
+    // Reception has one view here, named like its sidebar tab, with no tab strip.
+    expect(screen.getByRole('heading', { level: 1, name: 'Appointments' })).toBeInTheDocument()
+    expect(screen.queryByRole('tablist')).not.toBeInTheDocument()
   })
 
-  it('transitions appointment status to ARRIVED when Mark Arrived is clicked', async () => {
+  it('sends Check In to Check-in & Token with the booking chosen, changing nothing here', async () => {
     let patchedBody: unknown = null
 
     const mockFetch = vi.fn().mockImplementation((url: string, init?: RequestInit) => {
@@ -176,19 +179,14 @@ describe('AppointmentsReception Component', () => {
       </QueryClientProvider>,
     )
 
-    await waitFor(() => {
-      expect(screen.getByText('Mark Arrived')).toBeInTheDocument()
-    })
+    const checkIn = await screen.findByRole('link', { name: 'Check In' })
+    expect(checkIn).toHaveAttribute('href', '/reception/tokens?patient_id=101&appointment_id=10')
 
-    await user.click(screen.getByText('Mark Arrived'))
+    await user.click(checkIn)
 
-    await waitFor(() => {
-      expect(patchedBody).toEqual({
-        status: 'ARRIVED',
-        version_id: 1,
-        cancellation_reason: null,
-      })
-    })
+    // The token is issued at the desk, so this screen sends no status change of its own.
+    expect(patchedBody).toBeNull()
+    expect(mockFetch).not.toHaveBeenCalledWith(expect.stringContaining('/status'), expect.anything())
   })
 
   it('opens cancellation reason dialog and cancels appointment', async () => {
@@ -453,6 +451,13 @@ describe('AppointmentsReception Component', () => {
       </QueryClientProvider>,
     )
 
+    // A doctor lands on Follow-ups (their sidebar tab); Schedule is the second tab, not a second queue tab.
+    expect(await screen.findByRole('heading', { level: 1, name: 'Follow-ups' })).toBeInTheDocument()
+    expect(screen.getByRole('tab', { name: 'Follow-ups' })).toHaveAttribute('aria-selected', 'true')
+    expect(screen.queryByRole('tab', { name: 'Appointments' })).not.toBeInTheDocument()
+    await user.click(screen.getByRole('tab', { name: 'Schedule' }))
+    expect(screen.getByRole('heading', { level: 1, name: 'Schedule' })).toBeInTheDocument()
+
     await waitFor(() => {
       expect(screen.getByText(/OPD Cabin Pacing & Doctor Schedule/i)).toBeInTheDocument()
     })
@@ -531,7 +536,10 @@ describe('AppointmentsReception check-in rules (RF-12)', () => {
 
     await screen.findByText('Aarav Kumar')
 
-    expect(screen.getByRole('button', { name: 'Mark Arrived' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Check In' })).toHaveAttribute(
+      'href',
+      `/reception/tokens?patient_id=${booked.patient_id}&appointment_id=${booked.id}`,
+    )
     expect(screen.queryByRole('button', { name: 'No-Show' })).not.toBeInTheDocument()
   })
 

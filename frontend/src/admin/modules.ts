@@ -95,8 +95,32 @@ export const ADMIN_MODULES: readonly AdminModule[] = [
     status: 'available',
     actions: [{ label: 'Doctors & fees', path: '/admin/doctors' }],
   },
+  {
+    id: 'departments',
+    title: 'Departments',
+    navLabel: 'Departments',
+    description: 'Reception departments and which doctors belong to each',
+    group: 'hospital-config',
+    canonicalPath: '/admin/departments',
+    requiredPermission: 'doctor:manage',
+    displayOrder: 5,
+    status: 'available',
+    actions: [{ label: 'Departments', path: '/admin/departments' }],
+  },
 
   // --- 2. Patient & Data Management ---
+  {
+    id: 'patient-records',
+    title: 'Patient Records',
+    navLabel: 'Patient Records',
+    description: 'Search, view and print patient records',
+    group: 'patient-data',
+    canonicalPath: '/reception/patients',
+    requiredPermission: 'patient:read',
+    displayOrder: 6,
+    status: 'available',
+    actions: [{ label: 'Patient records', path: '/reception/patients' }],
+  },
   {
     id: 'patient-correct',
     title: 'Patient Demographic Correction',
@@ -105,7 +129,7 @@ export const ADMIN_MODULES: readonly AdminModule[] = [
     group: 'patient-data',
     canonicalPath: '/admin/patients/correct',
     requiredPermission: 'patient:correct',
-    displayOrder: 5,
+    displayOrder: 7,
     status: 'available',
     actions: [{ label: 'Demographic correction', path: '/admin/patients/correct' }],
   },
@@ -119,21 +143,22 @@ export const ADMIN_MODULES: readonly AdminModule[] = [
     group: 'billing-finance',
     canonicalPath: '/admin/billing',
     requiredPermission: 'billing:read',
-    displayOrder: 6,
+    displayOrder: 8,
     status: 'available',
     actions: [{ label: 'Receipts & reversals', path: '/admin/billing' }],
   },
   {
+    // The Dues tab of Billing & Payments; the sidebar stays on Dues whichever tab is open there.
     id: 'pending-dues',
     title: 'Pending Dues',
     navLabel: 'Dues',
     description: 'Outstanding patient treatment package receivables and instalment tracking',
     group: 'billing-finance',
-    canonicalPath: '/reception/dues',
+    canonicalPath: '/reception/billing?tab=dues',
     requiredPermission: 'billing:read',
-    displayOrder: 7,
+    displayOrder: 9,
     status: 'available',
-    actions: [{ label: 'Pending dues', path: '/reception/dues' }],
+    actions: [{ label: 'Pending dues', path: '/reception/billing?tab=dues' }],
   },
 
   // --- 4. Users, Security & Governance ---
@@ -145,7 +170,7 @@ export const ADMIN_MODULES: readonly AdminModule[] = [
     group: 'users-security',
     canonicalPath: '/admin/users',
     requiredPermission: 'users:read',
-    displayOrder: 8,
+    displayOrder: 10,
     status: 'available',
     actions: [{ label: 'User accounts', path: '/admin/users' }],
   },
@@ -157,7 +182,7 @@ export const ADMIN_MODULES: readonly AdminModule[] = [
     group: 'users-security',
     canonicalPath: '/admin/roles',
     requiredPermission: 'users:read',
-    displayOrder: 9,
+    displayOrder: 11,
     status: 'available',
     actions: [{ label: 'Roles & permissions', path: '/admin/roles' }],
   },
@@ -169,7 +194,7 @@ export const ADMIN_MODULES: readonly AdminModule[] = [
     group: 'users-security',
     canonicalPath: '/admin/security',
     requiredPermission: 'security:read',
-    displayOrder: 10,
+    displayOrder: 12,
     status: 'available',
     actions: [{ label: 'Security & sessions', path: '/admin/security' }],
   },
@@ -181,7 +206,7 @@ export const ADMIN_MODULES: readonly AdminModule[] = [
     group: 'users-security',
     canonicalPath: '/admin/audit',
     requiredPermission: 'audit:read',
-    displayOrder: 11,
+    displayOrder: 13,
     status: 'available',
     actions: [{ label: 'Audit trail', path: '/admin/audit' }],
   },
@@ -195,7 +220,7 @@ export const ADMIN_MODULES: readonly AdminModule[] = [
     group: 'system-maintenance',
     canonicalPath: '/admin/backups',
     requiredPermission: 'backups:read',
-    displayOrder: 12,
+    displayOrder: 14,
     status: 'available',
     actions: [
       { label: 'Backup & restore', path: '/admin/backups' },
@@ -211,7 +236,7 @@ export const ADMIN_MODULES: readonly AdminModule[] = [
     group: 'system-maintenance',
     canonicalPath: '/admin/integrity',
     requiredPermission: 'backups:read',
-    displayOrder: 13,
+    displayOrder: 15,
     status: 'available',
     actions: [{ label: 'Data integrity', path: '/admin/integrity' }],
   },
@@ -223,7 +248,7 @@ export const ADMIN_MODULES: readonly AdminModule[] = [
     group: 'system-maintenance',
     canonicalPath: '/admin/system',
     requiredPermission: 'system:read',
-    displayOrder: 14,
+    displayOrder: 16,
     status: 'available',
     actions: [{ label: 'System health', path: '/admin/system' }],
   },
@@ -240,10 +265,9 @@ export function findAdminModuleForPath(
 ): { module: AdminModule; action: AdminModuleAction } | null {
   for (const module of ADMIN_MODULES) {
     for (const action of module.actions) {
-      if (
-        action.path === pathname ||
-        (action.path !== '/admin' && pathname.startsWith(`${action.path}/`))
-      ) {
+      // An action may open a tab (?tab=dues); the page is what the pathname names.
+      const base = action.path.split('?')[0]
+      if (base === pathname || (base !== '/admin' && pathname.startsWith(`${base}/`))) {
         return { module, action }
       }
     }

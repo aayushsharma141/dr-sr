@@ -1,328 +1,424 @@
-import { useState, useMemo } from 'react'
-import { Link, useNavigate } from 'react-router'
+import { useMemo, useState, type FormEvent, type ReactNode } from 'react'
+import { Link, useSearchParams } from 'react-router'
 import { AppShell } from '../components/AppShell'
-import { QueueTicketPreview } from '../components/QueueTicketPreview'
+import { PriorityBadge } from '../components/checkin/PriorityBadge'
+import { TodayAppointmentsPanel } from '../components/checkin/TodayAppointmentsPanel'
 import {
-  usePatients,
-  useDepartments,
-  useDepartmentDoctors,
+  useAppointment,
   useAppointments,
-  useWalkIn,
+  useCheckDuplicate,
   useCheckIn,
+  useCheckInNewPatient,
+  useConsultingDoctors,
   useMe,
+  usePatient,
+  usePatients,
+  useWalkIn,
 } from '../api/queries'
 import { ApiError } from '../api/client'
+import type {
+  Appointment,
+  CheckInDetails,
+  PatientOut,
+  PriorityLevel,
+  ReferralSource,
+  VisitKind,
+} from '../api/types'
+import { formatPaise, formatToken, istToday } from '../format'
 import {
+  IconAlertTriangle,
   IconCalendar,
   IconCheck,
-  IconRefresh,
   IconSearch,
-  IconStethoscope,
   IconTicket,
   IconUser,
-  IconUserCheck,
   IconUserPlus,
-  IconWalk,
   IconX,
 } from '../components/icons'
-import type { PatientOut, DepartmentDoctorOut } from '../api/types'
-import { formatToken, istToday } from '../format'
+
+type PatientMode = 'new' | 'existing'
+type Sex = 'M' | 'F' | 'O'
+
+const LABEL = 'mb-1 block text-xs font-semibold uppercase tracking-wider text-slate-600'
+const INPUT =
+  'min-h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm font-medium text-slate-900 shadow-2xs placeholder:text-slate-400 focus:border-[#8E1C3D] focus:outline-none focus:ring-2 focus:ring-[#8E1C3D]/15 disabled:bg-slate-100'
+
+const REFERRAL_OPTIONS: { value: ReferralSource; label: string; nameLabel: string }[] = [
+  { value: 'SELF', label: 'Self (came on their own)', nameLabel: '' },
+  { value: 'DOCTOR', label: 'Doctor referral', nameLabel: "Referring doctor's name" },
+  { value: 'PERSONAL', label: 'Patient / personal reference', nameLabel: "Referring person's name" },
+  { value: 'ORGANIZATION', label: 'Hospital / organisation', nameLabel: 'Hospital or organisation name' },
+  { value: 'OTHER', label: 'Other / unknown', nameLabel: 'Details (optional)' },
+]
+const REFERRAL_NEEDS_NAME: ReferralSource[] = ['DOCTOR', 'PERSONAL', 'ORGANIZATION']
+
+const PRIORITY_OPTIONS: { value: PriorityLevel; label: string; hint: string }[] = [
+  { value: 'NORMAL', label: 'Normal', hint: 'Seen in token order' },
+  { value: 'PRIORITY', label: 'Priority', hint: 'Amber: elderly, pregnant, disabled…' },
+  { value: 'EMERGENCY', label: 'Emergency', hint: 'Red: the doctor is alerted' },
+]
+
+const SEX_OPTIONS: { value: Sex; label: string }[] = [
+  { value: 'M', label: 'Male' },
+  { value: 'F', label: 'Female' },
+  { value: 'O', label: 'Other' },
+]
+
+function sexLabel(gender: string): string {
+  return gender === 'M' ? 'Male' : gender === 'F' ? 'Female' : 'Other'
+}
+
+interface Issued {
+  appointment: Appointment
+  isNewPatient: boolean
+  departmentName: string | null
+  cabinCode: string | null
+}
+
+/** A segmented two-or-three-way choice; the selected option is white with the brand gold edge. */
+function Segmented<T extends string>({
+  label,
+  value,
+  options,
+  onChange,
+}: {
+  label: string
+  value: T | null
+  /** selectedClass replaces the default selected look, e.g. red for Emergency. */
+  options: { value: T; label: ReactNode; selectedClass?: string }[]
+  onChange: (value: T) => void
+}) {
+  return (
+    <div role="group" aria-label={label} className="flex gap-1 rounded-lg border border-slate-300 bg-slate-100/70 p-1">
+      {options.map((o) => (
+        <button
+          key={o.value}
+          type="button"
+          aria-pressed={value === o.value}
+          onClick={() => onChange(o.value)}
+          className={`flex min-h-9 flex-1 items-center justify-center gap-1.5 rounded-md px-2 text-xs font-bold transition-colors ${
+            value === o.value
+              ? (o.selectedClass ?? 'border border-[#C39A35] bg-white text-[#5D0B26] shadow-2xs')
+              : 'border border-transparent text-slate-600 hover:text-[#5D0B26]'
+          }`}
+        >
+          {o.label}
+        </button>
+      ))}
+    </div>
+  )
+}
 
 export function TokenGenerationPage() {
   const { data: me } = useMe()
-  const navigate = useNavigate()
-
-  // State
-  const [patientMode, setPatientMode] = useState<'existing' | 'new'>('existing')
-  const [searchQuery, setSearchQuery] = useState('')
-  const [selectedPatient, setSelectedPatient] = useState<PatientOut | null>(null)
-
-  const [selectedDepartmentId, setSelectedDepartmentId] = useState<number | ''>('')
-  const [selectedDoctorId, setSelectedDoctorId] = useState<number | ''>('')
-  // null follows the patient: "booked" when they have a booking waiting today, else a walk-in.
-  const [visitTypeChoice, setVisitTypeChoice] = useState<'walk-in' | 'booked' | null>(null)
-  const [selectedBookingId, setSelectedBookingId] = useState<number | null>(null)
-  const [remarks, setRemarks] = useState('')
-
-  const [generatedTicket, setGeneratedTicket] = useState<{
-    tokenLabel: string
-    departmentName: string
-    doctorName: string
-    patientName: string
-    patientUrn: string
-    date: string
-  } | null>(null)
-  const [errorMsg, setErrorMsg] = useState<string | null>(null)
-  // Set when a walk-in was refused because the patient already has a booking with that doctor.
-  const [hasDuplicateBooking, setHasDuplicateBooking] = useState(false)
-
+  const permissions = me?.permissions ?? []
+  const canCheckIn = permissions.includes('visit:write')
+  const canManageBookings = permissions.includes('appointment:write')
   const today = istToday()
 
-  // API Queries
-  const { data: searchResults, isPending: isSearching } = usePatients(searchQuery, 8, 0)
-  const { data: departments } = useDepartments()
+  // --- Patient ---------------------------------------------------------------------------
+  const [mode, setMode] = useState<PatientMode>('new')
+  // New patient (OD-22-03)
+  const [fullName, setFullName] = useState('')
+  const [ageYears, setAgeYears] = useState('')
+  const [mobile, setMobile] = useState('')
+  const [sex, setSex] = useState<Sex | null>(null)
+  const [guardianName, setGuardianName] = useState('')
+  const [address, setAddress] = useState('')
+  const [notDuplicate, setNotDuplicate] = useState(false)
+  // Existing patient (OD-22-04)
+  const [searchQuery, setSearchQuery] = useState('')
+  const [selectedPatient, setSelectedPatient] = useState<PatientOut | null>(null)
+  const [visitKind, setVisitKind] = useState<VisitKind | null>(null)
+  // A booking for today being checked in (from the list on the right, or the patient's own).
+  const [booking, setBooking] = useState<Appointment | null>(null)
+
+  // --- Visit -----------------------------------------------------------------------------
+  const [doctorKey, setDoctorKey] = useState('')
+  const [referralSource, setReferralSource] = useState<ReferralSource>('SELF')
+  const [referrerName, setReferrerName] = useState('')
+  const [priority, setPriority] = useState<PriorityLevel>('NORMAL')
+  const [priorityReason, setPriorityReason] = useState('')
+  const [remarks, setRemarks] = useState('')
+
+  const [issued, setIssued] = useState<Issued | null>(null)
+  const [errorMsg, setErrorMsg] = useState<string | null>(null)
+  const [duplicateBooking, setDuplicateBooking] = useState(false)
+
+  // "Check In" on the Dashboard and on Appointments opens this desk with the patient and their
+  // booking already chosen (?patient_id=&appointment_id=).
+  const [searchParams, setSearchParams] = useSearchParams()
+  const [presetApplied, setPresetApplied] = useState(false)
+  const presetPatientId = Number(searchParams.get('patient_id')) || null
+  const presetBookingId = Number(searchParams.get('appointment_id')) || 0
+  const { data: presetPatient } = usePatient(presetApplied ? null : presetPatientId)
+  const { data: presetBooking, isPending: presetBookingPending } = useAppointment(
+    presetApplied ? 0 : presetBookingId,
+  )
+  if (!presetApplied && presetPatient && (!presetBookingId || !presetBookingPending)) {
+    setPresetApplied(true)
+    setMode('existing')
+    setSelectedPatient(presetPatient)
+    if (presetBooking && presetBooking.patient_id === presetPatient.id && isBookable(presetBooking)) {
+      setBooking(presetBooking)
+    }
+  }
+
+  // --- Data ------------------------------------------------------------------------------
+  const { options: doctorOptions, isPending: doctorsPending } = useConsultingDoctors()
+  const { data: searchResults, isPending: searching } = usePatients(searchQuery, 8, 0)
+  const duplicateCheck = useCheckDuplicate(fullName, mobile, mode === 'new' && !issued)
+  const duplicateMatch = duplicateCheck.data?.has_duplicate ? duplicateCheck.data.matching_patient : null
   const { data: patientBookingsData } = useAppointments(
     { appointment_date: today, patient_id: selectedPatient?.id },
-    { enabled: selectedPatient != null },
+    { enabled: mode === 'existing' && selectedPatient != null },
   )
-
-  // Bookings for today that are still waiting for their patient. A patient marked "not arrived"
-  // who turns up late can still be checked in, so those count too.
-  const bookings = useMemo(
+  const patientBookings = useMemo(
     () =>
       (patientBookingsData?.appointments ?? []).filter(
-        (a) =>
-          a.patient_id === selectedPatient?.id && (a.status === 'BOOKED' || a.status === 'NO_SHOW'),
+        (a) => a.patient_id === selectedPatient?.id && isBookable(a),
       ),
     [patientBookingsData, selectedPatient],
   )
-  const visitType = visitTypeChoice ?? (bookings.length > 0 ? 'booked' : 'walk-in')
-  const selectedBooking =
-    visitType === 'booked'
-      ? (bookings.find((b) => b.id === selectedBookingId) ??
-        (bookings.length === 1 ? bookings[0] : null))
-      : null
 
-  // The department and doctor come from the chosen booking, or from the selects for a walk-in.
-  const activeDepartmentId = selectedBooking
-    ? (selectedBooking.department_id ?? null)
-    : selectedDepartmentId
-      ? Number(selectedDepartmentId)
-      : null
-  const activeDoctorId = selectedBooking
-    ? selectedBooking.doctor_id
-    : selectedDoctorId
-      ? Number(selectedDoctorId)
-      : null
-  const { data: departmentDoctors } = useDepartmentDoctors(activeDepartmentId)
+  const walkIn = useWalkIn()
+  const checkIn = useCheckIn()
+  const newPatientCheckIn = useCheckInNewPatient()
+  const busy = walkIn.isPending || checkIn.isPending || newPatientCheckIn.isPending
 
-  const selectedDepartment = useMemo(() => {
-    return departments?.find((d) => d.id === activeDepartmentId)
-  }, [departments, activeDepartmentId])
-  const selectedDoctor = useMemo(() => {
-    return departmentDoctors?.find((d: DepartmentDoctorOut) => d.id === activeDoctorId)
-  }, [departmentDoctors, activeDoctorId])
-  const cabinCode = selectedDoctor?.cabin_code ?? undefined
-
-  // Today's appointments for the doctor, to show who is waiting and which token comes next.
-  const { data: appointmentsData } = useAppointments(
-    { appointment_date: today, doctor_id: activeDoctorId ?? undefined },
-    { enabled: activeDoctorId != null },
-  )
-
-  const queueStats = useMemo(() => {
-    const list = appointmentsData?.appointments || []
-    const waiting = list.filter((a) =>
-      a.consultation_status ? a.consultation_status === 'WAITING' : a.status === 'ARRIVED',
-    ).length
-    // Tokens are issued at check-in, one after another, so the next one follows the highest so far.
-    const nextTokenNum = Math.max(0, ...list.map((a) => a.token_number ?? 0)) + 1
-    return {
-      waiting,
-      nextTokenNum,
+  // The doctor comes from the booking when one is being checked in, else from the list.
+  const chosenOption = useMemo(() => {
+    if (booking) {
+      return (
+        doctorOptions.find(
+          (o) => o.doctor.id === booking.doctor_id && o.department.id === booking.department_id,
+        ) ?? doctorOptions.find((o) => o.doctor.id === booking.doctor_id) ?? null
+      )
     }
-  }, [appointmentsData])
+    return doctorOptions.find((o) => `${o.department.id}:${o.doctor.id}` === doctorKey) ?? null
+  }, [booking, doctorKey, doctorOptions])
 
-  // Mutations
-  const walkInMutation = useWalkIn()
-  const checkInMutation = useCheckIn()
-  const isIssuing = walkInMutation.isPending || checkInMutation.isPending
+  const departments = useMemo(() => {
+    const groups = new Map<number, { name: string; options: typeof doctorOptions }>()
+    for (const o of doctorOptions) {
+      const g = groups.get(o.department.id) ?? { name: o.department.name_en, options: [] }
+      g.options.push(o)
+      groups.set(o.department.id, g)
+    }
+    return [...groups.entries()]
+  }, [doctorOptions])
 
-  // Token letter prefix (e.g. 'P' for Physiotherapy, 'O' for Ophthalmology, 'G' for General)
-  const tokenPrefix = useMemo(() => {
-    if (!selectedDepartment) return 'G'
-    return selectedDepartment.name_en.charAt(0).toUpperCase()
-  }, [selectedDepartment])
+  // --- Actions ---------------------------------------------------------------------------
+  const resetVisit = () => {
+    setDoctorKey('')
+    setReferralSource('SELF')
+    setReferrerName('')
+    setPriority('NORMAL')
+    setPriorityReason('')
+    setRemarks('')
+  }
 
-  // A booking that already holds a token keeps it; anything else gets the next one.
-  const previewTokenNumber = selectedBooking?.token_number ?? queueStats.nextTokenNum
+  const resetAll = () => {
+    setFullName('')
+    setAgeYears('')
+    setMobile('')
+    setSex(null)
+    setGuardianName('')
+    setAddress('')
+    setNotDuplicate(false)
+    setSearchQuery('')
+    setSelectedPatient(null)
+    setVisitKind(null)
+    setBooking(null)
+    resetVisit()
+    setErrorMsg(null)
+    setDuplicateBooking(false)
+    setIssued(null)
+    if (searchParams.has('patient_id')) setSearchParams({}, { replace: true })
+  }
 
-  const handleSelectPatient = (patient: PatientOut) => {
+  const switchMode = (next: PatientMode) => {
+    if (next === mode) return
+    setMode(next)
+    setBooking(null)
+    setErrorMsg(null)
+    setDuplicateBooking(false)
+  }
+
+  const choosePatient = (patient: PatientOut) => {
+    setMode('existing')
     setSelectedPatient(patient)
     setSearchQuery('')
-    // A new patient has their own bookings, so start from what they have today.
-    setVisitTypeChoice(null)
-    setSelectedBookingId(null)
-    setHasDuplicateBooking(false)
+    setVisitKind(null)
+    setBooking(null)
     setErrorMsg(null)
+    setDuplicateBooking(false)
   }
 
-  const handleClear = () => {
-    setSelectedPatient(null)
-    setSearchQuery('')
-    setSelectedDepartmentId('')
-    setSelectedDoctorId('')
-    setVisitTypeChoice(null)
-    setSelectedBookingId(null)
-    setRemarks('')
+  /** "Check in" on the right: the form takes the booking; reception confirms the rest. */
+  const takeBooking = (b: Appointment) => {
+    setIssued(null)
+    setMode('existing')
+    setSelectedPatient((current) =>
+      current?.id === b.patient_id ? current : bookingPatient(b),
+    )
+    setBooking(b)
+    setVisitKind(null)
+    resetVisit()
     setErrorMsg(null)
-    setHasDuplicateBooking(false)
-    setGeneratedTicket(null)
+    setDuplicateBooking(false)
   }
 
-  // Check a booked patient in, or register a walk-in. Either one issues the token, opens or joins
-  // the patient's visit and puts them in the doctor's waiting list, all or nothing: when the
-  // server refuses, no token was issued and nothing was booked. No payment is taken here.
-  const handleIssueToken = async () => {
+  // Everything the desk must have before the token can be issued; shown as the reason the
+  // button is disabled, so reception is never left guessing.
+  const missing: string[] = []
+  if (mode === 'new') {
+    if (fullName.trim().length < 2) missing.push('patient name')
+    if (ageYears === '' || Number(ageYears) < 0 || Number(ageYears) > 150) missing.push('age')
+    if (mobile.replace(/\D/g, '').length < 10) missing.push('10-digit phone number')
+    if (!sex) missing.push('sex')
+    if (address.trim().length < 2) missing.push('address')
+    if (duplicateMatch && !notDuplicate) missing.push('confirmation that this is a different patient')
+  } else {
+    if (!selectedPatient) missing.push('patient')
+    if (!visitKind) missing.push('consultation type')
+  }
+  if (!chosenOption) missing.push('consulting doctor')
+  if (REFERRAL_NEEDS_NAME.includes(referralSource) && referrerName.trim().length < 2)
+    missing.push('referrer name')
+  if (priority !== 'NORMAL' && priorityReason.trim().length < 3) missing.push('priority reason')
+
+  const details = (): CheckInDetails => ({
+    referral_source: referralSource,
+    referrer_name: referrerName.trim() || null,
+    priority_level: priority,
+    priority_reason: priority === 'NORMAL' ? null : priorityReason.trim(),
+    visit_kind: mode === 'new' ? 'NEW' : visitKind,
+  })
+
+  const handleSubmit = async (e: FormEvent) => {
+    e.preventDefault()
     setErrorMsg(null)
-    setHasDuplicateBooking(false)
-    if (!selectedPatient) {
-      setErrorMsg('Please select a patient or switch to New Patient.')
+    setDuplicateBooking(false)
+    if (missing.length > 0 || !chosenOption) {
+      setErrorMsg(`Still needed: ${missing.join(', ')}.`)
       return
     }
-
     try {
-      let issued
-      if (visitType === 'booked') {
-        if (!selectedBooking) {
-          setErrorMsg("Please choose which of today's bookings to check in.")
-          return
-        }
-        issued = await checkInMutation.mutateAsync({
-          id: selectedBooking.id,
-          body: { version_id: selectedBooking.version_id },
+      let appointment: Appointment
+      if (mode === 'new') {
+        appointment = await newPatientCheckIn.mutateAsync({
+          patient: {
+            full_name: fullName.trim(),
+            guardian_name: guardianName.trim() || 'Self / Not specified',
+            gender: sex as Sex,
+            age_years: Number(ageYears),
+            mobile: mobile.trim(),
+            address: address.trim(),
+            district: 'Bhojpur',
+            state: 'Bihar',
+            allergies: 'None reported',
+          },
+          doctor_id: chosenOption.doctor.id,
+          department_id: chosenOption.department.id,
+          notes: remarks.trim() || null,
+          ...details(),
+        })
+      } else if (booking) {
+        appointment = await checkIn.mutateAsync({
+          id: booking.id,
+          body: { version_id: booking.version_id, ...details() },
         })
       } else {
-        if (!selectedDepartmentId) {
-          setErrorMsg('Please select a hospital department.')
-          return
-        }
-        if (!selectedDoctorId) {
-          setErrorMsg('Please select a consulting doctor.')
-          return
-        }
-        issued = await walkInMutation.mutateAsync({
-          patient_id: selectedPatient.id,
-          department_id: Number(selectedDepartmentId),
-          doctor_id: Number(selectedDoctorId),
+        appointment = await walkIn.mutateAsync({
+          patient_id: (selectedPatient as PatientOut).id,
+          doctor_id: chosenOption.doctor.id,
+          department_id: chosenOption.department.id,
           notes: remarks.trim() || null,
+          ...details(),
         })
       }
-
-      setGeneratedTicket({
-        tokenLabel: formatToken(issued.token_number, cabinCode),
-        departmentName: selectedDepartment?.name_en || 'Consultation',
-        doctorName: selectedDoctor?.name_en || 'Clinician',
-        patientName: selectedPatient.full_name,
-        patientUrn: selectedPatient.urn,
-        date: new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true }),
+      setIssued({
+        appointment,
+        isNewPatient: mode === 'new',
+        departmentName: chosenOption.department.name_en,
+        cabinCode: chosenOption.doctor.cabin_code ?? null,
       })
     } catch (err: unknown) {
       if (err instanceof ApiError && err.code === 'duplicate_appointment') {
-        setHasDuplicateBooking(true)
-        setErrorMsg('This patient already has a booking with this doctor today.')
-      } else if (err instanceof Error) {
+        setDuplicateBooking(true)
+        setErrorMsg('This patient already has a booking with this doctor today. Check that booking in instead.')
+      } else if (err instanceof Error && err.message) {
         setErrorMsg(err.message)
       } else {
-        setErrorMsg('Failed to issue the token.')
+        setErrorMsg('The token was not issued. Please try again.')
       }
     }
   }
+
+  const submitLabel =
+    mode === 'new'
+      ? 'Register patient & issue token'
+      : booking
+        ? 'Check in booking & issue token'
+        : 'Check in & issue token'
 
   return (
     <AppShell name={me?.full_name || 'Staff'} role={me?.role || 'RECEPTION'}>
       <div className="w-full space-y-5">
-        {/* Top Header & Subtitle matching Mock 2 */}
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between border-b border-slate-200/80 pb-4">
-          <div className="flex items-center gap-3">
-            <div className="flex h-11 w-11 items-center justify-center rounded-xl border border-emerald-200 bg-emerald-50 text-emerald-800 shadow-xs shrink-0">
+        {/* Header */}
+        <header className="flex flex-col gap-3 border-b border-slate-200/80 pb-4 sm:flex-row sm:items-start sm:justify-between">
+          <div className="flex items-start gap-3">
+            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-[#E4C8D1] bg-[#FBF5F7] text-[#8E1C3D]">
               <IconTicket className="h-6 w-6" />
-            </div>
+            </span>
             <div>
-              <h1 className="text-xl font-bold tracking-tight text-slate-900">
-                Token Desk
-              </h1>
+              <h1 className="text-xl font-bold tracking-tight text-slate-900">Check-in &amp; Token</h1>
               <p className="text-xs text-slate-500">
-                Check a patient in: pick a booking for today, or register a walk-in, and issue the queue token.
+                Every patient who arrives is checked in here and gets a token number for their doctor&apos;s queue.
+                No payment is taken at check-in.
               </p>
             </div>
           </div>
-
-          <div className="flex items-center gap-2.5">
-            <Link
-              to="/reception/patients/new"
-              className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 shadow-2xs"
-            >
-              <IconUserPlus className="h-4 w-4 text-emerald-800" />
-              New Patient Registration
-            </Link>
-            <Link
-              to="/reception/appointments?tab=today"
-              className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 shadow-2xs"
-            >
-              <IconCalendar className="h-4 w-4 text-slate-500" />
-              Today&apos;s OPD Queue
-            </Link>
-          </div>
-        </div>
-
-        {/* Success Modal / Banner when Token is generated */}
-        {generatedTicket && (
-          <div
-            role="status"
-            className="rounded-2xl border border-emerald-300 bg-emerald-50/90 p-6 text-emerald-950 shadow-sm space-y-4"
+          <Link
+            to="/reception/patients/new"
+            className="inline-flex min-h-9 shrink-0 items-center gap-1.5 self-start rounded-lg border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-700 shadow-2xs hover:border-[#8E1C3D] hover:text-[#5D0B26]"
           >
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-              <div className="flex items-center gap-4">
-                <div className="flex h-12 w-12 items-center justify-center rounded-full bg-emerald-600 text-white font-bold">
-                  <IconCheck className="h-6 w-6" />
-                </div>
-                <div>
-                  <h3 className="text-lg font-bold text-emerald-950">
-                    Token Allocated Successfully!
-                  </h3>
-                  <p className="text-xs text-emerald-800">
-                    Patient <span className="font-semibold">{generatedTicket.patientName}</span> ({generatedTicket.patientUrn}) is placed in{' '}
-                    <span className="font-semibold">{generatedTicket.doctorName}&apos;s</span> queue.
-                  </p>
-                </div>
-              </div>
+            <IconUserPlus className="h-4 w-4 text-[#8E1C3D]" />
+            Full registration form
+          </Link>
+        </header>
 
-              <div className="rounded-xl border border-emerald-300 bg-white px-5 py-3 text-center shadow-xs">
-                <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
-                  Daily Token
-                </span>
-                <div className="font-mono text-3xl font-black text-emerald-800">
-                  {generatedTicket.tokenLabel}
-                </div>
-              </div>
-            </div>
+        {/* How the desk works: booked vs walk-in, check-in vs token, in one line each. */}
+        <ol className="grid grid-cols-1 gap-2 text-xs text-slate-700 md:grid-cols-3">
+          <li className="rounded-xl border border-slate-200 bg-white px-3 py-2">
+            <span className="font-bold text-[#5D0B26]">Booked patient?</span> Find them in Today&apos;s appointments
+            and press <span className="font-semibold">Check in</span>.
+          </li>
+          <li className="rounded-xl border border-slate-200 bg-white px-3 py-2">
+            <span className="font-bold text-[#5D0B26]">Walk-in?</span> Choose New or Existing patient on the left
+            and fill the form.
+          </li>
+          <li className="rounded-xl border border-slate-200 bg-white px-3 py-2">
+            <span className="font-bold text-[#5D0B26]">Token</span> is the patient&apos;s number in the doctor&apos;s
+            queue. The fee is collected at Billing after the consultation.
+          </li>
+        </ol>
 
-            <div className="flex flex-wrap items-center gap-3 pt-2 border-t border-emerald-200">
-              <Link
-                to="/reception/appointments?tab=today"
-                className="inline-flex min-h-11 items-center justify-center rounded-lg bg-emerald-800 px-4 text-xs font-bold text-white hover:bg-emerald-900 shadow-xs"
-              >
-                Open Today&apos;s Token Queue
-              </Link>
-              <button
-                type="button"
-                onClick={() => {
-                  setGeneratedTicket(null)
-                  handleClear()
-                }}
-                className="inline-flex min-h-11 items-center justify-center rounded-lg border border-slate-300 bg-white px-4 text-xs font-semibold text-slate-700 hover:bg-slate-50"
-              >
-                Register Next Patient
-              </button>
-            </div>
-          </div>
+        {issued && (
+          <IssuedCard issued={issued} onNext={resetAll} />
         )}
 
         {errorMsg && (
           <div
             role="alert"
-            className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-red-300 bg-red-50 p-4 text-sm font-semibold text-red-900 shadow-xs"
+            className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-red-300 bg-red-50 p-4 text-sm font-semibold text-red-900"
           >
             <span>{errorMsg}</span>
-            {hasDuplicateBooking && (
+            {duplicateBooking && patientBookings.length > 0 && (
               <button
                 type="button"
-                onClick={() => {
-                  setVisitTypeChoice('booked')
-                  setErrorMsg(null)
-                  setHasDuplicateBooking(false)
-                }}
+                onClick={() => takeBooking(patientBookings[0])}
                 className="inline-flex min-h-9 items-center rounded-lg border border-red-300 bg-white px-3 text-xs font-bold text-red-900 hover:bg-red-100"
               >
                 Check in their booking instead
@@ -331,396 +427,626 @@ export function TokenGenerationPage() {
           </div>
         )}
 
-        {/* 3-Column Cockpit matching Mock 2 */}
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
-          {/* COLUMN 1: Patient (lg:col-span-4) */}
-          <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs lg:col-span-4 flex flex-col justify-between">
-            <div className="space-y-4">
-              <div className="flex items-center gap-2 border-b border-slate-100 pb-3">
-                <IconUser className="h-5 w-5 text-emerald-800" />
-                <h2 className="text-base font-bold text-slate-900">Patient</h2>
-              </div>
-
-              {/* Segmented Tab: Existing Patient vs New Patient */}
-              <div className="flex rounded-xl border border-slate-300 bg-slate-100/70 p-1 shadow-2xs">
-                <button
-                  type="button"
-                  onClick={() => setPatientMode('existing')}
-                  className={`flex flex-1 items-center justify-center gap-1.5 rounded-lg py-2 text-xs font-bold transition-all ${patientMode === 'existing'
-                      ? 'border border-emerald-300 bg-[#124832] text-white shadow-xs'
-                      : 'text-slate-600 hover:text-slate-900'
-                    }`}
-                >
-                  <IconSearch className="h-3.5 w-3.5" />
-                  Existing Patient
+        <div className="grid grid-cols-1 items-start gap-5 lg:grid-cols-12">
+          {/* LEFT: the check-in form */}
+          <form
+            onSubmit={handleSubmit}
+            aria-labelledby="check-in-form-heading"
+            className="space-y-5 rounded-2xl border border-slate-200 bg-white p-5 shadow-xs lg:col-span-7"
+          >
+            <div className="flex items-center justify-between gap-2 border-b border-slate-100 pb-3">
+              <h2 id="check-in-form-heading" className="flex items-center gap-2 text-base font-bold text-slate-900">
+                <IconUser className="h-5 w-5 text-[#8E1C3D]" />
+                Check in a patient
+              </h2>
+              {(selectedPatient || fullName || booking) && !issued && (
+                <button type="button" onClick={resetAll} className="text-xs font-semibold text-slate-500 hover:text-red-700">
+                  Clear form
                 </button>
-                <button
-                  type="button"
-                  onClick={() => navigate('/reception/patients/new')}
-                  className="flex flex-1 items-center justify-center gap-1.5 rounded-lg py-2 text-xs font-bold text-slate-600 hover:text-slate-900 transition-all"
-                >
-                  <IconUserPlus className="h-3.5 w-3.5 text-slate-500" />
-                  New Patient
-                </button>
-              </div>
+              )}
+            </div>
 
-              {/* Search Bar */}
-              <div className="relative">
-                <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5 text-slate-500">
-                  <IconSearch className="h-4 w-4" />
-                </div>
-                <input
-                  type="text"
-                  aria-label="Search patient by Name, Mobile or Patient ID"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Search by Name, Mobile or Patient ID (URN)"
-                  className="w-full rounded-xl border border-slate-300 bg-white pl-10 pr-9 py-2.5 text-xs font-medium text-slate-900 placeholder:text-slate-400 shadow-2xs focus:border-emerald-700 focus:outline-none focus:ring-1 focus:ring-emerald-700 min-h-[44px]"
+            {/* 1. Who is the patient? */}
+            <fieldset className="space-y-3">
+              <legend className={LABEL}>1. Patient</legend>
+              <Segmented<PatientMode>
+                label="New or existing patient"
+                value={mode}
+                onChange={switchMode}
+                options={[
+                  {
+                    value: 'new',
+                    label: (
+                      <>
+                        <IconUserPlus className="h-4 w-4" /> New patient
+                      </>
+                    ),
+                  },
+                  {
+                    value: 'existing',
+                    label: (
+                      <>
+                        <IconSearch className="h-4 w-4" /> Existing patient
+                      </>
+                    ),
+                  },
+                ]}
+              />
+              <p className="text-xs text-slate-500">
+                {mode === 'new'
+                  ? 'First visit: the patient gets a permanent hospital number (URN) now.'
+                  : 'Been here before: find them by URN, name or mobile. Their URN never changes.'}
+              </p>
+
+              {mode === 'new' ? (
+                <NewPatientFields
+                  fullName={fullName}
+                  setFullName={setFullName}
+                  ageYears={ageYears}
+                  setAgeYears={setAgeYears}
+                  mobile={mobile}
+                  setMobile={setMobile}
+                  sex={sex}
+                  setSex={setSex}
+                  guardianName={guardianName}
+                  setGuardianName={setGuardianName}
+                  address={address}
+                  setAddress={setAddress}
+                  duplicate={duplicateMatch ?? null}
+                  notDuplicate={notDuplicate}
+                  setNotDuplicate={setNotDuplicate}
+                  onUseExisting={(p) => choosePatient(p)}
                 />
-                {searchQuery && (
+              ) : selectedPatient ? (
+                <SelectedPatientCard
+                  patient={selectedPatient}
+                  onChange={() => {
+                    setSelectedPatient(null)
+                    setBooking(null)
+                    setVisitKind(null)
+                  }}
+                />
+              ) : (
+                <PatientSearch
+                  query={searchQuery}
+                  setQuery={setSearchQuery}
+                  results={searchResults}
+                  searching={searching}
+                  onPick={choosePatient}
+                />
+              )}
+
+              {mode === 'existing' && selectedPatient && (
+                <div>
+                  <span className={LABEL}>Consultation type *</span>
+                  <Segmented<VisitKind>
+                    label="Consultation type"
+                    value={visitKind}
+                    onChange={setVisitKind}
+                    options={[
+                      { value: 'NEW', label: 'New consultation' },
+                      { value: 'FOLLOW_UP', label: 'Follow-up / Revisit' },
+                    ]}
+                  />
+                </div>
+              )}
+            </fieldset>
+
+            {/* 2. Which doctor? */}
+            <fieldset className="space-y-3">
+              <legend className={LABEL}>2. Doctor</legend>
+              {booking ? (
+                <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-sky-200 bg-sky-50 p-3 text-xs text-sky-950">
+                  <span className="flex items-center gap-2">
+                    <IconCalendar className="h-4 w-4 text-sky-700" />
+                    <span>
+                      Booked appointment with <span className="font-bold">{booking.doctor_name_en}</span>
+                      {booking.expected_time ? ` at ${booking.expected_time.slice(0, 5)}` : ''}
+                      {booking.status === 'NO_SHOW' ? ' (marked not arrived; checking in late)' : ''}
+                    </span>
+                  </span>
                   <button
                     type="button"
-                    onClick={() => setSearchQuery('')}
-                    className="absolute inset-y-0 right-0 flex items-center pr-3 text-slate-500 hover:text-slate-700"
+                    onClick={() => setBooking(null)}
+                    className="font-semibold text-sky-800 underline hover:text-sky-950"
                   >
-                    <IconX className="h-4 w-4" />
+                    Not this booking
                   </button>
-                )}
-              </div>
-
-              {/* Autocomplete Search Dropdown */}
-              {searchQuery.trim().length >= 2 && (
-                <div className="max-h-48 overflow-y-auto rounded-xl border border-slate-200 bg-white shadow-lg divide-y divide-slate-100">
-                  {isSearching ? (
-                    <div className="p-3 text-center text-xs text-slate-500">Searching patients...</div>
-                  ) : searchResults && searchResults.length > 0 ? (
-                    searchResults.map((patient: PatientOut) => (
-                      <button
-                        key={patient.id}
-                        type="button"
-                        onClick={() => handleSelectPatient(patient)}
-                        className="w-full p-2.5 text-left text-xs hover:bg-emerald-50/60 cursor-pointer flex items-center justify-between transition-colors"
-                      >
-                        <div>
-                          <div className="font-bold text-slate-900">{patient.full_name}</div>
-                          <div className="font-mono text-xs text-emerald-800">{patient.urn}</div>
-                        </div>
-                        <div className="text-right text-xs text-slate-500 font-mono">
-                          {patient.mobile}
-                        </div>
-                      </button>
-                    ))
-                  ) : (
-                    <div className="p-3 text-center text-xs text-slate-500">No matching patients found.</div>
-                  )}
-                </div>
-              )}
-
-              {/* Selected Patient Card matching Mock 2 */}
-              {selectedPatient ? (
-                <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-4 space-y-3 shadow-2xs">
-                  <div className="flex items-start justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-100 text-emerald-800 font-bold">
-                        <IconUser className="h-5 w-5" />
-                      </div>
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <h4 className="font-bold text-slate-900 text-sm">
-                            {selectedPatient.full_name}
-                          </h4>
-                          <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-bold text-emerald-800">
-                            Existing
-                          </span>
-                        </div>
-                        <span className="font-mono text-xs font-bold text-slate-600 block mt-0.5">
-                          {selectedPatient.urn}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center justify-between text-xs text-slate-600 border-t border-slate-200/70 pt-2">
-                    <span>
-                      {selectedPatient.age_years} Years &bull;{' '}
-                      {selectedPatient.gender === 'M' ? 'Male' : selectedPatient.gender === 'F' ? 'Female' : 'Other'}
-                    </span>
-                    <span className="font-mono font-medium text-slate-700">{selectedPatient.mobile}</span>
-                  </div>
-
-                  <div className="flex justify-end pt-1">
-                    <Link
-                      to={`/reception/patients/${selectedPatient.id}`}
-                      className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50"
-                    >
-                      <IconUser className="h-3.5 w-3.5 text-slate-500" />
-                      View Profile
-                    </Link>
-                  </div>
                 </div>
               ) : (
-                <div className="rounded-xl border border-dashed border-slate-200 p-8 text-center text-xs text-slate-500">
-                  Select an existing patient by searching above, or click New Patient.
-                </div>
-              )}
-            </div>
-          </section>
-
-          {/* COLUMN 2: Visit Details (lg:col-span-4) */}
-          <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs lg:col-span-4 space-y-4">
-            <div className="flex items-center gap-2 border-b border-slate-100 pb-3">
-              <IconCalendar className="h-5 w-5 text-emerald-800" />
-              <h2 className="text-base font-bold text-slate-900">Visit Details</h2>
-            </div>
-
-            {/* Visit Type */}
-            <div>
-              <span className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
-                Visit Type *
-              </span>
-              <div className="flex rounded-xl border border-slate-300 bg-slate-100/70 p-1 shadow-2xs">
-                <button
-                  type="button"
-                  aria-pressed={visitType === 'walk-in'}
-                  onClick={() => setVisitTypeChoice('walk-in')}
-                  className={`flex flex-1 items-center justify-center gap-1.5 rounded-lg py-2 text-xs font-bold transition-all ${visitType === 'walk-in'
-                      ? 'border border-emerald-300 bg-white text-emerald-900 shadow-xs'
-                      : 'text-slate-600 hover:text-slate-900'
-                    }`}
-                >
-                  <IconWalk className="h-4 w-4 text-emerald-700" />
-                  Walk-in
-                </button>
-                <button
-                  type="button"
-                  aria-pressed={visitType === 'booked'}
-                  onClick={() => setVisitTypeChoice('booked')}
-                  className={`flex flex-1 items-center justify-center gap-1.5 rounded-lg py-2 text-xs font-bold transition-all ${visitType === 'booked'
-                      ? 'border border-emerald-300 bg-white text-emerald-900 shadow-xs'
-                      : 'text-slate-600 hover:text-slate-900'
-                    }`}
-                >
-                  <IconCalendar className="h-4 w-4 text-slate-500" />
-                  Booked appointment
-                  {bookings.length > 0 && (
-                    <span className="rounded-full bg-emerald-100 px-1.5 text-xs text-emerald-800">
-                      {bookings.length}
-                    </span>
-                  )}
-                </button>
-              </div>
-            </div>
-
-            {visitType === 'booked' ? (
-              /* A booking made earlier, waiting for its patient */
-              <fieldset>
-                <legend className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
-                  Booking to check in *
-                </legend>
-                {!selectedPatient ? (
-                  <p className="rounded-xl border border-dashed border-slate-200 p-4 text-center text-xs text-slate-500">
-                    Select a patient to see their bookings for today.
-                  </p>
-                ) : bookings.length === 0 ? (
-                  <p className="rounded-xl border border-dashed border-slate-200 p-4 text-center text-xs text-slate-500">
-                    No booking for today. Switch to Walk-in to register one.
-                  </p>
-                ) : (
-                  <ul className="space-y-2">
-                    {bookings.map((booking) => (
-                      <li key={booking.id}>
-                        <label className="flex cursor-pointer items-center gap-3 rounded-xl border border-slate-300 bg-white p-3 text-xs shadow-2xs has-[:checked]:border-emerald-600 has-[:checked]:bg-emerald-50/60">
-                          <input
-                            type="radio"
-                            name="booking-to-check-in"
-                            checked={selectedBooking?.id === booking.id}
-                            onChange={() => setSelectedBookingId(booking.id)}
-                            className="h-4 w-4 accent-emerald-800"
-                          />
-                          <span className="flex-1">
-                            <span className="block font-bold text-slate-900">
-                              {booking.doctor_name_en}
-                            </span>
-                            <span className="block text-slate-500">
-                              {booking.expected_time
-                                ? `Expected ${booking.expected_time.slice(0, 5)}`
-                                : 'No time given'}
-                              {booking.status === 'NO_SHOW' ? ' · marked not arrived, late' : ''}
-                            </span>
+                <>
+                  {mode === 'existing' && patientBookings.length > 0 && (
+                    <div className="space-y-1.5 rounded-xl border border-amber-300 bg-amber-50 p-3 text-xs text-amber-950">
+                      <p className="font-bold">This patient is booked for today:</p>
+                      {patientBookings.map((b) => (
+                        <div key={b.id} className="flex flex-wrap items-center justify-between gap-2">
+                          <span>
+                            {b.doctor_name_en}
+                            {b.expected_time ? ` at ${b.expected_time.slice(0, 5)}` : ''}
                           </span>
-                        </label>
-                      </li>
+                          <button
+                            type="button"
+                            onClick={() => takeBooking(b)}
+                            className="inline-flex min-h-8 items-center rounded-lg bg-[#8E1C3D] px-3 font-bold text-white hover:bg-[#5D0B26]"
+                          >
+                            Check in this booking
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  <div>
+                    <label htmlFor="checkin-doctor" className={LABEL}>
+                      Consulting doctor *
+                    </label>
+                    <select
+                      id="checkin-doctor"
+                      value={doctorKey}
+                      onChange={(e) => setDoctorKey(e.target.value)}
+                      disabled={doctorsPending && doctorOptions.length === 0}
+                      className={INPUT}
+                    >
+                      <option value="">{doctorsPending ? 'Loading doctors…' : 'Choose the doctor'}</option>
+                      {departments.map(([deptId, group]) => (
+                        <optgroup key={deptId} label={group.name}>
+                          {group.options.map((o) => (
+                            <option key={`${deptId}:${o.doctor.id}`} value={`${deptId}:${o.doctor.id}`}>
+                              {o.doctor.name_en}
+                              {o.doctor.qualification ? ` (${o.doctor.qualification})` : ''}
+                            </option>
+                          ))}
+                        </optgroup>
+                      ))}
+                    </select>
+                    {!doctorsPending && doctorOptions.length === 0 && (
+                      <p role="alert" className="mt-1 text-xs font-semibold text-amber-800">
+                        No doctor is assigned to a department yet. Ask the administrator to add doctors to a
+                        department (Admin → Departments).
+                      </p>
+                    )}
+                  </div>
+                </>
+              )}
+              {chosenOption && (
+                <p className="text-xs text-slate-600">
+                  {chosenOption.department.name_en} · Consultation fee{' '}
+                  <span className="font-semibold">{formatPaise(chosenOption.doctor.default_fee_paise)}</span>, collected at
+                  Billing after the consultation.
+                </p>
+              )}
+            </fieldset>
+
+            {/* 3. Referral and priority */}
+            <fieldset className="space-y-3">
+              <legend className={LABEL}>3. Referral &amp; priority</legend>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div>
+                  <label htmlFor="checkin-referral" className={LABEL}>
+                    Referred by *
+                  </label>
+                  <select
+                    id="checkin-referral"
+                    value={referralSource}
+                    onChange={(e) => {
+                      setReferralSource(e.target.value as ReferralSource)
+                      setReferrerName('')
+                    }}
+                    className={INPUT}
+                  >
+                    {REFERRAL_OPTIONS.map((o) => (
+                      <option key={o.value} value={o.value}>
+                        {o.label}
+                      </option>
                     ))}
-                  </ul>
+                  </select>
+                </div>
+                {referralSource !== 'SELF' && (
+                  <div>
+                    <label htmlFor="checkin-referrer" className={LABEL}>
+                      {REFERRAL_OPTIONS.find((o) => o.value === referralSource)?.nameLabel}
+                      {REFERRAL_NEEDS_NAME.includes(referralSource) ? ' *' : ''}
+                    </label>
+                    <input
+                      id="checkin-referrer"
+                      value={referrerName}
+                      onChange={(e) => setReferrerName(e.target.value)}
+                      maxLength={120}
+                      className={INPUT}
+                    />
+                  </div>
                 )}
-              </fieldset>
-            ) : (
-              <>
-                {/* Department Select */}
-                <div>
-                  <label
-                    htmlFor="token-department"
-                    className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1"
-                  >
-                    Department *
-                  </label>
-                  <div className="relative">
-                    <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5 text-slate-500">
-                      <IconStethoscope className="h-4 w-4" />
-                    </div>
-                    <select
-                      id="token-department"
-                      value={selectedDepartmentId}
-                      onChange={(e) => {
-                        setSelectedDepartmentId(e.target.value ? Number(e.target.value) : '')
-                        setSelectedDoctorId('')
-                      }}
-                      className="w-full rounded-xl border border-slate-300 bg-white pl-10 pr-3.5 py-2.5 text-xs font-medium text-slate-900 shadow-2xs focus:border-emerald-700 focus:outline-none focus:ring-1 focus:ring-emerald-700 min-h-[44px]"
-                    >
-                      <option value="">Select department</option>
-                      {departments?.map((d) => (
-                        <option key={d.id} value={d.id}>
-                          {d.name_en}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-
-                {/* Doctor Select */}
-                <div>
-                  <label
-                    htmlFor="token-doctor"
-                    className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1"
-                  >
-                    Doctor *
-                  </label>
-                  <div className="relative">
-                    <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5 text-slate-500">
-                      <IconUserCheck className="h-4 w-4" />
-                    </div>
-                    <select
-                      id="token-doctor"
-                      value={selectedDoctorId}
-                      onChange={(e) => setSelectedDoctorId(e.target.value ? Number(e.target.value) : '')}
-                      disabled={!selectedDepartmentId}
-                      className="w-full rounded-xl border border-slate-300 bg-white pl-10 pr-3.5 py-2.5 text-xs font-medium text-slate-900 shadow-2xs focus:border-emerald-700 focus:outline-none focus:ring-1 focus:ring-emerald-700 min-h-[44px] disabled:bg-slate-100"
-                    >
-                      <option value="">Select doctor</option>
-                      {departmentDoctors?.map((d: DepartmentDoctorOut) => (
-                        <option key={d.id} value={d.id}>
-                          {d.name_en} - {d.qualification || 'Clinician'}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-              </>
-            )}
-
-            {/* Payment is not taken here: it is collected at checkout, after the consultation. */}
-            <div className="rounded-xl border border-blue-200 bg-blue-50/70 p-3 text-xs text-blue-900 flex items-start gap-2">
-              <span className="font-bold text-blue-700 mt-0.5">ⓘ</span>
-              <span>
-                No payment is taken here. Fees are collected at checkout, after the consultation.
-                {selectedDoctor
-                  ? ` Consultation fee: ₹${(selectedDoctor.default_fee_paise / 100).toFixed(2)}.`
-                  : ''}
-              </span>
-            </div>
-
-            {/* Remarks (a walk-in only: a booking already has its own notes) */}
-            {visitType === 'walk-in' && (
-              <div>
-                <label
-                  htmlFor="visit-remarks"
-                  className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1"
-                >
-                  Remarks (optional)
-                </label>
-                <textarea
-                  id="visit-remarks"
-                  rows={2}
-                  value={remarks}
-                  onChange={(e) => setRemarks(e.target.value)}
-                  placeholder="Any specific note (e.g. referral, priority, etc.)"
-                  className="w-full rounded-xl border border-slate-300 bg-white p-3 text-xs font-medium text-slate-900 placeholder-slate-400 shadow-2xs focus:border-emerald-700 focus:outline-none focus:ring-1 focus:ring-emerald-700"
-                />
               </div>
-            )}
-          </section>
 
-          {/* COLUMN 3: Token Preview (lg:col-span-4) */}
-          <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs lg:col-span-4 space-y-4">
-            <div className="flex items-center gap-2 border-b border-slate-100 pb-3">
-              <IconTicket className="h-5 w-5 text-emerald-800" />
               <div>
-                <h2 className="text-base font-bold text-slate-900">Token Preview</h2>
-                <p className="text-xs text-slate-500">
-                  This token is issued when the patient is checked in.
+                <span className={LABEL}>Priority *</span>
+                <Segmented<PriorityLevel>
+                  label="Priority"
+                  value={priority}
+                  onChange={(v) => {
+                    setPriority(v)
+                    if (v === 'NORMAL') setPriorityReason('')
+                  }}
+                  options={PRIORITY_OPTIONS.map((o) => ({
+                    value: o.value,
+                    label: o.label,
+                    selectedClass:
+                      o.value === 'EMERGENCY'
+                        ? 'border border-red-700 bg-red-600 text-white shadow-2xs'
+                        : o.value === 'PRIORITY'
+                          ? 'border border-amber-400 bg-amber-100 text-amber-900 shadow-2xs'
+                          : undefined,
+                  }))}
+                />
+                <p className="mt-1 text-xs text-slate-500">
+                  {PRIORITY_OPTIONS.find((o) => o.value === priority)?.hint}. The token number never changes; the doctor
+                  decides whom to call.
                 </p>
               </div>
+              {priority !== 'NORMAL' && (
+                <div>
+                  <label htmlFor="checkin-priority-reason" className={LABEL}>
+                    Reason for {priority === 'EMERGENCY' ? 'emergency' : 'priority'} *
+                  </label>
+                  <input
+                    id="checkin-priority-reason"
+                    value={priorityReason}
+                    onChange={(e) => setPriorityReason(e.target.value)}
+                    maxLength={500}
+                    placeholder={priority === 'EMERGENCY' ? 'e.g. Severe acute pain' : 'e.g. 82 years old'}
+                    className={`${INPUT} ${priority === 'EMERGENCY' ? 'border-red-400' : 'border-amber-400'}`}
+                  />
+                </div>
+              )}
+
+              {!booking && (
+                <div>
+                  <label htmlFor="checkin-remarks" className={LABEL}>
+                    Remarks (optional)
+                  </label>
+                  <input
+                    id="checkin-remarks"
+                    value={remarks}
+                    onChange={(e) => setRemarks(e.target.value)}
+                    maxLength={1000}
+                    className={INPUT}
+                  />
+                </div>
+              )}
+            </fieldset>
+
+            <div className="space-y-2 border-t border-slate-100 pt-4">
+              {missing.length > 0 && !issued && (
+                <p className="text-xs text-slate-500">Still needed: {missing.join(', ')}.</p>
+              )}
+              <button
+                type="submit"
+                disabled={busy || missing.length > 0 || !canCheckIn || issued != null}
+                className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-[#8E1C3D] px-6 text-sm font-bold text-white shadow-xs hover:bg-[#5D0B26] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#8E1C3D] disabled:opacity-50"
+              >
+                <IconTicket className="h-4 w-4" />
+                {busy ? 'Issuing token…' : submitLabel}
+              </button>
             </div>
+          </form>
 
-            <QueueTicketPreview
-              departmentName={selectedDepartment?.name_en || 'Select department'}
-              doctorName={selectedDoctor?.name_en || 'Select doctor'}
-              tokenPrefix={tokenPrefix}
-              tokenNumber={
-                activeDoctorId == null
-                  ? null
-                  : cabinCode
-                    ? formatToken(previewTokenNumber, cabinCode)
-                    : previewTokenNumber
-              }
-              patientName={selectedPatient?.full_name || 'No patient selected'}
-              patientUrn={selectedPatient?.urn || 'KH-YYYY-XXXX'}
-              cabinCode={cabinCode}
-              waitingCount={queueStats.waiting}
+          {/* RIGHT: today's appointments */}
+          <div className="lg:col-span-5">
+            <TodayAppointmentsPanel
+              activeBookingId={booking?.id ?? null}
+              canCheckIn={canCheckIn}
+              canManage={canManageBookings}
+              onCheckIn={takeBooking}
             />
-          </section>
-        </div>
-
-        {/* BOTTOM ACTION BAR matching Mock 2 */}
-        <div className="flex flex-col sm:flex-row items-center justify-between gap-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-xs">
-          <button
-            type="button"
-            onClick={() => navigate('/reception/appointments')}
-            className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-slate-300 bg-white px-4 text-xs font-bold text-slate-700 hover:bg-slate-50 cursor-pointer"
-          >
-            <IconTicket className="h-4 w-4 text-emerald-800" />
-            View Waiting Queue
-          </button>
-
-          <div className="flex items-center gap-3">
-            <button
-              type="button"
-              onClick={handleClear}
-              className="inline-flex min-h-11 items-center gap-1.5 rounded-xl border border-slate-300 bg-white px-4 text-xs font-bold text-slate-700 hover:bg-slate-50 cursor-pointer"
-            >
-              <IconRefresh className="h-4 w-4 text-slate-500" />
-              Clear
-            </button>
-
-            <button
-              type="button"
-              onClick={handleIssueToken}
-              disabled={
-                isIssuing || !selectedPatient || (visitType === 'booked' ? !selectedBooking : !selectedDoctorId)
-              }
-              className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-[#124832] px-6 text-sm font-bold text-white shadow-xs hover:bg-[#0D3822] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-800 disabled:opacity-50 cursor-pointer"
-            >
-              <IconTicket className="h-4 w-4" />
-              {isIssuing
-                ? 'Issuing...'
-                : visitType === 'booked'
-                  ? 'Check In & Issue Token'
-                  : 'Register Walk-in & Issue Token'}
-            </button>
           </div>
         </div>
       </div>
     </AppShell>
   )
 }
+
+/** A booking that can still be checked in today (a late arrival marked not arrived too). */
+function isBookable(a: Appointment): boolean {
+  return a.appointment_date === istToday() && (a.status === 'BOOKED' || a.status === 'NO_SHOW')
+}
+
+/** The patient as the booking describes them, until their full record is needed. */
+function bookingPatient(b: Appointment): PatientOut {
+  return {
+    id: b.patient_id,
+    urn: b.patient_urn,
+    full_name: b.patient_name,
+    mobile: b.patient_mobile,
+  } as PatientOut
+}
+
+function NewPatientFields(props: {
+  fullName: string
+  setFullName: (v: string) => void
+  ageYears: string
+  setAgeYears: (v: string) => void
+  mobile: string
+  setMobile: (v: string) => void
+  sex: Sex | null
+  setSex: (v: Sex) => void
+  guardianName: string
+  setGuardianName: (v: string) => void
+  address: string
+  setAddress: (v: string) => void
+  duplicate: PatientOut | null
+  notDuplicate: boolean
+  setNotDuplicate: (v: boolean) => void
+  onUseExisting: (p: PatientOut) => void
+}) {
+  return (
+    <div className="space-y-3">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-6">
+        <div className="sm:col-span-4">
+          <label htmlFor="np-name" className={LABEL}>
+            Patient name *
+          </label>
+          <input id="np-name" value={props.fullName} onChange={(e) => props.setFullName(e.target.value)} maxLength={120} className={INPUT} autoComplete="off" />
+        </div>
+        <div className="sm:col-span-2">
+          <label htmlFor="np-age" className={LABEL}>
+            Age (years) *
+          </label>
+          <input
+            id="np-age"
+            type="number"
+            min={0}
+            max={150}
+            value={props.ageYears}
+            onChange={(e) => props.setAgeYears(e.target.value)}
+            className={INPUT}
+          />
+        </div>
+        <div className="sm:col-span-3">
+          <label htmlFor="np-mobile" className={LABEL}>
+            Phone number *
+          </label>
+          <input
+            id="np-mobile"
+            type="tel"
+            inputMode="numeric"
+            value={props.mobile}
+            onChange={(e) => props.setMobile(e.target.value)}
+            maxLength={15}
+            placeholder="10-digit mobile"
+            className={INPUT}
+          />
+        </div>
+        <div className="sm:col-span-3">
+          <span className={LABEL}>Sex *</span>
+          <Segmented<Sex> label="Sex" value={props.sex} onChange={props.setSex} options={SEX_OPTIONS} />
+        </div>
+        <div className="sm:col-span-6">
+          <label htmlFor="np-guardian" className={LABEL}>
+            Guardian name
+          </label>
+          <input
+            id="np-guardian"
+            value={props.guardianName}
+            onChange={(e) => props.setGuardianName(e.target.value)}
+            maxLength={120}
+            placeholder="Father / husband / mother (optional)"
+            className={INPUT}
+          />
+        </div>
+        <div className="sm:col-span-6">
+          <label htmlFor="np-address" className={LABEL}>
+            Address *
+          </label>
+          <input
+            id="np-address"
+            value={props.address}
+            onChange={(e) => props.setAddress(e.target.value)}
+            maxLength={1000}
+            placeholder="Village / town, area"
+            className={INPUT}
+          />
+        </div>
+      </div>
+
+      {props.duplicate && (
+        <div role="alert" className="space-y-2 rounded-xl border border-amber-300 bg-amber-50 p-3 text-xs text-amber-950">
+          <p className="flex items-center gap-2 font-bold">
+            <IconAlertTriangle className="h-4 w-4 text-amber-700" />
+            Already registered? {props.duplicate.full_name} ({props.duplicate.urn}) has the same name and mobile.
+          </p>
+          <div className="flex flex-wrap items-center gap-3">
+            <button
+              type="button"
+              onClick={() => props.onUseExisting(props.duplicate as PatientOut)}
+              className="inline-flex min-h-8 items-center rounded-lg bg-[#8E1C3D] px-3 font-bold text-white hover:bg-[#5D0B26]"
+            >
+              Use this patient
+            </button>
+            <label className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                checked={props.notDuplicate}
+                onChange={(e) => props.setNotDuplicate(e.target.checked)}
+                className="h-4 w-4 accent-[#8E1C3D]"
+              />
+              No, this is a different person
+            </label>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function PatientSearch({
+  query,
+  setQuery,
+  results,
+  searching,
+  onPick,
+}: {
+  query: string
+  setQuery: (v: string) => void
+  results: PatientOut[] | undefined
+  searching: boolean
+  onPick: (p: PatientOut) => void
+}) {
+  return (
+    <div className="space-y-2">
+      <div className="relative">
+        <IconSearch className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
+        <input
+          type="text"
+          aria-label="Search patient by URN, name or mobile"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Search by URN, name or mobile"
+          className={`${INPUT} pl-9 pr-9`}
+          autoComplete="off"
+        />
+        {query && (
+          <button
+            type="button"
+            aria-label="Clear search"
+            onClick={() => setQuery('')}
+            className="absolute inset-y-0 right-0 flex items-center pr-3 text-slate-500 hover:text-slate-700"
+          >
+            <IconX className="h-4 w-4" />
+          </button>
+        )}
+      </div>
+      {query.trim().length >= 2 && (
+        <div className="max-h-56 divide-y divide-slate-100 overflow-y-auto rounded-xl border border-slate-200 bg-white shadow-lg">
+          {searching ? (
+            <p className="p-3 text-center text-xs text-slate-500">Searching…</p>
+          ) : results && results.length > 0 ? (
+            results.map((p) => (
+              <button
+                key={p.id}
+                type="button"
+                onClick={() => onPick(p)}
+                className="flex w-full items-center justify-between gap-3 p-2.5 text-left text-xs hover:bg-[#FBF5F7]"
+              >
+                <span>
+                  <span className="block font-bold text-slate-900">{p.full_name}</span>
+                  <span className="block font-mono text-[#5D0B26]">{p.urn}</span>
+                </span>
+                <span className="text-right text-slate-500">
+                  <span className="block font-mono">{p.mobile}</span>
+                  <span className="block">
+                    {p.age_years} y · {sexLabel(p.gender)}
+                  </span>
+                </span>
+              </button>
+            ))
+          ) : (
+            <p className="p-3 text-center text-xs text-slate-500">
+              No registered patient matches. Switch to New patient to register them.
+            </p>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function SelectedPatientCard({ patient, onChange }: { patient: PatientOut; onChange: () => void }) {
+  // A patient chosen from a booking carries only name, URN and mobile until their record loads.
+  const { data: full } = usePatient(patient.id)
+  const p = full ?? patient
+  return (
+    <div className="rounded-xl border border-emerald-200 bg-emerald-50/50 p-3 text-xs">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="flex items-center gap-2 text-sm font-bold text-slate-900">
+            <IconCheck className="h-4 w-4 text-emerald-700" />
+            {p.full_name}
+          </p>
+          <p className="mt-0.5 font-mono font-bold text-[#5D0B26]">{p.urn}</p>
+          <p className="mt-1 text-slate-600">
+            {p.age_years != null ? `${p.age_years} y · ${sexLabel(p.gender)} · ` : ''}
+            <span className="font-mono">{p.mobile}</span>
+            {p.guardian_name ? ` · Guardian: ${p.guardian_name}` : ''}
+          </p>
+          {p.address && <p className="text-slate-600">{p.address}</p>}
+          <p className="mt-1 font-semibold text-emerald-800">Confirm with the patient that these details are theirs.</p>
+        </div>
+        <div className="flex shrink-0 flex-col items-end gap-1.5">
+          <button type="button" onClick={onChange} className="font-semibold text-slate-600 hover:text-red-700">
+            Not this patient
+          </button>
+          <Link to={`/reception/patients/${p.id}`} className="font-semibold text-[#8E1C3D] hover:underline">
+            Patient file
+          </Link>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function IssuedCard({ issued, onNext }: { issued: Issued; onNext: () => void }) {
+  const a = issued.appointment
+  return (
+    <div role="status" className="space-y-4 rounded-2xl border border-emerald-300 bg-emerald-50/90 p-5 text-emerald-950 shadow-sm">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="space-y-1">
+          <p className="flex items-center gap-2 text-lg font-bold">
+            <IconCheck className="h-5 w-5 text-emerald-700" />
+            {issued.isNewPatient ? 'Patient registered and checked in' : 'Patient checked in'}
+          </p>
+          <p className="text-sm">
+            <span className="font-semibold">{a.patient_name}</span> · URN{' '}
+            <span className="font-mono font-bold">{a.patient_urn}</span>
+            {issued.isNewPatient && <span className="ml-1 text-xs">(new, permanent)</span>}
+          </p>
+          <p className="text-sm">
+            Doctor: <span className="font-semibold">{a.doctor_name_en}</span>
+            {issued.departmentName ? ` · ${issued.departmentName}` : ''}
+          </p>
+          <div className="flex flex-wrap items-center gap-2 text-xs">
+            <PriorityBadge level={a.priority_level} reason={a.priority_reason} />
+            {a.visit_kind && <span>{a.visit_kind === 'FOLLOW_UP' ? 'Follow-up / Revisit' : 'New consultation'}</span>}
+            {a.referral_source && (
+              <span>
+                · Referred by:{' '}
+                {a.referral_source === 'SELF'
+                  ? 'Self'
+                  : `${REFERRAL_OPTIONS.find((o) => o.value === a.referral_source)?.label}${a.referrer_name ? ` (${a.referrer_name})` : ''}`}
+              </span>
+            )}
+          </div>
+        </div>
+        <div className="rounded-xl border border-emerald-300 bg-white px-6 py-3 text-center shadow-xs">
+          <span className="text-xs font-bold uppercase tracking-wider text-slate-500">Token</span>
+          <div data-testid="issued-token" className="font-mono text-4xl font-black text-[#5D0B26]">
+            {formatToken(a.token_number, issued.cabinCode)}
+          </div>
+        </div>
+      </div>
+      <div className="flex flex-wrap items-center gap-2 border-t border-emerald-200 pt-3">
+        <button
+          type="button"
+          onClick={onNext}
+          className="inline-flex min-h-11 items-center rounded-lg bg-[#8E1C3D] px-4 text-sm font-bold text-white hover:bg-[#5D0B26]"
+        >
+          Check in next patient
+        </button>
+        {issued.isNewPatient && (
+          <Link
+            to={`/reception/patients/${a.patient_id}/print`}
+            className="inline-flex min-h-11 items-center rounded-lg border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+          >
+            Print registration card
+          </Link>
+        )}
+        <Link
+          to={`/reception/patients/${a.patient_id}`}
+          className="inline-flex min-h-11 items-center rounded-lg border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+        >
+          Patient file
+        </Link>
+      </div>
+    </div>
+  )
+}
+
 export default TokenGenerationPage

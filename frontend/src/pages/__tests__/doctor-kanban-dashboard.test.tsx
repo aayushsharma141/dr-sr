@@ -157,7 +157,7 @@ describe('Doctor Dashboard 3-Zone Clinical Workspace and Kanban Cards', () => {
     )
 
     // Top Bar items
-    expect(await screen.findByText('Doctor Dashboard')).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { level: 1, name: 'My Queue' })).toBeInTheDocument()
     expect(screen.getByText('Room 104')).toBeInTheDocument()
     expect(screen.getByText(/Current Token:/)).toBeInTheDocument()
     expect((await screen.findAllByText(/#12/)).length).toBeGreaterThanOrEqual(1)

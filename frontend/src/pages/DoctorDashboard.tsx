@@ -983,7 +983,7 @@ export function DoctorDashboard() {
               <div>
                 <div className="flex items-center gap-2.5">
                   <h1 className="text-xl font-bold tracking-tight text-slate-900">
-                    Doctor Dashboard
+                    My Queue
                   </h1>
                   <span className="hidden sm:inline-block rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-semibold text-emerald-800">
                     Live Queue

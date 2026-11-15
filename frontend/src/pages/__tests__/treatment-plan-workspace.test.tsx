@@ -346,7 +346,7 @@ describe('Treatment Plan Workspace & Session Logger UI', () => {
     )
 
     await waitFor(() => {
-      expect(screen.getByText(/Physiotherapy & Rehabilitation Center/i)).toBeInTheDocument()
+      expect(screen.getByRole('heading', { level: 1, name: /Physiotherapy Treatment/ })).toBeInTheDocument()
     })
     expect(screen.getByPlaceholderText(/Type URN/i)).toBeInTheDocument()
     expect(screen.getByText(/Spine Rehabilitation \(Lumbar \/ Cervical\)/i)).toBeInTheDocument()

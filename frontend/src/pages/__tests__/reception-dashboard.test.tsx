@@ -268,20 +268,13 @@ describe('ReceptionDashboard Component', () => {
       expect(screen.getByText('Pooja Singh')).toBeInTheDocument()
     })
 
-    // Find "Check In" button for Pooja Singh
-    const checkInBtn = screen.getByRole('button', { name: /check in/i })
-    expect(checkInBtn).toBeInTheDocument()
-    await user.click(checkInBtn)
+    // "Check In" for Pooja Singh opens Check-in & Token with her booking chosen; the token is issued there.
+    const checkIn = screen.getByRole('link', { name: 'Check In' })
+    expect(checkIn).toHaveAttribute('href', '/reception/tokens?patient_id=4&appointment_id=104')
+    await user.click(checkIn)
 
-    // Verify status mutation triggered
     const { apiFetch } = await import('../../api/client')
-    expect(apiFetch).toHaveBeenCalledWith(
-      '/appointments/104/status',
-      expect.objectContaining({
-        method: 'PATCH',
-        body: expect.objectContaining({ status: 'ARRIVED' }),
-      }),
-    )
+    expect(apiFetch).not.toHaveBeenCalledWith('/appointments/104/status', expect.anything())
   })
 
   it('renders doctor workload column with waiting and next token indicator', async () => {

@@ -606,6 +606,37 @@ class VisitStatus(StrEnum):
     CANCELLED = "CANCELLED"
 
 
+class VisitKind(StrEnum):
+    """Visit type of one consultation (OD-22-05). Recorded only; it never sets the fee."""
+
+    NEW = "NEW"
+    FOLLOW_UP = "FOLLOW_UP"
+
+
+class PriorityLevel(StrEnum):
+    """Queue classification set by reception (OD-22-06). It never changes the token."""
+
+    NORMAL = "NORMAL"
+    PRIORITY = "PRIORITY"
+    EMERGENCY = "EMERGENCY"
+
+
+class ReferralSource(StrEnum):
+    """Who referred the patient for this visit (OD-22-16)."""
+
+    SELF = "SELF"
+    DOCTOR = "DOCTOR"
+    PERSONAL = "PERSONAL"
+    ORGANIZATION = "ORGANIZATION"
+    OTHER = "OTHER"
+
+
+# Referral sources that must name the referrer (OD-22-16).
+REFERRAL_SOURCES_NEEDING_NAME = frozenset(
+    {ReferralSource.DOCTOR.value, ReferralSource.PERSONAL.value, ReferralSource.ORGANIZATION.value}
+)
+
+
 class DailyTokenSequence(Base):
     """Per-doctor daily sequential token counter for gap-free appointment allocation (APT-01)."""
 
@@ -641,6 +672,17 @@ class Visit(Base):
             "status <> 'CANCELLED' OR (cancelled_at IS NOT NULL"
             " AND cancelled_by_user_id IS NOT NULL AND cancel_reason IS NOT NULL)",
             name="cancelled_fields_present",
+        ),
+        CheckConstraint(
+            "referral_source IS NULL OR referral_source IN"
+            " ('SELF', 'DOCTOR', 'PERSONAL', 'ORGANIZATION', 'OTHER')",
+            name="referral_source_valid",
+        ),
+        CheckConstraint(
+            "referral_source IS NULL OR referral_source NOT IN"
+            " ('DOCTOR', 'PERSONAL', 'ORGANIZATION')"
+            " OR (referrer_name IS NOT NULL AND length(trim(referrer_name)) >= 2)",
+            name="referrer_name_present",
         ),
         # Target of fk_appointments_visit_patient (same-patient rule, as SEC-03).
         UniqueConstraint("id", "patient_id", name="uq_visits_id_patient"),
@@ -681,6 +723,16 @@ class Visit(Base):
     )
     cancelled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     cancel_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Referred By, recorded by the check-in that opened the visit (OD-22-16). Empty only on
+    # visits opened before phase 22.
+    referral_source: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    referrer_name: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    referral_recorded_by_user_id: Mapped[int | None] = mapped_column(
+        BigInteger, ForeignKey("users.id", ondelete="RESTRICT"), nullable=True
+    )
+    referral_recorded_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
     version_id: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
@@ -723,6 +775,17 @@ class Appointment(Base):
             " ('WAITING', 'IN_CONSULTATION', 'COMPLETED', 'CANCELLED')",
             name="consultation_status_valid",
         ),
+        CheckConstraint(
+            "visit_kind IS NULL OR visit_kind IN ('NEW', 'FOLLOW_UP')", name="visit_kind_valid"
+        ),
+        CheckConstraint(
+            "priority_level IN ('NORMAL', 'PRIORITY', 'EMERGENCY')", name="priority_level_valid"
+        ),
+        CheckConstraint(
+            "priority_level = 'NORMAL'"
+            " OR (priority_reason IS NOT NULL AND length(trim(priority_reason)) >= 3)",
+            name="priority_reason_present",
+        ),
     )
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
@@ -759,6 +822,32 @@ class Appointment(Base):
     consultation_status: Mapped[str | None] = mapped_column(String(16), nullable=True)
     cancellation_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Visit type (OD-22-05); empty on consultations recorded before phase 22.
+    visit_kind: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    # Classification (OD-22-06/07/09). The token never changes with it; history lives in
+    # consultation_priority_events.
+    priority_level: Mapped[str] = mapped_column(
+        String(16),
+        default=PriorityLevel.NORMAL.value,
+        server_default=text(f"'{PriorityLevel.NORMAL.value}'"),
+        nullable=False,
+    )
+    priority_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+    priority_updated_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    priority_updated_by_user_id: Mapped[int | None] = mapped_column(
+        BigInteger, ForeignKey("users.id", ondelete="RESTRICT"), nullable=True
+    )
+    emergency_alerted_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    alert_acknowledged_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    alert_acknowledged_by_user_id: Mapped[int | None] = mapped_column(
+        BigInteger, ForeignKey("users.id", ondelete="RESTRICT"), nullable=True
+    )
     created_by_user_id: Mapped[int] = mapped_column(
         BigInteger, ForeignKey("users.id", ondelete="RESTRICT"), nullable=False
     )
@@ -778,7 +867,58 @@ class Appointment(Base):
     patient = relationship("Patient", lazy="joined")
     doctor = relationship("Doctor", lazy="joined")
     department = relationship("Department", lazy="joined")
-    created_by_user = relationship("User", lazy="joined")
+    created_by_user = relationship("User", foreign_keys=[created_by_user_id], lazy="joined")
+
+
+class PriorityEventType(StrEnum):
+    """What a classification history row records (OD-22-06/09)."""
+
+    CLASSIFIED = "CLASSIFIED"
+    ACKNOWLEDGED = "ACKNOWLEDGED"
+
+
+class ConsultationPriorityEvent(Base):
+    """Append-only history of classification changes and emergency acknowledgements.
+
+    The runtime role holds SELECT and INSERT only (migration 0026), so rows cannot be edited.
+    """
+
+    __tablename__ = "consultation_priority_events"
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["appointment_id", "patient_id"],
+            ["appointments.id", "appointments.patient_id"],
+            name="fk_consultation_priority_events_appointment_patient",
+            ondelete="RESTRICT",
+        ),
+        CheckConstraint("event IN ('CLASSIFIED', 'ACKNOWLEDGED')", name="event_valid"),
+        CheckConstraint(
+            "to_level IN ('NORMAL', 'PRIORITY', 'EMERGENCY')"
+            " AND (from_level IS NULL OR from_level IN ('NORMAL', 'PRIORITY', 'EMERGENCY'))",
+            name="levels_valid",
+        ),
+        Index("ix_consultation_priority_events_appointment", "appointment_id", "created_at"),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    appointment_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    visit_id: Mapped[int | None] = mapped_column(
+        BigInteger, ForeignKey("visits.id", ondelete="RESTRICT"), nullable=True
+    )
+    patient_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    doctor_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("doctors.id", ondelete="RESTRICT"), nullable=False
+    )
+    event: Mapped[str] = mapped_column(String(16), nullable=False)
+    from_level: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    to_level: Mapped[str] = mapped_column(String(16), nullable=False)
+    reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+    actor_user_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("users.id", ondelete="RESTRICT"), nullable=False
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
 
 
 class ClinicalEncounter(Base):

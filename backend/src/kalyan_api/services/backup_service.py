@@ -332,6 +332,8 @@ RUNTIME_TABLE_GRANTS: dict[str, tuple[str, ...]] = {
     "integrity_runs": ("SELECT", "INSERT"),
     # Visits are never deleted (RF-10, migration 0025).
     "visits": ("SELECT", "INSERT", "UPDATE"),
+    # Classification history is append-only (OD-22-06, migration 0026).
+    "consultation_priority_events": ("SELECT", "INSERT"),
 }
 
 

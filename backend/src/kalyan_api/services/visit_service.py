@@ -41,13 +41,19 @@ def open_or_join_visit(session: Session, patient_id: int, opened_by_user_id: int
 
 
 def join_or_open_visit(
-    session: Session, patient_id: int, opened_by_user_id: int
+    session: Session,
+    patient_id: int,
+    opened_by_user_id: int,
+    *,
+    referral_source: str | None = None,
+    referrer_name: str | None = None,
 ) -> tuple[Visit, bool]:
     """Return (visit, opened): today's OPEN visit for the patient, and whether this call opened it.
 
     The patient row is locked first, so two desks checking in the same patient at once cannot
     both open a visit. An OPEN visit left over from an earlier day is not joined: reception must
-    close or cancel it first, because visits are never closed automatically.
+    close or cancel it first, because visits are never closed automatically. A visit opened here
+    records the referral given (OD-22-16) in the same insert; a joined visit keeps its own.
     """
     patient = session.get(Patient, patient_id, with_for_update=True)
     if patient is None or not patient.is_active:
@@ -78,6 +84,11 @@ def join_or_open_visit(
         status=VisitStatus.OPEN.value,
         opened_by_user_id=opened_by_user_id,
     )
+    if referral_source is not None:
+        visit.referral_source = referral_source
+        visit.referrer_name = referrer_name
+        visit.referral_recorded_by_user_id = opened_by_user_id
+        visit.referral_recorded_at = clock.utcnow()
     session.add(visit)
     session.flush()
     return visit, True

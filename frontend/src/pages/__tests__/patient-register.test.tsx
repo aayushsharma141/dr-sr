@@ -156,6 +156,56 @@ describe('Patient Registration Screen', () => {
     expect((capturedBody as any)?.mobile).toBe('9876543210')
   })
 
+  it('offers Male, Female and Other for a new patient and saves Other as O', async () => {
+    const captured: { body: { gender?: string } | null } = { body: null }
+    const json = (status: number, body: unknown) => ({
+      ok: status < 300,
+      status,
+      headers: new Headers({ 'content-type': 'application/json' }),
+      text: () => Promise.resolve(JSON.stringify(body)),
+    })
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockImplementation((url: string, init?: RequestInit) => {
+        if (url.includes('/api/auth/me')) return Promise.resolve(json(200, mockMe))
+        if (url.includes('/api/patients/check-duplicate'))
+          return Promise.resolve(json(200, { has_duplicate: false, matching_patient: null }))
+        if (url.includes('/api/patients') && init?.method === 'POST') {
+          captured.body = JSON.parse(init.body as string)
+          return Promise.resolve(json(201, { ...mockRegisteredPatient, gender: 'O' }))
+        }
+        return Promise.reject(new Error(`Unhandled: ${url}`))
+      }),
+    )
+
+    const user = userEvent.setup()
+    render(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter>
+          <PatientRegister />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    )
+
+    // The Male radio carries the group's label ("Gender *") for the canonical-field check.
+    expect(screen.getByLabelText(/Gender \*/i)).toHaveAttribute('value', 'M')
+    expect(screen.getByRole('radio', { name: 'Female' })).toBeInTheDocument()
+    const other = screen.getByRole('radio', { name: 'Other' })
+    await user.click(other)
+    expect(other).toBeChecked()
+
+    await user.type(screen.getByLabelText(/Full Name \*/i), 'Aarav Kumar')
+    await user.type(screen.getByLabelText(/Mobile Number \*/i), '9876543210')
+    await user.type(screen.getByLabelText(/Age \(Years\)/i), '30')
+    await user.type(screen.getByLabelText(/Address \(Village/i), 'Main Bazaar, Ara')
+    await user.click(screen.getByRole('button', { name: /register patient/i }))
+
+    await waitFor(() => {
+      expect(screen.getByText('Registration Successful!')).toBeInTheDocument()
+    })
+    expect(captured.body?.gender).toBe('O')
+  })
+
   it('registers the patient only: no visit or token fields, no visit calls, and the Token Desk is a separate step', async () => {
     const requests: string[] = []
 
@@ -217,9 +267,10 @@ describe('Patient Registration Screen', () => {
     // Registration issues no queue token and touches no visit or appointment.
     expect(screen.queryByText(/Allocated Queue Token/i)).not.toBeInTheDocument()
     expect(requests.some((r) => /\/api\/(appointments|visits|encounters)/.test(r))).toBe(false)
-    expect(screen.getByRole('link', { name: /Issue Queue Token at Token Desk/i })).toHaveAttribute(
+    // The next step opens Check-in & Token with this patient already chosen.
+    expect(screen.getByRole('link', { name: 'Check In & Issue Token' })).toHaveAttribute(
       'href',
-      '/reception/tokens',
+      expect.stringMatching(/^\/reception\/tokens\?patient_id=\d+$/),
     )
   })
 

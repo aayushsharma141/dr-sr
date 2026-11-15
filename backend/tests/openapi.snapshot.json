@@ -523,6 +523,18 @@
       "AppointmentRead": {
         "description": "Detailed appointment record.",
         "properties": {
+          "alert_acknowledged_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Alert Acknowledged At"
+          },
           "appointment_date": {
             "format": "date",
             "title": "Appointment Date",
@@ -597,6 +609,18 @@
             ],
             "title": "Doctor Name Hi"
           },
+          "emergency_alerted_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Emergency Alerted At"
+          },
           "expected_time": {
             "anyOf": [
               {
@@ -639,6 +663,56 @@
           "patient_urn": {
             "title": "Patient Urn",
             "type": "string"
+          },
+          "priority_level": {
+            "default": "NORMAL",
+            "title": "Priority Level",
+            "type": "string"
+          },
+          "priority_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Priority Reason"
+          },
+          "priority_updated_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Priority Updated At"
+          },
+          "referral_source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Referral Source"
+          },
+          "referrer_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Referrer Name"
           },
           "rescheduled_from_id": {
             "anyOf": [
@@ -701,6 +775,17 @@
               }
             ],
             "title": "Visit Id"
+          },
+          "visit_kind": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Visit Kind"
           }
         },
         "required": [
@@ -1828,14 +1913,61 @@
       "CheckInRequest": {
         "description": "Payload to check a booked patient in on arrival (RF-12).",
         "properties": {
+          "priority_level": {
+            "$ref": "#/components/schemas/PriorityLevel",
+            "default": "NORMAL",
+            "description": "Queue classification; the token never changes"
+          },
+          "priority_reason": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Required for PRIORITY and EMERGENCY",
+            "title": "Priority Reason"
+          },
+          "referral_source": {
+            "$ref": "#/components/schemas/ReferralSource",
+            "description": "Who referred the patient (OD-22-16)"
+          },
+          "referrer_name": {
+            "anyOf": [
+              {
+                "maxLength": 120,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Referring doctor, person or organisation; required for those sources",
+            "title": "Referrer Name"
+          },
           "version_id": {
             "description": "Optimistic locking version ID",
             "exclusiveMinimum": 0.0,
             "title": "Version Id",
             "type": "integer"
+          },
+          "visit_kind": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/VisitKind"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "NEW or FOLLOW_UP; recorded only, never sets the fee"
           }
         },
         "required": [
+          "referral_source",
           "version_id"
         ],
         "title": "CheckInRequest",
@@ -3042,6 +3174,30 @@
       "DoctorQueueItem": {
         "description": "Item in doctor consultation queue.",
         "properties": {
+          "alert_acknowledged_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Alert Acknowledged At"
+          },
+          "check_in_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Check In At"
+          },
           "consultation_status": {
             "anyOf": [
               {
@@ -3052,6 +3208,18 @@
               }
             ],
             "title": "Consultation Status"
+          },
+          "emergency_alerted_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Emergency Alerted At"
           },
           "id": {
             "title": "Id",
@@ -3096,6 +3264,22 @@
             "title": "Patient Urn",
             "type": "string"
           },
+          "priority_level": {
+            "default": "NORMAL",
+            "title": "Priority Level",
+            "type": "string"
+          },
+          "priority_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Priority Reason"
+          },
           "status": {
             "title": "Status",
             "type": "string"
@@ -3119,6 +3303,17 @@
           "version_id": {
             "title": "Version Id",
             "type": "integer"
+          },
+          "visit_kind": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Visit Kind"
           }
         },
         "required": [
@@ -4881,6 +5076,93 @@
         "title": "MonthOverMonth",
         "type": "object"
       },
+      "NewPatientCheckIn": {
+        "description": "Register a first-time patient and check them in, in one transaction (OD-22-03).\n\nThe patient receives a permanent URN, today's visit is opened and the consultation joins\nthe doctor's waiting list with its token. A first visit is always a NEW consultation.",
+        "properties": {
+          "department_id": {
+            "description": "Configured department/specialty ID",
+            "exclusiveMinimum": 0.0,
+            "title": "Department Id",
+            "type": "integer"
+          },
+          "doctor_id": {
+            "description": "Consulting doctor ID",
+            "exclusiveMinimum": 0.0,
+            "title": "Doctor Id",
+            "type": "integer"
+          },
+          "notes": {
+            "anyOf": [
+              {
+                "maxLength": 1000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Reception notes",
+            "title": "Notes"
+          },
+          "patient": {
+            "$ref": "#/components/schemas/PatientCreate"
+          },
+          "priority_level": {
+            "$ref": "#/components/schemas/PriorityLevel",
+            "default": "NORMAL",
+            "description": "Queue classification; the token never changes"
+          },
+          "priority_reason": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Required for PRIORITY and EMERGENCY",
+            "title": "Priority Reason"
+          },
+          "referral_source": {
+            "$ref": "#/components/schemas/ReferralSource",
+            "description": "Who referred the patient (OD-22-16)"
+          },
+          "referrer_name": {
+            "anyOf": [
+              {
+                "maxLength": 120,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Referring doctor, person or organisation; required for those sources",
+            "title": "Referrer Name"
+          },
+          "visit_kind": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/VisitKind"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "NEW or FOLLOW_UP; recorded only, never sets the fee"
+          }
+        },
+        "required": [
+          "referral_source",
+          "patient",
+          "doctor_id",
+          "department_id"
+        ],
+        "title": "NewPatientCheckIn",
+        "type": "object"
+      },
       "OverviewAlertOut": {
         "additionalProperties": false,
         "description": "Factual condition worth an administrator's attention (no invented thresholds).",
@@ -6593,6 +6875,49 @@
         "title": "PrintTemplateUpdate",
         "type": "object"
       },
+      "PriorityLevel": {
+        "description": "Queue classification set by reception (OD-22-06). It never changes the token.",
+        "enum": [
+          "NORMAL",
+          "PRIORITY",
+          "EMERGENCY"
+        ],
+        "title": "PriorityLevel",
+        "type": "string"
+      },
+      "PriorityUpdate": {
+        "description": "Change a checked-in patient's classification (OD-22-06). The token never changes.",
+        "properties": {
+          "priority_level": {
+            "$ref": "#/components/schemas/PriorityLevel"
+          },
+          "priority_reason": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Required for PRIORITY and EMERGENCY",
+            "title": "Priority Reason"
+          },
+          "version_id": {
+            "description": "Optimistic locking version ID",
+            "exclusiveMinimum": 0.0,
+            "title": "Version Id",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "priority_level",
+          "version_id"
+        ],
+        "title": "PriorityUpdate",
+        "type": "object"
+      },
       "RecentAdminActionOut": {
         "additionalProperties": false,
         "description": "One audit row written by an ADMIN actor.",
@@ -6826,6 +7151,18 @@
         ],
         "title": "ReceptionOverviewResponse",
         "type": "object"
+      },
+      "ReferralSource": {
+        "description": "Who referred the patient for this visit (OD-22-16).",
+        "enum": [
+          "SELF",
+          "DOCTOR",
+          "PERSONAL",
+          "ORGANIZATION",
+          "OTHER"
+        ],
+        "title": "ReferralSource",
+        "type": "string"
       },
       "RescheduleRequest": {
         "description": "Payload to move a booking to another date, or to change its expected time (RF-12).",
@@ -8986,6 +9323,15 @@
         "title": "VisitDueOut",
         "type": "object"
       },
+      "VisitKind": {
+        "description": "Visit type of one consultation (OD-22-05). Recorded only; it never sets the fee.",
+        "enum": [
+          "NEW",
+          "FOLLOW_UP"
+        ],
+        "title": "VisitKind",
+        "type": "string"
+      },
       "VisitListResponse": {
         "description": "Filtered visit list.",
         "properties": {
@@ -9528,9 +9874,56 @@
             "exclusiveMinimum": 0.0,
             "title": "Patient Id",
             "type": "integer"
+          },
+          "priority_level": {
+            "$ref": "#/components/schemas/PriorityLevel",
+            "default": "NORMAL",
+            "description": "Queue classification; the token never changes"
+          },
+          "priority_reason": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Required for PRIORITY and EMERGENCY",
+            "title": "Priority Reason"
+          },
+          "referral_source": {
+            "$ref": "#/components/schemas/ReferralSource",
+            "description": "Who referred the patient (OD-22-16)"
+          },
+          "referrer_name": {
+            "anyOf": [
+              {
+                "maxLength": 120,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Referring doctor, person or organisation; required for those sources",
+            "title": "Referrer Name"
+          },
+          "visit_kind": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/VisitKind"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "NEW or FOLLOW_UP; recorded only, never sets the fee"
           }
         },
         "required": [
+          "referral_source",
           "patient_id",
           "doctor_id",
           "department_id"
@@ -10623,6 +11016,48 @@
         ]
       }
     },
+    "/api/appointments/walk-in/new-patient": {
+      "post": {
+        "description": "Register a first-time patient and check them in, all or nothing (OD-22-03).\n\nOne transaction: permanent URN and patient record, today's visit, the consultation with\nthe chosen doctor and its token. If any step is refused, nothing is saved.",
+        "operationId": "check_in_new_patient_api_appointments_walk_in_new_patient_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NewPatientCheckIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AppointmentRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Check In New Patient",
+        "tags": [
+          "appointments"
+        ]
+      }
+    },
     "/api/appointments/{id}": {
       "get": {
         "description": "Retrieve an appointment by ID.",
@@ -10714,6 +11149,59 @@
           }
         },
         "summary": "Check In Appointment",
+        "tags": [
+          "appointments"
+        ]
+      }
+    },
+    "/api/appointments/{id}/priority": {
+      "patch": {
+        "description": "Mark a checked-in patient Normal, Priority or Emergency, with a reason (OD-22-06).\n\nThe token and the place in the consultation are untouched. Each change is kept in the\nclassification history and the audit log; Emergency raises an alert for the doctor.",
+        "operationId": "update_priority_api_appointments__id__priority_patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "title": "Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PriorityUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AppointmentRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Priority",
         "tags": [
           "appointments"
         ]

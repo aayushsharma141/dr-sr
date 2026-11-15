@@ -802,8 +802,10 @@ describe('Clinical Encounter Workspace Test Suite', () => {
         expect(screen.getByText(/✓ AUTHORISED \(Locked\)/i)).toBeInTheDocument()
       })
 
-      // Print Prescription Slip is enabled
-      expect(screen.getByRole('link', { name: /Print Prescription Slip/i })).toBeInTheDocument()
+      // Print Prescription Slip opens the A4 slip in place (there is no separate print page)
+      expect(screen.queryByRole('link', { name: /Print Prescription Slip/i })).not.toBeInTheDocument()
+      await userEvent.click(screen.getByRole('button', { name: /Print Prescription Slip/i }))
+      expect(await screen.findByRole('dialog', { name: 'Prescription slip' })).toBeInTheDocument()
     })
 
     it('requires cancellation reason min 3 chars to cancel and reissue prescription', async () => {

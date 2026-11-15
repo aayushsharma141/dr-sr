@@ -198,6 +198,6 @@ describe('DoctorDashboard integration with Unfinished Consultations card', () =>
     expect(screen.getByText('KH-2026-8801')).toBeInTheDocument()
 
     // Today's consultation queue is also visible below
-    expect(screen.getByText('Doctor Dashboard')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { level: 1, name: 'My Queue' })).toBeInTheDocument()
   })
 })

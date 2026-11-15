@@ -74,7 +74,8 @@ def _tokenless_booking(db_session, patient, doctor_user, reception_user, appoint
 
 def _check_in(client, appointment_id: int, version_id: int = 1):
     return client.post(
-        f"/api/appointments/{appointment_id}/check-in", json={"version_id": version_id}
+        f"/api/appointments/{appointment_id}/check-in",
+        json={"version_id": version_id, "referral_source": "SELF"},
     )
 
 
@@ -298,6 +299,7 @@ def _walk_in(client, patient, doctor_user, **extra):
             "patient_id": patient.id,
             "doctor_id": doctor_user.doctor_id,
             "department_id": doctor_user.doctor.departments[0].id,
+            "referral_source": "SELF",
             **extra,
         },
     )

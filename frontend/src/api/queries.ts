@@ -34,6 +34,9 @@ import type {
   CheckInRequest,
   DoctorQueueResponse,
   WalkInCreate,
+  NewPatientCheckIn,
+  PriorityUpdate,
+  RescheduleRequest,
   EncounterCreate,
   EncounterRead,
   EncounterSummary,
@@ -84,6 +87,7 @@ import type {
 import {
   QueryClient,
   useMutation,
+  useQueries,
   useQuery,
   useQueryClient,
 } from '@tanstack/react-query'
@@ -632,6 +636,28 @@ export function useDepartmentDoctors(departmentId: number | null) {
   })
 }
 
+/** One choice at the check-in desk: a doctor in one of the departments they consult in. */
+export interface ConsultingDoctorOption {
+  doctor: DepartmentDoctorOut
+  department: DepartmentOut
+}
+
+/** Every doctor of every active department, for the check-in desk's single doctor list. */
+export function useConsultingDoctors() {
+  const { data: departments, isPending: departmentsPending } = useDepartments()
+  const active = (departments ?? []).filter((d) => d.is_active)
+  const results = useQueries({
+    queries: active.map((dept) => ({
+      queryKey: ['departments', dept.id, 'doctors'],
+      queryFn: () => apiFetch<DepartmentDoctorOut[]>(`/departments/${dept.id}/doctors`),
+    })),
+  })
+  const options: ConsultingDoctorOption[] = active.flatMap((department, index) =>
+    (results[index]?.data ?? []).map((doctor) => ({ doctor, department })),
+  )
+  return { options, isPending: departmentsPending || results.some((r) => r.isPending) }
+}
+
 export function useDoctorDepartments(doctorId: number | null) {
   return useQuery({
     queryKey: ['doctors', doctorId, 'departments'],
@@ -897,6 +923,47 @@ export function useWalkIn() {
       qc.invalidateQueries({ queryKey: ['appointments'] })
       qc.invalidateQueries({ queryKey: ['doctor-queue'] })
       qc.invalidateQueries({ queryKey: ['visits'] })
+    },
+  })
+}
+
+/** Move a booking to another day (a new linked booking) or change its expected time. */
+export function useRescheduleAppointment() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, body }: { id: number; body: RescheduleRequest }) =>
+      apiFetch<Appointment>(`/appointments/${id}/reschedule`, { method: 'POST', body }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['appointments'] })
+    },
+  })
+}
+
+/** Register a first-time patient and check them in, all or nothing (OD-22-03). */
+export function useCheckInNewPatient() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (body: NewPatientCheckIn) =>
+      apiFetch<Appointment>('/appointments/walk-in/new-patient', { method: 'POST', body }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['appointments'] })
+      qc.invalidateQueries({ queryKey: ['doctor-queue'] })
+      qc.invalidateQueries({ queryKey: ['visits'] })
+      qc.invalidateQueries({ queryKey: ['patients'] })
+    },
+  })
+}
+
+/** Mark a checked-in patient Normal, Priority or Emergency (OD-22-06). */
+export function useUpdatePriority() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, body }: { id: number; body: PriorityUpdate }) =>
+      apiFetch<Appointment>(`/appointments/${id}/priority`, { method: 'PATCH', body }),
+    onSuccess: (data) => {
+      qc.setQueryData(['appointment', data.id], data)
+      qc.invalidateQueries({ queryKey: ['appointments'] })
+      qc.invalidateQueries({ queryKey: ['doctor-queue'] })
     },
   })
 }

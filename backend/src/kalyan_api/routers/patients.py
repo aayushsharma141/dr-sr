@@ -28,19 +28,15 @@ from kalyan_api.schemas.patients import (
     PatientOut,
     PatientUpdate,
 )
-from kalyan_api.services import audit_service, photo_service
+from kalyan_api.services import audit_service, patient_service, photo_service
 from kalyan_api.services.audit_service import AuditAction
-from kalyan_api.services.urn_service import allocate_next_urn
 
 router = APIRouter(prefix="/patients", tags=["patients"])
 
 
 def _clean_mobile(raw: str) -> str:
-    """Normalize mobile to 10 digits."""
-    digits = re.sub(r"\D", "", raw)
-    if digits.startswith("91") and len(digits) == 12:
-        return digits[2:]
-    return digits[-10:] if len(digits) >= 10 else digits
+    """Normalize mobile to 10 digits (shared with new-patient check-in)."""
+    return patient_service.clean_mobile(raw)
 
 
 async def _extract_photo_bytes(request: Request) -> bytes:
@@ -77,26 +73,7 @@ def register_patient(
     principal: Principal = Depends(current_principal),
 ) -> PatientOut:
     """Register a new patient with 12 canonical demographic fields and atomic URN."""
-    urn = allocate_next_urn(session)
-    clean_phone = _clean_mobile(payload.mobile)
-
-    patient = Patient(
-        urn=urn,
-        full_name=payload.full_name.strip(),
-        guardian_name=payload.guardian_name.strip(),
-        gender=payload.gender,
-        dob=payload.dob,
-        age_years=payload.age_years,
-        mobile=clean_phone,
-        address=payload.address.strip(),
-        district=payload.district.strip(),
-        state=payload.state.strip(),
-        emergency_contact=payload.emergency_contact.strip() if payload.emergency_contact else None,
-        allergies=payload.allergies.strip(),
-        notes=payload.notes.strip() if payload.notes else None,
-    )
-    session.add(patient)
-    session.flush()
+    patient = patient_service.create_patient(session, payload)
 
     ctx = build_audit_context(request, principal)
     audit_service.record(
@@ -105,13 +82,7 @@ def register_patient(
         AuditAction.PATIENT_REGISTERED,
         "PATIENT",
         str(patient.id),
-        after={
-            "urn": patient.urn,
-            "full_name": patient.full_name,
-            "mobile": patient.mobile,
-            "gender": patient.gender,
-            "age_years": patient.age_years,
-        },
+        after=patient_service.registration_audit_after(patient),
     )
 
     return PatientOut.model_validate(patient)

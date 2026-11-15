@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Modal } from './Modal'
+import { PrescriptionPrint } from './PrescriptionPrint'
 import type { PrescriptionItemCreate, PrescriptionOut } from '../api/types'
 
 export interface PrescriptionFormSectionProps {
@@ -39,6 +40,7 @@ export function PrescriptionFormSection({
   const [cancelReason, setCancelReason] = useState('')
   const [cancelError, setCancelError] = useState<string | null>(null)
   const [validationError, setValidationError] = useState<string | null>(null)
+  const [showPrint, setShowPrint] = useState(false)
 
   const status = prescription?.status || 'DRAFT'
   const isLocked = status === 'AUTHORISED' || status === 'CANCELLED' || readOnly
@@ -176,17 +178,17 @@ export function PrescriptionFormSection({
           {status === 'AUTHORISED' && (
             <>
               {prescription?.id && (
-                <a
-                  href={`/doctor/prescriptions/${prescription.id}/print`}
-                  target="_blank"
-                  rel="noopener noreferrer"
+                // Opens the A4 slip in place; there is no separate print page to open.
+                <button
+                  type="button"
+                  onClick={() => setShowPrint(true)}
                   className="px-3 py-1.5 border border-neutral-300 rounded text-xs font-semibold text-neutral-700 hover:bg-neutral-50 flex items-center gap-1.5"
                 >
                   <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
                   </svg>
                   Print Prescription Slip
-                </a>
+                </button>
               )}
               {!readOnly && (
                 <button
@@ -424,6 +426,10 @@ export function PrescriptionFormSection({
       </div>
 
       {/* Cancel Prescription Confirmation Modal */}
+      {showPrint && prescription && (
+        <PrescriptionPrint prescription={prescription} onClose={() => setShowPrint(false)} />
+      )}
+
       {showCancelModal && (
         <Modal
           open

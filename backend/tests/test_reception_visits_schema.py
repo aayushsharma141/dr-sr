@@ -255,13 +255,15 @@ def test_downgrade_0025_refuses_while_visits_exist(owner_engine: Engine, test_se
         )
         patient = _patient(session, "VC")
         _visit(session, patient, user)
+        version_before = connection.scalar(text("SELECT version_num FROM alembic_version"))
 
         context = MigrationContext.configure(connection, opts={"target_metadata": Base.metadata})
         with Operations.context(context), pytest.raises(RuntimeError, match="visit row"):
             migration.downgrade()
 
         assert connection.scalar(text("SELECT to_regclass('public.visits') IS NOT NULL"))
-        assert connection.scalar(text("SELECT version_num FROM alembic_version")) == "0025"
+        # Nothing changed: the database stays at whatever head it was (0026 since phase 22).
+        assert connection.scalar(text("SELECT version_num FROM alembic_version")) == version_before
     finally:
         session.close()
         transaction.rollback()
