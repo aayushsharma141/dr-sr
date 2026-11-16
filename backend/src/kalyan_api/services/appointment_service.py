@@ -34,8 +34,33 @@ from kalyan_api.models import (
 ALLOWED_TRANSITIONS: dict[AppointmentStatus, set[AppointmentStatus]] = {
     AppointmentStatus.BOOKED: {
         AppointmentStatus.ARRIVED,
+        AppointmentStatus.CHECKED_IN,
         AppointmentStatus.CANCELLED,
         AppointmentStatus.NO_SHOW,
+    },
+    AppointmentStatus.TO_ARRIVE: {
+        AppointmentStatus.REGISTERED,
+        AppointmentStatus.CHECKED_IN,
+        AppointmentStatus.ARRIVED,
+        AppointmentStatus.WAITING,
+        AppointmentStatus.CANCELLED,
+        AppointmentStatus.NO_SHOW,
+        AppointmentStatus.RESCHEDULED,
+    },
+    AppointmentStatus.REGISTERED: {
+        AppointmentStatus.CHECKED_IN,
+        AppointmentStatus.ARRIVED,
+        AppointmentStatus.WAITING,
+        AppointmentStatus.CANCELLED,
+    },
+    AppointmentStatus.CHECKED_IN: {
+        AppointmentStatus.WAITING,
+        AppointmentStatus.IN_CONSULTATION,
+        AppointmentStatus.CANCELLED,
+    },
+    AppointmentStatus.WAITING: {
+        AppointmentStatus.IN_CONSULTATION,
+        AppointmentStatus.CANCELLED,
     },
     AppointmentStatus.ARRIVED: {
         AppointmentStatus.IN_CONSULTATION,
@@ -44,11 +69,14 @@ ALLOWED_TRANSITIONS: dict[AppointmentStatus, set[AppointmentStatus]] = {
     },
     AppointmentStatus.IN_CONSULTATION: {
         AppointmentStatus.DONE,
+        AppointmentStatus.COMPLETED,
         AppointmentStatus.CANCELLED,
     },
     AppointmentStatus.DONE: set(),
+    AppointmentStatus.COMPLETED: set(),
     AppointmentStatus.CANCELLED: set(),
     AppointmentStatus.NO_SHOW: set(),
+    AppointmentStatus.RESCHEDULED: set(),
 }
 
 
@@ -127,14 +155,35 @@ BOOKING_TRANSITIONS: dict[AppointmentStatus, frozenset[AppointmentStatus]] = {
     AppointmentStatus.BOOKED: frozenset(
         {
             AppointmentStatus.ARRIVED,
+            AppointmentStatus.CHECKED_IN,
             AppointmentStatus.NO_SHOW,
             AppointmentStatus.CANCELLED,
             AppointmentStatus.RESCHEDULED,
         }
     ),
+    AppointmentStatus.TO_ARRIVE: frozenset(
+        {
+            AppointmentStatus.REGISTERED,
+            AppointmentStatus.CHECKED_IN,
+            AppointmentStatus.ARRIVED,
+            AppointmentStatus.NO_SHOW,
+            AppointmentStatus.CANCELLED,
+            AppointmentStatus.RESCHEDULED,
+        }
+    ),
+    AppointmentStatus.REGISTERED: frozenset(
+        {
+            AppointmentStatus.CHECKED_IN,
+            AppointmentStatus.ARRIVED,
+            AppointmentStatus.CANCELLED,
+        }
+    ),
+    AppointmentStatus.CHECKED_IN: frozenset(),
+    AppointmentStatus.WAITING: frozenset(),
+    AppointmentStatus.COMPLETED: frozenset(),
     # A late arrival checks in the same day; otherwise the booking moves to a new date.
     AppointmentStatus.NO_SHOW: frozenset(
-        {AppointmentStatus.ARRIVED, AppointmentStatus.RESCHEDULED}
+        {AppointmentStatus.ARRIVED, AppointmentStatus.CHECKED_IN, AppointmentStatus.RESCHEDULED}
     ),
     # After check-in the booking is settled; the consultation status carries on from there.
     AppointmentStatus.ARRIVED: frozenset(),
@@ -144,7 +193,7 @@ BOOKING_TRANSITIONS: dict[AppointmentStatus, frozenset[AppointmentStatus]] = {
 
 # Check-in and reschedule belong to reception (owner decision 10: Admin is oversight only).
 RECEPTION_ONLY_BOOKING_TARGETS = frozenset(
-    {AppointmentStatus.ARRIVED, AppointmentStatus.RESCHEDULED}
+    {AppointmentStatus.ARRIVED, AppointmentStatus.CHECKED_IN, AppointmentStatus.RESCHEDULED}
 )
 
 

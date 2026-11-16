@@ -735,6 +735,11 @@ export type AppointmentStatus =
   | 'CANCELLED'
   | 'NO_SHOW'
   | 'RESCHEDULED'
+  | 'TO_ARRIVE'
+  | 'REGISTERED'
+  | 'CHECKED_IN'
+  | 'WAITING'
+  | 'COMPLETED'
 
 /** Where the doctor's side of a checked-in appointment stands (RF-10). Empty until check-in. */
 export type ConsultationStatus = 'WAITING' | 'IN_CONSULTATION' | 'COMPLETED' | 'CANCELLED'
@@ -832,6 +837,7 @@ export interface NewPatientCheckIn extends CheckInDetails {
   department_id: number
   doctor_id: number
   notes?: string | null
+  to_arrive?: boolean
 }
 
 /** Move a booking to another date, or change its expected time (RF-12). */

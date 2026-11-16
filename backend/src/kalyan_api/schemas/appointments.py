@@ -76,6 +76,10 @@ class AppointmentCreate(BaseModel):
             "(BR-006)"
         ),
     )
+    issue_token: bool = Field(
+        default=False,
+        description="When true, allocates token atomically for doctor queue (TO_ARRIVE)",
+    )
 
 
 class WalkInCreate(CheckInDetailsIn):
@@ -109,6 +113,10 @@ class NewPatientCheckIn(CheckInDetailsIn):
     doctor_id: int = Field(..., gt=0, description="Consulting doctor ID")
     department_id: int = Field(..., gt=0, description="Configured department/specialty ID")
     notes: str | None = Field(default=None, max_length=1000, description="Reception notes")
+    to_arrive: bool = Field(
+        default=False,
+        description="When true, issues token and places in TO_ARRIVE status pending registration",
+    )
 
     @model_validator(mode="after")
     def _first_visit_is_new(self) -> "NewPatientCheckIn":

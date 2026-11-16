@@ -18,12 +18,14 @@ from kalyan_api.core.principal import (
 from kalyan_api.db.session import SessionDep
 from kalyan_api.models import (
     Appointment,
+    AppointmentSource,
     AppointmentStatus,
     ConsultationStatus,
     Doctor,
     PriorityLevel,
     ReferralSource,
     Visit,
+    VisitKind,
 )
 from kalyan_api.schemas.appointments import (
     AcknowledgeAlertRequest,
@@ -41,7 +43,7 @@ from kalyan_api.schemas.appointments import (
     RescheduleRequest,
     WalkInCreate,
 )
-from kalyan_api.services import audit_service, booking_service, patient_service
+from kalyan_api.services import audit_service, booking_service, patient_service, token_service
 from kalyan_api.services.appointment_service import validate_status_update
 from kalyan_api.services.audit_service import AuditAction
 
@@ -207,6 +209,7 @@ def book_appointment(
     The booking has no token: it is issued at check-in (RF-12, owner decision 7), so queue
     order follows arrival.
     """
+    issue_tok = bool(payload.issue_token)
     appt = booking_service.create_booking(
         session,
         principal,
@@ -218,8 +221,11 @@ def book_appointment(
         override_reason=payload.override_reason,
         source=payload.source,
         expected_time=payload.expected_time,
-        issue_token=False,
+        issue_token=issue_tok,
     )
+    if issue_tok:
+        appt.status = AppointmentStatus.TO_ARRIVE.value
+        session.flush()
     override_text = (payload.override_reason or "").strip() or None
     _record_booking_created(session, build_audit_context(request, principal), appt, override_text)
     return _to_read_schema(appt)
@@ -285,6 +291,31 @@ def check_in_new_patient(
         str(patient.id),
         after=patient_service.registration_audit_after(patient),
     )
+    if payload.to_arrive:
+        token = token_service.generate_next_daily_token(
+            session, payload.doctor_id, clock.ist_today()
+        )
+        now = clock.utcnow()
+        appt = Appointment(
+            patient_id=patient.id,
+            doctor_id=payload.doctor_id,
+            department_id=payload.department_id,
+            appointment_date=clock.ist_today(),
+            token_number=token,
+            status=AppointmentStatus.TO_ARRIVE.value,
+            status_updated_at=now,
+            source=AppointmentSource.WALK_IN.value,
+            visit_kind=VisitKind.NEW.value,
+            priority_level=payload.priority_level.value,
+            priority_reason=payload.priority_reason,
+            notes=payload.notes,
+            created_by_user_id=principal.user_id,
+        )
+        session.add(appt)
+        session.flush()
+        _record_booking_created(session, ctx, appt)
+        return _to_read_schema(appt)
+
     result = booking_service.walk_in(
         session,
         principal,

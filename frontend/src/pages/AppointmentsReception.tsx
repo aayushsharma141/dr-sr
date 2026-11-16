@@ -27,6 +27,11 @@ const STATUS_LABEL: Record<AppointmentStatus, string> = {
   CANCELLED: 'Cancelled',
   NO_SHOW: 'No-show',
   RESCHEDULED: 'Rescheduled',
+  TO_ARRIVE: 'To arrive',
+  REGISTERED: 'Registered',
+  CHECKED_IN: 'Checked in',
+  WAITING: 'Waiting',
+  COMPLETED: 'Completed',
 }
 
 const STATUS_CLASS: Record<AppointmentStatus, string> = {
@@ -37,6 +42,11 @@ const STATUS_CLASS: Record<AppointmentStatus, string> = {
   CANCELLED: 'bg-slate-100 text-slate-700 ring-slate-200',
   NO_SHOW: 'bg-slate-100 text-slate-700 ring-slate-200',
   RESCHEDULED: 'bg-slate-100 text-slate-700 ring-slate-200',
+  TO_ARRIVE: 'bg-amber-50 text-amber-800 ring-amber-200',
+  REGISTERED: 'bg-blue-50 text-blue-800 ring-blue-200',
+  CHECKED_IN: 'bg-emerald-50 text-emerald-800 ring-emerald-200',
+  WAITING: 'bg-slate-100 text-slate-800 ring-slate-200',
+  COMPLETED: 'bg-emerald-50 text-emerald-800 ring-emerald-200',
 }
 
 const SECONDARY_BUTTON =

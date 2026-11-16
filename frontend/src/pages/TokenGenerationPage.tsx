@@ -1,5 +1,5 @@
 import { useMemo, useState, type FormEvent, type ReactNode } from 'react'
-import { Link, useSearchParams } from 'react-router'
+import { Link, useNavigate, useSearchParams } from 'react-router'
 import { AppShell } from '../components/AppShell'
 import { PriorityBadge } from '../components/checkin/PriorityBadge'
 import { TodayAppointmentsPanel } from '../components/checkin/TodayAppointmentsPanel'
@@ -31,7 +31,6 @@ import {
   IconCheck,
   IconSearch,
   IconTicket,
-  IconUser,
   IconUserPlus,
   IconX,
 } from '../components/icons'
@@ -53,9 +52,9 @@ const REFERRAL_OPTIONS: { value: ReferralSource; label: string; nameLabel: strin
 const REFERRAL_NEEDS_NAME: ReferralSource[] = ['DOCTOR', 'PERSONAL', 'ORGANIZATION']
 
 const PRIORITY_OPTIONS: { value: PriorityLevel; label: string; hint: string }[] = [
-  { value: 'NORMAL', label: 'Normal', hint: 'Seen in token order' },
-  { value: 'PRIORITY', label: 'Priority', hint: 'Amber: elderly, pregnant, disabled…' },
-  { value: 'EMERGENCY', label: 'Emergency', hint: 'Red: the doctor is alerted' },
+  { value: 'NORMAL', label: 'Normal', hint: 'Regular queue' },
+  { value: 'PRIORITY', label: 'High', hint: 'Needs preferential attention' },
+  { value: 'EMERGENCY', label: 'Emergency', hint: 'Immediate clinical attention' },
 ]
 
 const SEX_OPTIONS: { value: Sex; label: string }[] = [
@@ -115,6 +114,7 @@ export function TokenGenerationPage() {
   const canCheckIn = permissions.includes('visit:write')
   const canManageBookings = permissions.includes('appointment:write')
   const today = istToday()
+  const navigate = useNavigate()
 
   // --- Patient ---------------------------------------------------------------------------
   const [mode, setMode] = useState<PatientMode>('new')
@@ -186,6 +186,13 @@ export function TokenGenerationPage() {
   const newPatientCheckIn = useCheckInNewPatient()
   const busy = walkIn.isPending || checkIn.isPending || newPatientCheckIn.isPending
 
+  // Today's appointments to compute next available token for the chosen doctor
+  const { data: allAppointmentsData } = useAppointments({ appointment_date: today })
+  const allTodayAppointments = useMemo(
+    () => allAppointmentsData?.appointments ?? [],
+    [allAppointmentsData],
+  )
+
   // The doctor comes from the booking when one is being checked in, else from the list.
   const chosenOption = useMemo(() => {
     if (booking) {
@@ -197,6 +204,15 @@ export function TokenGenerationPage() {
     }
     return doctorOptions.find((o) => `${o.department.id}:${o.doctor.id}` === doctorKey) ?? null
   }, [booking, doctorKey, doctorOptions])
+
+  const nextTokenPreview = useMemo(() => {
+    if (!chosenOption) return null
+    const tokens = allTodayAppointments
+      .filter((a) => a.doctor_id === chosenOption.doctor.id && a.token_number != null)
+      .map((a) => a.token_number as number)
+    const maxTok = tokens.length > 0 ? Math.max(...tokens) : 0
+    return maxTok + 1
+  }, [chosenOption, allTodayAppointments])
 
   const departments = useMemo(() => {
     const groups = new Map<number, { name: string; options: typeof doctorOptions }>()
@@ -436,8 +452,9 @@ export function TokenGenerationPage() {
           >
             <div className="flex items-center justify-between gap-2 border-b border-slate-100 pb-3">
               <h2 id="check-in-form-heading" className="flex items-center gap-2 text-base font-bold text-slate-900">
-                <IconUser className="h-5 w-5 text-[#8E1C3D]" />
-                Check in a patient
+                <IconTicket className="h-5 w-5 text-[#8E1C3D]" />
+                Create today&apos;s OPD token
+                <span className="sr-only">Check in a patient</span>
               </h2>
               {(selectedPatient || fullName || booking) && !issued && (
                 <button type="button" onClick={resetAll} className="text-xs font-semibold text-slate-500 hover:text-red-700">
@@ -586,7 +603,7 @@ export function TokenGenerationPage() {
                       disabled={doctorsPending && doctorOptions.length === 0}
                       className={INPUT}
                     >
-                      <option value="">{doctorsPending ? 'Loading doctors…' : 'Choose the doctor'}</option>
+                      <option value="">{doctorsPending ? 'Loading doctors…' : 'Choose consulting doctor'}</option>
                       {departments.map(([deptId, group]) => (
                         <optgroup key={deptId} label={group.name}>
                           {group.options.map((o) => (
@@ -714,6 +731,26 @@ export function TokenGenerationPage() {
               )}
             </fieldset>
 
+            {/* Next available token preview (Image 5) */}
+            <div className="space-y-1.5 rounded-xl border border-emerald-200 bg-emerald-50/50 p-4">
+              <span className="block text-xs font-bold uppercase tracking-wider text-slate-700">
+                Next available token
+              </span>
+              <div
+                data-testid="next-token-preview"
+                className="font-mono text-3xl font-black text-emerald-700"
+              >
+                {chosenOption
+                  ? nextTokenPreview != null
+                    ? `#${String(nextTokenPreview).padStart(2, '0')}`
+                    : '#01'
+                  : '#--'}
+              </div>
+              <p className="text-xs text-slate-500">
+                Illustrative preview only. Actual number is assigned atomically when the token is created.
+              </p>
+            </div>
+
             <div className="space-y-2 border-t border-slate-100 pt-4">
               {missing.length > 0 && !issued && (
                 <p className="text-xs text-slate-500">Still needed: {missing.join(', ')}.</p>
@@ -724,7 +761,14 @@ export function TokenGenerationPage() {
                 className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-[#8E1C3D] px-6 text-sm font-bold text-white shadow-xs hover:bg-[#5D0B26] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#8E1C3D] disabled:opacity-50"
               >
                 <IconTicket className="h-4 w-4" />
-                {busy ? 'Issuing token…' : submitLabel}
+                {busy ? (
+                  'Issuing token…'
+                ) : (
+                  <div className="flex flex-col items-center leading-tight">
+                    <span>Generate token</span>
+                    <span className="text-xs font-normal opacity-85">({submitLabel})</span>
+                  </div>
+                )}
               </button>
             </div>
           </form>
@@ -736,6 +780,13 @@ export function TokenGenerationPage() {
               canCheckIn={canCheckIn}
               canManage={canManageBookings}
               onCheckIn={takeBooking}
+              onRegisterPatient={(a) => {
+                navigate(
+                  a.patient_id
+                    ? `/reception/patients/${a.patient_id}/edit?appointment_id=${a.id}`
+                    : `/reception/patients/new?appointment_id=${a.id}`,
+                )
+              }}
             />
           </div>
         </div>
@@ -892,27 +943,43 @@ function PatientSearch({
 }) {
   return (
     <div className="space-y-2">
-      <div className="relative">
-        <IconSearch className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
-        <input
-          type="text"
-          aria-label="Search patient by URN, name or mobile"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="Search by URN, name or mobile"
-          className={`${INPUT} pl-9 pr-9`}
-          autoComplete="off"
-        />
-        {query && (
-          <button
-            type="button"
-            aria-label="Clear search"
-            onClick={() => setQuery('')}
-            className="absolute inset-y-0 right-0 flex items-center pr-3 text-slate-500 hover:text-slate-700"
-          >
-            <IconX className="h-4 w-4" />
-          </button>
-        )}
+      <div className="space-y-1.5">
+        <label htmlFor="find-existing-input" className="block text-xs font-semibold text-slate-700">
+          Find existing patient
+        </label>
+        <div className="relative">
+          <IconSearch className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
+          <input
+            id="find-existing-input"
+            type="text"
+            aria-label="Search patient by URN, name or mobile"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Enter mobile number or hospital URN"
+            className={`${INPUT} pl-9 pr-9`}
+            autoComplete="off"
+          />
+          {query && (
+            <button
+              type="button"
+              aria-label="Clear search"
+              onClick={() => setQuery('')}
+              className="absolute inset-y-0 right-0 flex items-center pr-3 text-slate-500 hover:text-slate-700"
+            >
+              <IconX className="h-4 w-4" />
+            </button>
+          )}
+        </div>
+        <button
+          type="button"
+          onClick={() => {}}
+          className="inline-flex w-full items-center justify-center rounded-lg border border-slate-300 bg-slate-50 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-100"
+        >
+          Search patient
+        </button>
+        <p className="text-xs text-slate-500">
+          Verify the matching patient before creating today&apos;s visit.
+        </p>
       </div>
       {query.trim().length >= 2 && (
         <div className="max-h-56 divide-y divide-slate-100 overflow-y-auto rounded-xl border border-slate-200 bg-white shadow-lg">

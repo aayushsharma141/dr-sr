@@ -458,4 +458,31 @@ describe('Check-in & Token desk (phase 22)', () => {
     })
     expect(writes[0].url).toContain('/api/appointments/501/status')
   })
+
+  it('renders next available token preview and existing patient search matching OPD check-in design', async () => {
+    // Ramesh has token 1 today with Dr. Anil Kumar (id 10)
+    const existingTokenAppt: Appointment = {
+      ...rameshBooking,
+      token_number: 1,
+      status: 'ARRIVED',
+    }
+    installApi({ today: [existingTokenAppt] })
+    const user = renderDesk()
+
+    // 1. Initial next token preview is #-- before doctor selection
+    expect(screen.getByTestId('next-token-preview')).toHaveTextContent('#--')
+    expect(
+      screen.getByText(/Illustrative preview only\. Actual number is assigned atomically/i),
+    ).toBeInTheDocument()
+
+    // 2. Select Dr. Anil Kumar -> next available token preview updates to #02
+    await chooseDoctor(user)
+    expect(screen.getByTestId('next-token-preview')).toHaveTextContent('#02')
+
+    // 3. Switch to Existing patient -> verify search heading and placeholder
+    await user.click(screen.getByRole('button', { name: /Existing patient/i }))
+    expect(screen.getByText('Find existing patient')).toBeInTheDocument()
+    expect(screen.getByPlaceholderText('Enter mobile number or hospital URN')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Search patient' })).toBeInTheDocument()
+  })
 })

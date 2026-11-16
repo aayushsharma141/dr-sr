@@ -46,6 +46,11 @@ ACTIVE_BOOKING_STATUSES = (
     AppointmentStatus.ARRIVED.value,
     AppointmentStatus.IN_CONSULTATION.value,
     AppointmentStatus.DONE.value,
+    AppointmentStatus.TO_ARRIVE.value,
+    AppointmentStatus.REGISTERED.value,
+    AppointmentStatus.CHECKED_IN.value,
+    AppointmentStatus.WAITING.value,
+    AppointmentStatus.COMPLETED.value,
 )
 
 

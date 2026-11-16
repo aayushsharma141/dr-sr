@@ -133,6 +133,67 @@ describe('TodayAppointmentsPanel status labels and colours', () => {
     renderPanel()
     expect(screen.getByRole('button', { name: 'Cancel booking' })).toBeInTheDocument()
   })
+
+  it('renders "Register patient" button for new patient in To arrive', async () => {
+    state.appointments = [
+      appt({
+        id: 8,
+        status: 'TO_ARRIVE',
+        visit_kind: 'NEW',
+        token_number: 1,
+        patient_name: 'Aayush',
+      }),
+    ]
+    renderPanel()
+    expect(screen.getByText('New patient')).toBeInTheDocument()
+    expect(screen.getByText('#1')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Register patient' })).toBeInTheDocument()
+  })
+
+  it('renders "Check In" button for existing patient in To arrive', async () => {
+    state.appointments = [
+      appt({
+        id: 9,
+        status: 'TO_ARRIVE',
+        visit_kind: 'FOLLOW_UP',
+        token_number: 2,
+        patient_name: 'Rahul Kumar',
+      }),
+    ]
+    renderPanel()
+    expect(screen.getByText('Existing patient')).toBeInTheDocument()
+    expect(screen.getByText('#2')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Check in' })).toBeInTheDocument()
+  })
+
+  it('opens priority dropdown with Normal, High, Emergency and mandatory reason', async () => {
+    state.appointments = [
+      appt({
+        id: 10,
+        status: 'ARRIVED',
+        consultation_status: 'WAITING',
+        token_number: 2,
+        patient_name: 'Rahul Kumar',
+        priority_level: 'NORMAL',
+      }),
+    ]
+    renderPanel()
+    const allTab = screen.getByRole('tab', { name: /All/ })
+    await userEvent.click(allTab)
+
+    const changePriorityBtn = screen.getByRole('button', { name: 'Change priority' })
+    await userEvent.click(changePriorityBtn)
+
+    const select = screen.getByRole('combobox', { name: /Priority \*/i })
+    expect(select).toBeInTheDocument()
+    expect(screen.getByText(/Normal \(Regular queue\)/)).toBeInTheDocument()
+    expect(screen.getByText(/High \(Needs preferential attention\)/)).toBeInTheDocument()
+    expect(screen.getByText(/Emergency \(Immediate clinical attention\)/)).toBeInTheDocument()
+
+    const reasonInput = screen.getByPlaceholderText(/Enter reason for updating priority/i)
+    expect(reasonInput).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Save priority' })).toBeInTheDocument()
+  })
 })
 
 describe('TodayAppointmentsPanel tablist keyboard navigation (roving tabindex)', () => {

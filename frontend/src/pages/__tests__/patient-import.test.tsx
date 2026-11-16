@@ -15,6 +15,17 @@ vi.mock('../../api/integrity', () => ({
   useLatestIntegrityRun: () => ({ data: undefined }),
 }))
 
+// The AppShell's LANStatusPill would otherwise take a queued apiFetch response.
+vi.mock('../../api/health', () => ({
+  useHealth: () => ({
+    data: { status: 'ok', db: 'ok', setup_required: false },
+    isError: false,
+    isLoading: false,
+    refetch: vi.fn(),
+    isFetching: false,
+  }),
+}))
+
 vi.mock('../../api/branding', () => ({
   useClinicBranding: () => ({
     trustNameEn: 'Sri Vashishtha Kalyan Trust',

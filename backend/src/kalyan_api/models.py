@@ -581,6 +581,12 @@ class AppointmentStatus(StrEnum):
     NO_SHOW = "NO_SHOW"
     # Replaced by a new linked appointment (RF-11); the old row keeps its history.
     RESCHEDULED = "RESCHEDULED"
+    # Explicit OPD lifecycle statuses: TO_ARRIVE -> REGISTERED -> CHECKED_IN -> WAITING -> IN_CONSULTATION -> COMPLETED
+    TO_ARRIVE = "TO_ARRIVE"
+    REGISTERED = "REGISTERED"
+    CHECKED_IN = "CHECKED_IN"
+    WAITING = "WAITING"
+    COMPLETED = "COMPLETED"
 
 
 class ConsultationStatus(StrEnum):

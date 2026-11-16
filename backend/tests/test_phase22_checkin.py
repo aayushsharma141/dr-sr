@@ -115,6 +115,37 @@ def test_new_patient_check_in_registers_opens_visit_and_issues_token(
     assert "PATIENT_REGISTERED" in actions
 
 
+def test_new_patient_token_to_arrive_and_check_in(
+    clock, login_client, reception_user, doctor_a_user, db_session
+):
+    client = login_client(reception_user)
+    body = _new_patient_body(
+        doctor_a_user,
+        name="Aayush Kumar",
+        to_arrive=True,
+        priority_level="PRIORITY",
+        priority_reason="Severe pain",
+    )
+    response = client.post("/api/appointments/walk-in/new-patient", json=body)
+    assert response.status_code == 201, response.text
+    data = response.json()
+    assert data["status"] == "TO_ARRIVE"
+    assert data["token_number"] is not None
+    assert data["priority_level"] == "PRIORITY"
+    assert data["consultation_status"] is None
+
+    # Now check in this appointment (transitioning to ARRIVED / WAITING)
+    check_in_resp = client.post(
+        f"/api/appointments/{data['id']}/check-in",
+        json={"version_id": data["version_id"], "referral_source": "SELF"},
+    )
+    assert check_in_resp.status_code == 200, check_in_resp.text
+    checked_in = check_in_resp.json()
+    assert checked_in["status"] == "ARRIVED"
+    assert checked_in["consultation_status"] == "WAITING"
+    assert checked_in["token_number"] == data["token_number"]
+
+
 def test_new_patient_check_in_saves_nothing_when_check_in_is_refused(
     clock, login_client, reception_user, doctor_a_user, db_session
 ):
