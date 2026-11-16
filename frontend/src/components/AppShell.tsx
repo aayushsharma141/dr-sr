@@ -114,23 +114,22 @@ interface NavigationItem {
  * tab's label is the title of the page it opens. The Administrator's menu is the module
  * registry in admin/modules.ts, rendered by renderAdminSidebar.
  */
-// Reception order set by the owner on 2026-11-15 (OD-22-01): Check-in & Token first. New
-// patients are registered at check-in; the full registration form opens from Check-in & Token
-// and Patient Records. Waiting Room, Receipts and Reports join as their pages are built.
+// Reception order: Dashboard first, followed by Check-in & Token. New patients are registered
+// at check-in; the full registration form opens from Check-in & Token and Patient Records.
 const RECEPTION_NAVIGATION: NavigationItem[] = [
-  {
-    key: 'check-in',
-    label: 'Check-in & Token',
-    description: 'Check in a new or existing patient, or a booking for today, and issue the token',
-    path: '/reception/tokens',
-    icon: 'ticket',
-  },
   {
     key: 'dashboard',
     label: 'Dashboard',
     description: "Today's overview: the queue, doctor workload and what needs attention",
     path: '/reception',
     icon: 'dashboard',
+  },
+  {
+    key: 'check-in',
+    label: 'Check-in & Token',
+    description: 'Check in a new or existing patient, or a booking for today, and issue the token',
+    path: '/reception/tokens',
+    icon: 'ticket',
   },
   {
     key: 'patient-records',

@@ -1,20 +1,23 @@
-import { useMemo, useRef, useState, type FormEvent } from 'react'
+import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import {
   useAppointments,
   useRescheduleAppointment,
   useUpdateAppointmentStatus,
   useUpdatePriority,
+  useUpdateOpdArrivalPriority,
+  useOpdArrivals,
 } from '../../api/queries'
-import type { Appointment, PriorityLevel } from '../../api/types'
+import type { Appointment, OpdArrival, PriorityLevel } from '../../api/types'
 import { istToday } from '../../format'
-import { IconSearch } from '../icons'
+import { IconSearch, IconX } from '../icons'
 import { PriorityBadge } from './PriorityBadge'
 
 type ListView = 'all' | 'arrive' | 'checked'
-type RowAction = { id: number; kind: 'no-show' | 'cancel' | 'reschedule' | 'priority' }
+type RowAction = { key: string; kind: 'no-show' | 'cancel' | 'reschedule' | 'priority' }
+type QueueRow = { key: string; appointment: Appointment; pendingArrival?: OpdArrival }
 
 const INPUT =
-  'min-h-9 w-full rounded-xl border border-zinc-800 bg-zinc-950 px-3 text-xs font-medium text-zinc-100 placeholder:text-zinc-500 focus:border-zinc-600 focus:outline-none focus:ring-1 focus:ring-zinc-600'
+  'min-h-10 w-full rounded-xl border border-slate-300 bg-white px-3 text-xs font-medium text-slate-900 placeholder:text-slate-400 focus:border-[#8E1C3D] focus:outline-none focus:ring-2 focus:ring-[#8E1C3D]/15'
 
 /** Booked for today and not here yet; a booking marked not arrived can still check in late. */
 export function isAwaitingArrival(a: Appointment): boolean {
@@ -44,6 +47,40 @@ function isNewPatient(a: Appointment): boolean {
   return a.visit_kind === 'NEW'
 }
 
+function arrivalAsAppointment(arrival: OpdArrival): Appointment {
+  return {
+    id: -arrival.id,
+    patient_id: -arrival.id,
+    patient_urn: '',
+    patient_name: arrival.full_name,
+    patient_mobile: arrival.mobile,
+    patient_age: arrival.age_years,
+    doctor_id: arrival.doctor_id,
+    department_id: arrival.department_id,
+    department_name: arrival.department_name,
+    doctor_name_en: arrival.doctor_name_en,
+    doctor_name_hi: null,
+    appointment_date: arrival.appointment_date,
+    token_number: arrival.token_number,
+    status: 'TO_ARRIVE',
+    status_updated_at: arrival.created_at,
+    check_in_at: null,
+    cancellation_reason: null,
+    notes: null,
+    source: 'WALK_IN',
+    expected_time: null,
+    visit_id: null,
+    consultation_status: null,
+    rescheduled_from_id: null,
+    visit_kind: 'NEW',
+    priority_level: arrival.priority_level,
+    priority_reason: arrival.priority_reason ?? null,
+    version_id: arrival.version_id,
+    created_at: arrival.created_at,
+    updated_at: arrival.created_at,
+  } as Appointment
+}
+
 function formatDisplayDate(dateStr: string): string {
   try {
     const [y, m, d] = dateStr.split('-').map(Number)
@@ -60,7 +97,7 @@ function statusView(a: Appointment): { label: string; style: string } {
       return { label: 'Booked', style: 'bg-sky-50 text-sky-800 ring-sky-200' }
     case 'TO_ARRIVE':
     case 'REGISTERED':
-      return { label: 'To arrive', style: 'bg-amber-950/50 text-amber-500 border border-amber-900' }
+      return { label: 'To arrive', style: 'bg-amber-50 text-amber-800 ring-amber-200' }
     case 'NO_SHOW':
       return { label: 'No-show', style: 'bg-slate-100 text-slate-700 ring-slate-200' }
     case 'CANCELLED':
@@ -92,33 +129,39 @@ function errorText(err: unknown, fallback: string): string {
 export function TodayAppointmentsPanel({
   activeBookingId,
   canCheckIn,
+  canRegister,
   canManage,
   onCheckIn,
-  onRegisterPatient,
+  onRegisterArrival,
 }: {
   activeBookingId: number | null
   canCheckIn: boolean
+  canRegister: boolean
   canManage: boolean
   onCheckIn: (booking: Appointment) => void
-  onRegisterPatient?: (booking: Appointment) => void
+  onRegisterArrival: (arrival: OpdArrival) => void
 }) {
   const today = istToday()
-  const { data, isPending, isError, error } = useAppointments({ appointment_date: today })
+  const { data, isPending, isError, error, refetch, isFetching } = useAppointments({ appointment_date: today })
+  const { data: arrivalData, isPending: arrivalsPending, isError: arrivalsError, error: arrivalsErrorValue, refetch: refetchArrivals } = useOpdArrivals(today)
   const [view, setView] = useState<ListView>('all')
   const [doctorFilter, setDoctorFilter] = useState<number | ''>('')
   const [search, setSearch] = useState('')
   const [action, setAction] = useState<RowAction | null>(null)
+  const [arrivalVerification, setArrivalVerification] = useState<Record<string, string>>({})
 
   const all = useMemo(() => data?.appointments ?? [], [data])
+  const pendingArrivals = useMemo(() => arrivalData?.arrivals ?? [], [arrivalData])
   const doctors = useMemo(() => {
     const seen = new Map<number, string>()
     for (const a of all) seen.set(a.doctor_id, a.doctor_name_en)
+    for (const arrival of pendingArrivals) seen.set(arrival.doctor_id, arrival.doctor_name_en)
     return [...seen.entries()].sort((x, y) => x[1].localeCompare(y[1]))
-  }, [all])
+  }, [all, pendingArrivals])
 
   const counts = {
-    all: all.length,
-    arrive: all.filter(isAwaitingArrival).length,
+    all: all.length + pendingArrivals.length,
+    arrive: all.filter(isAwaitingArrival).length + pendingArrivals.length,
     checked: all.filter(isCheckedIn).length,
   }
 
@@ -128,25 +171,33 @@ export function TodayAppointmentsPanel({
   }, [doctorFilter, doctors])
 
   const rows = useMemo(() => {
+    const entries: QueueRow[] = [
+      ...all.map((appointment) => ({ key: `appointment-${appointment.id}`, appointment })),
+      ...pendingArrivals.map((arrival) => ({
+        key: `arrival-${arrival.id}`,
+        pendingArrival: arrival,
+        appointment: arrivalAsAppointment(arrival),
+      })),
+    ]
     const q = search.trim().toLowerCase()
-    return all
-      .filter((a) =>
+    return entries
+      .filter(({ appointment: a }) =>
         view === 'arrive'
           ? isAwaitingArrival(a)
           : view === 'checked'
             ? isCheckedIn(a)
             : true,
       )
-      .filter((a) => doctorFilter === '' || a.doctor_id === doctorFilter)
+      .filter(({ appointment: a }) => doctorFilter === '' || a.doctor_id === doctorFilter)
       .filter(
-        (a) =>
+        ({ appointment: a }) =>
           !q ||
           a.patient_name.toLowerCase().includes(q) ||
-          a.patient_urn.toLowerCase().includes(q) ||
+          (a.patient_urn ?? '').toLowerCase().includes(q) ||
           a.patient_mobile.includes(q) ||
           String(a.token_number ?? '') === q,
       )
-      .sort((x, y) => {
+      .sort(({ appointment: x }, { appointment: y }) => {
         // Tokens in queue order
         const tokX = x.token_number ?? 9999
         const tokY = y.token_number ?? 9999
@@ -155,7 +206,7 @@ export function TodayAppointmentsPanel({
         const ty = y.expected_time ?? '99'
         return tx === ty ? x.id - y.id : tx.localeCompare(ty)
       })
-  }, [all, view, doctorFilter, search])
+  }, [all, pendingArrivals, view, doctorFilter, search])
 
   const tabs: { key: ListView; label: string }[] = [
     { key: 'all', label: 'All' },
@@ -186,25 +237,31 @@ export function TodayAppointmentsPanel({
   return (
     <section
       aria-labelledby="today-appointments-heading"
-      className="flex flex-col rounded-2xl border border-zinc-800 bg-[#0a0a0a] text-zinc-100 shadow-md"
+      className="flex flex-col rounded-2xl border border-slate-200 bg-white text-slate-900 shadow-xs"
     >
-      <div className="space-y-3 border-b border-zinc-800/80 p-4 sm:p-5">
+      <div className="space-y-3 border-b border-slate-200 p-4 sm:p-5">
         <div className="flex items-start justify-between gap-3">
           <div>
-            <h2 id="today-appointments-heading" className="text-base font-bold text-white">
+            <h2 id="today-appointments-heading" className="text-base font-bold text-slate-900">
               Today&apos;s appointments
             </h2>
-            <p className="mt-0.5 text-xs text-zinc-200">
+            <p className="mt-0.5 text-xs text-slate-600">
               {formatDisplayDate(today)} · {selectedDoctorName}
             </p>
           </div>
-          <span className="inline-flex items-center rounded-full border border-emerald-800/80 bg-emerald-950/60 px-2.5 py-0.5 text-xs font-semibold text-emerald-400 shadow-2xs">
-            LAN Online
-          </span>
+          <button type="button" onClick={() => { void refetch(); void refetchArrivals() }} disabled={isFetching} aria-label="Refresh appointments" className="inline-flex min-h-9 items-center rounded-lg border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-700 hover:border-[#8E1C3D] hover:text-[#5D0B26] disabled:opacity-50">
+            {isFetching ? 'Refreshing…' : 'Refresh'}
+          </button>
+        </div>
+
+        <div className="grid grid-cols-3 gap-2">
+          {tabs.map((t) => <button key={t.key} type="button" onClick={() => setView(t.key)} className={`rounded-xl border p-2 text-left ${view === t.key ? 'border-[#8E1C3D] bg-[#FBF5F7]' : 'border-slate-200 bg-white'}`}>
+            <span className="block text-lg font-bold text-[#5D0B26]">{counts[t.key]}</span><span className="text-xs text-slate-600">{t.key === 'all' ? 'All' : t.key === 'arrive' ? 'To Arrive' : 'Checked In'}</span>
+          </button>)}
         </div>
 
         {/* 3 Tabs with count on top */}
-        <div role="tablist" aria-label="Which appointments" className="flex gap-2 rounded-xl bg-zinc-900/60 p-1 border border-zinc-800/70">
+        <div role="tablist" aria-label="Which appointments" className="flex gap-2 rounded-xl border border-slate-200 bg-slate-100 p-1">
           {tabs.map((t, idx) => {
             const isSelected = view === t.key
             return (
@@ -221,11 +278,11 @@ export function TodayAppointmentsPanel({
                 onClick={() => setView(t.key)}
                 className={`flex flex-1 flex-col items-center justify-center rounded-lg py-2 transition-colors ${
                   isSelected
-                    ? 'bg-zinc-800/95 text-white shadow-sm'
-                    : 'text-zinc-200 hover:text-white hover:bg-zinc-800/40'
+                    ? 'border border-[#E4C8D1] bg-white text-[#5D0B26] shadow-sm'
+                    : 'text-slate-600 hover:bg-white hover:text-[#5D0B26]'
                 }`}
               >
-                <span className="font-mono text-sm font-bold text-white leading-none">
+                <span className="font-mono text-sm font-bold text-[#5D0B26] leading-none">
                   {counts[t.key]}
                 </span>
                 <span className="mt-1 text-xs font-medium leading-none">
@@ -237,10 +294,10 @@ export function TodayAppointmentsPanel({
         </div>
 
         {/* Filters */}
-        <div className="space-y-2">
+        <div className="grid gap-2 sm:grid-cols-[1fr_12rem]">
           <label className="relative block">
             <span className="sr-only">Search today&apos;s appointments</span>
-            <IconSearch className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-500" />
+            <IconSearch className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
             <input
               type="search"
               value={search}
@@ -267,15 +324,15 @@ export function TodayAppointmentsPanel({
         </div>
       </div>
 
-      <div className="max-h-[42rem] flex-1 overflow-y-auto p-4 space-y-3">
-        {isPending ? (
-          <p className="p-6 text-center text-xs text-zinc-500">Loading today&apos;s appointments…</p>
-        ) : isError ? (
-          <p role="alert" className="p-6 text-center text-xs font-semibold text-red-400">
-            Could not load today&apos;s appointments: {error.message}
+      <div className="max-h-[42rem] flex-1 overflow-auto p-4">
+        {isPending || arrivalsPending ? (
+          <p className="p-6 text-center text-xs text-slate-500">Loading today&apos;s appointments…</p>
+        ) : isError || arrivalsError ? (
+          <p role="alert" className="p-6 text-center text-xs font-semibold text-red-700">
+            Could not load today&apos;s appointments: {error?.message ?? arrivalsErrorValue?.message}
           </p>
         ) : rows.length === 0 ? (
-          <p className="rounded-xl border border-dashed border-zinc-800 p-8 text-center text-xs text-zinc-500">
+          <p className="rounded-xl border border-dashed border-slate-300 p-8 text-center text-xs text-slate-500">
             {view === 'arrive'
               ? 'No one booked for today is still to arrive.'
               : view === 'checked'
@@ -283,31 +340,32 @@ export function TodayAppointmentsPanel({
                 : 'No appointments today.'}
           </p>
         ) : (
-          <ul className="space-y-3">
-            {rows.map((a) => (
+          <div className="overflow-x-auto rounded-xl border border-slate-200"><table className="w-full min-w-[900px] border-collapse text-left text-xs">
+            <thead className="bg-slate-50 text-slate-600"><tr>{['Token', 'Patient', 'Patient Type', 'Consulting Doctor', 'Priority', 'Actions'].map((h) => <th key={h} scope="col" className="px-3 py-3 font-semibold">{h}</th>)}</tr></thead>
+            <tbody className="divide-y divide-slate-200">
+          {rows.map(({ key, appointment: a, pendingArrival }) => (
               <AppointmentCard
-                key={a.id}
+                key={key}
                 appointment={a}
+                pendingArrival={pendingArrival}
                 active={a.id === activeBookingId}
                 canCheckIn={canCheckIn}
+                canRegister={canRegister}
                 canManage={canManage}
-                action={action?.id === a.id ? action.kind : null}
-                onAction={(kind) => setAction(kind ? { id: a.id, kind } : null)}
+                arrivalVerification={arrivalVerification[key] ?? ''}
+                onArrivalVerificationChange={(value) =>
+                  setArrivalVerification((current) => ({ ...current, [key]: value }))
+                }
+                action={action?.key === key ? action.kind : null}
+                onAction={(kind) => setAction(kind ? { key, kind } : null)}
+                onRegisterArrival={() => pendingArrival && onRegisterArrival(pendingArrival)}
                 onCheckIn={() => {
                   setAction(null)
                   onCheckIn(a)
                 }}
-                onRegisterPatient={() => {
-                  setAction(null)
-                  if (onRegisterPatient) {
-                    onRegisterPatient(a)
-                  } else {
-                    onCheckIn(a)
-                  }
-                }}
               />
             ))}
-          </ul>
+            </tbody></table></div>
         )}
       </div>
     </section>
@@ -316,128 +374,110 @@ export function TodayAppointmentsPanel({
 
 function AppointmentCard({
   appointment: a,
+  pendingArrival,
   active,
   canCheckIn,
+  canRegister,
   canManage,
+  arrivalVerification,
+  onArrivalVerificationChange,
   action,
   onAction,
   onCheckIn,
-  onRegisterPatient,
+  onRegisterArrival,
 }: {
   appointment: Appointment
+  pendingArrival?: OpdArrival
   active: boolean
   canCheckIn: boolean
+  canRegister: boolean
   canManage: boolean
+  arrivalVerification: string
+  onArrivalVerificationChange: (value: string) => void
   action: RowAction['kind'] | null
   onAction: (kind: RowAction['kind'] | null) => void
   onCheckIn: () => void
-  onRegisterPatient: () => void
+  onRegisterArrival: () => void
 }) {
   const status = statusView(a)
   const isChecked = isCheckedIn(a)
   const isAwaiting = isAwaitingArrival(a)
-  const isNew = isNewPatient(a)
+  const isNew = pendingArrival != null || isNewPatient(a)
+  const registerPendingArrival = pendingArrival != null
 
   return (
-    <li
-      className={`rounded-2xl border p-4 text-xs transition-colors shadow-2xs ${
+    <>
+    <tr
+      className={`text-xs transition-colors ${
         active
-          ? 'border-[#8E1C3D] bg-zinc-900/90'
-          : 'border-zinc-800/90 bg-[#0d0d0e]'
-      } ${
-        a.priority_level === 'EMERGENCY'
-          ? 'border-l-4 border-l-red-600'
-          : a.priority_level === 'PRIORITY'
-            ? 'border-l-4 border-l-amber-500'
-            : ''
+          ? 'bg-[#FBF5F7]'
+          : 'bg-white'
       }`}
     >
-      <div className="flex items-start justify-between gap-3">
-        {/* Left side of card */}
-        <div className="min-w-0 space-y-1">
-          <p className="truncate text-base font-bold text-white tracking-tight">{a.patient_name}</p>
-          <p className="font-mono text-xs text-zinc-200">{a.patient_urn}</p>
-          <p className="text-xs text-zinc-200">{a.doctor_name_en}</p>
-          <div className="pt-1.5 flex flex-wrap items-center gap-1.5">
-            <PriorityBadge level={a.priority_level} reason={a.priority_reason} showNormal={true} />
-          </div>
-          {isChecked && (
-            <p className="pt-1 text-xs font-semibold text-emerald-400">
-              Checked-in · Waiting
-            </p>
-          )}
-        </div>
-
-        {/* Right side of card */}
-        <div className="flex shrink-0 flex-col items-end gap-1">
+      <td className="px-3 py-3 font-mono font-bold text-[#5D0B26]">{a.token_number != null ? `#${a.token_number}` : '—'}</td>
+      <td className="px-3 py-3"><p className="font-semibold text-slate-900">{pendingArrival?.full_name ?? a.patient_name}</p><p className="mt-0.5 text-slate-500">{pendingArrival ? pendingArrival.mobile : a.patient_urn}{pendingArrival?.age_years != null ? ` · ${pendingArrival.age_years} yrs` : (a as Appointment & { patient_age?: number }).patient_age != null ? ` · ${(a as Appointment & { patient_age?: number }).patient_age} yrs` : ''}</p></td>
+      <td className="px-3 py-3 text-slate-700">{isNew ? 'New patient' : 'Existing patient'}</td>
+      <td className="px-3 py-3 text-slate-700">{a.doctor_name_en}{a.department_name && <span className="block text-slate-500">{a.department_name}</span>}</td>
+      <td className="px-3 py-3"><PriorityBadge level={a.priority_level} reason={a.priority_reason} showNormal /></td>
+      <td className="px-3 py-3"><div className="flex flex-wrap items-center gap-2">
           <span
             className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ring-1 ${status.style}`}
           >
             {status.label}
           </span>
-          {a.token_number != null && (
-            <span className="font-mono text-xl font-bold text-white mt-0.5">
-              #{a.token_number}
-            </span>
-          )}
-          <span className="text-xs text-zinc-200">
-            {isNew ? 'New patient' : 'Existing patient'}
-          </span>
-          {isChecked && canCheckIn && action === null && (
+          {(isChecked || registerPendingArrival) && canManage && action === null && (
             <button
               type="button"
               onClick={() => onAction('priority')}
-              className="mt-2 inline-flex items-center rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-1.5 text-xs font-semibold text-zinc-200 hover:bg-zinc-800 hover:text-white transition-colors"
+              className="mt-2 inline-flex min-h-9 items-center rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:border-[#8E1C3D] hover:text-[#5D0B26] transition-colors"
             >
               Change priority
             </button>
           )}
-        </div>
-      </div>
-
-      {/* To arrive bottom actions */}
-      {isAwaiting && action === null && (
-        <div className="mt-3 pt-3 border-t border-zinc-800/80">
-          {isNew ? (
+        {isAwaiting && action === null && registerPendingArrival && canRegister ? (
             <button
               type="button"
-              onClick={onRegisterPatient}
-              className="w-full rounded-xl bg-zinc-200 py-2.5 px-4 text-xs font-bold text-zinc-900 hover:bg-white transition-colors text-center shadow-xs"
+              onClick={onRegisterArrival}
+              className="min-h-9 rounded-lg bg-[#8E1C3D] px-3 text-xs font-bold text-white hover:bg-[#5D0B26] transition-colors"
             >
-              Register patient
+              Register
             </button>
-          ) : (
-            <div className="flex items-center justify-between gap-2">
-              <span className="font-mono text-xs text-zinc-200">
-                {a.patient_mobile || a.patient_urn}
-              </span>
+          ) : isAwaiting && action === null && canCheckIn ? (
+            <>
+              <input
+                type="text"
+                value={arrivalVerification}
+                onChange={(event) => onArrivalVerificationChange(event.target.value)}
+                aria-label={`Verify ${a.patient_name} by mobile or URN`}
+                placeholder="Enter mobile no. or URN"
+                className="min-h-9 w-40 rounded-lg border border-slate-300 bg-white px-2 text-xs text-slate-900 placeholder:text-slate-500 focus:border-[#8E1C3D] focus:outline-none focus:ring-2 focus:ring-[#8E1C3D]/15"
+              />
               <button
                 type="button"
+                disabled={!matchesPatientReference(arrivalVerification, a.patient_mobile, a.patient_urn)}
                 onClick={onCheckIn}
-                className="rounded-lg bg-zinc-200 px-4 py-1.5 text-xs font-bold text-zinc-900 hover:bg-white transition-colors shadow-xs"
+                className="min-h-9 rounded-lg bg-emerald-700 px-3 text-xs font-bold text-white hover:bg-emerald-800 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
               >
                 Check in
               </button>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Secondary booking management actions */}
-      {a.status === 'BOOKED' && canManage && action === null && (
-        <div className="mt-2 flex flex-wrap gap-1.5 pt-1 text-xs">
-          <RowButton onClick={() => onAction('no-show')}>No-show</RowButton>
-          <RowButton onClick={() => onAction('reschedule')}>Reschedule</RowButton>
-          <RowButton onClick={() => onAction('cancel')}>Cancel booking</RowButton>
-        </div>
-      )}
-
-      {action === 'priority' && <PriorityForm appointment={a} onDone={() => onAction(null)} />}
+            </>
+          ) : null}
+        {a.status === 'BOOKED' && canManage && action === null && <details className="relative"><summary className="min-h-9 cursor-pointer list-none rounded-lg border border-slate-300 px-3 py-2 font-semibold text-slate-700">More</summary><div className="absolute right-0 z-10 mt-1 flex min-w-max flex-col gap-1 rounded-lg border border-slate-200 bg-white p-2 shadow-lg"><RowButton onClick={() => onAction('no-show')}>No-show</RowButton><RowButton onClick={() => onAction('reschedule')}>Reschedule</RowButton><RowButton onClick={() => onAction('cancel')}>Cancel booking</RowButton></div></details>}
+      </div></td>
+      </tr>
+      {action && <tr><td colSpan={6} className="bg-slate-50 p-3">{action === 'priority' && <PriorityForm appointment={a} pendingArrival={pendingArrival} onDone={() => onAction(null)} />}
       {action === 'no-show' && <NoShowForm appointment={a} onDone={() => onAction(null)} />}
       {action === 'cancel' && <CancelForm appointment={a} onDone={() => onAction(null)} />}
-      {action === 'reschedule' && <RescheduleForm appointment={a} onDone={() => onAction(null)} />}
-    </li>
+      {action === 'reschedule' && <RescheduleForm appointment={a} onDone={() => onAction(null)} />}</td></tr>}
+    </>
   )
+}
+
+function matchesPatientReference(value: string, mobile: string, urn: string): boolean {
+  const normalized = value.trim().toUpperCase()
+  const typedDigits = normalized.replace(/\D/g, '')
+  const mobileDigits = mobile.replace(/\D/g, '')
+  return normalized.length > 0 && (normalized === urn.toUpperCase() || (mobileDigits.length > 0 && typedDigits === mobileDigits))
 }
 
 function RowButton({ onClick, children }: { onClick: () => void; children: React.ReactNode }) {
@@ -445,7 +485,7 @@ function RowButton({ onClick, children }: { onClick: () => void; children: React
     <button
       type="button"
       onClick={onClick}
-      className="inline-flex min-h-8 items-center rounded-lg border border-zinc-700 bg-zinc-900 px-2.5 text-xs font-semibold text-zinc-200 hover:bg-zinc-800 hover:text-white transition-colors"
+      className="inline-flex min-h-8 items-center rounded-lg border border-slate-300 bg-white px-2.5 text-xs font-semibold text-slate-700 hover:border-[#8E1C3D] hover:text-[#5D0B26] transition-colors"
     >
       {children}
     </button>
@@ -455,12 +495,15 @@ function RowButton({ onClick, children }: { onClick: () => void; children: React
 /** Priority change form matching Image 4 specifications */
 function PriorityForm({
   appointment,
+  pendingArrival,
   onDone,
 }: {
   appointment: Appointment
+  pendingArrival?: OpdArrival
   onDone: () => void
 }) {
   const update = useUpdatePriority()
+  const updateArrival = useUpdateOpdArrivalPriority()
   const [level, setLevel] = useState<PriorityLevel>(appointment.priority_level ?? 'NORMAL')
   const [reason, setReason] = useState(appointment.priority_reason ?? '')
   const [error, setError] = useState<string | null>(null)
@@ -473,14 +516,25 @@ function PriorityForm({
       return
     }
     try {
-      await update.mutateAsync({
-        id: appointment.id,
-        body: {
-          priority_level: level,
-          priority_reason: reason.trim(),
-          version_id: appointment.version_id,
-        },
-      })
+      if (pendingArrival) {
+        await updateArrival.mutateAsync({
+          id: pendingArrival.id,
+          body: {
+            priority_level: level,
+            reason: reason.trim(),
+            version_id: pendingArrival.version_id,
+          },
+        })
+      } else {
+        await update.mutateAsync({
+          id: appointment.id,
+          body: {
+            priority_level: level,
+            priority_reason: reason.trim(),
+            version_id: appointment.version_id,
+          },
+        })
+      }
       onDone()
     } catch (err) {
       setError(errorText(err, 'Could not change the priority.'))
@@ -490,23 +544,23 @@ function PriorityForm({
   return (
     <form
       onSubmit={handleSubmit}
-      className="mt-3 space-y-3 rounded-xl border border-zinc-800 bg-zinc-900/90 p-3.5"
+      className="mt-3 space-y-3 rounded-xl border border-[#E4C8D1] bg-[#FBF5F7] p-3.5"
     >
       <div className="flex items-center justify-between">
-        <p className="text-xs font-bold text-zinc-200">
-          Change priority: {appointment.patient_name} (#{appointment.token_number ?? '--'})
+        <p className="text-xs font-bold text-slate-800">
+          Change priority: {pendingArrival?.full_name ?? appointment.patient_name} (#{appointment.token_number ?? '--'})
         </p>
       </div>
 
       <div>
-        <label htmlFor="priority-level-select" className="mb-1 block text-xs font-semibold text-zinc-200">
+        <label htmlFor="priority-level-select" className="mb-1 block text-xs font-semibold text-slate-700">
           Priority *
         </label>
         <select
           id="priority-level-select"
           value={level}
           onChange={(e) => setLevel(e.target.value as PriorityLevel)}
-          className="w-full rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2 text-xs font-medium text-zinc-100 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+          className="min-h-10 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-medium text-slate-900 focus:border-[#8E1C3D] focus:outline-none focus:ring-2 focus:ring-[#8E1C3D]/15"
         >
           <option value="NORMAL">Normal (Regular queue)</option>
           <option value="PRIORITY">High (Needs preferential attention)</option>
@@ -515,7 +569,7 @@ function PriorityForm({
       </div>
 
       <div>
-        <label htmlFor="priority-reason-input" className="mb-1 block text-xs font-semibold text-zinc-200">
+        <label htmlFor="priority-reason-input" className="mb-1 block text-xs font-semibold text-slate-700">
           Mandatory Reason *
         </label>
         <textarea
@@ -525,12 +579,12 @@ function PriorityForm({
           required
           rows={2}
           placeholder="Enter reason for updating priority..."
-          className="w-full rounded-lg border border-zinc-700 bg-zinc-950 p-2 text-xs text-zinc-100 placeholder:text-zinc-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+          className="w-full rounded-lg border border-slate-300 bg-white p-2 text-xs text-slate-900 placeholder:text-slate-400 focus:border-[#8E1C3D] focus:outline-none focus:ring-2 focus:ring-[#8E1C3D]/15"
         />
       </div>
 
       {error && (
-        <p role="alert" className="text-xs font-semibold text-red-400">
+        <p role="alert" className="text-xs font-semibold text-red-700">
           {error}
         </p>
       )}
@@ -538,15 +592,15 @@ function PriorityForm({
       <div className="flex gap-2">
         <button
           type="submit"
-          disabled={update.isPending}
-          className="rounded-lg bg-zinc-100 px-3.5 py-1.5 text-xs font-bold text-zinc-900 hover:bg-white disabled:opacity-50 transition-colors"
+          disabled={update.isPending || updateArrival.isPending}
+          className="min-h-9 rounded-lg bg-[#8E1C3D] px-3.5 py-1.5 text-xs font-bold text-white hover:bg-[#5D0B26] disabled:opacity-50 transition-colors"
         >
-          {update.isPending ? 'Saving…' : 'Save priority'}
+          {update.isPending || updateArrival.isPending ? 'Saving…' : 'Save priority'}
         </button>
         <button
           type="button"
           onClick={onDone}
-          className="rounded-lg border border-zinc-700 px-3 py-1.5 text-xs font-semibold text-zinc-200 hover:text-white transition-colors"
+          className="min-h-9 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:border-[#8E1C3D] hover:text-[#5D0B26] transition-colors"
         >
           Cancel
         </button>
@@ -578,12 +632,12 @@ function InlineForm({
         e.preventDefault()
         onSubmit()
       }}
-      className="mt-3 space-y-2 rounded-xl border border-zinc-800 bg-zinc-900/80 p-3"
+      className="mt-3 space-y-2 rounded-xl border border-slate-200 bg-slate-50 p-3"
     >
-      <p className="font-bold text-zinc-200 text-xs">{title}</p>
+      <p className="font-bold text-slate-800 text-xs">{title}</p>
       {children}
       {error && (
-        <p role="alert" className="font-semibold text-red-400 text-xs">
+        <p role="alert" className="font-semibold text-red-700 text-xs">
           {error}
         </p>
       )}
@@ -591,7 +645,7 @@ function InlineForm({
         <button
           type="submit"
           disabled={busy}
-          className="inline-flex min-h-8 items-center rounded-lg bg-zinc-100 px-3 text-xs font-bold text-zinc-900 hover:bg-white disabled:opacity-50"
+          className="inline-flex min-h-9 items-center rounded-lg bg-[#8E1C3D] px-3 text-xs font-bold text-white hover:bg-[#5D0B26] disabled:opacity-50"
         >
           {busy ? 'Saving…' : submitLabel}
         </button>
@@ -656,7 +710,7 @@ function CancelForm({ appointment, onDone }: { appointment: Appointment; onDone:
       }}
     >
       <label className="block">
-        <span className="mb-1 block font-semibold text-zinc-200">Reason *</span>
+        <span className="mb-1 block font-semibold text-slate-700">Reason *</span>
         <input value={reason} onChange={(e) => setReason(e.target.value)} className={INPUT} placeholder="e.g. Patient called to cancel" />
       </label>
     </InlineForm>
@@ -696,16 +750,16 @@ function RescheduleForm({ appointment, onDone }: { appointment: Appointment; onD
     >
       <div className="grid grid-cols-2 gap-2">
         <label className="block">
-          <span className="mb-1 block font-semibold text-zinc-200">New date *</span>
+          <span className="mb-1 block font-semibold text-slate-700">New date *</span>
           <input type="date" required min={istToday()} value={date} onChange={(e) => setDate(e.target.value)} className={INPUT} />
         </label>
         <label className="block">
-          <span className="mb-1 block font-semibold text-zinc-200">Time</span>
+          <span className="mb-1 block font-semibold text-slate-700">Time</span>
           <input type="time" value={time} onChange={(e) => setTime(e.target.value)} className={INPUT} />
         </label>
       </div>
       <label className="block">
-        <span className="mb-1 block font-semibold text-zinc-200">Reason</span>
+        <span className="mb-1 block font-semibold text-slate-700">Reason</span>
         <input value={reason} onChange={(e) => setReason(e.target.value)} className={INPUT} placeholder="e.g. Patient asked for Monday" />
       </label>
     </InlineForm>

@@ -92,10 +92,12 @@ def _to_read_schema(appt: Appointment, visit: Visit | None = None) -> Appointmen
         patient_urn=appt.patient.urn,
         patient_name=appt.patient.full_name,
         patient_mobile=appt.patient.mobile,
+        patient_age=appt.patient.age_years,
         doctor_id=appt.doctor_id,
         department_id=appt.department_id,
         doctor_name_en=appt.doctor.name_en,
         doctor_name_hi=appt.doctor.name_hi,
+        department_name=appt.department.name_en if appt.department is not None else None,
         appointment_date=appt.appointment_date,
         token_number=appt.token_number,
         status=appt.status,
@@ -225,6 +227,8 @@ def book_appointment(
     )
     if issue_tok:
         appt.status = AppointmentStatus.TO_ARRIVE.value
+        appt.priority_level = payload.priority_level.value
+        appt.priority_reason = payload.priority_reason.strip() if payload.priority_reason else None
         session.flush()
     override_text = (payload.override_reason or "").strip() or None
     _record_booking_created(session, build_audit_context(request, principal), appt, override_text)
@@ -678,7 +682,7 @@ def update_appointment_status(
 ) -> AppointmentRead:
     """Transition appointment status with optimistic locking and validation (APT-02).
 
-    Since RF-12 slice 2 an ARRIVED request is a check-in (visit, token, waiting list), and a
+    Since RF-12 slice 2 an ARRIVED or CHECKED_IN request is a check-in (visit, token, waiting list), and a
     checked-in patient only moves through the consultation. See validate_status_update.
     """
     appt = booking_service.lock_appointment(session, id)
@@ -705,7 +709,7 @@ def update_appointment_status(
     ctx = build_audit_context(request, principal)
     before = {"status": appt.status, "version_id": payload.version_id}
 
-    if payload.status == AppointmentStatus.ARRIVED:
+    if payload.status in (AppointmentStatus.ARRIVED, AppointmentStatus.CHECKED_IN):
         # Referred By is required on every visit and defaults to Self (OD-22-16). This path has
         # no desk form, so the visit is opened with the default instead of having no referral.
         default_details = booking_service.CheckInDetails(

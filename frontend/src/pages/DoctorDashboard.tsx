@@ -222,7 +222,7 @@ export function DoctorDashboard() {
         return item.notes?.toLowerCase().includes('emergency') || item.notes?.toLowerCase().includes('urgent')
       }
       if (kanbanFilter === 'WALKIN') {
-        return item.status === 'ARRIVED' && !item.notes?.toLowerCase().includes('follow')
+        return (item.status === 'ARRIVED' || item.status === 'CHECKED_IN') && !item.notes?.toLowerCase().includes('follow')
       }
       if (kanbanFilter === 'SCHEDULED') {
         return item.status === 'BOOKED'
@@ -320,8 +320,8 @@ export function DoctorDashboard() {
 
     setSelectedPatientId(target.id)
 
-    // Advance status to IN_CONSULTATION if it is currently ARRIVED or BOOKED
-    if (target.status === 'ARRIVED' || target.status === 'BOOKED') {
+    // Advance status to IN_CONSULTATION if it is currently waiting or still a legacy booking
+    if (target.status === 'ARRIVED' || target.status === 'CHECKED_IN' || target.status === 'BOOKED') {
       try {
         await updateStatusMutation.mutateAsync({
           id: target.id,

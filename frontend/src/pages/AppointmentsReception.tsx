@@ -29,7 +29,7 @@ const STATUS_LABEL: Record<AppointmentStatus, string> = {
   RESCHEDULED: 'Rescheduled',
   TO_ARRIVE: 'To arrive',
   REGISTERED: 'Registered',
-  CHECKED_IN: 'Checked in',
+  CHECKED_IN: 'Waiting',
   WAITING: 'Waiting',
   COMPLETED: 'Completed',
 }
@@ -270,6 +270,7 @@ function RowActions({
         </div>
       )
     case 'ARRIVED':
+    case 'CHECKED_IN':
       return (
         <div className="flex flex-wrap justify-end gap-2">
           {showCallCabin && (
@@ -577,7 +578,7 @@ export function AppointmentsReception() {
               </div>
               <div className="ml-auto flex flex-wrap gap-x-5 gap-y-1 text-sm text-slate-700">
                 <span><strong>{appointments.length}</strong> booked</span>
-                <span><strong>{countWith('ARRIVED')}</strong> waiting</span>
+                <span><strong>{countWith('ARRIVED') + countWith('CHECKED_IN')}</strong> waiting</span>
                 <span><strong>{countWith('IN_CONSULTATION')}</strong> with doctor</span>
                 <span><strong>{countWith('DONE')}</strong> completed</span>
               </div>

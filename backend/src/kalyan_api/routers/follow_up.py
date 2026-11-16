@@ -414,6 +414,7 @@ def book_follow_up(
     active_statuses = [
         AppointmentStatus.BOOKED.value,
         AppointmentStatus.ARRIVED.value,
+        AppointmentStatus.CHECKED_IN.value,
         AppointmentStatus.IN_CONSULTATION.value,
         AppointmentStatus.DONE.value,
     ]

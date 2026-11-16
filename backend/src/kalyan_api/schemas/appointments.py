@@ -80,6 +80,22 @@ class AppointmentCreate(BaseModel):
         default=False,
         description="When true, allocates token atomically for doctor queue (TO_ARRIVE)",
     )
+    priority_level: PriorityLevel = Field(
+        default=PriorityLevel.NORMAL, description="Initial priority for a tokenized arrival"
+    )
+    priority_reason: str | None = Field(
+        default=None, max_length=500, description="Required when initial priority is High or Emergency"
+    )
+
+    @model_validator(mode="after")
+    def _check_priority_reason(self) -> "AppointmentCreate":
+        if self.priority_level != PriorityLevel.NORMAL and not self.issue_token:
+            raise ValueError("Priority can be set when a doctor-queue token is created.")
+        if self.priority_level != PriorityLevel.NORMAL and len((self.priority_reason or "").strip()) < 3:
+            raise ValueError("Enter a reason for marking the patient Priority or Emergency.")
+        if self.priority_level == PriorityLevel.NORMAL and (self.priority_reason or "").strip():
+            raise ValueError("A priority reason can only be supplied for High or Emergency priority.")
+        return self
 
 
 class WalkInCreate(CheckInDetailsIn):
@@ -200,12 +216,14 @@ class AppointmentRead(BaseModel):
     patient_urn: str
     patient_name: str
     patient_mobile: str
+    patient_age: int | None = None
     doctor_id: int
     department_id: int | None = None
+    department_name: str | None = None
     doctor_name_en: str
     doctor_name_hi: str | None = None
     appointment_date: date
-    # Issued at check-in (RF-12); empty while the booking has not been checked in.
+    # Empty on an ordinary booking; tokenized TO_ARRIVE entries already have their token.
     token_number: int | None = None
     status: str
     status_updated_at: datetime

@@ -7,6 +7,9 @@ import {
   useUploadPatientPhoto,
   useCheckDuplicate,
   useMe,
+  useUpdateAppointmentStatus,
+  useOpdArrival,
+  useRegisterOpdArrival,
 } from '../api/queries'
 import { ApiError, apiFetch } from '../api/client'
 import { AppShell } from '../components/AppShell'
@@ -28,7 +31,7 @@ import {
   IconUser,
   IconUserPlus,
 } from '../components/icons'
-import type { PatientCreate, PatientOut, PatientUpdate } from '../api/types'
+import type { Appointment, PatientCreate, PatientOut, PatientUpdate } from '../api/types'
 
 /** Shared field styling: one control height, one brand focus treatment, across both columns. */
 const LABEL_CLASS =
@@ -79,6 +82,8 @@ export function PatientRegister() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const appointmentId = searchParams.get('appointment_id')
+  const arrivalId = Number(searchParams.get('arrival_id')) || 0
+  const arrivalQuery = useOpdArrival(arrivalId)
   const { id: editIdParam } = useParams<{ id: string }>()
   const isEditMode = editIdParam !== undefined
   const editId = isEditMode ? Number(editIdParam) : null
@@ -91,11 +96,13 @@ export function PatientRegister() {
   const registerMutation = useRegisterPatient()
   const updateMutation = useUpdatePatient()
   const uploadPhotoMutation = useUploadPatientPhoto()
+  const updateAppointmentStatus = useUpdateAppointmentStatus()
+  const registerOpdArrival = useRegisterOpdArrival()
 
   // 12 Canonical demographic fields
   const [fullName, setFullName] = useState('')
   const [guardianName, setGuardianName] = useState('')
-  const [gender, setGender] = useState<'M' | 'F' | 'O'>('M')
+  const [gender, setGender] = useState<'M' | 'F' | 'O' | null>(null)
   const [dob, setDob] = useState('')
   const [ageYears, setAgeYears] = useState<number | ''>('')
   const [mobile, setMobile] = useState('')
@@ -129,6 +136,7 @@ export function PatientRegister() {
   const [photoFailure, setPhotoFailure] = useState<{ patientId: number; fileName: string; message: string } | null>(null)
   const [photoRetrying, setPhotoRetrying] = useState(false)
   const [photoSavedNotice, setPhotoSavedNotice] = useState<string | null>(null)
+  const arrivalPrefilledRef = useRef<number | null>(null)
   // Edit mode: the record as last loaded (its version_id guards the save), and save state.
   const [baseline, setBaseline] = useState<PatientOut | null>(null)
   const [isConflict, setIsConflict] = useState(false)
@@ -165,7 +173,7 @@ export function PatientRegister() {
       Boolean(
         fullName.trim() ||
           guardianName.trim() ||
-          gender !== 'M' ||
+          gender !== null ||
           dob ||
           ageYears !== '' ||
           mobile.trim() ||
@@ -285,6 +293,17 @@ export function PatientRegister() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isEditMode, patientQuery.data])
 
+  // A To Arrive registration is promoted from its persisted draft only after the
+  // receptionist completes the permanent patient details on this page.
+  useEffect(() => {
+    const arrival = arrivalQuery.data
+    if (!arrival || arrivalPrefilledRef.current === arrival.id) return
+    arrivalPrefilledRef.current = arrival.id
+    setFullName(arrival.full_name)
+    setAgeYears(arrival.age_years)
+    setMobile(arrival.mobile)
+  }, [arrivalQuery.data])
+
   // Release the preview's object URL when leaving the page.
   useEffect(
     () => () => {
@@ -316,7 +335,7 @@ export function PatientRegister() {
     setPhotoSavedNotice(null)
     setFullName('')
     setGuardianName('')
-    setGender('M')
+    setGender(null)
     setDob('')
     setAgeYears('')
     setMobile('')
@@ -387,6 +406,10 @@ export function PatientRegister() {
   /** Save the edited patient with PATCH /patients/{id}; the photo, if changed, goes after it. */
   const handleEditSubmit = async () => {
     if (!baseline) return
+    if (!gender) {
+      setFormError('Please select the patient’s sex.')
+      return
+    }
     if (baseline.dob && !dob.trim()) {
       // The API treats a missing date as "leave unchanged", so a cleared date would silently not save.
       setFormError('A recorded date of birth cannot be removed. Enter the correct date instead.')
@@ -416,6 +439,15 @@ export function PatientRegister() {
       const updated = await updateMutation.mutateAsync({ id: baseline.id, body })
       // The version moved on with this save; keep it so a later save is not a false conflict.
       setBaseline(updated)
+      if (appointmentId && Number.isInteger(Number(appointmentId)) && Number(appointmentId) > 0) {
+        const linkedAppointment = await apiFetch<Appointment>(`/appointments/${appointmentId}`)
+        if (linkedAppointment.status === 'TO_ARRIVE') {
+          await updateAppointmentStatus.mutateAsync({
+            id: linkedAppointment.id,
+            body: { status: 'REGISTERED', version_id: linkedAppointment.version_id },
+          })
+        }
+      }
       if (photoFile) {
         try {
           await uploadPhotoMutation.mutateAsync({ id: updated.id, file: photoFile })
@@ -458,6 +490,21 @@ export function PatientRegister() {
       return
     }
 
+    if (arrivalId > 0 && (!arrivalQuery.data || arrivalQuery.isError)) {
+      setFormError('The To Arrive entry could not be loaded. Refresh and try again.')
+      return
+    }
+
+    if (!gender) {
+      setFormError('Please select the patient’s sex.')
+      return
+    }
+
+    if (!guardianName.trim()) {
+      setFormError('Please enter the patient’s father, guardian, or spouse name.')
+      return
+    }
+
     if (isEditMode) {
       await handleEditSubmit()
       return
@@ -468,12 +515,9 @@ export function PatientRegister() {
       return
     }
 
-    // Default guardian name if not manually expanded
-    const effectiveGuardian = guardianName.trim() || 'Self / Not specified'
-
     const payload: PatientCreate = {
       full_name: fullName.trim(),
-      guardian_name: effectiveGuardian,
+      guardian_name: guardianName.trim(),
       gender,
       dob: dob.trim() || null,
       age_years: Number(ageYears),
@@ -488,6 +532,26 @@ export function PatientRegister() {
 
     submittingRef.current = true
     try {
+      if (arrivalId > 0 && arrivalQuery.data) {
+        const appointment = await registerOpdArrival.mutateAsync({
+          id: arrivalId,
+          body: { version_id: arrivalQuery.data.version_id, patient: payload },
+        })
+        let photoWarning = ''
+        if (photoFile) {
+          try {
+            await uploadPhotoMutation.mutateAsync({ id: appointment.patient_id, file: photoFile })
+          } catch (photoErr) {
+            photoWarning = ` Photo upload failed: ${errorText(photoErr)}`
+          }
+        }
+        skipUnsavedGuardRef.current = true
+        navigate(`/reception/tokens?patient_id=${appointment.patient_id}&appointment_id=${appointment.id}`, {
+          state: { notice: `Patient registered and linked to token #${appointment.token_number}.${photoWarning}` },
+        })
+        return
+      }
+
       // 1. Register Patient Demographics. A failure here means nothing was saved.
       const patient = await registerMutation.mutateAsync(payload)
 
@@ -552,6 +616,25 @@ export function PatientRegister() {
     )
   }
 
+  if (!isEditMode && arrivalId > 0 && (arrivalQuery.isPending || !arrivalQuery.data)) {
+    return (
+      <AppShell name={me?.full_name || 'Reception Staff'} role={me?.role || 'RECEPTION'}>
+        <div className="mx-auto max-w-2xl rounded-xl border border-slate-200 bg-white p-6">
+          {arrivalQuery.isError ? (
+            <div role="alert" className="space-y-4 text-sm text-red-800">
+              <p>Could not load this To Arrive entry. No patient record has been created.</p>
+              <Link to="/reception/tokens" className="font-semibold text-[#8E1C3D] hover:underline">
+                Return to Check-in &amp; Token
+              </Link>
+            </div>
+          ) : (
+            <p role="status" className="text-sm text-slate-600">Loading To Arrive registration…</p>
+          )}
+        </div>
+      </AppShell>
+    )
+  }
+
   return (
     <AppShell name={me?.full_name || 'Reception Staff'} role={me?.role || 'RECEPTION'}>
       <UnsavedChangesGuard dirty={isDirty && !createdPatient} bypassRef={skipUnsavedGuardRef} />
@@ -569,7 +652,7 @@ export function PatientRegister() {
             </span>
             <div className="min-w-0">
               <h1 className="text-xl font-bold tracking-tight text-slate-900">
-                {isEditMode ? 'Edit Patient Details' : 'Patient Registration'}
+                {isEditMode ? 'Edit Patient Details' : arrivalId > 0 ? 'Register To Arrive Patient' : 'Patient Registration'}
               </h1>
               <p className="text-xs text-slate-500">
                 {isEditMode ? (
@@ -937,6 +1020,7 @@ export function PatientRegister() {
                           required
                           value={fullName}
                           onChange={(e) => setFullName(e.target.value)}
+                          readOnly={arrivalId > 0}
                           placeholder="Enter full name"
                           className={INPUT_CLASS}
                         />
@@ -951,6 +1035,7 @@ export function PatientRegister() {
                           aria-label="Father / Guardian / Spouse Name *"
                           type="text"
                           value={guardianName}
+                          required
                           onChange={(e) => setGuardianName(e.target.value)}
                           placeholder="Guardian name"
                           className={INPUT_CLASS}
@@ -972,6 +1057,7 @@ export function PatientRegister() {
                             required
                             value={mobile}
                             onChange={(e) => setMobile(e.target.value)}
+                            readOnly={arrivalId > 0}
                             placeholder="Enter mobile number"
                             className={INPUT_WITH_ICON_CLASS}
                           />
@@ -1010,6 +1096,7 @@ export function PatientRegister() {
                           required
                           value={ageYears}
                           onChange={(e) => setAgeYears(e.target.value === '' ? '' : Number(e.target.value))}
+                          readOnly={arrivalId > 0}
                           placeholder="0"
                           className={INPUT_CLASS}
                         />
@@ -1033,6 +1120,7 @@ export function PatientRegister() {
                               value="M"
                               checked={gender === 'M'}
                               onChange={() => setGender('M')}
+                              required
                               className="h-4 w-4 shrink-0 accent-[#8E1C3D] focus:ring-[#8E1C3D]"
                             />
                             Male

@@ -65,16 +65,14 @@ describe('AppShell clinical navigation hierarchy', () => {
     window.localStorage.clear()
   })
 
-  it('lists reception tabs once each, Check-in & Token first, named like their pages', () => {
+  it('lists reception tabs once each, Dashboard first, named like their pages', () => {
     renderShell('RECEPTION', '/reception/appointments')
 
     const primaryNav = screen.getByRole('navigation', { name: 'Primary navigation' })
     const links = within(primaryNav).getAllByRole('link')
-    // Owner order of 2026-11-15 (OD-22-01). New patients register at check-in, so there is no
-    // separate Patient Registration tab; the full form opens from Patient Records.
     expect(links.map((l) => l.textContent)).toEqual([
-      'Check-in & Token',
       'Dashboard',
+      'Check-in & Token',
       'Patient Records',
       'Appointments',
       'Waiting Room',
@@ -83,8 +81,8 @@ describe('AppShell clinical navigation hierarchy', () => {
       'Reports',
     ])
     expect(links.map((l) => l.getAttribute('href'))).toEqual([
-      '/reception/tokens',
       '/reception',
+      '/reception/tokens',
       '/reception/patients',
       '/reception/appointments',
       '/reception/waiting',

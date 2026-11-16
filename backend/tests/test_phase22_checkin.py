@@ -93,7 +93,7 @@ def test_new_patient_check_in_registers_opens_visit_and_issues_token(
     assert response.status_code == 201, response.text
     body = response.json()
     assert body["patient_urn"].startswith("KH-")
-    assert body["status"] == "ARRIVED"
+    assert body["status"] == "CHECKED_IN"
     assert body["consultation_status"] == "WAITING"
     assert body["token_number"] == 1
     assert body["visit_kind"] == "NEW"
@@ -134,16 +134,75 @@ def test_new_patient_token_to_arrive_and_check_in(
     assert data["priority_level"] == "PRIORITY"
     assert data["consultation_status"] is None
 
-    # Now check in this appointment (transitioning to ARRIVED / WAITING)
+    registration_response = client.patch(
+        f"/api/appointments/{data['id']}/status",
+        json={"status": "REGISTERED", "version_id": data["version_id"]},
+    )
+    assert registration_response.status_code == 200, registration_response.text
+    registered = registration_response.json()
+    assert registered["status"] == "REGISTERED"
+
+    # Registration and check-in remain distinct; check-in creates the waiting consultation.
     check_in_resp = client.post(
         f"/api/appointments/{data['id']}/check-in",
-        json={"version_id": data["version_id"], "referral_source": "SELF"},
+        json={"version_id": registered["version_id"], "referral_source": "SELF"},
     )
     assert check_in_resp.status_code == 200, check_in_resp.text
     checked_in = check_in_resp.json()
-    assert checked_in["status"] == "ARRIVED"
+    assert checked_in["status"] == "CHECKED_IN"
     assert checked_in["consultation_status"] == "WAITING"
     assert checked_in["token_number"] == data["token_number"]
+
+
+def test_existing_patient_token_entry_allocates_doctor_token_and_keeps_priority(
+    clock, login_client, reception_user, doctor_a_user, db_session
+):
+    client = login_client(reception_user)
+    patient = _patient(db_session, "ARRIVAL")
+
+    response = client.post(
+        "/api/appointments",
+        json={
+            "patient_id": patient.id,
+            "doctor_id": doctor_a_user.doctor_id,
+            "department_id": doctor_a_user.doctor.departments[0].id,
+            "appointment_date": app_clock.ist_today().isoformat(),
+            "source": "WALK_IN",
+            "issue_token": True,
+            "priority_level": "PRIORITY",
+            "priority_reason": "Needs preferential attention",
+        },
+    )
+
+    assert response.status_code == 201, response.text
+    data = response.json()
+    assert data["status"] == "TO_ARRIVE"
+    assert data["token_number"] == 1
+    assert data["priority_level"] == "PRIORITY"
+    assert data["priority_reason"] == "Needs preferential attention"
+    assert data["patient_age"] == patient.age_years
+    assert data["department_name"] == doctor_a_user.doctor.departments[0].name_en
+
+
+def test_existing_patient_priority_token_requires_reason(
+    clock, login_client, reception_user, doctor_a_user, db_session
+):
+    client = login_client(reception_user)
+    patient = _patient(db_session, "NO-REASON")
+
+    response = client.post(
+        "/api/appointments",
+        json={
+            "patient_id": patient.id,
+            "doctor_id": doctor_a_user.doctor_id,
+            "department_id": doctor_a_user.doctor.departments[0].id,
+            "appointment_date": app_clock.ist_today().isoformat(),
+            "issue_token": True,
+            "priority_level": "EMERGENCY",
+        },
+    )
+
+    assert response.status_code == 422
 
 
 def test_new_patient_check_in_saves_nothing_when_check_in_is_refused(

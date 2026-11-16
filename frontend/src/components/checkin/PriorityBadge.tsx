@@ -8,7 +8,7 @@ export const PRIORITY_LABEL: Record<PriorityLevel, string> = {
 }
 
 /**
- * Red for Emergency, amber for High, neutral for Normal.
+ * Burgundy for Emergency, gold for High, neutral for Normal.
  */
 export function PriorityBadge({
   level,
@@ -26,7 +26,7 @@ export function PriorityBadge({
     return (
       <span
         title={reason ?? 'Regular queue'}
-        className="inline-flex items-center rounded-full border border-zinc-700 bg-zinc-800/80 px-2.5 py-0.5 text-xs font-semibold text-zinc-200"
+        className="inline-flex items-center rounded-full border border-slate-200 bg-slate-100 px-2.5 py-0.5 text-xs font-semibold text-slate-700"
       >
         Normal
       </span>
@@ -39,8 +39,8 @@ export function PriorityBadge({
       title={reason ?? undefined}
       className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-semibold ${
         emergency
-          ? 'border border-red-700/80 bg-red-950/60 text-red-300'
-          : 'border border-amber-600/80 bg-amber-950/50 text-amber-300'
+          ? 'border border-[#8E1C3D]/25 bg-[#FBF5F7] text-[#5D0B26]'
+          : 'border border-[#C39A35]/40 bg-[#C39A35]/10 text-[#73540B]'
       }`}
     >
       {emergency && <IconAlertTriangle className="h-3 w-3" />}

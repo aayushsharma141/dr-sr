@@ -29,6 +29,10 @@ import type {
   AddendumRead,
   Appointment,
   AppointmentCreate,
+  OpdArrival,
+  OpdArrivalCreate,
+  OpdArrivalRegister,
+  OpdArrivalPriorityUpdate,
   AppointmentListResponse,
   AppointmentStatusUpdate,
   CheckInRequest,
@@ -889,6 +893,63 @@ export function useAppointments(
     enabled: options?.enabled ?? true,
     // Reception and doctor screens share this list; poll so every workstation sees the same queue.
     refetchInterval: options?.refetchInterval ?? 10000,
+  })
+}
+
+export function useOpdArrivals(arrivalDate: string) {
+  const query = new URLSearchParams({ arrival_date: arrivalDate })
+  return useQuery({
+    queryKey: ['opd-arrivals', arrivalDate],
+    queryFn: () => apiFetch<{ total: number; arrivals: OpdArrival[] }>(`/opd-arrivals?${query}`),
+    refetchInterval: 10000,
+  })
+}
+
+export function useOpdArrival(id: number) {
+  return useQuery({
+    queryKey: ['opd-arrival', id],
+    queryFn: () => apiFetch<OpdArrival>(`/opd-arrivals/${id}`),
+    enabled: id > 0,
+  })
+}
+
+export function useCreateOpdArrival() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (body: OpdArrivalCreate) => apiFetch<OpdArrival>('/opd-arrivals', { method: 'POST', body }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['opd-arrivals'] })
+      qc.invalidateQueries({ queryKey: ['appointments'] })
+    },
+  })
+}
+
+export function useRegisterOpdArrival() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, body }: { id: number; body: OpdArrivalRegister }) =>
+      apiFetch<Appointment>(`/opd-arrivals/${id}/register`, { method: 'POST', body }),
+    onSuccess: (appointment) => {
+      qc.invalidateQueries({ queryKey: ['opd-arrivals'] })
+      qc.invalidateQueries({ queryKey: ['appointments'] })
+      qc.invalidateQueries({ queryKey: ['doctor-queue'] })
+      qc.invalidateQueries({ queryKey: ['patients'] })
+      qc.setQueryData(['appointment', appointment.id], appointment)
+    },
+  })
+}
+
+export function useUpdateOpdArrivalPriority() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, body }: { id: number; body: OpdArrivalPriorityUpdate }) =>
+      apiFetch<OpdArrival>(`/opd-arrivals/${id}/priority`, { method: 'PATCH', body }),
+    onSuccess: (arrival) => {
+      qc.setQueryData(['opd-arrival', arrival.id], arrival)
+      qc.invalidateQueries({ queryKey: ['opd-arrivals'] })
+      qc.invalidateQueries({ queryKey: ['appointments'] })
+      qc.invalidateQueries({ queryKey: ['doctor-queue'] })
+    },
   })
 }
 

@@ -41,7 +41,7 @@ def test_appointment_status_lifecycle(login_client, reception_user, doctor_a_use
     assert appt_data["status"] == "BOOKED"
     assert appt_data["version_id"] == 1
 
-    # 3. Reception marks patient ARRIVED
+    # 3. Reception marks patient CHECKED_IN; WAITING is the separate consultation state.
     arr_resp = reception_client.patch(
         f"/api/appointments/{appt_id}/status",
         json={
@@ -50,7 +50,8 @@ def test_appointment_status_lifecycle(login_client, reception_user, doctor_a_use
         },
     )
     assert arr_resp.status_code == 200
-    assert arr_resp.json()["status"] == "ARRIVED"
+    assert arr_resp.json()["status"] == "CHECKED_IN"
+    assert arr_resp.json()["consultation_status"] == "WAITING"
     assert arr_resp.json()["version_id"] == 2
 
     # 4. Doctor logs in and starts consultation (IN_CONSULTATION)

@@ -1,15 +1,31 @@
-import { cleanup, render, screen } from '@testing-library/react'
+import { cleanup, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { TodayAppointmentsPanel } from '../checkin/TodayAppointmentsPanel'
-import type { Appointment } from '../../api/types'
+import type { Appointment, OpdArrival } from '../../api/types'
 
 vi.mock('../../api/queries', () => ({
-  useAppointments: () => ({ data: { appointments: state.appointments }, isPending: false, isError: false }),
+  useAppointments: () => ({
+    data: { appointments: state.appointments },
+    isPending: false,
+    isError: Boolean(state.appointmentsError),
+    error: state.appointmentsError,
+    refetch: vi.fn(),
+    isFetching: false,
+  }),
+  useOpdArrivals: () => ({
+    data: { arrivals: state.arrivals },
+    isPending: false,
+    isError: Boolean(state.arrivalsError),
+    error: state.arrivalsError,
+    refetch: vi.fn(),
+    isFetching: false,
+  }),
   useUpdateAppointmentStatus: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useRescheduleAppointment: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useUpdatePriority: () => ({ mutateAsync: vi.fn(), isPending: false }),
+  useUpdateOpdArrivalPriority: () => ({ mutateAsync: vi.fn(), isPending: false }),
 }))
 
 vi.mock('../../format', () => ({
@@ -17,7 +33,12 @@ vi.mock('../../format', () => ({
   formatToken: (n: number | null) => (n != null ? String(n).padStart(3, '0') : '---'),
 }))
 
-const state: { appointments: Appointment[] } = { appointments: [] }
+const state: {
+  appointments: Appointment[]
+  arrivals: OpdArrival[]
+  appointmentsError: Error | null
+  arrivalsError: Error | null
+} = { appointments: [], arrivals: [], appointmentsError: null, arrivalsError: null }
 
 function appt(overrides: Partial<Appointment>): Appointment {
   return {
@@ -48,15 +69,17 @@ function appt(overrides: Partial<Appointment>): Appointment {
   } as Appointment
 }
 
-function renderPanel() {
+function renderPanel(onRegisterArrival: (arrival: OpdArrival) => void = vi.fn()) {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   return render(
     <QueryClientProvider client={qc}>
       <TodayAppointmentsPanel
         activeBookingId={null}
         canCheckIn={true}
+        canRegister={true}
         canManage={true}
         onCheckIn={vi.fn()}
+        onRegisterArrival={onRegisterArrival}
       />
     </QueryClientProvider>,
   )
@@ -65,6 +88,9 @@ function renderPanel() {
 afterEach(() => {
   cleanup()
   state.appointments = []
+  state.arrivals = []
+  state.appointmentsError = null
+  state.arrivalsError = null
 })
 
 describe('TodayAppointmentsPanel status labels and colours', () => {
@@ -74,7 +100,7 @@ describe('TodayAppointmentsPanel status labels and colours', () => {
     // switch to All tab to see checked-in
     const allTab = screen.getByRole('tab', { name: /All/ })
     await userEvent.click(allTab)
-    const badge = screen.getByText('Waiting')
+    const badge = within(screen.getByRole('table')).getByText('Waiting')
     expect(badge.className).toMatch(/bg-slate-100/)
     expect(badge.className).toMatch(/text-slate-800/)
     expect(badge.className).not.toMatch(/amber/)
@@ -95,7 +121,7 @@ describe('TodayAppointmentsPanel status labels and colours', () => {
     renderPanel()
     const allTab = screen.getByRole('tab', { name: /All/ })
     await userEvent.click(allTab)
-    const badge = screen.getByText('Completed')
+    const badge = within(screen.getByRole('table')).getByText('Completed')
     expect(badge.className).toMatch(/bg-emerald-50/)
     expect(badge.className).toMatch(/text-emerald-800/)
   })
@@ -107,6 +133,15 @@ describe('TodayAppointmentsPanel status labels and colours', () => {
     const badge = screen.getByText('No-show')
     expect(badge.className).toMatch(/bg-slate-100/)
     expect(badge.className).not.toMatch(/red/)
+  })
+
+  it('shows an error when pending arrivals fail to load', () => {
+    state.arrivalsError = new Error('Network unavailable')
+    renderPanel()
+
+    expect(screen.getByRole('alert')).toHaveTextContent('Queue data could not load. Refresh to try again.')
+    expect(screen.getByRole('alert')).toHaveTextContent('Pending arrivals: Network unavailable')
+    expect(screen.queryByText('No patients today.')).not.toBeInTheDocument()
   })
 
   it('shows "Cancelled" with slate-600 and no red class for CANCELLED status', async () => {
@@ -134,20 +169,27 @@ describe('TodayAppointmentsPanel status labels and colours', () => {
     expect(screen.getByRole('button', { name: 'Cancel booking' })).toBeInTheDocument()
   })
 
-  it('renders "Register patient" button for new patient in To arrive', async () => {
-    state.appointments = [
-      appt({
-        id: 8,
-        status: 'TO_ARRIVE',
-        visit_kind: 'NEW',
-        token_number: 1,
-        patient_name: 'Aayush',
-      }),
-    ]
+  it('renders "Register" button for new patient in To arrive', async () => {
+    state.arrivals = [{
+      id: 8,
+      full_name: 'Aayush',
+      age_years: 26,
+      mobile: '9876543210',
+      doctor_id: 1,
+      doctor_name_en: 'Dr. Anil',
+      department_id: 10,
+      department_name: 'General Medicine',
+      appointment_date: '2026-11-15',
+      token_number: 1,
+      priority_level: 'PRIORITY',
+      status: 'TO_ARRIVE',
+      version_id: 1,
+      created_at: '2026-11-15T03:00:00Z',
+    }]
     renderPanel()
     expect(screen.getByText('New patient')).toBeInTheDocument()
     expect(screen.getByText('#1')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Register patient' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Register' })).toBeInTheDocument()
   })
 
   it('renders "Check In" button for existing patient in To arrive', async () => {
@@ -164,6 +206,67 @@ describe('TodayAppointmentsPanel status labels and colours', () => {
     expect(screen.getByText('Existing patient')).toBeInTheDocument()
     expect(screen.getByText('#2')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Check in' })).toBeInTheDocument()
+  })
+
+  it('shows persisted new arrival before permanent registration and opens registration', async () => {
+    const registerArrival = vi.fn()
+    state.arrivals = [{
+      id: 12,
+      full_name: 'Aayush Kumar',
+      age_years: 26,
+      mobile: '9876543210',
+      doctor_id: 1,
+      doctor_name_en: 'Dr. Anil',
+      department_id: 10,
+      department_name: 'General Medicine',
+      appointment_date: '2026-11-15',
+      token_number: 3,
+      priority_level: 'PRIORITY',
+      priority_reason: 'Needs preferential attention',
+      status: 'TO_ARRIVE',
+      version_id: 1,
+      created_at: '2026-11-15T03:00:00Z',
+    }]
+    const user = userEvent.setup()
+    renderPanel(registerArrival)
+
+    expect(screen.getByText('Aayush Kumar')).toBeInTheDocument()
+    expect(screen.getByText('#3')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Register' }))
+    expect(registerArrival).toHaveBeenCalledWith(state.arrivals[0])
+  })
+
+  it('requires a reason when changing a pending arrival priority', async () => {
+    state.arrivals = [{
+      id: 13,
+      full_name: 'Aayush Kumar',
+      age_years: 26,
+      mobile: '9876543210',
+      doctor_id: 1,
+      doctor_name_en: 'Dr. Anil',
+      department_id: 10,
+      department_name: 'General Medicine',
+      appointment_date: '2026-11-15',
+      token_number: 4,
+      priority_level: 'NORMAL',
+      status: 'TO_ARRIVE',
+      version_id: 2,
+      created_at: '2026-11-15T03:00:00Z',
+    }]
+    renderPanel()
+
+    const changePriority = screen.getByRole('button', { name: 'Change priority' })
+    await userEvent.click(changePriority)
+    expect(changePriority).toHaveAttribute('aria-expanded', 'true')
+    expect(screen.getByLabelText('Priority *')).toHaveFocus()
+    await userEvent.selectOptions(screen.getByLabelText('Priority *'), 'EMERGENCY')
+    await userEvent.click(screen.getByRole('button', { name: 'Save priority' }))
+    expect(screen.getByLabelText('Reason *')).toBeRequired()
+
+    await userEvent.type(screen.getByLabelText('Reason *'), 'Severe acute pain')
+    await userEvent.click(screen.getByRole('button', { name: 'Save priority' }))
+    await waitFor(() => expect(screen.queryByLabelText('Reason *')).not.toBeInTheDocument())
+    expect(changePriority).toHaveFocus()
   })
 
   it('opens priority dropdown with Normal, High, Emergency and mandatory reason', async () => {
@@ -201,9 +304,11 @@ describe('TodayAppointmentsPanel tablist keyboard navigation (roving tabindex)',
     state.appointments = []
     renderPanel()
     const tabs = screen.getAllByRole('tab')
-    // First tab (To arrive) is selected by default
-    expect(tabs[0]).toHaveAttribute('tabindex', '0')
-    expect(tabs[1]).toHaveAttribute('tabindex', '-1')
+    // The reception queue opens on To arrive, as in the desk workflow.
+    expect(tabs[0]).toHaveAttribute('aria-selected', 'false')
+    expect(tabs[0]).toHaveAttribute('tabindex', '-1')
+    expect(tabs[1]).toHaveAttribute('aria-selected', 'true')
+    expect(tabs[1]).toHaveAttribute('tabindex', '0')
     expect(tabs[2]).toHaveAttribute('tabindex', '-1')
   })
 

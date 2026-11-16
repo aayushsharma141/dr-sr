@@ -63,7 +63,7 @@ export function WaitingRoom() {
   )
 
   const waiting = visible
-    .filter((a) => a.status === 'ARRIVED' && a.consultation_status === 'WAITING')
+    .filter((a) => (a.status === 'ARRIVED' || a.status === 'CHECKED_IN') && a.consultation_status === 'WAITING')
     .sort(suggestedOrder)
   const inCabin = visible.filter((a) => a.consultation_status === 'IN_CONSULTATION')
   const completed = visible.filter((a) => a.consultation_status === 'COMPLETED')

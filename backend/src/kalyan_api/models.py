@@ -685,6 +685,76 @@ class DailyTokenSequence(Base):
     )
 
 
+class PendingOpdArrival(Base):
+    """Token reservation for a first-time patient before canonical registration (OD-OPD-01).
+
+    This row holds only intake facts supplied at reception. It becomes a permanent Patient and
+    linked Appointment atomically when the full registration form is submitted. Token numbers
+    are reserved through DailyTokenSequence and retained on the resulting appointment.
+    """
+
+    __tablename__ = "pending_opd_arrivals"
+    __table_args__ = (
+        CheckConstraint("age_years >= 0 AND age_years <= 150", name="age_valid"),
+        CheckConstraint(
+            "priority_level IN ('NORMAL', 'PRIORITY', 'EMERGENCY')", name="priority_valid"
+        ),
+        CheckConstraint(
+            "priority_level = 'NORMAL' OR (priority_reason IS NOT NULL AND length(trim(priority_reason)) >= 3)",
+            name="priority_reason_present",
+        ),
+        CheckConstraint("status IN ('TO_ARRIVE', 'REGISTERED')", name="status_valid"),
+        UniqueConstraint(
+            "doctor_id", "appointment_date", "token_number", name="uq_pending_opd_arrival_token"
+        ),
+        Index("ix_pending_opd_arrivals_date_status", "appointment_date", "status"),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, Identity(always=False), primary_key=True)
+    full_name: Mapped[str] = mapped_column(String(120), nullable=False)
+    age_years: Mapped[int] = mapped_column(Integer, nullable=False)
+    mobile: Mapped[str] = mapped_column(String(15), nullable=False)
+    doctor_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("doctors.id", ondelete="RESTRICT"), nullable=False, index=True
+    )
+    department_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("departments.id", ondelete="RESTRICT"), nullable=False, index=True
+    )
+    appointment_date: Mapped[date] = mapped_column(Date, nullable=False)
+    token_number: Mapped[int] = mapped_column(Integer, nullable=False)
+    priority_level: Mapped[str] = mapped_column(
+        String(16), default=PriorityLevel.NORMAL.value, server_default="NORMAL", nullable=False
+    )
+    priority_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+    status: Mapped[str] = mapped_column(
+        String(16), default="TO_ARRIVE", server_default="TO_ARRIVE", nullable=False
+    )
+    patient_id: Mapped[int | None] = mapped_column(
+        BigInteger, ForeignKey("patients.id", ondelete="RESTRICT"), nullable=True, unique=True
+    )
+    appointment_id: Mapped[int | None] = mapped_column(
+        BigInteger, ForeignKey("appointments.id", ondelete="RESTRICT"), nullable=True, unique=True
+    )
+    created_by_user_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("users.id", ondelete="RESTRICT"), nullable=False
+    )
+    status_updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    version_id: Mapped[int] = mapped_column(Integer, default=1, server_default="1", nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
+    )
+
+    doctor: Mapped["Doctor"] = relationship("Doctor", lazy="joined")
+    department: Mapped["Department"] = relationship("Department", lazy="joined")
+
+    __mapper_args__ = {"version_id_col": version_id}
+
+
 class Visit(Base):
     """A patient's visit at reception on one day, opened at check-in (RF-10)."""
 

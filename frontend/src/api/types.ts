@@ -813,10 +813,12 @@ export interface Appointment {
   id: number
   /** Department (specialty) chosen at booking; null for appointments booked before it existed. */
   department_id?: number | null
+  department_name?: string | null
   patient_id: number
   patient_urn: string
   patient_name: string
   patient_mobile: string
+  patient_age?: number | null
   doctor_id: number
   doctor_name_en: string
   doctor_name_hi: string | null
@@ -858,6 +860,50 @@ export interface AppointmentCreate {
   /** HH:MM or HH:MM:SS */
   expected_time?: string | null
   override_reason?: string | null
+  issue_token?: boolean
+  priority_level?: PriorityLevel
+  priority_reason?: string | null
+}
+
+export interface OpdArrival {
+  id: number
+  full_name: string
+  age_years: number
+  mobile: string
+  doctor_id: number
+  doctor_name_en: string
+  department_id: number
+  department_name: string
+  appointment_date: string
+  token_number: number
+  priority_level: PriorityLevel
+  priority_reason?: string | null
+  status: 'TO_ARRIVE' | 'REGISTERED'
+  version_id: number
+  created_at: string
+  patient_id?: number | null
+  appointment_id?: number | null
+}
+
+export interface OpdArrivalCreate {
+  full_name: string
+  age_years: number
+  mobile: string
+  doctor_id: number
+  department_id: number
+  priority_level: PriorityLevel
+  priority_reason?: string | null
+}
+
+export interface OpdArrivalRegister {
+  version_id: number
+  patient: PatientCreate
+}
+
+export interface OpdArrivalPriorityUpdate {
+  version_id: number
+  priority_level: PriorityLevel
+  reason: string
 }
 
 /** A walk-in: booked for today and checked in at once, with its token. */

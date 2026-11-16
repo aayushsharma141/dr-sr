@@ -35,6 +35,10 @@ function getElapsedMinutes(isoString: string): number {
   }
 }
 
+function isWaitingAppointment(appointment: Appointment): boolean {
+  return appointment.status === 'ARRIVED' || appointment.status === 'CHECKED_IN'
+}
+
 interface ReceptionDashboardProps {
   overview: ReceptionOverview
 }
@@ -93,7 +97,7 @@ export function ReceptionDashboard({ overview: initialOverview }: ReceptionDashb
 
   // Count by status from live appointments
   const waitingAppts = useMemo(
-    () => allAppointments.filter((a) => a.status === 'ARRIVED'),
+    () => allAppointments.filter(isWaitingAppointment),
     [allAppointments],
   )
   const inConsultationAppts = useMemo(
@@ -122,10 +126,10 @@ export function ReceptionDashboard({ overview: initialOverview }: ReceptionDashb
     return allAppointments.filter((appt) => {
       // Delay filter toggle
       if (onlyDelayed) {
-        if (appt.status !== 'ARRIVED') return false
+        if (!isWaitingAppointment(appt)) return false
         const ts = appt.status_updated_at || appt.check_in_at || appt.created_at
         if (getElapsedMinutes(ts) < 30) return false
-      } else if (statusFilter !== 'ALL' && appt.status !== statusFilter) {
+      } else if (statusFilter !== 'ALL' && (statusFilter === 'ARRIVED' ? !isWaitingAppointment(appt) : appt.status !== statusFilter)) {
         return false
       }
 
@@ -614,7 +618,7 @@ export function ReceptionDashboard({ overview: initialOverview }: ReceptionDashb
                 ) : (
                   filteredQueue.map((appt, index) => {
                     const elapsed = getElapsedMinutes(appt.status_updated_at || appt.check_in_at || appt.created_at)
-                    const isDelayed = appt.status === 'ARRIVED' && elapsed >= 30
+                    const isDelayed = isWaitingAppointment(appt) && elapsed >= 30
 
                     const rowDelay = index * 50
 
@@ -658,7 +662,7 @@ export function ReceptionDashboard({ overview: initialOverview }: ReceptionDashb
 
                         {/* Arrival / Waiting time */}
                         <td className="py-3.5 px-4">
-                          {appt.status === 'ARRIVED' ? (
+                          {isWaitingAppointment(appt) ? (
                             <div>
                               <span
                                 className={`inline-flex items-center gap-1 font-semibold ${isDelayed ? 'text-amber-800 font-bold' : 'text-neutral-700'
@@ -682,7 +686,7 @@ export function ReceptionDashboard({ overview: initialOverview }: ReceptionDashb
 
                         {/* Status */}
                         <td className="py-3.5 px-4">
-                          {appt.status === 'ARRIVED' ? (
+                          {isWaitingAppointment(appt) ? (
                             <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-900 border border-amber-200">
                               <span className="w-1.5 h-1.5 rounded-full bg-amber-600 animate-pulse" />
                               Waiting
@@ -742,7 +746,7 @@ export function ReceptionDashboard({ overview: initialOverview }: ReceptionDashb
                             </button>
 
                             {/* Cancel Option (for active or booked) */}
-                            {(appt.status === 'BOOKED' || appt.status === 'ARRIVED') && (
+                            {(appt.status === 'BOOKED' || isWaitingAppointment(appt)) && (
                               <button
                                 type="button"
                                 onClick={() => {
@@ -784,12 +788,12 @@ export function ReceptionDashboard({ overview: initialOverview }: ReceptionDashb
                   doctor_id: d.id,
                   name: d.name_en,
                   appointments_today: allAppointments.filter((a) => a.doctor_id === d.id).length,
-                  waiting: allAppointments.filter((a) => a.doctor_id === d.id && a.status === 'ARRIVED').length,
-                  arrived_waiting: allAppointments.filter((a) => a.doctor_id === d.id && a.status === 'ARRIVED').length,
+                  waiting: allAppointments.filter((a) => a.doctor_id === d.id && isWaitingAppointment(a)).length,
+                  arrived_waiting: allAppointments.filter((a) => a.doctor_id === d.id && isWaitingAppointment(a)).length,
                   in_consultation: allAppointments.filter((a) => a.doctor_id === d.id && a.status === 'IN_CONSULTATION').length,
                   done: allAppointments.filter((a) => a.doctor_id === d.id && a.status === 'DONE').length,
                   department: d.qualification || 'Physiotherapy',
-                  next_token: allAppointments.find((a) => a.doctor_id === d.id && a.status === 'ARRIVED')?.token_number ?? null,
+                  next_token: allAppointments.find((a) => a.doctor_id === d.id && isWaitingAppointment(a))?.token_number ?? null,
                 }))
               ).map((doc) => (
                 <div

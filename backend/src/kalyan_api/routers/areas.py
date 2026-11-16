@@ -269,7 +269,9 @@ def _doctors_today(session: Session, today: date) -> list[DoctorTodayOut]:
             .where(
                 Appointment.doctor_id == doctor_id,
                 Appointment.appointment_date == today,
-                Appointment.status == AppointmentStatus.ARRIVED.value,
+                Appointment.status.in_(
+                    [AppointmentStatus.ARRIVED.value, AppointmentStatus.CHECKED_IN.value]
+                ),
             )
             .order_by(Appointment.token_number.asc())
             .limit(1)
@@ -280,8 +282,10 @@ def _doctors_today(session: Session, today: date) -> list[DoctorTodayOut]:
                 name=name_en,
                 appointments_today=sum(status_counts.values()),
                 waiting=status_counts.get(AppointmentStatus.BOOKED.value, 0)
-                + status_counts.get(AppointmentStatus.ARRIVED.value, 0),
-                arrived_waiting=status_counts.get(AppointmentStatus.ARRIVED.value, 0),
+                + status_counts.get(AppointmentStatus.ARRIVED.value, 0)
+                + status_counts.get(AppointmentStatus.CHECKED_IN.value, 0),
+                arrived_waiting=status_counts.get(AppointmentStatus.ARRIVED.value, 0)
+                + status_counts.get(AppointmentStatus.CHECKED_IN.value, 0),
                 in_consultation=status_counts.get(AppointmentStatus.IN_CONSULTATION.value, 0),
                 done=status_counts.get(AppointmentStatus.DONE.value, 0),
                 department=qualification or "Physiotherapy",
@@ -754,7 +758,9 @@ def _reception_alerts(session: Session, today: date, now_utc: datetime) -> list[
         session.scalar(
             select(func.count(Appointment.id)).where(
                 Appointment.appointment_date == today,
-                Appointment.status == AppointmentStatus.ARRIVED.value,
+                Appointment.status.in_(
+                    [AppointmentStatus.ARRIVED.value, AppointmentStatus.CHECKED_IN.value]
+                ),
                 Appointment.status_updated_at <= thirty_mins_ago,
             )
         )

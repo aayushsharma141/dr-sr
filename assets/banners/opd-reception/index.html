@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Kalyan Hospital · OPD Reception Banner Options</title>
+    <style>
+      :root {
+        --wine: #5d0b26;
+        --burgundy: #8e1c3d;
+        --gold: #c39a35;
+        --cream: #fbf5f7;
+        --ink: #14213d;
+        --muted: #57647c;
+        --green: #16804a;
+      }
+      * { box-sizing: border-box; }
+      html, body { margin: 0; min-height: 100%; background: #e8ebf0; font-family: Arial, Helvetica, sans-serif; color: var(--ink); }
+      body { display: grid; place-items: start center; padding: 0; }
+      .banner { width: 1920px; height: 800px; position: relative; overflow: hidden; isolation: isolate; }
+      .banner::before, .banner::after { content: ""; position: absolute; pointer-events: none; z-index: -1; }
+      .brand { position: absolute; left: 196px; top: 78px; display: flex; align-items: center; gap: 20px; }
+      .brand-mark { width: 68px; height: 68px; display: grid; place-items: center; border: 3px solid var(--gold); border-radius: 50%; background: var(--wine); color: #fff; font-size: 37px; line-height: 1; font-weight: 700; }
+      .brand-name { font-size: 25px; line-height: 1.2; font-weight: 800; letter-spacing: -.5px; }
+      .brand-name span { display: block; margin-top: 4px; font-size: 16px; font-weight: 600; letter-spacing: .1px; }
+      .eyebrow { display: flex; align-items: center; gap: 12px; font-weight: 800; font-size: 17px; letter-spacing: 2px; text-transform: uppercase; }
+      .eyebrow::before { content: ""; width: 33px; height: 3px; background: var(--gold); border-radius: 2px; }
+      h1 { margin: 23px 0 20px; font-size: 72px; line-height: 1.04; letter-spacing: -2.6px; max-width: 750px; }
+      .copy { margin: 0; max-width: 625px; font-size: 23px; line-height: 1.55; }
+      .cta { position: absolute; right: 200px; bottom: 83px; min-height: 58px; padding: 0 28px; border: 0; border-radius: 9px; display: inline-flex; align-items: center; gap: 13px; font: inherit; font-size: 17px; font-weight: 800; text-decoration: none; white-space: nowrap; }
+      .cta svg { width: 19px; height: 19px; }
+      .subline { position: absolute; left: 196px; bottom: 99px; font-size: 16px; font-weight: 600; display: flex; align-items: center; gap: 12px; }
+      .dot { width: 10px; height: 10px; background: #1ca364; border-radius: 50%; box-shadow: 0 0 0 5px #1ca36420; }
+      .visual { position: absolute; right: 207px; top: 162px; width: 620px; height: 460px; }
+      .queue-card { position: absolute; left: 45px; top: 48px; width: 540px; min-height: 330px; padding: 27px; background: white; border: 1px solid #d9dfe8; border-radius: 18px; box-shadow: 0 24px 60px #23365417; }
+      .queue-head { display: flex; align-items: center; justify-content: space-between; padding-bottom: 22px; border-bottom: 1px solid #e7eaf0; font-size: 21px; font-weight: 800; }
+      .today { color: var(--muted); font-size: 14px; font-weight: 600; }
+      .status-strip { display: flex; flex-wrap: wrap; gap: 8px; margin: 20px 0 10px; }
+      .status-strip span { border-radius: 20px; background: #f7f8fa; padding: 8px 12px; color: #33415b; font-size: 13px; font-weight: 700; }
+      .patient { display: grid; grid-template-columns: 48px 1fr auto; align-items: center; gap: 13px; padding: 15px 0; border-top: 1px solid #edf0f4; }
+      .token { color: var(--burgundy); background: #fbf0f3; border: 1px solid #efc5d1; border-radius: 9px; padding: 8px 6px; text-align: center; font-size: 17px; font-weight: 800; }
+      .patient b { font-size: 15px; }
+      .patient small { display: block; margin-top: 5px; color: var(--muted); font-size: 12px; }
+      .tag { padding: 6px 11px; border-radius: 20px; background: #fff3d7; color: #7b5200; font-size: 12px; font-weight: 800; }
+      .status { color: var(--burgundy); font-size: 12px; font-weight: 700; }
+
+      /* Option 1: minimalist, light, calm */
+      .minimal { background: #fff; }
+      .minimal::before { top: 0; left: 0; width: 14px; height: 100%; background: var(--burgundy); }
+      .minimal .brand { color: var(--wine); }
+      .minimal .content { position: absolute; left: 212px; top: 248px; }
+      .minimal .eyebrow { color: var(--burgundy); }
+      .minimal h1 { color: var(--ink); }
+      .minimal .copy { color: var(--muted); }
+      .minimal .cta { background: var(--burgundy); color: #fff; box-shadow: 0 7px 0 #5d0b261a; }
+      .minimal .subline { color: var(--muted); }
+      .minimal .visual { transform: rotate(-1.4deg); }
+
+      /* Option 2: bold typography, brand-first */
+      .bold { color: #fff; background: var(--wine); }
+      .bold::before { right: -210px; top: -250px; width: 930px; height: 930px; border: 1px solid #ffffff24; border-radius: 50%; box-shadow: 0 0 0 50px #ffffff08, 0 0 0 100px #ffffff06; }
+      .bold::after { right: 245px; top: 152px; width: 470px; height: 470px; border-radius: 50%; background: linear-gradient(145deg,#8e1c3d,#741333); border: 1px solid #c39a3566; z-index: -1; }
+      .bold .brand { color: #fff; }
+      .bold .brand-mark { background: #fff; color: var(--wine); }
+      .bold .content { position: absolute; left: 210px; top: 248px; }
+      .bold .eyebrow { color: #e7ca7e; }
+      .bold h1 { color: #fff; font-size: 76px; max-width: 775px; }
+      .bold .copy { color: #f6eaf0; max-width: 640px; }
+      .bold .cta { background: var(--gold); color: var(--wine); }
+      .bold .subline { color: #f2dfe6; }
+      .bold .visual { right: 231px; top: 174px; width: 390px; height: 390px; border-radius: 50%; border: 2px solid #c39a35; display: grid; place-items: center; }
+      .token-big { color: #fff; text-align: center; font-size: 18px; font-weight: 700; }
+      .token-big strong { display: block; margin: 9px 0; color: #efd27e; font-size: 145px; line-height: .9; letter-spacing: -9px; }
+      .token-big span { color: #f7e9ee; font-size: 19px; font-weight: 500; }
+
+      /* Option 3: editorial, grid-led service snapshot */
+      .editorial { background: #f6f3ef; }
+      .editorial::before { right: 0; top: 0; width: 890px; height: 100%; background: #efe8e2; }
+      .editorial::after { right: 220px; top: -90px; width: 210px; height: 980px; background: #e6d4db; transform: rotate(17deg); }
+      .editorial .brand { color: var(--wine); }
+      .editorial .content { position: absolute; left: 210px; top: 250px; }
+      .editorial .eyebrow { color: var(--burgundy); }
+      .editorial h1 { max-width: 690px; font-size: 68px; }
+      .editorial .copy { color: #4e596c; }
+      .editorial .visual { top: 195px; right: 255px; width: 505px; height: 375px; }
+      .editorial .queue-card { left: 0; top: 0; width: 505px; min-height: 344px; border: 0; border-top: 5px solid var(--burgundy); border-radius: 3px; box-shadow: 0 20px 48px #45213a1a; }
+      .editorial .queue-head { color: var(--wine); }
+      .editorial .status-strip span { background: #f8f3f2; border-radius: 3px; }
+      .editorial .cta { background: var(--wine); color: white; border-radius: 3px; }
+      .editorial .subline { color: #5b6576; }
+
+      @media (max-width: 1000px) {
+        body { display: block; overflow-x: auto; }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="banner minimal" id="banner" aria-label="Kalyan Hospital OPD reception banner">
+      <div class="brand">
+        <div class="brand-mark" aria-hidden="true">✚</div>
+        <div class="brand-name">Kalyan Hospital<span lang="hi">कल्याण हॉस्पिटल</span></div>
+      </div>
+      <div class="content">
+        <div class="eyebrow">OPD reception</div>
+        <h1>Every visit starts<br />with a clear check-in.</h1>
+        <p class="copy">Create doctor-wise tokens, register new patients, and guide returning patients into the waiting queue.</p>
+      </div>
+      <div class="visual" aria-hidden="true">
+        <div class="queue-card">
+          <div class="queue-head"><span>Today’s OPD</span><span class="today">Doctor-wise queue</span></div>
+          <div class="status-strip"><span>All visits</span><span>To arrive</span><span>Checked in</span></div>
+          <div class="patient"><span class="token">#—</span><div><b>New patient</b><small>Registration needed</small></div><span class="tag">To arrive</span></div>
+          <div class="patient"><span class="token">#—</span><div><b>Existing patient</b><small>URN linked · Ready for care</small></div><span class="status">Waiting</span></div>
+        </div>
+      </div>
+      <div class="subline"><i class="dot"></i> Doctor-wise tokens · Clear visit status</div>
+      <a class="cta" href="#opd-check-in">Open reception desk <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
+    </main>
+    <script>
+      const style = new URLSearchParams(location.search).get('style') || 'minimal';
+      const banner = document.getElementById('banner');
+      const options = {
+        minimal: { title: 'Every visit starts<br />with a clear check-in.', eyebrow: 'OPD reception', copy: 'Create doctor-wise tokens, register new patients, and guide returning patients into the waiting queue.', footer: 'Doctor-wise tokens · Clear visit status' },
+        bold: { title: 'A calmer start<br />for every visit.', eyebrow: 'Kalyan Hospital · Ara', copy: 'Create a token, complete registration, and keep each doctor’s queue moving from one reception desk.', footer: 'New and returning patients · One reception' },
+        editorial: { title: 'Reception,<br />in sync.', eyebrow: 'Reception & registration', copy: 'Keep arrivals clear, patient records linked, and each doctor’s queue moving through one reception workflow.', footer: 'One permanent record · Doctor-wise OPD' }
+      };
+      if (!options[style]) document.body.innerHTML = '<p>Use ?style=minimal, ?style=bold, or ?style=editorial.</p>';
+      else {
+        banner.className = `banner ${style}`;
+        banner.querySelector('.eyebrow').textContent = options[style].eyebrow;
+        banner.querySelector('h1').innerHTML = options[style].title;
+        banner.querySelector('.copy').textContent = options[style].copy;
+        banner.querySelector('.subline').innerHTML = `<i class="dot"></i>${options[style].footer}`;
+        if (style === 'bold') banner.querySelector('.visual').innerHTML = '<div class="token-big">NEXT AVAILABLE TOKEN<strong>#—</strong><span>Selected doctor’s queue</span></div>';
+      }
+    </script>
+  </body>
+</html>

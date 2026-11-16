@@ -657,7 +657,7 @@ function NeedsAttention({ overview, className }: { overview: Partial<AdminOvervi
 // ------------------------------------------------------------------------------ row panels
 
 const APPOINTMENT_SEGMENTS = [
-  { key: 'waiting', label: 'Waiting', color: 'bg-amber-500', codes: ['BOOKED', 'ARRIVED'] },
+  { key: 'waiting', label: 'Waiting', color: 'bg-amber-500', codes: ['BOOKED', 'ARRIVED', 'CHECKED_IN'] },
   { key: 'in', label: 'In consultation', color: 'bg-consult-600', codes: ['IN_CONSULTATION'] },
   { key: 'done', label: 'Done', color: 'bg-emerald-600', codes: ['DONE'] },
   { key: 'off', label: 'Cancelled or no-show', color: 'bg-slate-400', codes: ['CANCELLED', 'NO_SHOW'] },

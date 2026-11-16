@@ -6,10 +6,12 @@ import { TodayAppointmentsPanel } from '../components/checkin/TodayAppointmentsP
 import {
   useAppointment,
   useAppointments,
+  useBookAppointment,
   useCheckDuplicate,
   useCheckIn,
   useCheckInNewPatient,
   useConsultingDoctors,
+  useCreateOpdArrival,
   useMe,
   usePatient,
   usePatients,
@@ -36,9 +38,9 @@ import {
 } from '../components/icons'
 
 type PatientMode = 'new' | 'existing'
-type Sex = 'M' | 'F' | 'O'
 
-const LABEL = 'mb-1 block text-xs font-semibold uppercase tracking-wider text-slate-600'
+const LABEL = 'mb-1 block text-sm font-medium text-slate-700'
+const SECTION_LABEL = 'text-sm font-semibold text-slate-800'
 const INPUT =
   'min-h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm font-medium text-slate-900 shadow-2xs placeholder:text-slate-400 focus:border-[#8E1C3D] focus:outline-none focus:ring-2 focus:ring-[#8E1C3D]/15 disabled:bg-slate-100'
 
@@ -55,12 +57,6 @@ const PRIORITY_OPTIONS: { value: PriorityLevel; label: string; hint: string }[] 
   { value: 'NORMAL', label: 'Normal', hint: 'Regular queue' },
   { value: 'PRIORITY', label: 'High', hint: 'Needs preferential attention' },
   { value: 'EMERGENCY', label: 'Emergency', hint: 'Immediate clinical attention' },
-]
-
-const SEX_OPTIONS: { value: Sex; label: string }[] = [
-  { value: 'M', label: 'Male' },
-  { value: 'F', label: 'Female' },
-  { value: 'O', label: 'Other' },
 ]
 
 function sexLabel(gender: string): string {
@@ -122,9 +118,6 @@ export function TokenGenerationPage() {
   const [fullName, setFullName] = useState('')
   const [ageYears, setAgeYears] = useState('')
   const [mobile, setMobile] = useState('')
-  const [sex, setSex] = useState<Sex | null>(null)
-  const [guardianName, setGuardianName] = useState('')
-  const [address, setAddress] = useState('')
   const [notDuplicate, setNotDuplicate] = useState(false)
   // Existing patient (OD-22-04)
   const [searchQuery, setSearchQuery] = useState('')
@@ -142,6 +135,7 @@ export function TokenGenerationPage() {
   const [remarks, setRemarks] = useState('')
 
   const [issued, setIssued] = useState<Issued | null>(null)
+  const [notice, setNotice] = useState<string | null>(null)
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
   const [duplicateBooking, setDuplicateBooking] = useState(false)
 
@@ -184,7 +178,14 @@ export function TokenGenerationPage() {
   const walkIn = useWalkIn()
   const checkIn = useCheckIn()
   const newPatientCheckIn = useCheckInNewPatient()
-  const busy = walkIn.isPending || checkIn.isPending || newPatientCheckIn.isPending
+  const createArrival = useCreateOpdArrival()
+  const bookAppointment = useBookAppointment()
+  const busy =
+    walkIn.isPending ||
+    checkIn.isPending ||
+    newPatientCheckIn.isPending ||
+    createArrival.isPending ||
+    bookAppointment.isPending
 
   // Today's appointments to compute next available token for the chosen doctor
   const { data: allAppointmentsData } = useAppointments({ appointment_date: today })
@@ -238,9 +239,6 @@ export function TokenGenerationPage() {
     setFullName('')
     setAgeYears('')
     setMobile('')
-    setSex(null)
-    setGuardianName('')
-    setAddress('')
     setNotDuplicate(false)
     setSearchQuery('')
     setSelectedPatient(null)
@@ -292,15 +290,13 @@ export function TokenGenerationPage() {
     if (fullName.trim().length < 2) missing.push('patient name')
     if (ageYears === '' || Number(ageYears) < 0 || Number(ageYears) > 150) missing.push('age')
     if (mobile.replace(/\D/g, '').length < 10) missing.push('10-digit phone number')
-    if (!sex) missing.push('sex')
-    if (address.trim().length < 2) missing.push('address')
     if (duplicateMatch && !notDuplicate) missing.push('confirmation that this is a different patient')
   } else {
     if (!selectedPatient) missing.push('patient')
-    if (!visitKind) missing.push('consultation type')
+    if (booking && !visitKind) missing.push('consultation type')
   }
   if (!chosenOption) missing.push('consulting doctor')
-  if (REFERRAL_NEEDS_NAME.includes(referralSource) && referrerName.trim().length < 2)
+  if (booking && REFERRAL_NEEDS_NAME.includes(referralSource) && referrerName.trim().length < 2)
     missing.push('referrer name')
   if (priority !== 'NORMAL' && priorityReason.trim().length < 3) missing.push('priority reason')
 
@@ -315,51 +311,64 @@ export function TokenGenerationPage() {
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault()
     setErrorMsg(null)
+    setNotice(null)
     setDuplicateBooking(false)
     if (missing.length > 0 || !chosenOption) {
       setErrorMsg(`Still needed: ${missing.join(', ')}.`)
       return
     }
     try {
-      let appointment: Appointment
       if (mode === 'new') {
-        appointment = await newPatientCheckIn.mutateAsync({
-          patient: {
-            full_name: fullName.trim(),
-            guardian_name: guardianName.trim() || 'Self / Not specified',
-            gender: sex as Sex,
-            age_years: Number(ageYears),
-            mobile: mobile.trim(),
-            address: address.trim(),
-            district: 'Bhojpur',
-            state: 'Bihar',
-            allergies: 'None reported',
-          },
+        const arrival = await createArrival.mutateAsync({
+          full_name: fullName.trim(),
+          age_years: Number(ageYears),
+          mobile: mobile.trim(),
           doctor_id: chosenOption.doctor.id,
           department_id: chosenOption.department.id,
-          notes: remarks.trim() || null,
-          ...details(),
+          priority_level: priority,
+          priority_reason: priority === 'NORMAL' ? null : priorityReason.trim(),
         })
-      } else if (booking) {
-        appointment = await checkIn.mutateAsync({
+        setNotice(`Token #${arrival.token_number} added to To Arrive. Complete registration from today's queue.`)
+        setFullName('')
+        setAgeYears('')
+        setMobile('')
+        setPriority('NORMAL')
+        setPriorityReason('')
+        setRemarks('')
+        return
+      }
+
+      if (booking) {
+        const appointment = await checkIn.mutateAsync({
           id: booking.id,
           body: { version_id: booking.version_id, ...details() },
         })
-      } else {
-        appointment = await walkIn.mutateAsync({
-          patient_id: (selectedPatient as PatientOut).id,
+        setIssued({
+          appointment,
+          isNewPatient: false,
+          departmentName: chosenOption.department.name_en,
+          cabinCode: chosenOption.doctor.cabin_code ?? null,
+        })
+        return
+      }
+
+      if (selectedPatient) {
+        const appointment = await bookAppointment.mutateAsync({
+          patient_id: selectedPatient.id,
           doctor_id: chosenOption.doctor.id,
           department_id: chosenOption.department.id,
-          notes: remarks.trim() || null,
-          ...details(),
+          appointment_date: today,
+          issue_token: true,
+          priority_level: priority,
+          priority_reason: priority === 'NORMAL' ? null : priorityReason.trim(),
         })
+        setNotice(`Token created; awaiting check-in. Token #${appointment.token_number} issued for ${appointment.patient_name}.`)
+        setSelectedPatient(null)
+        setPriority('NORMAL')
+        setPriorityReason('')
+        setRemarks('')
+        return
       }
-      setIssued({
-        appointment,
-        isNewPatient: mode === 'new',
-        departmentName: chosenOption.department.name_en,
-        cabinCode: chosenOption.doctor.cabin_code ?? null,
-      })
     } catch (err: unknown) {
       if (err instanceof ApiError && err.code === 'duplicate_appointment') {
         setDuplicateBooking(true)
@@ -372,12 +381,9 @@ export function TokenGenerationPage() {
     }
   }
 
-  const submitLabel =
-    mode === 'new'
-      ? 'Register patient & issue token'
-      : booking
-        ? 'Check in booking & issue token'
-        : 'Check in & issue token'
+  const submitLabel = booking
+    ? 'Check in & Send to Waiting'
+    : 'Create Entry & Generate Token'
 
   return (
     <AppShell name={me?.full_name || 'Staff'} role={me?.role || 'RECEPTION'}>
@@ -390,39 +396,30 @@ export function TokenGenerationPage() {
             </span>
             <div>
               <h1 className="text-xl font-bold tracking-tight text-slate-900">Check-in &amp; Token</h1>
-              <p className="text-xs text-slate-500">
-                Every patient who arrives is checked in here and gets a token number for their doctor&apos;s queue.
-                No payment is taken at check-in.
-              </p>
+              <p className="text-sm text-slate-600">Issue doctor-wise tokens and manage today&apos;s queue.</p>
             </div>
           </div>
-          <Link
-            to="/reception/patients/new"
-            className="inline-flex min-h-9 shrink-0 items-center gap-1.5 self-start rounded-lg border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-700 shadow-2xs hover:border-[#8E1C3D] hover:text-[#5D0B26]"
-          >
-            <IconUserPlus className="h-4 w-4 text-[#8E1C3D]" />
-            Full registration form
-          </Link>
         </header>
-
-        {/* How the desk works: booked vs walk-in, check-in vs token, in one line each. */}
-        <ol className="grid grid-cols-1 gap-2 text-xs text-slate-700 md:grid-cols-3">
-          <li className="rounded-xl border border-slate-200 bg-white px-3 py-2">
-            <span className="font-bold text-[#5D0B26]">Booked patient?</span> Find them in Today&apos;s appointments
-            and press <span className="font-semibold">Check in</span>.
-          </li>
-          <li className="rounded-xl border border-slate-200 bg-white px-3 py-2">
-            <span className="font-bold text-[#5D0B26]">Walk-in?</span> Choose New or Existing patient on the left
-            and fill the form.
-          </li>
-          <li className="rounded-xl border border-slate-200 bg-white px-3 py-2">
-            <span className="font-bold text-[#5D0B26]">Token</span> is the patient&apos;s number in the doctor&apos;s
-            queue. The fee is collected at Billing after the consultation.
-          </li>
-        </ol>
 
         {issued && (
           <IssuedCard issued={issued} onNext={resetAll} />
+        )}
+
+        {notice && (
+          <div
+            role="status"
+            className="flex items-center justify-between rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-xs font-semibold text-emerald-900 shadow-2xs"
+          >
+            <span>{notice}</span>
+            <button
+              type="button"
+              onClick={() => setNotice(null)}
+              aria-label="Dismiss notification"
+              className="text-xs font-bold text-emerald-800 hover:text-emerald-950"
+            >
+              <IconX aria-hidden="true" className="h-4 w-4" />
+            </button>
+          </div>
         )}
 
         {errorMsg && (
@@ -443,18 +440,17 @@ export function TokenGenerationPage() {
           </div>
         )}
 
-        <div className="grid grid-cols-1 items-start gap-5 lg:grid-cols-12">
+        <div className="grid grid-cols-1 items-start gap-5 xl:grid-cols-[minmax(24rem,0.75fr)_minmax(0,2.25fr)]">
           {/* LEFT: the check-in form */}
           <form
             onSubmit={handleSubmit}
             aria-labelledby="check-in-form-heading"
-            className="space-y-5 rounded-2xl border border-slate-200 bg-white p-5 shadow-xs lg:col-span-7"
+            className="space-y-5 rounded-2xl border border-slate-200 bg-white p-5 shadow-xs"
           >
             <div className="flex items-center justify-between gap-2 border-b border-slate-100 pb-3">
               <h2 id="check-in-form-heading" className="flex items-center gap-2 text-base font-bold text-slate-900">
                 <IconTicket className="h-5 w-5 text-[#8E1C3D]" />
-                Create today&apos;s OPD token
-                <span className="sr-only">Check in a patient</span>
+                Create OPD Token
               </h2>
               {(selectedPatient || fullName || booking) && !issued && (
                 <button type="button" onClick={resetAll} className="text-xs font-semibold text-slate-500 hover:text-red-700">
@@ -465,9 +461,9 @@ export function TokenGenerationPage() {
 
             {/* 1. Who is the patient? */}
             <fieldset className="space-y-3">
-              <legend className={LABEL}>1. Patient</legend>
+              <legend className={SECTION_LABEL}>Patient</legend>
               <Segmented<PatientMode>
-                label="New or existing patient"
+                label="Patient type"
                 value={mode}
                 onChange={switchMode}
                 options={[
@@ -489,12 +485,6 @@ export function TokenGenerationPage() {
                   },
                 ]}
               />
-              <p className="text-xs text-slate-500">
-                {mode === 'new'
-                  ? 'First visit: the patient gets a permanent hospital number (URN) now.'
-                  : 'Been here before: find them by URN, name or mobile. Their URN never changes.'}
-              </p>
-
               {mode === 'new' ? (
                 <NewPatientFields
                   fullName={fullName}
@@ -503,12 +493,6 @@ export function TokenGenerationPage() {
                   setAgeYears={setAgeYears}
                   mobile={mobile}
                   setMobile={setMobile}
-                  sex={sex}
-                  setSex={setSex}
-                  guardianName={guardianName}
-                  setGuardianName={setGuardianName}
-                  address={address}
-                  setAddress={setAddress}
                   duplicate={duplicateMatch ?? null}
                   notDuplicate={notDuplicate}
                   setNotDuplicate={setNotDuplicate}
@@ -551,7 +535,7 @@ export function TokenGenerationPage() {
 
             {/* 2. Which doctor? */}
             <fieldset className="space-y-3">
-              <legend className={LABEL}>2. Doctor</legend>
+              <legend className={SECTION_LABEL}>Doctor</legend>
               {booking ? (
                 <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-sky-200 bg-sky-50 p-3 text-xs text-sky-950">
                   <span className="flex items-center gap-2">
@@ -635,7 +619,7 @@ export function TokenGenerationPage() {
 
             {/* 3. Referral and priority */}
             <fieldset className="space-y-3">
-              <legend className={LABEL}>3. Referral &amp; priority</legend>
+              <legend className={SECTION_LABEL}>Referral &amp; priority</legend>
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div>
                   <label htmlFor="checkin-referral" className={LABEL}>
@@ -675,28 +659,25 @@ export function TokenGenerationPage() {
               </div>
 
               <div>
-                <span className={LABEL}>Priority *</span>
-                <Segmented<PriorityLevel>
-                  label="Priority"
+                <label htmlFor="checkin-priority" className={LABEL}>
+                  Priority *
+                </label>
+                <select
+                  id="checkin-priority"
                   value={priority}
-                  onChange={(v) => {
+                  onChange={(e) => {
+                    const v = e.target.value as PriorityLevel
                     setPriority(v)
                     if (v === 'NORMAL') setPriorityReason('')
                   }}
-                  options={PRIORITY_OPTIONS.map((o) => ({
-                    value: o.value,
-                    label: o.label,
-                    selectedClass:
-                      o.value === 'EMERGENCY'
-                        ? 'border border-red-700 bg-red-600 text-white shadow-2xs'
-                        : o.value === 'PRIORITY'
-                          ? 'border border-amber-400 bg-amber-100 text-amber-900 shadow-2xs'
-                          : undefined,
-                  }))}
-                />
+                  className={INPUT}
+                >
+                  <option value="NORMAL">Normal</option>
+                  <option value="PRIORITY">High</option>
+                  <option value="EMERGENCY">Emergency</option>
+                </select>
                 <p className="mt-1 text-xs text-slate-500">
-                  {PRIORITY_OPTIONS.find((o) => o.value === priority)?.hint}. The token number never changes; the doctor
-                  decides whom to call.
+                  {PRIORITY_OPTIONS.find((o) => o.value === priority)?.hint}.
                 </p>
               </div>
               {priority !== 'NORMAL' && (
@@ -733,7 +714,7 @@ export function TokenGenerationPage() {
 
             {/* Next available token preview (Image 5) */}
             <div className="space-y-1.5 rounded-xl border border-emerald-200 bg-emerald-50/50 p-4">
-              <span className="block text-xs font-bold uppercase tracking-wider text-slate-700">
+              <span className="block text-sm font-semibold text-slate-700">
                 Next available token
               </span>
               <div
@@ -746,9 +727,7 @@ export function TokenGenerationPage() {
                     : '#01'
                   : '#--'}
               </div>
-              <p className="text-xs text-slate-500">
-                Illustrative preview only. Actual number is assigned atomically when the token is created.
-              </p>
+              <p className="text-xs text-slate-600">Preview only. Assigned when created.</p>
             </div>
 
             <div className="space-y-2 border-t border-slate-100 pt-4">
@@ -761,25 +740,22 @@ export function TokenGenerationPage() {
                 className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-[#8E1C3D] px-6 text-sm font-bold text-white shadow-xs hover:bg-[#5D0B26] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#8E1C3D] disabled:opacity-50"
               >
                 <IconTicket className="h-4 w-4" />
-                {busy ? (
-                  'Issuing token…'
-                ) : (
-                  <div className="flex flex-col items-center leading-tight">
-                    <span>Generate token</span>
-                    <span className="text-xs font-normal opacity-85">({submitLabel})</span>
-                  </div>
-                )}
+                {busy ? 'Issuing token…' : submitLabel}
               </button>
             </div>
           </form>
 
           {/* RIGHT: today's appointments */}
-          <div className="lg:col-span-5">
+          <div>
             <TodayAppointmentsPanel
               activeBookingId={booking?.id ?? null}
               canCheckIn={canCheckIn}
               canManage={canManageBookings}
+              canRegister={canCheckIn}
               onCheckIn={takeBooking}
+              onRegisterArrival={(arrival) => {
+                navigate(`/reception/patients/new?arrival_id=${arrival.id}&doctor_id=${arrival.doctor_id}`)
+              }}
               onRegisterPatient={(a) => {
                 navigate(
                   a.patient_id
@@ -817,12 +793,6 @@ function NewPatientFields(props: {
   setAgeYears: (v: string) => void
   mobile: string
   setMobile: (v: string) => void
-  sex: Sex | null
-  setSex: (v: Sex) => void
-  guardianName: string
-  setGuardianName: (v: string) => void
-  address: string
-  setAddress: (v: string) => void
   duplicate: PatientOut | null
   notDuplicate: boolean
   setNotDuplicate: (v: boolean) => void
@@ -835,7 +805,15 @@ function NewPatientFields(props: {
           <label htmlFor="np-name" className={LABEL}>
             Patient name *
           </label>
-          <input id="np-name" value={props.fullName} onChange={(e) => props.setFullName(e.target.value)} maxLength={120} className={INPUT} autoComplete="off" />
+          <input
+            id="np-name"
+            value={props.fullName}
+            onChange={(e) => props.setFullName(e.target.value)}
+            maxLength={120}
+            className={INPUT}
+            autoComplete="name"
+            required
+          />
         </div>
         <div className="sm:col-span-2">
           <label htmlFor="np-age" className={LABEL}>
@@ -849,9 +827,10 @@ function NewPatientFields(props: {
             value={props.ageYears}
             onChange={(e) => props.setAgeYears(e.target.value)}
             className={INPUT}
+            required
           />
         </div>
-        <div className="sm:col-span-3">
+        <div className="sm:col-span-6">
           <label htmlFor="np-mobile" className={LABEL}>
             Phone number *
           </label>
@@ -859,41 +838,13 @@ function NewPatientFields(props: {
             id="np-mobile"
             type="tel"
             inputMode="numeric"
+            autoComplete="tel"
             value={props.mobile}
             onChange={(e) => props.setMobile(e.target.value)}
             maxLength={15}
             placeholder="10-digit mobile"
             className={INPUT}
-          />
-        </div>
-        <div className="sm:col-span-3">
-          <span className={LABEL}>Sex *</span>
-          <Segmented<Sex> label="Sex" value={props.sex} onChange={props.setSex} options={SEX_OPTIONS} />
-        </div>
-        <div className="sm:col-span-6">
-          <label htmlFor="np-guardian" className={LABEL}>
-            Guardian name
-          </label>
-          <input
-            id="np-guardian"
-            value={props.guardianName}
-            onChange={(e) => props.setGuardianName(e.target.value)}
-            maxLength={120}
-            placeholder="Father / husband / mother (optional)"
-            className={INPUT}
-          />
-        </div>
-        <div className="sm:col-span-6">
-          <label htmlFor="np-address" className={LABEL}>
-            Address *
-          </label>
-          <input
-            id="np-address"
-            value={props.address}
-            onChange={(e) => props.setAddress(e.target.value)}
-            maxLength={1000}
-            placeholder="Village / town, area"
-            className={INPUT}
+            required
           />
         </div>
       </div>
@@ -902,24 +853,27 @@ function NewPatientFields(props: {
         <div role="alert" className="space-y-2 rounded-xl border border-amber-300 bg-amber-50 p-3 text-xs text-amber-950">
           <p className="flex items-center gap-2 font-bold">
             <IconAlertTriangle className="h-4 w-4 text-amber-700" />
-            Already registered? {props.duplicate.full_name} ({props.duplicate.urn}) has the same name and mobile.
+            Already registered? {props.duplicate.full_name} ({props.duplicate.urn})
           </p>
-          <div className="flex flex-wrap items-center gap-3">
+          <p>
+            Same phone number. If this is the same person, check in their existing record instead of creating a duplicate.
+          </p>
+          <div className="flex flex-wrap items-center gap-2 pt-1">
             <button
               type="button"
-              onClick={() => props.onUseExisting(props.duplicate as PatientOut)}
-              className="inline-flex min-h-8 items-center rounded-lg bg-[#8E1C3D] px-3 font-bold text-white hover:bg-[#5D0B26]"
+              onClick={() => props.onUseExisting(props.duplicate!)}
+              className="inline-flex min-h-8 items-center rounded-lg bg-amber-800 px-3 text-xs font-bold text-white hover:bg-amber-900"
             >
               Use this patient
             </button>
-            <label className="flex items-center gap-2">
+            <label className="inline-flex items-center gap-2 text-xs font-semibold text-slate-700">
               <input
                 type="checkbox"
                 checked={props.notDuplicate}
                 onChange={(e) => props.setNotDuplicate(e.target.checked)}
-                className="h-4 w-4 accent-[#8E1C3D]"
+                className="rounded border-slate-300 text-[#8E1C3D] focus:ring-[#8E1C3D]"
               />
-              No, this is a different person
+              Different patient with same phone number
             </label>
           </div>
         </div>

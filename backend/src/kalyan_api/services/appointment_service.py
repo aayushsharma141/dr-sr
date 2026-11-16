@@ -255,7 +255,7 @@ def validate_booking_transition(
     _require_booking_actor(appt, target, principal)
 
     today = clock.ist_today()
-    if target == AppointmentStatus.ARRIVED and appt.appointment_date != today:
+    if target in (AppointmentStatus.ARRIVED, AppointmentStatus.CHECKED_IN) and appt.appointment_date != today:
         raise ApiError(
             status_code=422,
             code="check_in_wrong_day",
@@ -384,7 +384,7 @@ def validate_consultation_transition(
 
 # The legacy appointment status that goes with each consultation status.
 MIRRORED_STATUS: dict[ConsultationStatus, AppointmentStatus] = {
-    ConsultationStatus.WAITING: AppointmentStatus.ARRIVED,
+    ConsultationStatus.WAITING: AppointmentStatus.CHECKED_IN,
     ConsultationStatus.IN_CONSULTATION: AppointmentStatus.IN_CONSULTATION,
     ConsultationStatus.COMPLETED: AppointmentStatus.DONE,
     ConsultationStatus.CANCELLED: AppointmentStatus.CANCELLED,
@@ -407,7 +407,7 @@ def validate_status_update(
 ) -> ConsultationStatus | None:
     """Check a PATCH /appointments/{id}/status request; return the consultation status it sets.
 
-    Check-in (target ARRIVED) is handled by booking_service.check_in, not here. A checked-in
+    Check-in (target ARRIVED or CHECKED_IN) is handled by booking_service.check_in, not here. A checked-in
     patient can only move through the consultation: start, complete or cancel it. A booking that
     is not checked in can be marked not arrived or cancelled. Raises ApiError when refused; the
     error codes of the old status machine are kept (invalid_status_transition).
