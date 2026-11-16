@@ -24,7 +24,7 @@ Ordering notes:
 - [x] **Phase 19: Universal Consultation Workspace** - One consultation for Physiotherapy and Ophthalmology: real drafts with auto-save, new and follow-up encounters, versioned specialty templates, vitals, integrated prescription, follow-up recommendations, read-all edit-own access, one login at a time and a printed summary. (completed 2026-11-06)
 - [x] **Phase 20: Admin Data Governance & Asset Management** - Patient demographic correction with audit; CSV/XLSX import centre (8-stage staging pipeline: upload → inspect → map → validate → resolve → preview → commit → reconcile); controlled patient export (permission-checked, field-selective, audited); hospital identity and logo/asset CRUD with version history; bilingual print template management per document type (prescription, receipt, registration card); five-section Admin navigation reorganization (Hospital Configuration, Patient & Data Management, Users/Security/Governance, System & Maintenance). Uses existing RBAC; no new permission system. All existing admin pages preserved and reorganized, not removed. (completed 2026-11-08)
 - [x] **Phase 22: Integrated OPD Workflow** - Check-in with Referred By and classification, emergency acknowledgement, same-visit reassignment, fee-snapshot bill lines, checkout and receipts. (completed 2026-11-16)
-- [ ] **Phase 23: Advanced Data Operations** (deferred; formerly numbered 22) - Duplicate patient detection and merge workflow (high-risk FK cascade; dedicated transaction design); bulk archive and bulk delete for eligible records; extended data-edit permission controls; LAN workstation status monitoring. Depends on Phase 20 stable data foundation.
+- [x] **Phase 23: Advanced Data Operations** (deferred; formerly numbered 22) - Duplicate patient detection and merge workflow (high-risk FK cascade; dedicated transaction design); bulk archive and bulk delete for eligible records; extended data-edit permission controls; LAN workstation status monitoring. Depends on Phase 20 stable data foundation.
 
 ## Phase Details
 
@@ -371,4 +371,4 @@ Plans:
 - [x] 23-02-PLAN.md — Duplicate Detection, Open Visit Guard & Alias-Pointer Merge/Unmerge Service (Wave 2)
 - [x] 23-03-PLAN.md — Consolidated Patient Aggregations (Timeline, Visits, Dues) & Merged URN Routing (Wave 2)
 - [x] 23-04-PLAN.md — Filtered Bulk Archival, Hard Financial Dues Guard & Workstation Monitoring Backend (Wave 3)
-- [ ] 23-05-PLAN.md — Frontend Admin UI (/admin/duplicates, /admin/patients/archive, /admin/workstations) & Verification Gate (Wave 4)
+- [x] 23-05-PLAN.md — Frontend Admin UI (/admin/duplicates, /admin/patients/archive, /admin/workstations) & Verification Gate (Wave 4)

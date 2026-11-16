@@ -214,6 +214,33 @@ export const router = createBrowserRouter([
             },
           },
           {
+            path: '/admin/duplicates',
+            lazy: async () => {
+              const { DuplicateMergePage } = await import('./pages/admin/DuplicateMergePage')
+              return {
+                Component: DuplicateMergePage,
+              }
+            },
+          },
+          {
+            path: '/admin/patients/archive',
+            lazy: async () => {
+              const { BulkArchivePage } = await import('./pages/admin/BulkArchivePage')
+              return {
+                Component: BulkArchivePage,
+              }
+            },
+          },
+          {
+            path: '/admin/workstations',
+            lazy: async () => {
+              const { WorkstationMonitorPage } = await import('./pages/admin/WorkstationMonitorPage')
+              return {
+                Component: WorkstationMonitorPage,
+              }
+            },
+          },
+          {
             // Patient Import Centre merged into Backup & Restore module; keep old links working.
             path: '/admin/imports',
             element: <Navigate to="/admin/backups?action=import" replace />,

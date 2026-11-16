@@ -113,6 +113,8 @@ const ACTION_WORDS: Record<string, string> = {
   INTEGRITY_CHECK_RUN: 'Ran the data integrity check',
   BACKUP_CREATED: 'Created a backup',
   SETTINGS_UPDATED: 'Updated hospital settings',
+  PATIENT_MERGED: 'Merged duplicate patient record',
+  PATIENT_ARCHIVED: 'Archived patient file',
 }
 
 const METHOD_WORDS: Record<string, string> = { CASH: 'Cash', UPI: 'UPI', CARD: 'Card' }

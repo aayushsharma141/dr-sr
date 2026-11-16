@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { sendHeartbeat } from '../api/admin-data-ops'
 import { useClinicBranding } from '../api/branding'
 import { useMyDepartments, type SpecialtyCode } from '../api/specialty'
 import { useMyUnfinishedConsultations } from '../api/consultations'
@@ -520,6 +521,26 @@ export function AppShell({ name, role, children }: AppShellProps) {
     const page = crumbs[crumbs.length - 1].label
     document.title = `${page} – Kalyan Hospital`
   }, [location.pathname, location.search, role])
+
+  // Phase 23: Periodic 30s LAN workstation heartbeat
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+
+    const sendPing = () => {
+      const hostname = window.location.hostname || 'localhost'
+      sendHeartbeat({
+        hostname: `${hostname}-${role.toLowerCase()}`,
+        terminal_name: `${roleLabel} Desk`,
+        app_version: '1.0.0',
+      }).catch(() => {
+        // Non-blocking in offline / network disconnected conditions
+      })
+    }
+
+    sendPing()
+    const timer = setInterval(sendPing, 30000)
+    return () => clearInterval(timer)
+  }, [role, roleLabel])
 
   // A doctor's open consultation, or the newest one left unfinished, gets its own sidebar link.
   const unfinishedConsultations = useMyUnfinishedConsultations(role === 'DOCTOR')
