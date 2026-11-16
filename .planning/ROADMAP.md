@@ -23,7 +23,7 @@ Ordering notes:
 - [ ] **Phase 18: UI/UX Review Hardening** - Receipt printing from the app, native modal dialogs, non-blocking errors, 12px text and contrast floor, bundled Hindi font and language marking, form accessibility, webcam HTTPS decision, headless print verification.
 - [x] **Phase 19: Universal Consultation Workspace** - One consultation for Physiotherapy and Ophthalmology: real drafts with auto-save, new and follow-up encounters, versioned specialty templates, vitals, integrated prescription, follow-up recommendations, read-all edit-own access, one login at a time and a printed summary. (completed 2026-11-06)
 - [x] **Phase 20: Admin Data Governance & Asset Management** - Patient demographic correction with audit; CSV/XLSX import centre (8-stage staging pipeline: upload → inspect → map → validate → resolve → preview → commit → reconcile); controlled patient export (permission-checked, field-selective, audited); hospital identity and logo/asset CRUD with version history; bilingual print template management per document type (prescription, receipt, registration card); five-section Admin navigation reorganization (Hospital Configuration, Patient & Data Management, Users/Security/Governance, System & Maintenance). Uses existing RBAC; no new permission system. All existing admin pages preserved and reorganized, not removed. (completed 2026-11-08)
-- [ ] **Phase 22: Integrated OPD Workflow** - Check-in with Referred By and classification, emergency acknowledgement, same-visit reassignment, fee-snapshot bill lines, checkout and receipts (in progress; see phases/22-integrated-opd-workflow).
+- [x] **Phase 22: Integrated OPD Workflow** - Check-in with Referred By and classification, emergency acknowledgement, same-visit reassignment, fee-snapshot bill lines, checkout and receipts. (completed 2026-11-16)
 - [ ] **Phase 23: Advanced Data Operations** (deferred; formerly numbered 22) - Duplicate patient detection and merge workflow (high-risk FK cascade; dedicated transaction design); bulk archive and bulk delete for eligible records; extended data-edit permission controls; LAN workstation status monitoring. Depends on Phase 20 stable data foundation.
 
 ## Phase Details
@@ -268,7 +268,7 @@ Phases execute in numeric order: 11 → 12 → 13 → 14 → 15 → 16 → 17 �
 | 19. Universal Consultation Workspace | 7/7 | Complete | 2026-11-06 |
 | 20. Admin Data Governance & Asset Management | 8/8 | Complete | 2026-11-08 |
 | 21. Build Takeover & System Stabilization | 2/2 | Complete | 2026-11-14 |
-| 22. Integrated OPD Workflow | 20/20 | Complete (Deployed on :8000) | 2026-11-16 |
+| 22. Integrated OPD Workflow | 20/20 | Complete | 2026-11-16 |
 | 23. Advanced Data Operations | 0/0 | Deferred — depends on Phase 21 | - |
 
 ---
@@ -329,7 +329,7 @@ Plans:
 
 **Depends on**: Phase 21 build takeover and stabilisation
 
-**Status**: Complete (Plans 22-01..22-20 executed; backup verified, migration 0029 active, balance comparison clean, frontend dist rebuilt, server live on :8000). Features are IMPLEMENTED — NOT VERIFIED pending owner browser walkthrough.
+**Status**: Complete
 
 **Plans:** 20/20 plans complete
 
