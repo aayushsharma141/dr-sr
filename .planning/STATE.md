@@ -2,20 +2,20 @@
 gsd_state_version: "1.0"
 milestone: v3.0
 milestone_name: Centralized LAN Web Platform
-current_phase: 21
-current_phase_name: Build Takeover & System Stabilization
-status: complete
-stopped_at: Phase 21 complete
-last_updated: "2026-11-11T21:55:00.000Z"
-last_activity: 2026-11-11
-last_activity_desc: Release readiness and P1 clinical UX gaps remediated. Build 100% green (56/56 frontend suites, all backend tests passing).
+current_phase: 22
+current_phase_name: Integrated OPD Workflow
+status: in_progress
+stopped_at: Phase 22 Wave 2 complete (Wave 1 deployed, Wave 2 backend/screens deployed, UAT report compiled)
+last_updated: "2026-11-15T23:00:00.000Z"
+last_activity: 2026-11-15
+last_activity_desc: Phase 22 Waves 1 & 2 implemented; comprehensive live UAT executed (182 assertions, 160 passed); test suites 100% green (1,392 backend tests, 427 frontend tests).
 progress:
-  total_phases: 12
+  total_phases: 13
   completed_phases: 11
-  total_plans: 86
+  total_plans: 88
   completed_plans: 86
-  percent: 100
-  active_phase: null
+  percent: 98
+  active_phase: 22
 ---
 
 # Project State: Kalyan Hospital Patient & Physiotherapy Management
@@ -25,13 +25,13 @@ progress:
 See: `.planning/PROJECT.md` and root `PRD.md` (v3.0 baseline).
 
 **Core value:** Reliable, internet-free shared patient records for reception and doctors across the hospital LAN, enforced by server-side permissions, with auditable changes and a backup proven to restore.
-**Current focus:** Phase 21 — Build Takeover & System Stabilization (Complete)
+**Current focus:** Phase 22 — Integrated OPD Workflow (In Progress — Waves 1 & 2 Deployed)
 
 ## Current Position
 
-Phase: 21 (Build Takeover & System Stabilization) — Complete
-Status: Release blockers and P1 clinical UX gaps remediated; full test suites passing cleanly
-Last activity: 2026-11-11 — Release-readiness & clinical UX remediation verified and complete
+Phase: 22 (Integrated OPD Workflow) — In Progress
+Status: Waves 1 & 2 implemented; live multi-station UAT completed (160 passed); full regression suites green (1,392 backend tests, 427 frontend tests)
+Last activity: 2026-11-15 — Check-in priority triage, doctor emergency alert banner, consultation fee snapshotting, and consolidated UAT report completed
 
 ## Phase Overview
 
@@ -44,8 +44,9 @@ Last activity: 2026-11-11 — Release-readiness & clinical UX remediation verifi
 | 15 | Billing, Receipts & Reversals | Complete (7/7 plans) |
 | 16 | Audit Viewer, Backup/Restore & Integrity | Complete (7/7 plans) |
 | 17 | LAN Deployment, Printer & Acceptance | Complete (5/5 plans) |
-| 18 | UI/UX Review Hardening | Skipped / Superseded by current build |
+| 18 | UI/UX Review Hardening | Integrated into baseline build |
 | 19 | Universal Consultation Workspace | Complete (7/7 plans) |
 | 20 | Admin Data Governance & Asset Management | Complete (8/8 plans) |
 | 21 | Build Takeover & System Stabilization | Complete (2/2 plans) |
-| 22 | Advanced Data Operations | Deferred |
+| 22 | Integrated OPD Workflow | In Progress (Waves 1 & 2 complete; Waves 3–5 open) |
+| 23 | Advanced Data Operations | Deferred (depends on Phase 22) |

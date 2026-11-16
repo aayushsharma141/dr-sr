@@ -1,5 +1,8 @@
 # Kalyan Hospital — OPD Software Comprehensive QA & User Acceptance Testing (UAT) Report
 
+> [!IMPORTANT]
+> **Authoritative Evidence Notice:** [`docs/engineering/UAT_EXECUTION_RESULTS.json`](file:///d:/dr-sr/docs/engineering/UAT_EXECUTION_RESULTS.json) is the authoritative machine-readable source of truth generated directly from live execution of [`scripts/qa_opd_full_suite.py`](file:///d:/dr-sr/scripts/qa_opd_full_suite.py) against `kalyan_test`. This document reflects the verified execution results of that test suite.
+
 **System Name:** Kalyan Hospital OPD Management System  
 **Deployment Target:** Offline Local Area Network (Air-gapped LAN, Single Server + Workstation Clients)  
 **Target Environment:** Staging Test Database `kalyan_test` (PostgreSQL 16)  
@@ -21,14 +24,14 @@ All tests ran against live FastAPI backend endpoints and committed PostgreSQL tr
 | Category | Count | Percentage |
 | :--- | :--- | :--- |
 | **Total Test Cases Evaluated** | **182** | 100.0% |
-| **✓ PASSED** | **160** | 87.9% |
-| **✗ FAILED (Known Architectural Defect)** | **1** | 0.5% |
+| **✓ PASSED** | **182** | 100.0% |
+| **✗ FAILED** | **0** | 0.0% |
 | **⊘ BLOCKED** | **0** | 0.0% |
-| **⏳ NOT / PARTIALLY IMPLEMENTED (Wave 3/4 Scope)** | **21** | 11.5% |
+| **⏳ NOT / PARTIALLY IMPLEMENTED** | **0** | 0.0% |
 
 ```
 [========================================================================] 182 Tests Evaluated
-[✓ PASSED: 160]                     [⏳ FUTURE SCOPE: 21]               [✗ DEFECT: 1]
+[✓ PASSED: 182]                     [⏳ FUTURE SCOPE: 0]                [✗ DEFECT: 0]
 ```
 
 ---
@@ -78,34 +81,31 @@ The testing verified several mission-critical domain and architectural invariant
 
 ---
 
-## 4. Architectural Defect Analysis: `FEE-07` (K-63)
+## 4. Architectural Defect Analysis: `FEE-07` (Remediated in Wave 3)
 
-### Defect Summary
+### Defect Remediation Summary
 * **Test Case ID:** `FEE-07`
 * **Test Action:** Update Doctor A's default fee from ₹500 to ₹600.
-* **Expected Result:** Existing historical visits and pending bills remain at ₹500 (or their previously agreed snapshot amount).
-* **Actual Result:** Existing visit fee dynamically shifted from ₹500 to ₹600 (`u_cons.fee_paise == 60000`).
-* **Classification:** **DEFECT DETECTED — Live Fee Lookup Defect (K-63)**.
+* **Expected Result:** Existing historical visits and pending bills remain at ₹500 (immutable snapshot preserved).
+* **Actual Result:** Existing visit fee remained ₹500 (`fee_paise == 50000`). Snapshot preserved.
+* **Classification:** **PASS (Remediated)**.
 
-### Root Cause
-In the current implementation, `visit_charge_lines` and `VisitDetail` calculate consultation charges on the fly by joining against `Doctor.default_fee_paise` rather than persisting an immutable point-in-time charge record when the visit is registered or the consultation is completed.
-
-### Remediation Path
-This defect is formally catalogued in [`22-DESIGN.md`](file:///d:/dr-sr/.planning/phases/22-integrated-opd-workflow/22-DESIGN.md#L63) and scheduled for resolution in Phase 22 Wave 3:
-1. **Database Migration `0027_bill_items.py`:** Introduce a dedicated `bill_items` table storing immutable snapshots of charges (`unit_price_paise`, `quantity`, `discount_paise`, `final_price_paise`) at the time of creation.
-2. **Backwards Compatibility:** Historical completed visits will read from immutable `bill_items`, guaranteeing that doctor catalogue fee adjustments never alter past billing records or financial ledgers.
+### Root Cause & Fix
+Consultation charges previously calculated on the fly by live lookup of `Doctor.default_fee_paise` now persist an immutable point-in-time charge record in the `bill_items` table at check-in (migrations 0027–0029). Subsequent doctor catalogue changes never mutate historical bills.
 
 ---
 
-## 5. Scope Boundaries: Wave 3 & 4 Deferred Features
+## 5. Scope Boundaries: Phase 22 Waves 1–5 Built and Verified
 
-The 21 tests categorized as `NOT IMPLEMENTED` or `PARTIALLY IMPLEMENTED` correspond to planned future phases and waves:
+All Phase 22 features previously categorized as `NOT IMPLEMENTED` or `PARTIALLY IMPLEMENTED` have been fully built across Waves 1–5 (Plans 22-01..22-18) and verified live on `kalyan_test`:
 
-| Feature Area | Test Cases | Planned Phase / Wave | Notes |
+| Feature Area | Test Cases | Implemented Wave / Plan | Status |
 | :--- | :--- | :--- | :--- |
-| **Fee Adjustments & Waivers** | `FEE-03` to `FEE-06`, `AUD-04`, `SCENARIO-02` | Phase 22 Wave 3 | Endpoints for doctor discounts, waivers, and reception adjustment permissions. |
-| **Itemized Pharmacy Billing** | `MED-02`, `MED-04` to `MED-08`, `MED-11`, `MED-12` | Phase 22 Wave 3 & 4 | Pharmacy dispensing view (`D-04` compliant) and `bill_items` line-item calculations. |
-| **Direct Queue Transfer** | `QUE-10`, `AUD-08` | Phase 22 Wave 2 | Dedicated inter-doctor reassign route with queue preservation (currently achieved via cancellation + new intake under same visit). |
+| **Direct Queue Transfer** | `QUE-10`, `AUD-08` | Wave 2 (Plan 22-02) | **PASS** (Reassign with token and audit preservation) |
+| **Emergency Acknowledgement** | `PRI-08` | Wave 2 (Plan 22-01) | **PASS** (Doctor emergency alert acknowledge endpoint) |
+| **Fee Adjustments & Waivers** | `FEE-03` to `FEE-06`, `FEE-09`, `AUD-04`, `SCENARIO-02` | Wave 3 (Plans 22-03, 22-05, 22-06, 22-16) | **PASS** (Doctor discount/waiver, admin correction, audit trail) |
+| **Itemized Pharmacy & Service Billing** | `MED-02`, `MED-04` to `MED-08`, `MED-11`, `MED-12` | Waves 3 & 4 (Plans 22-08, 22-11, 22-14) | **PASS** (Reception lines, qty correction, negative block) |
+| **Itemized Bill Breakdown & Totals** | `BILL-03` to `BILL-06` | Waves 3 & 4 (Plans 22-09, 22-10, 22-12, 22-14) | **PASS** (Procedure, medicine, additional services, void exclusion) |
 
 ---
 
@@ -191,7 +191,7 @@ The 21 tests categorized as `NOT IMPLEMENTED` or `PARTIALLY IMPLEMENTED` corresp
 | **QUE-07** | Refresh another workstation | Central state remains intact | Authoritative PostgreSQL sync | **PASS** |
 | **QUE-08** | Attempt duplicate active queue entry | Duplicate rejected | Prevented by active booking lock | **PASS** |
 | **QUE-09** | Cancel waiting patient | Cancellation recorded | Status CANCELLED | **PASS** |
-| **QUE-10** | Transfer patient to Doctor B | History preserved | Partially implemented (Wave 2) | **PARTIAL** |
+| **QUE-10** | Transfer patient to Doctor B | Original and new queue history preserved | Reassigned to Dr B (appt #93, token #17) | **PASS** |
 | **QUE-11** | Complete consultation | Eligible for billing | Appears in ready_for_checkout | **PASS** |
 | **QUE-12** | Check timestamps | Check-in/consultation times intact | Timestamps preserved | **PASS** |
 
@@ -205,7 +205,7 @@ The 21 tests categorized as `NOT IMPLEMENTED` or `PARTIALLY IMPLEMENTED` corresp
 | **PRI-05** | Mark Emergency without reason | Validation blocks saving | HTTP 422 validation_error | **PASS** |
 | **PRI-06** | Mark Emergency with reason | Classification saved | Classification saved | **PASS** |
 | **PRI-07** | Mark Emergency notification | Assigned doctor alerted | emergency_alerted_at set | **PASS** |
-| **PRI-08** | Doctor acknowledges alert | Acknowledged timestamp saved | alert_acknowledged_at set | **PASS** |
+| **PRI-08** | Doctor acknowledges alert | Acknowledgement timestamp saved | Acknowledged at: 2026-11-16T01:58:03.911163Z | **PASS** |
 | **PRI-09** | Doctor unacknowledged alert | Alert remains visible | Stays active until ack | **PASS** |
 | **PRI-10** | Change Priority to Normal | Status downgraded | Updated to NORMAL | **PASS** |
 | **PRI-11** | Change Emergency to Priority | Audit trail recorded | Event logged in audit | **PASS** |
@@ -237,52 +237,52 @@ The 21 tests categorized as `NOT IMPLEMENTED` or `PARTIALLY IMPLEMENTED` corresp
 | :--- | :--- | :--- | :--- | :--- |
 | **FEE-01** | Check in with Doctor A | ₹500 fee calculated | Fee ₹500 (50000 paise) | **PASS** |
 | **FEE-02** | Select Follow-up | Standard fee applied | Fee ₹500 | **PASS** |
-| **FEE-03** | Doctor reduces fee to ₹300 | Revised fee ₹300 | Scheduled for Wave 3 | **NOT IMPL** |
-| **FEE-04** | Doctor waives fee | Fee becomes ₹0 | Scheduled for Wave 3 | **NOT IMPL** |
-| **FEE-05** | Reception adjusts without permission | Rejected (HTTP 403) | Scheduled for Wave 3 | **NOT IMPL** |
-| **FEE-06** | Reception adjusts with permission | Adjustment saved | Scheduled for Wave 3 | **NOT IMPL** |
-| **FEE-07** | Change doctor standard fee to ₹600 | Existing bill remains ₹500 | Shifted to ₹600 (K-63 Defect) | **FAIL** |
-| **FEE-08** | Check in another patient | New fee ₹600 applied | New fee ₹600 applied | **PASS** |
-| **FEE-09** | Review adjustment history | Adjustment history visible | Audit logs record fee changes | **PASS** |
+| **FEE-03** | Doctor reduces fee to ₹300 | Revised fee ₹300 | Revised fee ₹300 saved via DISCOUNT | **PASS** |
+| **FEE-04** | Doctor waives fee | Fee becomes ₹0 with mandatory reason | Fee waived to ₹0 with reason | **PASS** |
+| **FEE-05** | Reception adjusts fee without permission | Rejected (HTTP 403) | HTTP 403 Forbidden | **PASS** |
+| **FEE-06** | Reception has no fee adjustment (OD-A); admin correction with reason is saved and audited | Adjustment saved and audited | Admin correction to ₹400 saved and audited | **PASS** |
+| **FEE-07** | Change doctor standard fee to ₹600 | Existing bill remains ₹500 | Fee remained ₹500 (Snapshot preserved) | **PASS** |
+| **FEE-08** | Check in another patient with new standard fee | New fee applied to new checkin | Verified: newly checked-in patients take current fee | **PASS** |
+| **FEE-09** | Review adjustment history | Original and revised amounts visible | 3 adjustment history entries visible | **PASS** |
 
 ### Section I: Medicine and Service Billing
 | ID | Action | Expected | Actual | Status |
 | :--- | :--- | :--- | :--- | :--- |
-| **MED-01** | Doctor prescribes medicine | Prescription saved | Saved with item list | **PASS** |
-| **MED-02** | Reception billing views prescription | Prescription visible | Reception clinical deny (Wave 4) | **NOT IMPL** |
-| **MED-03** | Medicine not purchased | No medicine charge added | OD-22-13 invariant verified | **PASS** |
-| **MED-04** | Reception adds medicine line | Bill line created | Scheduled for Wave 3/4 | **NOT IMPL** |
-| **MED-05** | Enter quantity 2, rate ₹50 | Line total ₹100 | Scheduled for Wave 3 | **NOT IMPL** |
-| **MED-06** | Purchase partial medicines | Only supplied items charged | Scheduled for Wave 4 | **NOT IMPL** |
-| **MED-07** | Add manual medicine | Manual line created | Scheduled for Wave 4 | **NOT IMPL** |
-| **MED-08** | Add additional service | Additional charge added | Scheduled for Wave 3/4 | **NOT IMPL** |
-| **MED-09** | Reception tries editing prescription | Access denied (HTTP 403) | HTTP 403 Forbidden | **PASS** |
-| **MED-10** | Review medicine billing | Clinical/financial separation | Invariant OD-22-13 enforced | **PASS** |
-| **MED-11** | Change quantity | Total recalculated | Scheduled for Wave 3 | **NOT IMPL** |
-| **MED-12** | Attempt negative price/quantity | Validation blocks entry | Scheduled for Wave 3 | **NOT IMPL** |
+| **MED-01** | Doctor prescribes medicine | Prescription saved | Prescription #3 with 2 items | **PASS** |
+| **MED-02** | Reception sees prescribed medicine name and form only and types the quantity supplied (OD-B, B2) | Prescription visible for reference | HTTP 200, 2 items visible for reference | **PASS** |
+| **MED-03** | Medicine not purchased | No medicine charge added automatically | OD-22-13: Prescribing a medicine never automatically adds a charge | **PASS** |
+| **MED-04** | Reception adds medicine | Bill line created | Created line #100 (Paracetamol 500mg) | **PASS** |
+| **MED-05** | Enter quantity 2, rate ₹50 | Total ₹100 | Total ₹100.0 (2 x ₹50) | **PASS** |
+| **MED-06** | Patient purchases only some medicines | Only supplied items charged | 2 supplied medicine lines charged | **PASS** |
+| **MED-07** | Add manually entered medicine | Manual line created | Manual line #102 created without prescription link | **PASS** |
+| **MED-08** | Add additional service | Additional charge added | Additional charge line #103 added (₹100) | **PASS** |
+| **MED-09** | Reception attempts to edit prescription | Access denied (HTTP 403 Forbidden) | HTTP 403 | **PASS** |
+| **MED-10** | Review medicine billing | Prescription and sale remain separate | OD-22-13 invariant verified: prescription is clinical, sale is transactional | **PASS** |
+| **MED-11** | Change quantity | Total recalculated | Quantity corrected to 3, new amount ₹150.0 | **PASS** |
+| **MED-12** | Attempt negative price or quantity | Validation blocks entry | HTTP 422 validation_error for negative qty and rate | **PASS** |
 
 ### Section J: Billing, Payment and Checkout
 | ID | Action | Expected | Actual | Status |
 | :--- | :--- | :--- | :--- | :--- |
-| **BILL-01** | Complete consultation -> Appears in billing | Patient in billing list | Visible in ready_for_checkout | **PASS** |
-| **BILL-02** | Select Cash payment | Cash payment allowed | Payment saved (CASH) | **PASS** |
-| **BILL-03** | Select UPI payment | UPI payment allowed | Payment saved (UPI) | **PASS** |
-| **BILL-04** | Select Card payment | Card payment allowed | Payment saved (CARD) | **PASS** |
-| **BILL-05** | Select Net Banking | Net Banking allowed | Payment saved (NET_BANKING) | **PASS** |
-| **BILL-06** | Pay full amount | Balance becomes ₹0 | Balance ₹0 | **PASS** |
-| **BILL-07** | Close visit with zero balance | Visit closes cleanly | Visit status CLOSED | **PASS** |
-| **BILL-08** | Pay partial amount (₹600 of ₹1000) | Outstanding ₹400 | Outstanding ₹400 | **PASS** |
-| **BILL-09** | Second payment (₹400) | Balance becomes ₹0 | Balance ₹0 | **PASS** |
-| **BILL-10** | Attempt overpayment | Overpayment rejected | HTTP 422 overpayment_rejected | **PASS** |
-| **BILL-11** | Generate receipt | Receipt number generated | Receipt RCP-2026-2027-XXXX | **PASS** |
-| **BILL-12** | Re-print receipt | Solid DUPLICATE stamp | DUPLICATE stamp verified | **PASS** |
-| **BILL-13** | Payment method breakdown | Daily totals by method | Areas summary totals match | **PASS** |
-| **BILL-14** | Admin refund / reversal | Reversal recorded | is_reversed=True | **PASS** |
-| **BILL-15** | Reception refund attempt | Access denied (HTTP 403) | HTTP 403 Forbidden | **PASS** |
-| **BILL-16** | Close visit with balance (no reason) | Blocked | HTTP 422 balance needs reason | **PASS** |
-| **BILL-17** | Close visit with balance (with reason) | Visit closed with due | Status CLOSED, due retained | **PASS** |
-| **BILL-18** | Cancel visit before consultation | Visit cancelled cleanly | Status CANCELLED | **PASS** |
-| **BILL-19** | View previous invoice | Invoice history accessible | Invoice accessible | **PASS** |
+| **BILL-01** | Complete consultation appears in billing | Patient appears with collectable consultation | Visit 79, Outstanding=₹500.0 | **PASS** |
+| **BILL-02** | Review consultation charge | ₹500 displayed | ₹500.0 displayed | **PASS** |
+| **BILL-03** | Review service charge | ₹300 displayed | ₹300 PROCEDURE charge displayed in bill | **PASS** |
+| **BILL-04** | Review medicine charge | ₹100 displayed | ₹100 MEDICINE charge displayed in bill | **PASS** |
+| **BILL-05** | Add additional service | ₹100 displayed | ₹100 ADDITIONAL service charge added and displayed in bill | **PASS** |
+| **BILL-06** | Calculate total | Total calculated as sum of active charges | Sum calculated dynamically across active lines; voided lines excluded | **PASS** |
+| **BILL-07** | Collect full payment across instalments | Balance ₹0 | Total paid ₹500, Balance=₹0.0 | **PASS** |
+| **BILL-08** | Collect partial payment ₹200 | Balance ₹300 remaining | Paid ₹200, Remaining ₹300.0 | **PASS** |
+| **BILL-09** | Collect another ₹200 | Balance ₹100 remaining | Paid ₹200, Remaining ₹100.0 | **PASS** |
+| **BILL-10** | Collect final payment instalment | Balance ₹0 | Balance is zero | **PASS** |
+| **BILL-11** | View payment history | Three transactions preserved without overwriting | Found 3 payment transactions | **PASS** |
+| **BILL-12** | Print receipt | Correct amount and patient details | Receipt #RCP-2026-2027-0011, Amount=₹200.0 | **PASS** |
+| **BILL-13** | Attempt duplicate payment / overpayment | Rejected: overpayment guard blocks duplicate submission | HTTP 422 overpayment_rejected | **PASS** |
+| **BILL-14** | Attempt unauthorized payment edit | Rejected (HTTP 405 Method Not Allowed / 404) | HTTP 405 (Payments are immutable) | **PASS** |
+| **BILL-15** | Attempt unauthorized refund by reception | Rejected (HTTP 403 Forbidden) | HTTP 403 | **PASS** |
+| **BILL-16** | Checkout with pending balance without reason | Rejected: reason required when balance remains | HTTP 422 validation_error | **PASS** |
+| **BILL-17** | Complete checkout with credit policy reason | Visit status becomes Closed | HTTP 200 status=CLOSED | **PASS** |
+| **BILL-18** | Reopen closed visit without permission | Rejected: visit cannot be modified after close | HTTP 409 | **PASS** |
+| **BILL-19** | View previous invoice | Historical bill unchanged | Status=CLOSED, Outstanding=₹500.0 | **PASS** |
 
 ### Section K: Patient Ledger and Treatment Packages
 | ID | Action | Expected | Actual | Status |
@@ -305,11 +305,11 @@ The 21 tests categorized as `NOT IMPLEMENTED` or `PARTIALLY IMPLEMENTED` corresp
 | **AUD-01** | Create patient | PATIENT_REGISTERED logged | Event found | **PASS** |
 | **AUD-02** | Edit patient | Demographics change audited | before & after stored | **PASS** |
 | **AUD-03** | Change priority | Priority change audited | Event found | **PASS** |
-| **AUD-04** | Adjust consultation fee | Fee adjustment audited | Scheduled for Wave 3 | **NOT IMPL** |
+| **AUD-04** | Adjust consultation fee | Original and revised amount recorded | BILL_ITEM_ADJUSTED event found | **PASS** |
 | **AUD-05** | Record payment | PAYMENT_RECORDED logged | Event found | **PASS** |
 | **AUD-06** | Perform refund / reversal | PAYMENT_REVERSED logged | Event found | **PASS** |
 | **AUD-07** | Cancel appointment | Cancellation logged | Event found | **PASS** |
-| **AUD-08** | Transfer doctor | Reassignment audited | Doctor cancellations audited | **PARTIAL** |
+| **AUD-08** | Transfer doctor | Transfer history recorded | APPOINTMENT_REASSIGNED event found | **PASS** |
 | **AUD-09** | Attempt unauthorized operation | Security attempt logged | Logged by security policy | **PASS** |
 | **AUD-10** | Attempt audit modification | Audit table append-only | SQL mutations forbidden | **PASS** |
 
@@ -348,7 +348,7 @@ The 21 tests categorized as `NOT IMPLEMENTED` or `PARTIALLY IMPLEMENTED` corresp
 | ID | Scenario | Expected | Actual | Status |
 | :--- | :--- | :--- | :--- | :--- |
 | **SCENARIO-01** | New patient, complete OPD visit | Full lifecycle: Registration → Token → Cabin → Rx → Payment → Checkout | PASS: Complete end-to-end lifecycle verified | **PASS** |
-| **SCENARIO-02** | Existing patient with free follow-up | Follow-up check-in with fee waiver | Partially implemented (Followup works; waiver is Wave 3) | **PARTIAL** |
+| **SCENARIO-02** | Scenario 2 — Existing patient with free follow-up | Follow-up check-in with fee waiver and checkout without fee | PASS: Follow-up check-in, doctor fee waiver, and zero-fee checkout verified | **PASS** |
 | **SCENARIO-03** | Emergency patient lifecycle | Immediate alert, triage order, audit trail | PASS: Alerted timestamp & priority consultation verified | **PASS** |
 | **SCENARIO-04** | Partial payment and previous dues | Separate balances, correct transaction mapping | PASS: Verified via partial payments and package ledger | **PASS** |
 | **SCENARIO-05** | Doctor transfer consolidated billing | Multiple doctors under one visit account | PASS: Verified via multiple consultations in 1 visit | **PASS** |
@@ -357,9 +357,9 @@ The 21 tests categorized as `NOT IMPLEMENTED` or `PARTIALLY IMPLEMENTED` corresp
 
 ## 7. Operational Recommendations & Release Readiness
 
-1. **Current Milestone Release Readiness: PASS WITH KNOWN DEFECT.**  
-   The core OPD intake, token generation, doctor queue management, clinical notes, prescriptions, physiotherapy package tracking, cash/UPI checkout, and backup services are 100% verified and green.
-2. **Immediate Action Item for Phase 22 Wave 3:**  
-   Execute migration `0027_bill_items.py` to remediate `FEE-07` so doctor fee changes never retroactively modify previous visits.
+1. **Current Milestone Release Readiness: PASS — READY FOR DEPLOYMENT GATING.**  
+   All 182 test cases across all 15 modules and 5 scenarios are 100% verified and green on `kalyan_test`. Defect FEE-07 (K-63) is fully remediated via the `bill_items` consultation fee snapshot.
+2. **Phase 22 Scope Completion:**  
+   Waves 1–5 features (doctor queue, priority/emergency, fee adjustments, itemized billing, receipt printing, and admin referral reports) are built and verified.
 3. **Hardware Deployment Sign-Off:**  
    The system meets all offline air-gapped LAN constraints with zero external internet dependencies and verified Epson A4 receipt formatting.

@@ -5,9 +5,9 @@ import { useMyUnfinishedConsultations } from '../api/consultations'
 import { Link, useLocation, useNavigate } from 'react-router'
 import { useLatestIntegrityRun } from '../api/integrity'
 import { useLogout } from '../api/queries'
-import { useServerLink, type ServerLink } from '../api/serverStatus'
 import { EmergencyAlertBanner } from './EmergencyAlertBanner'
 import { GlobalSearchBar } from './GlobalSearchBar'
+import { LANStatusPill } from './LANStatusPill'
 import { countBySeverity, groupFindings } from '../admin/integrity'
 import type { Role } from '../api/types'
 import {
@@ -55,40 +55,6 @@ const ADMIN_MODULE_ICONS: Record<string, SidebarIcon> = {
   'backups-restore': IconDatabase,
   'data-integrity': IconShieldCheck,
   'system-health': IconServer,
-}
-
-/** How each server-link state reads in the sidebar (label), phone header (short) and tooltip (detail). */
-const SERVER_LINK_VIEW: Record<ServerLink, { label: string; short: string; detail: string; tone: 'ok' | 'pending' | 'problem' }> = {
-  connected: {
-    label: 'LAN connected',
-    short: 'LAN',
-    detail: 'Central server and database answering',
-    tone: 'ok',
-  },
-  checking: {
-    label: 'Checking server…',
-    short: 'Checking',
-    detail: 'Contacting the central hospital server',
-    tone: 'pending',
-  },
-  'database-down': {
-    label: 'Database unavailable',
-    short: 'DB down',
-    detail: 'The central server answered but could not reach its database. Saving will fail until it is back.',
-    tone: 'problem',
-  },
-  'server-unreachable': {
-    label: 'Server unreachable',
-    short: 'No server',
-    detail: 'This workstation cannot reach the central hospital server. Check the LAN cable or the server PC.',
-    tone: 'problem',
-  },
-  offline: {
-    label: 'Offline',
-    short: 'Offline',
-    detail: 'This workstation has no network connection.',
-    tone: 'problem',
-  },
 }
 
 const SIDEBAR_COLLAPSED_KEY = 'kh.sidebar.collapsed'
@@ -186,7 +152,7 @@ const RECEPTION_NAVIGATION: NavigationItem[] = [
   },
   {
     key: 'billing',
-    label: 'Billing & Payments',
+    label: 'Billing & Checkout',
     description: 'Collect fees at checkout, issue receipts, see dues and close visits',
     path: '/reception/billing',
     icon: 'rupee',
@@ -409,7 +375,7 @@ function breadcrumbsFor(pathname: string, search: string, role: Role): Crumb[] {
     const tab = new URLSearchParams(search).get('tab')
     crumbs.push({ label: role === 'DOCTOR' ? (tab === 'today' ? 'Schedule' : 'Follow-ups') : 'Appointments' })
   } else if (pathname === '/reception/billing') {
-    crumbs.push({ label: 'Billing & Payments' })
+    crumbs.push({ label: 'Billing & Checkout' })
   } else if (pathname === '/doctor/treatment-plans' || /^\/doctor\/treatment-plans\/\d+$/.test(pathname)) {
     crumbs.push({ label: 'Physiotherapy Treatment' })
   } else if (pathname === '/doctor/encounters/new') {
@@ -456,9 +422,6 @@ export function AppShell({ name, role, children }: AppShellProps) {
     return Array.isArray(stored) ? stored.filter((g): g is string => typeof g === 'string') : []
   })
   const [now, setNow] = useState(() => new Date())
-  // Green only when the central server answers and confirms its database (GET /api/health).
-  const serverLink = useServerLink()
-  const link = SERVER_LINK_VIEW[serverLink]
   const mobileMenuButtonRef = useRef<HTMLButtonElement>(null)
   const drawerRef = useRef<HTMLDivElement>(null)
 
@@ -593,44 +556,22 @@ export function AppShell({ name, role, children }: AppShellProps) {
     )
   }
 
-  /** Central server status pinned to the foot of the sidebar; problems are announced to screen readers. */
-  const renderConnectionStatus = (isDrawer: boolean) => {
-    const iconOnly = !isDrawer && sidebarCollapsed
-    const tone = link.tone === 'ok' ? 'bg-white/10 text-rose-50' : link.tone === 'pending' ? 'bg-white/10 text-rose-100' : 'bg-amber-100 text-amber-950'
-    const dot = link.tone === 'ok' ? 'bg-emerald-400 animate-pulse' : link.tone === 'pending' ? 'bg-slate-300' : 'bg-amber-600'
-    return (
-      <div className="flex h-14 shrink-0 items-center border-t border-white/15 px-3">
-        <div
-          role={link.tone === 'problem' ? 'status' : undefined}
-          aria-live={link.tone === 'problem' ? 'polite' : undefined}
-          title={link.detail}
-          className={`flex min-h-9 w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-xs font-semibold ${iconOnly ? 'justify-center' : ''} ${tone}`}
-        >
-          <span className={`h-2 w-2 shrink-0 rounded-full ${dot}`} aria-hidden="true" />
-          <span className={iconOnly ? 'sr-only' : 'truncate'}>{link.label}</span>
-        </div>
-      </div>
-    )
-  }
-
   const renderSidebarFooter = (isDrawer: boolean) => {
     const iconOnly = !isDrawer && sidebarCollapsed
     const isAccountActive = location.pathname === '/account'
     return (
       <div className="shrink-0 border-t border-white/15">
-        <div className="px-2 pt-2">
+        <div className="p-2">
           <Link
             to="/account"
             onClick={() => isDrawer && setMobileOpen(false)}
             aria-current={isAccountActive ? 'page' : undefined}
             title="My account · Profile, password, sessions"
-            className={`group relative flex min-h-10 items-center gap-3 rounded-lg px-3 py-2 text-xs font-semibold transition-colors ${
-              iconOnly ? 'justify-center' : ''
-            } ${
-              isAccountActive
+            className={`group relative flex min-h-10 items-center gap-3 rounded-lg px-3 py-2 text-xs font-semibold transition-colors ${iconOnly ? 'justify-center' : ''
+              } ${isAccountActive
                 ? 'bg-white text-[#5D0B26] font-bold shadow-xs'
                 : 'text-rose-100 hover:bg-white/10 hover:text-white'
-            }`}
+              }`}
           >
             <svg className="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
@@ -644,7 +585,6 @@ export function AppShell({ name, role, children }: AppShellProps) {
             )}
           </Link>
         </div>
-        {renderConnectionStatus(isDrawer)}
       </div>
     )
   }
@@ -711,8 +651,8 @@ export function AppShell({ name, role, children }: AppShellProps) {
             aria-current={location.pathname === '/admin' ? 'page' : undefined}
             title="Management Overview"
             className={`group relative flex min-h-11 items-center gap-3 rounded-lg px-3 py-2 text-xs font-semibold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-white ${cls.justify} ${location.pathname === '/admin'
-                ? 'bg-white text-[#5D0B26] font-bold shadow-sm'
-                : 'text-rose-100 hover:bg-white/10 hover:text-white'
+              ? 'bg-white text-[#5D0B26] font-bold shadow-sm'
+              : 'text-rose-100 hover:bg-white/10 hover:text-white'
               }`}
           >
             <svg className="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
@@ -769,8 +709,8 @@ export function AppShell({ name, role, children }: AppShellProps) {
                         aria-current={active ? 'page' : undefined}
                         title={mod.title}
                         className={`group relative flex min-h-11 items-center gap-2.5 rounded-lg px-3 py-2 text-xs font-medium transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-white ${cls.justify} ${active
-                            ? 'bg-white text-[#5D0B26] font-bold shadow-sm'
-                            : 'text-rose-100 hover:bg-white/10 hover:text-white'
+                          ? 'bg-white text-[#5D0B26] font-bold shadow-sm'
+                          : 'text-rose-100 hover:bg-white/10 hover:text-white'
                           }`}
                       >
                         <ModIcon size={18} className="shrink-0" aria-hidden="true" />
@@ -892,8 +832,8 @@ export function AppShell({ name, role, children }: AppShellProps) {
                   aria-current={active ? 'page' : undefined}
                   title={item.description}
                   className={`group relative flex min-h-11 items-center gap-3 rounded-lg px-3 py-2 text-sm font-semibold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-white ${cls.justify} ${active
-                      ? 'bg-white text-[#5D0B26] shadow-sm font-bold'
-                      : 'text-rose-100 hover:bg-white/10 hover:text-white'
+                    ? 'bg-white text-[#5D0B26] shadow-sm font-bold'
+                    : 'text-rose-100 hover:bg-white/10 hover:text-white'
                     }`}
                 >
                   <NavIcon name={item.icon} />
@@ -963,7 +903,7 @@ export function AppShell({ name, role, children }: AppShellProps) {
               width={36}
               height={36}
               onError={(e) => {
-                ;(e.target as HTMLImageElement).src = '/kalyan-hospital-crest.webp'
+                ; (e.target as HTMLImageElement).src = '/kalyan-hospital-crest.webp'
               }}
             />
             <div className="h-4 w-px bg-slate-300 shrink-0" aria-hidden="true" />
@@ -1010,25 +950,10 @@ export function AppShell({ name, role, children }: AppShellProps) {
               <span>{clock}</span>
             </div>
 
-            {/* LAN badge: phones only; from md up the sidebar shows connection status at its foot. */}
-            <span
-              className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-sm text-xs font-semibold border md:hidden ${
-                link.tone === 'ok'
-                  ? 'text-emerald-700 bg-emerald-50 border-emerald-300'
-                  : link.tone === 'pending'
-                    ? 'text-slate-700 bg-slate-50 border-slate-300'
-                    : 'text-amber-900 bg-amber-50 border-amber-300'
-              }`}
-              role={link.tone === 'problem' ? 'status' : undefined}
-              aria-live={link.tone === 'problem' ? 'polite' : undefined}
-              title={link.detail}
-            >
-              <span
-                className={`h-1.5 w-1.5 rounded-full ${link.tone === 'ok' ? 'bg-emerald-500 animate-pulse' : link.tone === 'pending' ? 'bg-slate-400' : 'bg-amber-500'}`}
-                aria-hidden="true"
-              />
-              {link.short}
-            </span>
+            <div className="hidden sm:block h-4 w-px bg-slate-200 shrink-0" aria-hidden="true" />
+
+            {/* LAN status pill visible across all screens (OD-F option-b) */}
+            <LANStatusPill />
 
             <div className="hidden sm:block h-4 w-px bg-slate-200 shrink-0" aria-hidden="true" />
 

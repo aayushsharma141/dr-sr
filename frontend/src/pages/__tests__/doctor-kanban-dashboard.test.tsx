@@ -367,3 +367,262 @@ describe('allergyStatus', () => {
     expect(allergyStatus('Sulfa drugs')).toEqual({ kind: 'recorded', text: 'Sulfa drugs' })
   })
 })
+
+// --- Task 1: PriorityBadge on doctor queue cards, server order kept ---
+
+const priorityQueue: DoctorQueueResponse = {
+  doctor_id: 1,
+  doctor_name: 'Dr Vikram Rane',
+  queue_date: '2026-11-14',
+  in_consultation: [],
+  waiting: [
+    {
+      id: 21,
+      patient_id: 201,
+      patient_urn: 'KH-2026-0021',
+      patient_name: 'Emergency Patient',
+      patient_gender: 'M',
+      patient_age: 50,
+      patient_mobile: '9000000001',
+      patient_allergies: 'None reported',
+      token_number: 21,
+      status: 'ARRIVED',
+      status_updated_at: '2026-11-14T09:00:00Z',
+      notes: null,
+      version_id: 1,
+      priority_level: 'EMERGENCY',
+      priority_reason: 'Chest pain',
+    },
+    {
+      id: 22,
+      patient_id: 202,
+      patient_urn: 'KH-2026-0022',
+      patient_name: 'Priority Patient',
+      patient_gender: 'F',
+      patient_age: 40,
+      patient_mobile: '9000000002',
+      patient_allergies: 'None reported',
+      token_number: 22,
+      status: 'ARRIVED',
+      status_updated_at: '2026-11-14T09:05:00Z',
+      notes: null,
+      version_id: 1,
+      priority_level: 'PRIORITY',
+      priority_reason: 'Severe pain',
+    },
+    {
+      id: 23,
+      patient_id: 203,
+      patient_urn: 'KH-2026-0023',
+      patient_name: 'Normal Patient',
+      patient_gender: 'M',
+      patient_age: 30,
+      patient_mobile: '9000000003',
+      patient_allergies: 'None reported',
+      token_number: 23,
+      status: 'ARRIVED',
+      status_updated_at: '2026-11-14T09:10:00Z',
+      notes: null,
+      version_id: 1,
+      priority_level: 'NORMAL',
+    },
+  ],
+  booked: [],
+  completed: [],
+  total_active: 3,
+}
+
+function renderWithPriorityQueue(q: DoctorQueueResponse = priorityQueue) {
+  const qc = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } })
+  qc.setQueryData(['me'], mockMeDoctor)
+  qc.setQueryData(['doctors', { activeOnly: false }], mockDoctors)
+  qc.setQueryData(['doctor-queue'], q)
+  const json = (body: unknown) =>
+    Promise.resolve({
+      ok: true,
+      status: 200,
+      headers: new Headers({ 'content-type': 'application/json' }),
+      text: () => Promise.resolve(JSON.stringify(body)),
+    })
+  vi.stubGlobal(
+    'fetch',
+    vi.fn().mockImplementation((url: string) => {
+      if (url.includes('/api/auth/me')) return json(mockMeDoctor)
+      if (url.includes('/api/doctors')) return json(mockDoctors)
+      if (url.includes('/api/doctor/queue')) return json(q)
+      return json([])
+    }),
+  )
+  render(
+    <QueryClientProvider client={qc}>
+      <MemoryRouter>
+        <DoctorDashboard />
+      </MemoryRouter>
+    </QueryClientProvider>,
+  )
+}
+
+describe('Doctor Queue: PriorityBadge and server order (OD-22-06, OD-22-07)', () => {
+  afterEach(() => {
+    cleanup()
+    vi.restoreAllMocks()
+  })
+
+  it('shows Emergency badge on EMERGENCY card and Priority badge on PRIORITY card', async () => {
+    renderWithPriorityQueue()
+    // The Live Queue sidebar shows waiting cards
+    expect(await screen.findByText('Emergency Patient')).toBeInTheDocument()
+    // EMERGENCY: badge text 'Emergency' (from PRIORITY_LABEL)
+    expect(screen.getByText('Emergency')).toBeInTheDocument()
+    // PRIORITY: badge text 'Priority'
+    expect(screen.getByText('Priority')).toBeInTheDocument()
+  })
+
+  it('shows no classification badge for NORMAL patients', async () => {
+    renderWithPriorityQueue()
+    expect(await screen.findByText('Normal Patient')).toBeInTheDocument()
+    // 'Normal' badge should NOT be present (PriorityBadge returns null for NORMAL)
+    expect(screen.queryByText('Normal')).not.toBeInTheDocument()
+  })
+
+  it('renders waiting cards in the order the server returns (no client-side sort)', async () => {
+    renderWithPriorityQueue()
+    expect(await screen.findByText('Emergency Patient')).toBeInTheDocument()
+
+    // DOM order: Emergency first, Priority second, Normal third (server order)
+    const cards = screen.getAllByText(/Patient$/)
+    const names = cards.map((el) => el.textContent)
+    expect(names).toEqual(['Emergency Patient', 'Priority Patient', 'Normal Patient'])
+  })
+
+  it('reversing the mock order renders in reversed DOM order (proves no client-side sort)', async () => {
+    const reversedQueue: DoctorQueueResponse = {
+      ...priorityQueue,
+      waiting: [...priorityQueue.waiting].reverse(),
+    }
+    renderWithPriorityQueue(reversedQueue)
+    expect(await screen.findByText('Normal Patient')).toBeInTheDocument()
+
+    const cards = screen.getAllByText(/Patient$/)
+    const names = cards.map((el) => el.textContent)
+    expect(names).toEqual(['Normal Patient', 'Priority Patient', 'Emergency Patient'])
+  })
+})
+
+// --- Task 2: Pinned in-consultation card, last-updated, stale warning ---
+
+const queueWithConsult: DoctorQueueResponse = {
+  doctor_id: 1,
+  doctor_name: 'Dr Vikram Rane',
+  queue_date: '2026-11-14',
+  in_consultation: [
+    {
+      id: 31,
+      patient_id: 301,
+      patient_urn: 'KH-2026-0031',
+      patient_name: 'Consult Patient',
+      patient_gender: 'M',
+      patient_age: 44,
+      patient_mobile: '9100000001',
+      patient_allergies: 'None reported',
+      token_number: 31,
+      status: 'IN_CONSULTATION',
+      status_updated_at: '2026-11-14T10:00:00Z',
+      notes: null,
+      version_id: 1,
+    },
+  ],
+  waiting: [
+    {
+      id: 32,
+      patient_id: 302,
+      patient_urn: 'KH-2026-0032',
+      patient_name: 'Emergency Waiter',
+      patient_gender: 'F',
+      patient_age: 55,
+      patient_mobile: '9100000002',
+      patient_allergies: 'None reported',
+      token_number: 32,
+      status: 'ARRIVED',
+      status_updated_at: '2026-11-14T10:05:00Z',
+      notes: null,
+      version_id: 1,
+      priority_level: 'EMERGENCY',
+    },
+  ],
+  booked: [],
+  completed: [],
+  total_active: 2,
+}
+
+describe('Doctor Queue: pinned in-consultation card and freshness (OD-22-08, CONTEXT)', () => {
+  afterEach(() => {
+    cleanup()
+    vi.restoreAllMocks()
+  })
+
+  function renderWithConsult(q: DoctorQueueResponse = queueWithConsult, overrides: { isError?: boolean } = {}) {
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } })
+    qc.setQueryData(['me'], mockMeDoctor)
+    qc.setQueryData(['doctors', { activeOnly: false }], mockDoctors)
+    qc.setQueryData(['doctor-queue'], q)
+    const json = (body: unknown) =>
+      Promise.resolve({
+        ok: overrides.isError ? false : true,
+        status: overrides.isError ? 500 : 200,
+        headers: new Headers({ 'content-type': 'application/json' }),
+        text: () => Promise.resolve(JSON.stringify(body)),
+      })
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockImplementation((url: string) => {
+        if (url.includes('/api/auth/me')) return json(mockMeDoctor)
+        if (url.includes('/api/doctors')) return json(mockDoctors)
+        if (url.includes('/api/doctor/queue')) return json(q)
+        return json([])
+      }),
+    )
+    render(
+      <QueryClientProvider client={qc}>
+        <MemoryRouter>
+          <DoctorDashboard />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    )
+  }
+
+  it('pins the in-consultation card in its own section above the waiting list (OD-22-08)', async () => {
+    renderWithConsult()
+
+    // Both cards rendered
+    expect((await screen.findAllByText('Consult Patient')).length).toBeGreaterThanOrEqual(1)
+    expect(screen.getByText('Emergency Waiter')).toBeInTheDocument()
+
+    // The in-consultation section heading must appear before the waiting room heading in the DOM
+    const inConsultLabel = screen.getByText('In Consultation')
+    const waitingRoomLabel = screen.getByText(/^Waiting Room/)
+    expect(
+      inConsultLabel.compareDocumentPosition(waitingRoomLabel) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy()
+
+    // The emergency waiter stays in the waiting list, not the in-consultation section
+    const inConsultSection = inConsultLabel.closest('div')!
+    expect(within(inConsultSection as HTMLElement).queryByText('Emergency Waiter')).toBeNull()
+  })
+
+  it('shows "Last updated" followed by a time after a successful fetch', async () => {
+    renderWithConsult()
+    // dataUpdatedAt is set by react-query when data lands; we just need the text to appear
+    expect(await screen.findByText(/Last updated/)).toBeInTheDocument()
+  })
+
+  it('shows stale-data InlineAlert with role=alert when isError and data is present', async () => {
+    renderWithConsult(queueWithConsult, { isError: true })
+    // With isError=true from the fetch mock, react-query will mark the query as errored
+    // The component should show the InlineAlert
+    // Note: since setQueryData already set data, the query has stale data + error state
+    const alerts = await screen.findAllByRole('alert')
+    const staleAlert = alerts.find((el) => el.textContent?.includes('Could not refresh'))
+    expect(staleAlert).toBeTruthy()
+  })
+})

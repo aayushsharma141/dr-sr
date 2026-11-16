@@ -1169,6 +1169,7 @@ export interface PaymentCreate {
   patient_id: number
   treatment_plan_id?: number | null
   appointment_id?: number | null
+  visit_id?: number | null
   amount_paise: number
   payment_method: PaymentMethod
   notes?: string | null
@@ -1189,6 +1190,7 @@ export interface PaymentOut {
   treatment_plan_id: number | null
   treatment_plan_name: string | null
   appointment_id: number | null
+  visit_id?: number | null
   amount_paise: number
   payment_method: PaymentMethod
   notes: string | null
@@ -1266,6 +1268,8 @@ export interface VisitSummary extends VisitRead {
   completed_consultations: number
   active_consultations: number
   outstanding_paise: number
+  token_numbers: number[]
+  last_completed_at: string | null
 }
 
 export interface VisitDetail extends VisitRead {
@@ -1287,13 +1291,12 @@ export interface VisitCloseRequest {
 
 export interface VisitDueOut {
   visit_id: number
-  appointment_id: number
   patient_id: number
   patient_urn: string
   patient_name: string
-  doctor_name_en: string
+  doctor_names: string[]
   visit_date: string
-  fee_paise: number
+  bill_total_paise: number
   paid_paise: number
   balance_paise: number
   close_reason: string | null

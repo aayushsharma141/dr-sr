@@ -923,9 +923,20 @@ class ConsultationPriorityEvent(Base):
 
 
 class BillItemCategory(StrEnum):
-    """Bill categories (OD-22-14). Only CONSULTATION is written so far (Phase 22, Wave 3)."""
+    """Bill categories (OD-22-14, migration 0027/0029)."""
 
     CONSULTATION = "CONSULTATION"
+    PROCEDURE = "PROCEDURE"
+    PACKAGE = "PACKAGE"
+    MEDICINE = "MEDICINE"
+    ADDITIONAL = "ADDITIONAL"
+
+
+class BillItemStatus(StrEnum):
+    """Status of a bill line (ACTIVE or VOIDED)."""
+
+    ACTIVE = "ACTIVE"
+    VOIDED = "VOIDED"
 
 
 class BillItemSource(StrEnum):
@@ -941,7 +952,8 @@ class BillItem(Base):
 
     A consultation's line stores the doctor's fee at check-in. Later fee changes never alter it,
     so an existing bill cannot change when a doctor's default fee is edited (K-63, FEE-07).
-    Rows are append-only for the application role (SELECT and INSERT only, migration 0027).
+    Rows are append-only except the amount/status moves written with a history row in the same
+    transaction (migration 0027, 0028, 0029).
     Amounts are integer paise.
     """
 
@@ -959,18 +971,40 @@ class BillItem(Base):
             name="fk_bill_items_appointment_patient",
             ondelete="RESTRICT",
         ),
+        ForeignKeyConstraint(
+            ["treatment_plan_id", "patient_id"],
+            ["treatment_plans.id", "treatment_plans.patient_id"],
+            name="fk_bill_items_treatment_plan_patient",
+            ondelete="RESTRICT",
+        ),
         CheckConstraint(
             "category IN ('CONSULTATION', 'PROCEDURE', 'PACKAGE', 'MEDICINE', 'ADDITIONAL')",
             name="category_valid",
         ),
         CheckConstraint("source IN ('DOCTOR', 'RECEPTION', 'SYSTEM')", name="source_valid"),
+        CheckConstraint("status IN ('ACTIVE', 'VOIDED')", name="status_valid"),
+        CheckConstraint(
+            "(status = 'ACTIVE' AND void_reason IS NULL AND voided_by_user_id IS NULL AND voided_at IS NULL) "
+            "OR (status = 'VOIDED' AND void_reason IS NOT NULL AND length(trim(void_reason)) >= 3 "
+            "AND voided_by_user_id IS NOT NULL AND voided_at IS NOT NULL)",
+            name="void_integrity",
+        ),
         CheckConstraint("quantity > 0", name="quantity_positive"),
         CheckConstraint("rate_paise >= 0 AND amount_paise >= 0", name="amounts_nonnegative"),
         CheckConstraint(
             "category <> 'CONSULTATION' OR appointment_id IS NOT NULL",
             name="consultation_has_appointment",
         ),
+        CheckConstraint(
+            "category <> 'PACKAGE' OR (treatment_plan_id IS NOT NULL AND rate_paise = 0 AND amount_paise = 0)",
+            name="package_reference",
+        ),
+        CheckConstraint(
+            "category = 'MEDICINE' OR prescription_item_id IS NULL",
+            name="prescription_link_medicine_only",
+        ),
         Index("ix_bill_items_visit", "visit_id"),
+        Index("ix_bill_items_appointment", "appointment_id"),
         # One consultation line per appointment: the snapshot is written once.
         Index(
             "uq_bill_items_consultation_appointment",
@@ -984,15 +1018,87 @@ class BillItem(Base):
     visit_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
     patient_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
     appointment_id: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    treatment_plan_id: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    prescription_item_id: Mapped[int | None] = mapped_column(
+        BigInteger, ForeignKey("prescription_items.id", ondelete="SET NULL"), nullable=True
+    )
     category: Mapped[str] = mapped_column(String(16), nullable=False)
     source: Mapped[str] = mapped_column(String(16), nullable=False)
+    status: Mapped[str] = mapped_column(
+        String(16),
+        default=BillItemStatus.ACTIVE.value,
+        server_default=text(f"'{BillItemStatus.ACTIVE.value}'"),
+        nullable=False,
+    )
     description: Mapped[str] = mapped_column(Text, nullable=False)
+    unit: Mapped[str | None] = mapped_column(String(32), nullable=True)
     quantity: Mapped[Decimal] = mapped_column(
         Numeric(10, 2), nullable=False, server_default=text("1")
     )
     rate_paise: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    # The amount as first billed (design §4). amount_paise moves only through a logged adjustment.
+    original_amount_paise: Mapped[int] = mapped_column(BigInteger, nullable=False)
     amount_paise: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    void_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+    voided_by_user_id: Mapped[int | None] = mapped_column(
+        BigInteger, ForeignKey("users.id", ondelete="RESTRICT"), nullable=True
+    )
+    voided_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_by_user_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("users.id", ondelete="RESTRICT"), nullable=False
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+class BillItemAdjustmentKind(StrEnum):
+    """Why a bill line changed: a discount, a waiver, a correction, or a void (OD-22-11, OD-22-15)."""
+
+    DISCOUNT = "DISCOUNT"
+    WAIVER = "WAIVER"
+    CORRECTION = "CORRECTION"
+    VOID = "VOID"
+
+
+class BillItemAdjustment(Base):
+    """Append-only history of bill line changes (design §4, OD-22-11, OD-22-15).
+
+    The line keeps its current amount; every change writes one row with the value it replaced,
+    the reason, the staff member and the time. Rows cannot be updated or deleted by the app.
+    """
+
+    __tablename__ = "bill_item_adjustments"
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["bill_item_id"],
+            ["bill_items.id"],
+            name="fk_bill_item_adjustments_bill_item",
+            ondelete="RESTRICT",
+        ),
+        CheckConstraint(
+            "kind IN ('DISCOUNT', 'WAIVER', 'CORRECTION', 'VOID')",
+            name="kind_valid",
+        ),
+        CheckConstraint("length(trim(reason)) >= 3", name="reason_present"),
+        CheckConstraint(
+            "old_amount_paise >= 0 AND new_amount_paise >= 0",
+            name="amounts_nonnegative",
+        ),
+        Index("ix_bill_item_adjustments_bill_item", "bill_item_id"),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    bill_item_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    old_quantity: Mapped[Decimal] = mapped_column(Numeric(10, 2), nullable=False)
+    new_quantity: Mapped[Decimal] = mapped_column(Numeric(10, 2), nullable=False)
+    old_rate_paise: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    new_rate_paise: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    old_amount_paise: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    new_amount_paise: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    kind: Mapped[str] = mapped_column(String(16), nullable=False)
+    reason: Mapped[str] = mapped_column(Text, nullable=False)
+    actor_user_id: Mapped[int] = mapped_column(
         BigInteger, ForeignKey("users.id", ondelete="RESTRICT"), nullable=False
     )
     created_at: Mapped[datetime] = mapped_column(
@@ -1476,6 +1582,7 @@ class Payment(Base):
         Index("ix_payments_patient_id", "patient_id"),
         Index("ix_payments_treatment_plan_id", "treatment_plan_id"),
         Index("ix_payments_appointment_id", "appointment_id"),
+        Index("ix_payments_visit_id", "visit_id"),
         Index("ix_payments_is_reversed", "is_reversed"),
         CheckConstraint("amount_paise > 0", name="ck_payments_amount_positive"),
         CheckConstraint(
@@ -1490,6 +1597,10 @@ class Payment(Base):
             "reversed_by_user_id IS NOT NULL AND reversed_at IS NOT NULL)",
             name="ck_payments_reversal_integrity",
         ),
+        CheckConstraint(
+            "visit_id IS NULL OR (treatment_plan_id IS NULL AND appointment_id IS NULL)",
+            name="single_target",
+        ),
         # FB-04 / SEC-03: payments must belong to the treatment plan / appointment's patient
         ForeignKeyConstraint(
             ["treatment_plan_id", "patient_id"],
@@ -1502,6 +1613,12 @@ class Payment(Base):
             ["appointments.id", "appointments.patient_id"],
             name="fk_payments_appointment_patient",
             ondelete="SET NULL (appointment_id)",
+        ),
+        ForeignKeyConstraint(
+            ["visit_id", "patient_id"],
+            ["visits.id", "visits.patient_id"],
+            name="fk_payments_visit_patient",
+            ondelete="RESTRICT",
         ),
     )
 
@@ -1520,6 +1637,7 @@ class Payment(Base):
     appointment_id: Mapped[int | None] = mapped_column(
         BigInteger, ForeignKey("appointments.id", ondelete="SET NULL"), nullable=True
     )
+    visit_id: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
     amount_paise: Mapped[int] = mapped_column(Integer, nullable=False)
     payment_method: Mapped[str] = mapped_column(String(16), nullable=False)
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)

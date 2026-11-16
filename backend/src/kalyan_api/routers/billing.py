@@ -45,7 +45,11 @@ from kalyan_api.schemas.billing import (
 )
 from kalyan_api.services import audit_service, billing_service
 from kalyan_api.services.audit_service import AuditAction
-from kalyan_api.services.billing_service import consultation_fee_paise
+from kalyan_api.services.billing_service import (
+    consultation_fee_paise,
+    lock_visit,
+    visit_totals,
+)
 from kalyan_api.services.receipt_service import (
     allocate_next_receipt_number,
     current_cycle_key,
@@ -69,6 +73,7 @@ def _to_payment_out(p: Payment) -> PaymentOut:
         treatment_plan_id=p.treatment_plan_id,
         treatment_plan_name=p.treatment_plan.plan_name if p.treatment_plan else None,
         appointment_id=p.appointment_id,
+        visit_id=p.visit_id,
         amount_paise=p.amount_paise,
         payment_method=p.payment_method,
         notes=p.notes,
@@ -103,7 +108,42 @@ def record_payment(
             message="Active patient not found.",
         )
 
-    # 2. If treatment plan payment, serialize and enforce balance limits
+    # 2. If visit linked, serialize and enforce visit balance limits (Phase 22, OD-D)
+    if payload.visit_id is not None:
+        if payload.appointment_id is not None or payload.treatment_plan_id is not None:
+            raise ApiError(
+                status_code=422,
+                code="payment_target_conflict",
+                message="A payment cannot target both a visit and a consultation or treatment package.",
+            )
+        visit = lock_visit(session, payload.visit_id)
+        if not visit or visit.patient_id != payload.patient_id:
+            raise ApiError(
+                status_code=404,
+                code="visit_not_found",
+                message="Visit not found for patient.",
+            )
+        totals = visit_totals(session, [visit.id])
+        v_tot = totals[visit.id]
+        if not v_tot.has_completed:
+            raise ApiError(
+                status_code=422,
+                code="checkout_not_open",
+                message="Fees are collected after at least one consultation is completed.",
+            )
+        if payload.amount_paise > v_tot.due_paise:
+            max_rupees = max(0, v_tot.due_paise) / 100
+            attempted_rupees = payload.amount_paise / 100
+            raise ApiError(
+                status_code=422,
+                code="overpayment_rejected",
+                message=(
+                    f"Payment of ₹{attempted_rupees:,.2f} exceeds remaining "
+                    f"visit balance of ₹{max_rupees:,.2f}."
+                ),
+            )
+
+    # 3. If treatment plan payment, serialize and enforce balance limits
     if payload.treatment_plan_id is not None:
         plan_stmt = (
             select(TreatmentPlan)
@@ -148,8 +188,14 @@ def record_payment(
                 ),
             )
 
-    # 3. If appointment linked, verify and block consultation fee overpayments (BR-004, FB-02)
+    # 4. If appointment linked, verify and block consultation fee overpayments (BR-004, FB-02)
     if payload.appointment_id is not None:
+        appt_visit_id = session.scalar(
+            select(Appointment.visit_id).where(Appointment.id == payload.appointment_id)
+        )
+        if appt_visit_id is not None:
+            lock_visit(session, appt_visit_id)
+
         appt_stmt = (
             select(Appointment)
             .where(Appointment.id == payload.appointment_id)
@@ -168,6 +214,10 @@ def record_payment(
                 code="appointment_not_found",
                 message="Appointment not found for patient.",
             )
+        if appt_visit_id is not None and appt.visit_id != appt_visit_id:
+            if appt.visit_id is not None:
+                lock_visit(session, appt.visit_id)
+
         # Fees are collected after the consultation (RF-23, owner decision 6), and a cancelled
         # consultation owes nothing. A booking that was never checked in is left as before.
         if appt.consultation_status in (
@@ -188,12 +238,15 @@ def record_payment(
                 code="consultation_cancelled",
                 message="This consultation was cancelled, so nothing is due for it.",
             )
-        # The fee is the consultation's bill line (OD-22-10, FEE-07). A consultation with no line
-        # (a row that never went through check-in) falls back to the doctor's current fee.
+        # The fee is the consultation's bill line (OD-22-10, FEE-07). Fail closed (W4, K-63):
+        # a consultation with no consultation bill line is refused.
         fee_paise = consultation_fee_paise(session, appt.id)
         if fee_paise is None:
-            doctor = session.get(Doctor, appt.doctor_id)
-            fee_paise = doctor.default_fee_paise if doctor else 0
+            raise ApiError(
+                status_code=422,
+                code="consultation_missing_bill_line",
+                message="This consultation has no consultation bill line.",
+            )
         if fee_paise > 0:
             paid_stmt = select(func.coalesce(func.sum(Payment.amount_paise), 0)).where(
                 Payment.appointment_id == appt.id,
@@ -212,14 +265,27 @@ def record_payment(
                         f"consultation fee balance of ₹{max_rupees:,.2f}."
                     ),
                 )
+        if appt.visit_id is not None:
+            v_due = visit_totals(session, [appt.visit_id])[appt.visit_id].due_paise
+            if payload.amount_paise > v_due:
+                max_rupees = max(0, v_due) / 100
+                attempted_rupees = payload.amount_paise / 100
+                raise ApiError(
+                    status_code=422,
+                    code="overpayment_rejected",
+                    message=(
+                        f"Payment of ₹{attempted_rupees:,.2f} exceeds remaining "
+                        f"visit balance of ₹{max_rupees:,.2f}."
+                    ),
+                )
 
-    # 4. Determine receipt sequence cycle from clinic settings
+    # 5. Determine receipt sequence cycle from clinic settings
     settings = session.scalar(select(ClinicSettings).where(ClinicSettings.id == 1))
     cycle = settings.receipt_sequence_cycle if settings else "FINANCIAL_YEAR"
 
     receipt_number = allocate_next_receipt_number(session, cycle=cycle)
 
-    # 5. Insert Payment
+    # 6. Insert Payment
     payment = Payment(
         receipt_number=receipt_number,
         patient_id=payload.patient_id,
@@ -229,6 +295,7 @@ def record_payment(
         patient_address=patient.address,
         treatment_plan_id=payload.treatment_plan_id,
         appointment_id=payload.appointment_id,
+        visit_id=payload.visit_id,
         amount_paise=payload.amount_paise,
         payment_method=payload.payment_method,
         notes=payload.notes,
@@ -238,7 +305,7 @@ def record_payment(
     session.add(payment)
     session.flush()
 
-    # 6. Audit Trail
+    # 7. Audit Trail
     ctx = build_audit_context(request, principal)
     audit_service.record(
         session,
@@ -250,6 +317,8 @@ def record_payment(
             "receipt_number": payment.receipt_number,
             "patient_id": payment.patient_id,
             "treatment_plan_id": payment.treatment_plan_id,
+            "appointment_id": payment.appointment_id,
+            "visit_id": payment.visit_id,
             "amount_paise": payment.amount_paise,
             "payment_method": payment.payment_method,
         },

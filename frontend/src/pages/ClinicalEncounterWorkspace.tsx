@@ -20,6 +20,7 @@ import { FollowUpSection } from '../components/FollowUpSection'
 import { AppointmentBookingModal } from '../components/AppointmentBookingModal'
 import { ConsultationSummaryPrint } from '../components/ConsultationSummaryPrint'
 import { QuickPhraseBar } from '../components/QuickPhraseBar'
+import { DoctorChargesPanel } from '../components/billing/DoctorChargesPanel'
 import { asSpecialty, useBookedAppointment, useMyDepartments } from '../api/specialty'
 import { ApiError, isVersionConflict } from '../api/client'
 import { UnsavedChangesGuard, hasReportedAllergies } from '../components/UnsavedChangesGuard'
@@ -127,7 +128,8 @@ function EncounterWorkspace({ workspaceKey }: { workspaceKey: string }) {
   // D-19-03: the specialty comes from the consultation's own department, then the booked
   // appointment's, then the doctor's department when they have exactly one. Never assume one.
   const myDepartments = useMyDepartments()
-  const bookedAppointment = useBookedAppointment(existingEncounter?.appointment_id ?? paramApptId)
+  const effectiveAppointmentId = existingEncounter?.appointment_id ?? paramApptId
+  const bookedAppointment = useBookedAppointment(effectiveAppointmentId)
   const departmentId: number | null =
     existingEncounter?.department_id ??
     bookedAppointment?.department_id ??
@@ -1329,6 +1331,13 @@ function EncounterWorkspace({ workspaceKey }: { workspaceKey: string }) {
                   ))}
                 </ul>
               </div>
+            )}
+
+            {effectiveAppointmentId != null && (
+              <DoctorChargesPanel
+                appointmentId={effectiveAppointmentId}
+                patientId={effectivePatientId}
+              />
             )}
 
             <div data-testid="prior-encounter-card" className="rounded-xl border border-slate-200 bg-white p-4 shadow-xs">

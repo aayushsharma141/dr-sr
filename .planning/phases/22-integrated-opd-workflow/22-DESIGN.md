@@ -1,6 +1,6 @@
 # Phase 22 — Integrated OPD Workflow (Check-in → Queue → Consultation → Billing → Patient Out)
 
-Status: DESIGN AGREED 2026-11-15, Wave 1 in progress. Owner decisions below are frozen.
+Status: DESIGN AGREED 2026-11-15. Waves 1-5 built (plans 22-01..22-18); deploy state unverified on kalyan_dev; 22-20 deploy pending. Owner decisions below are frozen.
 Source: the owner's specification of 2026-11-15 (pasted in the session) and four answers on
 priority, consultation fees, medicine billing and referral.
 
@@ -40,6 +40,8 @@ Booking (phone / walk-in) → arrival → new or existing patient → URN (new o
 | OD-22-17 | Previous dues are shown beside the current bill, never merged into it; they are collected against their own ledger entry. |
 | OD-22-18 | Payment is not a condition for entering the queue. Patient Out with a balance is allowed with a reason (owner decision 8, already built); the balance stays in the ledger. |
 | OD-22-19 | Reception never completes a consultation; the doctor owns clinical completion. Reception owns payment collection and checkout. |
+| OD-22-20 | Reassignment: reception may move a consultation to any consulting doctor on the same visit; the current department is kept when the new doctor belongs to it, otherwise reception picks one of the new doctor's departments (owner, 2026-11-15; CONTEXT Q19). |
+| OD-22-21 | The referral report is admin-only; reception's Reports tab shows today's collection summary (owner, 2026-11-15; CONTEXT Q10). |
 
 ## 3. What already exists (verified in code 2026-11-15)
 
@@ -105,7 +107,7 @@ New table `bill_items` (the visit's bill; the visit acts as the invoice):
 category (CONSULTATION | PROCEDURE | PACKAGE | MEDICINE | ADDITIONAL), source (DOCTOR | RECEPTION | SYSTEM),
 description, unit NULL, quantity numeric(10,2) > 0, rate_paise ≥ 0, amount_paise ≥ 0,
 original_amount_paise, status (ACTIVE | VOIDED), void_reason, voided_by, voided_at,
-created_by_user_id, created_at, version_id`. Same-patient composite FK to visits.
+created_by_user_id, created_at, version_id` (version_id omitted in migration 0027/0029 per RESEARCH OQ-3; row-level locking via with_for_update is used instead). Same-patient composite FK to visits.
 
 New append-only table `bill_item_adjustments`:
 `id, bill_item_id, old_quantity, new_quantity, old_rate_paise, new_rate_paise, old_amount_paise,
@@ -227,9 +229,7 @@ T22-01..T22-04 implemented on branch `fix/sidebar-daily-flow` (uncommitted; chec
 - Verified on a side server (port 8010, `kalyan_test`, scratch build): new-patient check-in
   (Emergency + doctor referral), booked check-in from the list (Follow-up + personal referral),
   priority change from the list, reload persistence, DB rows, history and audit rows.
-- NOT done on the owner's :8000 server: migration 0026 is not applied to `kalyan_dev`, the
-  server is not restarted and `frontend/dist` is not rebuilt. All three must happen together;
-  a new dist against the old server breaks check-in.
+- Deploy state (22-19, 2026-11-16): deploy state unverified on kalyan_dev (migrations 0026-0028 verified only upon 22-20 check-db output); migration 0029 and the Phase 22 frontend/dist go out together in plan 22-20.
 - Closed gap: the older `PATCH /appointments/{id}/status` → ARRIVED path now defaults referral to
   Self, satisfying OD-22-16 and database constraints without inventing external data.
 
@@ -247,7 +247,7 @@ Wave 2 backend implementation completed on branch `fix/sidebar-daily-flow` (chec
   - Reception only (`Permission.VISIT_WRITE`). Only permits reassigning consultations in `WAITING` status.
   - Cancels existing consultation with reason and marks cancellation.
   - Creates new consultation under the same `visit_id` with next sequential token from target doctor's daily sequence.
-  - Preserves priority level, priority reason, and emergency alerted timestamps across the reassigned consultation.
+  - Preserves priority level and priority reason; an EMERGENCY consultation raises a fresh alert for the new doctor (research W2-G: the doc was wrong, the code is kept).
 - **Suggested Queue Ordering (OD-22-07, T22-05 / T22-06):**
   - `_suggested_order_key` sorts waiting queue: EMERGENCY first by classification timestamp, then PRIORITY by token number, then NORMAL by token number.
 - **Status Path Arrival Default Referral (OD-22-16):**
@@ -257,8 +257,30 @@ Wave 2 backend implementation completed on branch `fix/sidebar-daily-flow` (chec
   - RBAC matrix rows added for both new endpoints (`/acknowledge-alert`, `/reassign`).
   - OpenAPI snapshot synchronized (`openapi.snapshot.json`).
   - Full backend test suite passing: 1381 passed, 1 skipped (test_spa_serving).
-- **Still Open for Wave 2:**
-  - Wave 2 UI: Waiting Room kanban page (reception), Doctor dashboard alert banner, and Reassign modal/action.
+- See §8c.
+
+## 8c. Waves 3-5 status (2026-11-16)
+
+Waves 3–5 implemented across plans 22-01..22-18 on branch `fix/sidebar-daily-flow`. All features are IMPLEMENTED — NOT VERIFIED until plan 22-20 deployment checks on `:8000`:
+
+- **Plan 22-01 (Wave 2):** Doctor emergency alert acknowledgement & emergency banner (`DoctorDashboard.tsx`, `test_phase22_wave2.py`) — IMPLEMENTED — NOT VERIFIED.
+- **Plan 22-02 (Wave 2):** Waiting room kanban, doctor reassign modal, labels & keyboard roving tabindex (`WaitingRoom.tsx`, `TodayAppointmentsPanel.tsx`) — IMPLEMENTED — NOT VERIFIED.
+- **Plan 22-03 (Wave 3):** Fee adjustments API (doctor discount/waiver, admin fee correction) — IMPLEMENTED — NOT VERIFIED.
+- **Plan 22-04 (Wave 3):** Bill items schema and database migration 0027 (`0027_bill_items.py`) — IMPLEMENTED — NOT VERIFIED.
+- **Plan 22-05 (Wave 3):** Consultation fee snapshot at check-in & visit charge lines (`test_phase22_bill_snapshot.py`) — IMPLEMENTED — NOT VERIFIED.
+- **Plan 22-06 (Wave 3):** Visit-level payments & balance calculation switch (`0029_bill_lines_and_visit_payments.py`, `test_phase22_visit_payments.py`) — IMPLEMENTED — NOT VERIFIED.
+- **Plan 22-07 (Wave 3):** Payment receipt printing layout with A4 specifications (`receipt-print.test.tsx`) — IMPLEMENTED — NOT VERIFIED.
+- **Plan 22-08 (Wave 3):** Bill line creation endpoint for reception (`test_phase22_bill_lines.py`) — IMPLEMENTED — NOT VERIFIED.
+- **Plan 22-09 (Wave 4):** 5-section visit bill view endpoint (`test_phase22_bill_view.py`) — IMPLEMENTED — NOT VERIFIED.
+- **Plan 22-10 (Wave 3):** Bill line void endpoint for reception and admin (`test_phase22_bill_void.py`) — IMPLEMENTED — NOT VERIFIED.
+- **Plan 22-11 (Wave 4):** Bill line correction endpoint & prescribed medicines reference (`test_phase22_bill_correct.py`, `test_phase22_prescribed_medicines.py`) — IMPLEMENTED — NOT VERIFIED.
+- **Plan 22-12 (Wave 4):** Doctor charges endpoint and doctor read view (`test_phase22_doctor_lines.py`) — IMPLEMENTED — NOT VERIFIED.
+- **Plan 22-13 (Wave 4):** Billing & checkout UI page integration (`ReceptionBillingPage.tsx`, `BillPanel.tsx`) — IMPLEMENTED — NOT VERIFIED.
+- **Plan 22-14 (Wave 4):** Bill line action modals (Add Medicine, Add Particular, Void, Correct, Admin Fee Correction) — IMPLEMENTED — NOT VERIFIED.
+- **Plan 22-15 (Wave 4):** Receipts page & payment receipt printing UI (`ReceiptsPage.tsx`) — IMPLEMENTED — NOT VERIFIED.
+- **Plan 22-16 (Wave 4):** Doctor charges UI panel on clinical consultation page (`DoctorChargesPanel.tsx`) — IMPLEMENTED — NOT VERIFIED.
+- **Plan 22-17 (Wave 5):** Admin referral reports backend endpoint (`reports.py`, `test_phase22_referral_report.py`) — IMPLEMENTED — NOT VERIFIED.
+- **Plan 22-18 (Wave 5):** Admin referral report frontend page & reception daily collection summary (`ReferralReportPage.tsx`, `ReceptionReportsPage.tsx`) — IMPLEMENTED — NOT VERIFIED.
 
 ## 9. Risks
 

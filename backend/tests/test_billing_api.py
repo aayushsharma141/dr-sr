@@ -12,6 +12,7 @@ Guarantees:
 """
 
 from datetime import UTC, datetime
+from decimal import Decimal
 from typing import Any
 
 from sqlalchemy import select
@@ -21,10 +22,14 @@ from kalyan_api import clock
 from kalyan_api.models import (
     Appointment,
     AuditLog,
+    BillItem,
+    BillItemCategory,
+    BillItemSource,
     Doctor,
     Patient,
     TreatmentPlan,
     User,
+    Visit,
 )
 
 
@@ -58,6 +63,15 @@ def test_reception_records_consultation_payment(
     pat = _create_test_patient(db_session, "01")
     rec_c = login_client(reception_user)
 
+    visit = Visit(
+        patient_id=pat.id,
+        visit_date=datetime.now(UTC).date(),
+        status="OPEN",
+        opened_by_user_id=reception_user.id,
+    )
+    db_session.add(visit)
+    db_session.flush()
+
     # Book appointment
     appt = Appointment(
         patient_id=pat.id,
@@ -65,9 +79,27 @@ def test_reception_records_consultation_payment(
         appointment_date=datetime.now(UTC).date(),
         token_number=1,
         status="ARRIVED",
+        consultation_status="COMPLETED",
+        visit_id=visit.id,
         created_by_user_id=reception_user.id,
     )
     db_session.add(appt)
+    db_session.flush()
+
+    line = BillItem(
+        visit_id=visit.id,
+        patient_id=pat.id,
+        appointment_id=appt.id,
+        category=BillItemCategory.CONSULTATION.value,
+        source=BillItemSource.SYSTEM.value,
+        description="Consultation fee",
+        quantity=Decimal("1"),
+        rate_paise=30000,
+        original_amount_paise=30000,
+        amount_paise=30000,
+        created_by_user_id=reception_user.id,
+    )
+    db_session.add(line)
     db_session.flush()
 
     # Record Payment of ₹300 (30,000 paise) via UPI
@@ -438,6 +470,34 @@ def test_consultation_fee_overpayment_rejected(
         },
     )
     appt_id = book.json()["id"]
+
+    visit = Visit(
+        patient_id=pat.id,
+        visit_date=clock.ist_today(),
+        status="OPEN",
+        opened_by_user_id=reception_user.id,
+    )
+    db_session.add(visit)
+    db_session.flush()
+
+    appt = db_session.get(Appointment, appt_id)
+    appt.visit_id = visit.id
+    appt.consultation_status = "COMPLETED"
+    line = BillItem(
+        visit_id=visit.id,
+        patient_id=pat.id,
+        appointment_id=appt_id,
+        category=BillItemCategory.CONSULTATION.value,
+        source=BillItemSource.SYSTEM.value,
+        description="Consultation fee",
+        quantity=Decimal("1"),
+        rate_paise=40000,
+        original_amount_paise=40000,
+        amount_paise=40000,
+        created_by_user_id=reception_user.id,
+    )
+    db_session.add(line)
+    db_session.flush()
 
     # Attempting to pay ₹500 when fee is ₹400 is rejected
     overpay = rec_c.post(

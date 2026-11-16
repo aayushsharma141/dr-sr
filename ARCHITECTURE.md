@@ -1,115 +1,148 @@
 # Architecture — Kalyan Hospital v3.0
 
-**Status:** Target architecture; not yet implemented. See PRD.md, SECURITY.md and DECISIONS.md.
+**Status:** Implemented and Operational v3.0 Architecture. Phases 11–21 complete, Phase 22 (Integrated OPD Workflow) deployed through Wave 2. See [PRD](PRD.md), [Security](SECURITY.md), [Decisions](DECISIONS.md), and [Consolidated UAT Report](docs/engineering/KALYAN_OPD_UAT_CONSOLIDATED_REPORT.md).
 
 ## 1. System context
 
-One central on-premises server serves 3–5 browser clients on the hospital LAN. Runtime operation must not depend on internet.
+One central on-premises server serves 3–5 browser clients across the Kalyan Hospital LAN. Runtime operation is strictly offline-first and does not depend on internet access.
 
 ```mermaid
 flowchart TB
-  R[Reception browser] --> S[Central server]
-  D[Doctor browser] --> S
-  A[Admin browser] --> S
-  S --> F[React + TypeScript]
-  S --> API[FastAPI]
-  API --> DB[(PostgreSQL)]
-  API --> FS[Private patient files]
-  API --> AU[Append-only audit]
-  API --> BK[Backup and verification]
-  BK --> DRIVE[Second physical drive]
+  R[Reception Workstation] --> S[Central LAN Server]
+  D1[Doctor Cabin 1 Workstation] --> S
+  D2[Doctor Cabin 2 Workstation] --> S
+  A[Admin Workstation] --> S
+  
+  subgraph S [Central Server Application Stack]
+    F[React 18 + Vite SPA Client]
+    API[FastAPI 0.162 Application Server]
+    DB[(PostgreSQL 16 Engine)]
+    FS[Private Patient File Store]
+    AU[Append-Only Audit Journal]
+    BK[Backup & Integrity Engine]
+  end
+
+  API --> DB
+  API --> FS
+  API --> AU
+  API --> BK
+  BK --> DRIVE[Secondary Physical Drive]
 ```
 
-## 2. Target stack and repository layout
+## 2. Technology Stack and Repository Layout
 
-- Frontend: React + TypeScript, one application with role-specific routes.
-- Backend: Python + FastAPI; business rules and authorization live here.
-- Database: PostgreSQL; SQLAlchemy models and Alembic migrations.
-- Files: private server-side directory with generated names and authorization-checked download routes.
-- Deployment: central server, browser clients, offline runtime.
+The production implementation uses:
+- **Frontend:** React 18, TypeScript 5, Vite, TailwindCSS, Lucide-React, TanStack Query.
+- **Backend:** Python 3.12, FastAPI 0.162, SQLAlchemy 2.0.55 ORM, Alembic migrations.
+- **Database:** PostgreSQL 16 with row-level locks, foreign-key cascades, and unique constraints.
+- **File Storage:** Private server-side directory with access-controlled streaming endpoints.
+- **Deployment:** Single on-premises server hosting FastAPI API and serving static SPA bundle to LAN clients.
 
-Suggested layout:
+### Implemented Codebase Layout
 
 ```text
-frontend/src/{app,features,shared}
-backend/app/{api/v1,core,models,schemas,services,repositories,audit,files,backup,migrations}
-tests/{unit,integration,security,concurrency,acceptance}
-docs/
+frontend/
+├── src/
+│   ├── admin/             # Admin module registries & SSOT navigation
+│   ├── api/               # API clients, queries, mutations, type definitions
+│   ├── auth/              # AuthContext, role guards, token/session management
+│   ├── components/        # Shared UI (AppShell, modals, badges, print templates, alerts)
+│   │   └── checkin/       # OPD check-in panels, priority badges, appointment lists
+│   ├── pages/             # Route-level screens (Check-in, Queues, Encounters, Billing, Admin)
+│   └── router.tsx         # Central application routing with RBAC guards
+backend/
+├── src/kalyan_api/
+│   ├── core/              # Config, database engine, security hashing, audit writers
+│   ├── migrations/        # Alembic migration scripts (0001 through 0027)
+│   ├── models.py          # SQLAlchemy relational models
+│   ├── routers/           # FastAPI thin routers (auth, patients, appointments, billing, encounters, etc.)
+│   ├── schemas/           # Pydantic v2 validation contracts
+│   └── services/          # Domain services (patient, visit, booking, billing, audit, backup, token)
+tests/ & backend/tests/    # 1,392 unit, integration, RBAC matrix, concurrency, and gate tests
+docs/                      # Engineering status, inventories, audit reports, and UAT results
 ```
 
-Routes should be thin. Services own invariants and transaction boundaries. React must not be trusted to enforce permissions.
+Routes remain thin; domain services manage invariants, transactions, and audit boundaries. The React frontend enforces role-based UX, but all security and financial invariants are strictly enforced server-side.
 
-## 3. Authentication and first-run bootstrap
+## 3. Integrated OPD Workflow Architecture (Phase 22)
 
-Individual accounts only. Passwords use Argon2id or another approved modern password hash. Use secure session handling, CSRF protection for cookie-authenticated mutations, idle expiry, lockout/backoff and session revocation.
+The hospital's central clinical and administrative operation runs as an end-to-end OPD lifecycle:
 
-First-run sequence:
-1. Backend detects that no administrator exists.
-2. Server generates a cryptographically random, short-lived one-time setup code and prints it only to the local server console.
-3. Browser setup is enabled only in this state; secret is never exposed through a public API.
-4. First administrator submits code, username and password.
-5. A database transaction locks bootstrap state, validates and consumes code, creates administrator, writes audit event and marks setup complete.
-6. Simultaneous submissions: exactly one succeeds.
-7. All public setup endpoints are permanently disabled after commit.
-8. Recovery is a documented local CLI procedure, never a hidden HTTP backdoor.
+```
+[Arrival / Booking] 
+       │
+       ▼
+[Check-in & Token Desk] ──► Auto-register new patient (permanent URN) or find existing
+       │                ──► Open or join Visit (Referred By mandatory, default: Self)
+       │                ──► Assign Doctor & generate monotonic queue token
+       │                ──► Set Triage Classification (Normal, Priority, Emergency)
+       │                ──► Snapshot Doctor Consultation Fee into bill_items
+       ▼
+[Waiting Room & Queue]  ──► Live computed priority order (Emergency → Priority → Normal)
+       │                ──► Instant Emergency Alert Banner on Doctor's screen
+       │                ──► Doctor emergency acknowledgment timestamp recorded
+       │                ──► Doctor can reassign patient to another doctor in same visit
+       ▼
+[Doctor Cabin]          ──► Doctor calls patient (In Cabin state)
+       │                ──► Universal consultation workspace (auto-save drafts, vitals, templates)
+       │                ──► Prescriptions Rx pad & treatment package recommendations
+       │                ──► Doctor may adjust/waive consultation fee with mandatory reason
+       │                ──► Clinical completion locks encounter
+       ▼
+[Billing & Checkout]    ──► Aggregates Consultation fee snapshot + Medicines + Procedures
+       │                ──► Displays previous dues separately (never merged into current bill)
+       │                ──► Cash / UPI payment recording in integer-paise ledger
+       │                ──► Transactional receipt issuance with printable layout
+       ▼
+[Patient Out]           ──► Visit checkout complete; closure with balance allowed with reason
+```
 
-No default production credentials or seeded production accounts.
+## 4. Authentication, Sessions & First-Run Bootstrap
 
-## 4. Authorization and roles
+- **Password Security:** Individual accounts only, hashed using Argon2id with unique salts.
+- **Session Control:** Secure HTTP-only cookies, idle timeout revocation, and single-active-session policy per user.
+- **Console-Only Bootstrap:** When the database contains no administrator, a cryptographically random, short-lived setup code is printed only to the local server console. The setup wizard consumes this code atomically in a single transaction to create the initial admin. Public bootstrap endpoints are permanently disabled thereafter. Break-glass recovery is local CLI only.
 
-Fixed Admin, Reception and Doctor permission catalogue. Every protected endpoint and object/file access checks authorization server-side. Automated route coverage must fail if a protected route lacks a declared policy. Account deactivation revokes sessions and preserves historical attribution.
+## 5. Authorization and Role Hierarchy
 
-Recommended doctor policy: read clinically relevant records across doctors, write only assigned cases. This is pending client approval. Final role-to-permission matrix is in SECURITY.md.
+Enforced server-side across all endpoints via route policy markers:
+- **`ADMIN`:** Full configuration, user management, audit review, asset/print template control, database backup/restore, and financial reversals (reversals require reason; admin cannot post routine payments).
+- **`RECEPTION`:** Patient registration, check-in, token generation, appointment management, billing, payment collection, receipt printing, and visit checkout. Cannot finalize clinical notes or administer doctor-only settings.
+- **`DOCTOR`:** Queue inspection, clinical encounters, vitals recording, prescription authoring, treatment plan creation, session logging, consultation fee adjustments, and emergency acknowledgment. Cannot collect payments or delete patient records.
 
-## 5. Data model
+## 6. Concurrency, Locking and Invariants
 
-Conceptual entities:
-- users, sessions, bootstrap_state, fixed permissions
-- clinic_settings, branches, doctors, fee_catalogue
-- patients, patient_files, patient_id_counters
-- appointments
-- clinical_encounters, clinical_addenda, prescriptions, prescription_items
-- treatment_plans, treatment_sessions, treatment_addenda
-- charge/accounts, payments, payment_reversals, receipt_counters
-- audit_events, backup_runs, backup_verification_reports
+1. **Patient URN Allocation:** Transactional allocation with gapless advisory locks and duplicate prevention by phone, name, and demographic checks.
+2. **Monotonic Daily Tokens:** Strictly ascending token integers scoped per `(doctor_id, appointment_date)`. Tokens are never recycled or reissued upon cancellation.
+3. **Optimistic Locking:** Entity mutations carry version numbers (`version` column). Conflicting simultaneous edits return HTTP 409 (`version_conflict`) with server reloads, never overwriting silently.
+4. **Financial Ledger & Integer Paise:** All monetary values are stored as 64-bit integer paise (INR ₹1.00 = 100 paise). Balances are computed dynamically from posted payments and bill line items. Simultaneous payments lock the target ledger scope to prevent negative balances or overpayments.
+5. **Fee Snapshotting:** When a patient is checked in, the assigned doctor's current consultation fee is copied into `bill_items` as a snapshot. Subsequent rate modifications never retroactively alter existing bills.
 
-Use foreign keys, unique indexes, check constraints and created_by/created_at/version fields. Balances are derived, not stored editable.
+## 7. Clinical and Financial Immutability
 
-## 6. Concurrency and transactions
+- **Finalized Medical Encounters:** Immutable upon doctor finalization. Amendments require dated addenda with clinician ID, timestamp, and justification.
+- **Ledger Entries & Receipts:** Posted payments are immutable. Adjustments require compensating reversal transactions with mandatory administrative reasons and audit logging. Receipt reprints retain the original receipt sequence number and carry a visible `DUPLICATE` watermark.
 
-- Patient URN allocation and receipt numbering are transactional and unique. Define what gap-free means when a transaction rolls back or a record is voided.
-- Payment posting locks the relevant account/ledger scope, recalculates balance inside transaction, rejects negative and overpayment, and commits ledger + receipt atomically.
-- Stale edits use version/ETag/If-Match and return HTTP 409; never silently overwrite.
-- Audit event commits in the same transaction as sensitive mutation. Audit failure aborts the mutation.
-- Use PostgreSQL constraints as the final integrity boundary, not only application validation.
+## 8. Audit Journaling
 
-## 7. Clinical and financial immutability
+Append-only audit events capture actor, timestamp, action, target entity, request ID, IP/workstation, outcome, and structured before/after payloads for all sensitive demographic, clinical, financial, and administrative operations. The audit table is queryable only by `ADMIN`.
 
-Finalized encounters, prescriptions and sessions are immutable. Corrections are dated addenda with author, reason and original-record link. Posted payments are append-only; reversal is a new compensating event requiring Admin authorization and reason. Reprints retain original receipt number and are marked DUPLICATE.
+## 9. File Security & Asset Storage
 
-## 8. Audit
+Patient photographs and clinic branding assets are stored in a private directory outside the public web root. File access requires session authentication and role verification. File paths are verified to prevent path traversal; uploads are validated by MIME type, byte header, and maximum size limits.
 
-Append-only audit events include actor, timestamp, action, entity, request ID, outcome, reason and structured before/after values where relevant. Avoid logging passwords, setup codes, tokens or unnecessary clinical narrative. Restrict audit access to Admin. Protect rows from ordinary update/delete.
+## 10. Backup, Restore & Disaster Recovery
 
-## 9. File security
+- **Automated Snapshots:** PostgreSQL dump combined with referenced file store into timestamped, checksummed `.tar.gz` archives.
+- **Verification & Staging Restore:** Restores run into an isolated staging database and directory to verify checksums and schema integrity before production cutover.
+- **Physical Isolation:** Backups are written to a secondary physical drive to protect against single-disk failures.
 
-Files stay outside public web root. Validate content type and size, generate opaque names, prevent path traversal, store checksums and enforce patient-level authorization on every read. Backup must include every referenced file.
+## 11. Testing and Acceptance Evidence
 
-## 10. Backup and restore
-
-Consistent PostgreSQL backup plus all referenced files. Manifest includes app/schema version, timestamps and database/file checksums. Support manual and scheduled backup to second drive. Restore into isolated staging DB and file directory; verify checksums, schema compatibility and integrity report before controlled cutover. Create pre-restore safety snapshot and document rollback. Clean-machine restore is mandatory.
-
-## 11. Offline deployment and security
-
-Serve all frontend assets locally. No runtime CDN, cloud auth, telemetry or internet API. Restrict firewall to clinic subnet and required ports; no public exposure or router port forwarding. Stable LAN address and UPS are recommended. HTTPS preferred; HTTP first-release exception requires explicit approval and must be described as unencrypted. Auto-start services after power recovery.
-
-## 12. Testing
-
-Required: unit tests; API/role matrix for every route; unguarded-route failure test; concurrency tests for URN, receipt, payment and stale edits; clinical immutability/addenda; audit atomicity; file authorization/path traversal; corrupted backup rejection; clean-machine restore; offline deployment; actual clinic printer acceptance.
-
-## 13. Legacy boundary
-
-The current PySide6/SQLite app is legacy reference, not v3 runtime. Do not share its database file over a network. Reuse only reviewed business rules, assets and tests.
+System reliability is evidenced by:
+- **Backend Pytest:** 1,392 tests (1,391 passed, 1 skipped) verifying models, services, RBAC matrix (724 route-role combinations), concurrency, and data invariants.
+- **Frontend Vitest:** 427 tests across 65 suites (422 passed, 5 skipped) verifying rendering, state transitions, modals, forms, and accessibility.
+- **Live Staging UAT:** 182-case end-to-end integration and concurrency test suite against live PostgreSQL (`kalyan_test`).
 
 ---
-*Architecture describes intended v3.0 system, not implementation status.*
+*Kalyan Hospital System Architecture — v3.0 Production Baseline*

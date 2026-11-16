@@ -12,6 +12,7 @@ const samplePayment: PaymentOut = {
   treatment_plan_id: 5,
   treatment_plan_name: 'Cervical Spondylosis Package',
   appointment_id: null,
+  visit_id: null,
   amount_paise: 250000,
   payment_method: 'CASH',
   notes: 'First instalment',
@@ -60,6 +61,35 @@ describe('ReceiptPrint', () => {
     expect(screen.getByText('TRANSACTION REVERSED')).toBeInTheDocument()
     expect(screen.getByText(/Entered duplicate by error/i)).toBeInTheDocument()
     expect(screen.getByText(/Authorized by @admin/i)).toBeInTheDocument()
+  })
+
+  it('prints totals only with no line items for a visit payment (OD-H, BILL-12)', () => {
+    const visitPayment: PaymentOut = {
+      ...samplePayment,
+      id: 43,
+      receipt_number: 'RCP-2026-0043',
+      treatment_plan_id: null,
+      treatment_plan_name: null,
+      appointment_id: null,
+      visit_id: 7,
+      amount_paise: 50000,
+      payment_method: 'CASH',
+      notes: 'Visit 2026-11-14',
+    }
+
+    render(<ReceiptPrint payment={visitPayment} />)
+
+    expect(screen.getByText('RCP-2026-0043')).toBeInTheDocument()
+    expect(screen.getByText('Aarav Patel')).toBeInTheDocument()
+    expect(screen.getByText('KLY-001')).toBeInTheDocument()
+    expect(screen.getByText('₹500.00')).toBeInTheDocument()
+    expect(screen.getByText('CASH')).toBeInTheDocument()
+    expect(screen.getByText('Visit 2026-11-14')).toBeInTheDocument()
+
+    // OD-H: totals only, no bill line items or table rendered
+    expect(screen.queryByRole('table')).not.toBeInTheDocument()
+    expect(screen.queryByText(/Line Items/i)).not.toBeInTheDocument()
+    expect(screen.queryByText(/Consultation Fee/i)).not.toBeInTheDocument()
   })
 })
 

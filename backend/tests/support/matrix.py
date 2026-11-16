@@ -289,6 +289,19 @@ def _priority_payload(target: Any = None) -> dict[str, Any]:
     return {"version_id": ver, "priority_level": "PRIORITY", "priority_reason": "Matrix elderly"}
 
 
+def _fee_adjustment_payload(target: Any = None) -> dict[str, Any]:
+    return {"kind": "DISCOUNT", "new_amount_paise": 1000, "reason": "Matrix discount"}
+
+
+def _doctor_line_create_payload(target: Any = None) -> dict[str, Any]:
+    return {
+        "category": "PROCEDURE",
+        "description": "Matrix procedure",
+        "quantity": 1,
+        "rate_paise": 10000,
+    }
+
+
 def _acknowledge_alert_payload(target: Any = None) -> dict[str, Any]:
     ver = target.version_id if target and hasattr(target, "version_id") else 1
     return {"version_id": ver}
@@ -317,6 +330,30 @@ def _close_visit_payload(target: Any = None) -> dict[str, Any]:
 def _cancel_visit_payload(target: Any = None) -> dict[str, Any]:
     ver = target.version_id if target and hasattr(target, "version_id") else 1
     return {"version_id": ver, "reason": "Matrix visit cancel"}
+
+
+def _reception_bill_line_payload(_target: Any = None) -> dict[str, Any]:
+    return {
+        "category": "MEDICINE",
+        "description": "Matrix Paracetamol 500",
+        "unit": "strip",
+        "quantity": "2",
+        "rate_paise": 5000,
+    }
+
+
+def _bill_line_void_payload(_target: Any = None) -> dict[str, Any]:
+    return {
+        "reason": "Matrix void test reason",
+    }
+
+
+def _bill_line_correct_payload(_target: Any = None) -> dict[str, Any]:
+    return {
+        "quantity": "3",
+        "reason": "Matrix correct test reason",
+    }
+
 
 
 def _create_encounter_payload(target: Any = None) -> dict[str, Any]:
@@ -1224,6 +1261,30 @@ MATRIX: list[MatrixRow] = [
     ),
     MatrixRow(
         method="POST",
+        path="/api/appointments/{id}/fee-adjustment",
+        body_factory=_fee_adjustment_payload,
+        expected={
+            "anonymous": 401,
+            "admin": 403,
+            "reception": 403,
+            "doctor_a": 422,
+            "doctor_b": 404,
+        },
+    ),
+    MatrixRow(
+        method="POST",
+        path="/api/appointments/{id}/fee-correction",
+        body_factory=_fee_adjustment_payload,
+        expected={
+            "anonymous": 401,
+            "admin": 422,
+            "reception": 403,
+            "doctor_a": 403,
+            "doctor_b": 403,
+        },
+    ),
+    MatrixRow(
+        method="POST",
         path="/api/appointments/{id}/acknowledge-alert",
         body_factory=_acknowledge_alert_payload,
         expected={
@@ -1255,6 +1316,30 @@ MATRIX: list[MatrixRow] = [
             "admin": 403,
             "reception": 201,
             "doctor_a": 403,
+            "doctor_b": 404,
+        },
+    ),
+    MatrixRow(
+        method="POST",
+        path="/api/appointments/{id}/bill-items",
+        body_factory=_doctor_line_create_payload,
+        expected={
+            "anonymous": 401,
+            "admin": 403,
+            "reception": 403,
+            "doctor_a": 201,
+            "doctor_b": 404,
+        },
+    ),
+    MatrixRow(
+        method="GET",
+        path="/api/appointments/{id}/bill-items",
+        body_factory=None,
+        expected={
+            "anonymous": 401,
+            "admin": 403,
+            "reception": 403,
+            "doctor_a": 200,
             "doctor_b": 404,
         },
     ),
@@ -1298,6 +1383,90 @@ MATRIX: list[MatrixRow] = [
         method="POST",
         path="/api/visits/{id}/cancel",
         body_factory=_cancel_visit_payload,
+        expected={
+            "anonymous": 401,
+            "admin": 403,
+            "reception": 200,
+            "doctor_a": 403,
+            "doctor_b": 403,
+        },
+    ),
+    MatrixRow(
+        method="POST",
+        path="/api/visits/{id}/bill-items",
+        body_factory=_reception_bill_line_payload,
+        expected={
+            "anonymous": 401,
+            "admin": 403,
+            "reception": 201,
+            "doctor_a": 403,
+            "doctor_b": 403,
+        },
+    ),
+    MatrixRow(
+        method="GET",
+        path="/api/visits/{id}/bill",
+        body_factory=None,
+        expected={
+            "anonymous": 401,
+            "admin": 200,
+            "reception": 200,
+            "doctor_a": 403,
+            "doctor_b": 403,
+        },
+    ),
+    MatrixRow(
+        method="POST",
+        path="/api/bill-items/{id}/void",
+        body_factory=_bill_line_void_payload,
+        expected={
+            "anonymous": 401,
+            "admin": 403,
+            "reception": 200,
+            "doctor_a": 403,
+            "doctor_b": 403,
+        },
+    ),
+    MatrixRow(
+        method="POST",
+        path="/api/bill-items/{id}/admin-void",
+        body_factory=_bill_line_void_payload,
+        expected={
+            "anonymous": 401,
+            "admin": 200,
+            "reception": 403,
+            "doctor_a": 403,
+            "doctor_b": 403,
+        },
+    ),
+    MatrixRow(
+        method="POST",
+        path="/api/bill-items/{id}/correct",
+        body_factory=_bill_line_correct_payload,
+        expected={
+            "anonymous": 401,
+            "admin": 403,
+            "reception": 200,
+            "doctor_a": 403,
+            "doctor_b": 403,
+        },
+    ),
+    MatrixRow(
+        method="POST",
+        path="/api/bill-items/{id}/admin-correct",
+        body_factory=_bill_line_correct_payload,
+        expected={
+            "anonymous": 401,
+            "admin": 200,
+            "reception": 403,
+            "doctor_a": 403,
+            "doctor_b": 403,
+        },
+    ),
+    MatrixRow(
+        method="GET",
+        path="/api/visits/{id}/prescribed-medicines",
+        body_factory=None,
         expected={
             "anonymous": 401,
             "admin": 403,
@@ -2256,12 +2425,24 @@ MATRIX: list[MatrixRow] = [
             "doctor_b": 403,
         },
     ),
+    MatrixRow(
+        method="GET",
+        path="/api/reports/referrals?date_from=2026-11-01&date_to=2026-11-30",
+        body_factory=None,
+        expected={
+            "anonymous": 401,
+            "admin": 200,
+            "reception": 403,
+            "doctor_a": 403,
+            "doctor_b": 403,
+        },
+    ),
 ]
 
 
 def check_matrix_completeness(app: FastAPI, matrix: list[MatrixRow]) -> list[str]:
     """Return all non-public (method, path) endpoints lacking an entry in matrix."""
-    matrix_pairs = {(r.method, r.path) for r in matrix}
+    matrix_pairs = {(r.method, r.path.split("?")[0]) for r in matrix}
     uncovered: list[str] = []
 
     for method, path, dep in walk_routes(app):

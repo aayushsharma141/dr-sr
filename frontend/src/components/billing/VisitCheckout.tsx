@@ -1,4 +1,5 @@
 import { useState, type FormEvent } from 'react'
+import type { PreviousDueOut } from '../../api/bill'
 import {
   useCloseVisit,
   useRecordPayment,
@@ -7,26 +8,18 @@ import {
   useVisits,
 } from '../../api/queries'
 import type {
-  ConsultationStatus,
   PaymentMethod,
   PaymentOut,
   VisitConsultation,
   VisitDetail,
   VisitDueOut,
-  VisitPayment,
 } from '../../api/types'
-import { formatIst, formatPaise, paiseToRupees, rupeesToPaise } from '../../format'
-import { IconCheck, IconPrinter, IconRupee, IconStethoscope, IconUser } from '../icons'
+import { formatIst, formatPaise, formatToken, paiseToRupees, rupeesToPaise } from '../../format'
+import { IconCheck, IconPrinter, IconRupee, IconUser } from '../icons'
 import { PAYMENT_RECORDED_EVENT } from '../ReceiptHost'
+import { BillPanel } from './BillPanel'
 
 const PAYMENT_METHODS: PaymentMethod[] = ['CASH', 'UPI', 'CARD']
-
-const CONSULTATION_LABEL: Record<ConsultationStatus, string> = {
-  WAITING: 'Waiting',
-  IN_CONSULTATION: 'With doctor',
-  COMPLETED: 'Completed',
-  CANCELLED: 'Cancelled',
-}
 
 function isActiveConsultation(c: VisitConsultation): boolean {
   return c.consultation_status === 'WAITING' || c.consultation_status === 'IN_CONSULTATION'
@@ -84,152 +77,47 @@ function StatusBadge({ status }: { status: VisitDetail['status'] }) {
   return <span className={`rounded px-2 py-0.5 text-xs font-bold ${style}`}>{label}</span>
 }
 
-function ConsultationTable({ consultations }: { consultations: VisitConsultation[] }) {
-  return (
-    <div className="overflow-x-auto">
-      <table className="w-full text-left text-xs">
-        <thead className="border-b border-slate-200 bg-slate-50 font-bold uppercase tracking-wider text-slate-600">
-          <tr>
-            <th className="px-3 py-2">Doctor</th>
-            <th className="px-3 py-2">Token</th>
-            <th className="px-3 py-2">Consultation</th>
-            <th className="px-3 py-2 text-right">Fee</th>
-            <th className="px-3 py-2 text-right">Paid</th>
-            <th className="px-3 py-2 text-right">Balance</th>
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-slate-100 font-medium">
-          {consultations.map((c) => (
-            <tr key={c.appointment_id}>
-              <td className="px-3 py-2 font-bold text-slate-900">{c.doctor_name_en}</td>
-              <td className="px-3 py-2 font-mono text-slate-700">
-                {c.token_number == null ? '—' : `#${c.token_number}`}
-              </td>
-              <td className="px-3 py-2 text-slate-700">
-                {c.consultation_status ? CONSULTATION_LABEL[c.consultation_status] : '—'}
-                {isActiveConsultation(c) && (
-                  <span className="block text-xs text-amber-700">Fee after the doctor completes it</span>
-                )}
-              </td>
-              <td className="px-3 py-2 text-right font-mono">{formatPaise(c.fee_paise)}</td>
-              <td className="px-3 py-2 text-right font-mono font-bold text-emerald-800">
-                {formatPaise(c.paid_paise)}
-              </td>
-              <td className="px-3 py-2 text-right font-mono font-black text-red-700">
-                {formatPaise(c.balance_paise)}
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  )
-}
-
-function PaymentsTable({
-  payments,
-  onReprint,
-}: {
-  payments: VisitPayment[]
-  onReprint: (paymentId: number) => void
-}) {
-  if (payments.length === 0) {
-    return <p className="text-xs text-slate-500">No payments recorded on this visit yet.</p>
-  }
-  return (
-    <div className="overflow-x-auto">
-      <table className="w-full text-left text-xs">
-        <thead className="border-b border-slate-200 bg-slate-50 font-bold uppercase tracking-wider text-slate-600">
-          <tr>
-            <th className="px-3 py-2">Receipt #</th>
-            <th className="px-3 py-2">Time (IST)</th>
-            <th className="px-3 py-2 text-center">Mode</th>
-            <th className="px-3 py-2 text-right">Amount</th>
-            <th className="px-3 py-2 text-center">Status</th>
-            <th className="px-3 py-2 text-right">Receipt</th>
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-slate-100 font-medium">
-          {payments.map((p) => (
-            <tr key={p.id}>
-              <td className="px-3 py-2 font-mono font-bold text-slate-900">{p.receipt_number}</td>
-              <td className="px-3 py-2 text-slate-600">{formatIst(p.created_at)}</td>
-              <td className="px-3 py-2 text-center">
-                <span className="rounded bg-slate-100 px-2 py-0.5 font-bold text-slate-700">
-                  {p.payment_method}
-                </span>
-              </td>
-              <td className="px-3 py-2 text-right font-mono font-bold text-emerald-900">
-                {formatPaise(p.amount_paise)}
-              </td>
-              <td className="px-3 py-2 text-center">
-                {p.is_reversed ? (
-                  <span className="rounded bg-red-100 px-2 py-0.5 font-bold text-red-800">Reversed</span>
-                ) : (
-                  <span className="rounded bg-emerald-100 px-2 py-0.5 font-bold text-emerald-800">Active</span>
-                )}
-              </td>
-              <td className="px-3 py-2 text-right">
-                <button
-                  type="button"
-                  onClick={() => onReprint(p.id)}
-                  className="inline-flex cursor-pointer items-center gap-1 rounded-lg border border-slate-300 bg-white px-2.5 py-1 text-xs font-semibold text-slate-700 shadow-2xs hover:bg-slate-50"
-                >
-                  <IconPrinter className="h-3.5 w-3.5 text-slate-500" />
-                  Print
-                </button>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  )
-}
-
 function PaymentForm({
   visit,
+  amount,
+  amountPaise,
+  onAmountChange,
   onPaid,
 }: {
   visit: VisitDetail
+  amount: string
+  amountPaise: number
+  onAmountChange: (value: string | null) => void
   onPaid: (payment: PaymentOut) => void
 }) {
-  const payable = visit.consultations.filter((c) => c.collectable && c.balance_paise > 0)
-  const [picked, setPicked] = useState<number | null>(null)
-  const selected = payable.find((c) => c.appointment_id === picked) ?? payable[0] ?? null
-  // The amount follows the balance of the chosen consultation until reception types over it.
-  const [amountOverride, setAmountOverride] = useState<string | null>(null)
+  const hasCompleted = visit.consultations.some((c) => c.consultation_status === 'COMPLETED')
+  const canPay = visit.status === 'OPEN' && hasCompleted && visit.outstanding_paise > 0
   const [method, setMethod] = useState<PaymentMethod>('CASH')
   const [remarks, setRemarks] = useState('')
   const [error, setError] = useState<string | null>(null)
   const recordPayment = useRecordPayment()
 
-  const amount =
-    amountOverride ?? (selected ? paiseToRupees(selected.balance_paise) : '')
-  const amountPaise = rupeesToPaise(amount) ?? 0
-
   const submit = async (e: FormEvent) => {
     e.preventDefault()
     setError(null)
-    if (!selected) return
     const paise = rupeesToPaise(amount)
     if (paise === null) {
       setError('Enter the amount in rupees, for example 350 or 350.50.')
       return
     }
-    if (paise > selected.balance_paise) {
-      setError(`Only ${formatPaise(selected.balance_paise)} is due on this consultation.`)
+    if (paise > visit.outstanding_paise) {
+      setError(`Only ${formatPaise(visit.outstanding_paise)} is due on this visit.`)
       return
     }
     try {
       const payment = await recordPayment.mutateAsync({
         patient_id: visit.patient_id,
-        appointment_id: selected.appointment_id,
+        visit_id: visit.id,
         amount_paise: paise,
         payment_method: method,
-        notes: remarks.trim() || `Consultation - ${selected.doctor_name_en}`,
+        notes: remarks.trim() || `Visit ${visit.visit_date}`,
       })
-      setAmountOverride(null)
+      onAmountChange(null)
       setRemarks('')
       onPaid(payment)
       announcePayment(payment)
@@ -245,7 +133,7 @@ function PaymentForm({
         <h3 className="text-sm font-bold text-slate-900">Take payment</h3>
       </div>
 
-      {payable.length === 0 ? (
+      {!canPay ? (
         <p className="text-xs text-slate-600">
           {visit.consultations.some(isActiveConsultation)
             ? 'Fees are collected after the consultation. The doctor has not completed it yet.'
@@ -256,28 +144,6 @@ function PaymentForm({
           {error && (
             <div role="alert" className="rounded-xl border border-red-300 bg-red-50 p-3 text-xs font-semibold text-red-900">
               {error}
-            </div>
-          )}
-          {payable.length > 1 && (
-            <div>
-              <label htmlFor="visit-payment-consultation" className="mb-1 block text-xs font-bold uppercase tracking-wider text-slate-700">
-                Consultation
-              </label>
-              <select
-                id="visit-payment-consultation"
-                value={selected?.appointment_id ?? ''}
-                onChange={(e) => {
-                  setPicked(Number(e.target.value))
-                  setAmountOverride(null)
-                }}
-                className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-medium text-slate-900"
-              >
-                {payable.map((c) => (
-                  <option key={c.appointment_id} value={c.appointment_id}>
-                    {c.doctor_name_en} - due {formatPaise(c.balance_paise)}
-                  </option>
-                ))}
-              </select>
             </div>
           )}
 
@@ -291,12 +157,12 @@ function PaymentForm({
               step="0.01"
               min="1"
               value={amount}
-              onChange={(e) => setAmountOverride(e.target.value)}
+              onChange={(e) => onAmountChange(e.target.value)}
               aria-describedby="visit-payment-hint"
               className="w-full max-w-xs rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-base font-black text-slate-900 shadow-2xs focus:border-emerald-700 focus:outline-none min-h-[44px]"
             />
             <p id="visit-payment-hint" className="mt-1 text-xs text-slate-600">
-              Up to {selected ? formatPaise(selected.balance_paise) : '₹0.00'} on this consultation. Part payments are recorded as they come.
+              Up to {formatPaise(visit.outstanding_paise)} on this visit. Part payments are recorded as they come.
             </p>
           </div>
 
@@ -311,14 +177,14 @@ function PaymentForm({
               type="text"
               value={remarks}
               onChange={(e) => setRemarks(e.target.value)}
-              placeholder="UPI reference, counter, or note"
+              placeholder={`Visit ${visit.visit_date}`}
               className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-medium text-slate-900"
             />
           </div>
 
           <button
             type="submit"
-            disabled={recordPayment.isPending || !selected}
+            disabled={recordPayment.isPending}
             className="inline-flex min-h-11 w-full cursor-pointer items-center justify-center gap-2 rounded-xl bg-[#124832] px-6 text-sm font-bold text-white shadow-xs hover:bg-[#0D3822] disabled:opacity-50"
           >
             {recordPayment.isPending
@@ -369,7 +235,7 @@ function CloseForm({
 
   return (
     <section className="space-y-3 rounded-2xl border border-slate-200 bg-white p-5 shadow-xs">
-      <h3 className="text-sm font-bold text-slate-900">Close visit (Patient Out)</h3>
+      <h3 className="text-sm font-bold text-slate-900">Patient Out</h3>
       {error && (
         <div role="alert" className="rounded-xl border border-red-300 bg-red-50 p-3 text-xs font-semibold text-red-900">
           {error}
@@ -378,9 +244,14 @@ function CloseForm({
       <form onSubmit={submit} className="space-y-3">
         {owes && (
           <div>
-            <label htmlFor="visit-close-reason" className="mb-1 block text-xs font-bold uppercase tracking-wider text-amber-900">
-              Reason for closing with {formatPaise(visit.outstanding_paise)} unpaid *
-            </label>
+            <div className="mb-1 flex items-center justify-between">
+              <label htmlFor="visit-close-reason" className="block text-xs font-bold uppercase tracking-wider text-amber-900">
+                Reason for closing with {formatPaise(visit.outstanding_paise)} unpaid *
+              </label>
+              <span className="text-xs text-slate-500">
+                {reason.length}/500
+              </span>
+            </div>
             <textarea
               id="visit-close-reason"
               rows={2}
@@ -402,7 +273,7 @@ function CloseForm({
           className="inline-flex min-h-11 w-full cursor-pointer items-center justify-center gap-2 rounded-xl border border-slate-900 bg-slate-900 px-6 text-sm font-bold text-white shadow-xs hover:bg-slate-800 disabled:opacity-50"
         >
           <IconCheck className="h-4 w-4" />
-          {closeVisit.isPending ? 'Closing...' : 'Close Visit / Patient Out'}
+          {closeVisit.isPending ? 'Closing...' : 'Patient Out'}
         </button>
       </form>
     </section>
@@ -424,6 +295,12 @@ function VisitDetailPanel({
 }) {
   const isOpen = visit.status === 'OPEN'
   const [lastPayment, setLastPayment] = useState<PaymentOut | null>(null)
+  const [amountOverride, setAmountOverride] = useState<string | null>(null)
+  const [collectingDue, setCollectingDue] = useState<PreviousDueOut | null>(null)
+
+  const defaultRupees = visit.outstanding_paise > 0 ? paiseToRupees(visit.outstanding_paise) : ''
+  const amount = amountOverride ?? defaultRupees
+  const amountPaise = rupeesToPaise(amount) ?? 0
 
   return (
     <div className="space-y-5">
@@ -442,23 +319,37 @@ function VisitDetailPanel({
         <StatusBadge status={visit.status} />
       </header>
 
-      <div className="space-y-2">
-        <div className="flex items-center gap-2">
-          <IconStethoscope className="h-4 w-4 text-emerald-800" />
-          <h4 className="text-xs font-bold uppercase tracking-wider text-slate-700">Charges</h4>
-        </div>
-        <ConsultationTable consultations={visit.consultations} />
-        <div className="flex flex-wrap justify-end gap-6 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-xs">
-          <span>
-            Total paid{' '}
-            <strong className="font-mono text-emerald-800">{formatPaise(visit.total_paid_paise)}</strong>
-          </span>
-          <span>
-            Outstanding{' '}
-            <strong className="font-mono text-red-700">{formatPaise(visit.outstanding_paise)}</strong>
-          </span>
-        </div>
-      </div>
+      {/* Bill panel from GET /api/visits/{id}/bill with totals, previous dues and packages */}
+      <BillPanel
+        visitId={visit.id}
+        payingNowPaise={amountPaise}
+        canCollect={canCollect}
+        onCollectDue={(due) => setCollectingDue(due)}
+        onReprint={onReprint}
+      />
+
+      {/* Previous dues collection form if triggered from previous dues card */}
+      {collectingDue && canCollect && (
+        <DueCollectForm
+          due={{
+            visit_id: collectingDue.visit_id,
+            patient_id: visit.patient_id,
+            patient_urn: visit.patient_urn ?? '',
+            patient_name: visit.patient_name ?? '',
+            doctor_names: collectingDue.doctor_names,
+            visit_date: collectingDue.visit_date,
+            bill_total_paise: collectingDue.balance_paise,
+            paid_paise: 0,
+            balance_paise: collectingDue.balance_paise,
+            close_reason: null,
+          }}
+          onCancel={() => setCollectingDue(null)}
+          onCollected={(payment) => {
+            setCollectingDue(null)
+            setLastPayment(payment)
+          }}
+        />
+      )}
 
       {isOpen && canCollect && (
         <>
@@ -478,14 +369,15 @@ function VisitDetailPanel({
               </button>
             </div>
           )}
-          <PaymentForm visit={visit} onPaid={setLastPayment} />
+          <PaymentForm
+            visit={visit}
+            amount={amount}
+            amountPaise={amountPaise}
+            onAmountChange={setAmountOverride}
+            onPaid={setLastPayment}
+          />
         </>
       )}
-
-      <div className="space-y-2">
-        <h4 className="text-xs font-bold uppercase tracking-wider text-slate-700">Payments on this visit</h4>
-        <PaymentsTable payments={visit.payments} onReprint={onReprint} />
-      </div>
 
       {isOpen && canClose && <CloseForm visit={visit} onClosed={onClosed} />}
 
@@ -532,34 +424,49 @@ export function VisitCheckout({ canCollect, canClose, initialVisitId, onReprint 
         {readyPending ? (
           <p className="p-4 text-center text-xs text-slate-500">Loading visits...</p>
         ) : !ready || ready.visits.length === 0 ? (
-          <p className="rounded-xl border border-dashed border-slate-200 p-4 text-center text-xs text-slate-500">
-            No visit is waiting for checkout.
+          <p className="rounded-xl border border-dashed border-slate-200 p-4 text-center text-xs text-slate-600">
+            Nothing to check out. Patients appear here when their doctor completes the consultation.
           </p>
         ) : (
           <ul className="space-y-2">
-            {ready.visits.map((v) => (
-              <li key={v.id}>
-                <button
-                  type="button"
-                  aria-pressed={v.id === selectedId}
-                  onClick={() => {
-                    setNotice(null)
-                    setPicked(v.id)
-                  }}
-                  className={`w-full cursor-pointer rounded-xl border p-3 text-left text-xs transition-colors ${v.id === selectedId
-                      ? 'border-emerald-700 bg-emerald-50'
-                      : 'border-slate-200 bg-white hover:bg-slate-50'
+            {ready.visits.map((v) => {
+              const tokens =
+                v.token_numbers && v.token_numbers.length > 0
+                  ? v.token_numbers.map((t) => formatToken(t)).join(', ')
+                  : formatToken(null)
+
+              return (
+                <li key={v.id}>
+                  <button
+                    type="button"
+                    aria-pressed={v.id === selectedId}
+                    onClick={() => {
+                      setNotice(null)
+                      setPicked(v.id)
+                    }}
+                    className={`w-full cursor-pointer rounded-xl border p-3 text-left text-xs transition-colors ${
+                      v.id === selectedId
+                        ? 'border-emerald-700 bg-emerald-50'
+                        : 'border-slate-200 bg-white hover:bg-slate-50'
                     }`}
-                >
-                  <div className="font-bold text-slate-900">{v.patient_name}</div>
-                  <div className="font-mono text-slate-600">{v.patient_urn} &bull; {v.visit_date}</div>
-                  <div className="text-slate-600">{v.doctors.join(', ')}</div>
-                  <div className="mt-1 font-mono font-bold text-red-700">
-                    {v.outstanding_paise > 0 ? `${formatPaise(v.outstanding_paise)} due` : 'Paid in full'}
-                  </div>
-                </button>
-              </li>
-            ))}
+                  >
+                    <div className="font-bold text-slate-900">{v.patient_name}</div>
+                    <div className="font-mono text-slate-600">
+                      {v.patient_urn} &bull; Token {tokens}
+                    </div>
+                    <div className="text-slate-600">{v.doctors.join(', ')}</div>
+                    {v.last_completed_at && (
+                      <div className="text-xs text-slate-500">
+                        Completed {formatIst(v.last_completed_at)}
+                      </div>
+                    )}
+                    <div className="mt-1 font-mono font-bold text-red-700">
+                      {v.outstanding_paise > 0 ? `${formatPaise(v.outstanding_paise)} due` : 'Paid in full'}
+                    </div>
+                  </button>
+                </li>
+              )
+            })}
           </ul>
         )}
       </section>
@@ -651,7 +558,7 @@ export function VisitDuesSection({ canCollect }: { canCollect: boolean }) {
                 <th className="px-3 py-2">Patient</th>
                 <th className="px-3 py-2">Visit</th>
                 <th className="px-3 py-2">Doctor</th>
-                <th className="px-3 py-2 text-right">Fee</th>
+                <th className="px-3 py-2 text-right">Bill total</th>
                 <th className="px-3 py-2 text-right">Paid</th>
                 <th className="px-3 py-2 text-right">Balance</th>
                 <th className="px-3 py-2">Closed with reason</th>
@@ -660,14 +567,14 @@ export function VisitDuesSection({ canCollect }: { canCollect: boolean }) {
             </thead>
             <tbody className="divide-y divide-slate-100 font-medium">
               {dues.map((d) => (
-                <tr key={d.appointment_id}>
+                <tr key={d.visit_id}>
                   <td className="px-3 py-2">
                     <div className="font-bold text-slate-900">{d.patient_name}</div>
                     <div className="font-mono text-slate-500">{d.patient_urn}</div>
                   </td>
                   <td className="px-3 py-2 font-mono text-slate-700">{d.visit_date}</td>
-                  <td className="px-3 py-2 text-slate-700">{d.doctor_name_en}</td>
-                  <td className="px-3 py-2 text-right font-mono">{formatPaise(d.fee_paise)}</td>
+                  <td className="px-3 py-2 text-slate-700">{d.doctor_names.join(', ')}</td>
+                  <td className="px-3 py-2 text-right font-mono">{formatPaise(d.bill_total_paise)}</td>
                   <td className="px-3 py-2 text-right font-mono font-bold text-emerald-800">{formatPaise(d.paid_paise)}</td>
                   <td className="px-3 py-2 text-right font-mono font-black text-red-700">{formatPaise(d.balance_paise)}</td>
                   <td className="px-3 py-2 text-slate-600">{d.close_reason ?? '—'}</td>
@@ -723,10 +630,10 @@ function DueCollectForm({
     try {
       const payment = await recordPayment.mutateAsync({
         patient_id: due.patient_id,
-        appointment_id: due.appointment_id,
+        visit_id: due.visit_id,
         amount_paise: paise,
         payment_method: method,
-        notes: `Balance from visit ${due.visit_date} - ${due.doctor_name_en}`,
+        notes: `Balance from visit ${due.visit_date}`,
       })
       announcePayment(payment)
       onCollected(payment)

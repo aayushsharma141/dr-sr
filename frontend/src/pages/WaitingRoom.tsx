@@ -70,9 +70,9 @@ export function WaitingRoom() {
 
   return (
     <section aria-labelledby="waiting-room-title" className="space-y-4">
-      <header className="flex flex-wrap items-end justify-between gap-3">
+      <header className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h1 id="waiting-room-title" className="text-2xl font-bold text-neutral-900">Waiting Room</h1>
+          <h1 id="waiting-room-title" className="text-base font-bold text-neutral-900">Waiting Room</h1>
           <p className="text-sm text-neutral-600">
             {updatedAt
               ? `Last updated ${updatedAt.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Kolkata' })}`
@@ -88,7 +88,7 @@ export function WaitingRoom() {
         </InlineAlert>
       )}
 
-      <div className="flex flex-wrap gap-3">
+      <div className="flex flex-wrap gap-4">
         <label className="flex flex-col text-sm font-semibold text-neutral-700">
           Doctor
           <select
@@ -127,17 +127,17 @@ export function WaitingRoom() {
       </div>
 
       <div className="grid gap-4 lg:grid-cols-3">
-        <Column title="Waiting" count={waiting.length}>
+        <Column title="Waiting" count={waiting.length} emptyText="No one is waiting.">
           {waiting.map((a, index) => (
             <WaitingCard key={a.id} appt={a} position={index + 1} />
           ))}
         </Column>
-        <Column title="In Cabin" count={inCabin.length}>
+        <Column title="In Cabin" count={inCabin.length} emptyText="No one is in a cabin.">
           {inCabin.map((a) => (
             <PlainCard key={a.id} appt={a} />
           ))}
         </Column>
-        <Column title="Completed" count={completed.length}>
+        <Column title="Completed" count={completed.length} emptyText="No consultations completed yet today.">
           {completed.map((a) => (
             <PlainCard key={a.id} appt={a} billLink />
           ))}
@@ -147,15 +147,15 @@ export function WaitingRoom() {
   )
 }
 
-function Column({ title, count, children }: { title: string; count: number; children: React.ReactNode }) {
+function Column({ title, count, emptyText, children }: { title: string; count: number; emptyText: string; children: React.ReactNode }) {
   return (
     <div className="flex max-h-[70vh] flex-col rounded-lg border border-neutral-200 bg-neutral-50">
-      <div className="flex items-center justify-between border-b border-neutral-200 px-3 py-2">
+      <div className="flex items-center justify-between border-b border-neutral-200 px-4 py-2">
         <h2 className="text-xs font-bold uppercase tracking-wider text-neutral-600">{title}</h2>
         <span className="font-mono text-sm text-neutral-700">{count}</span>
       </div>
-      <div className="space-y-2 overflow-y-auto p-3">
-        {count === 0 ? <p className="text-sm text-neutral-500">No patients here.</p> : children}
+      <div className="space-y-2 overflow-y-auto p-4">
+        {count === 0 ? <p className="text-sm text-neutral-500">{emptyText}</p> : children}
       </div>
     </div>
   )
@@ -163,7 +163,7 @@ function Column({ title, count, children }: { title: string; count: number; chil
 
 function CardFrame({ appt, children }: { appt: Appointment; children?: React.ReactNode }) {
   return (
-    <article className="rounded-md border border-neutral-200 bg-white p-3 shadow-sm">
+    <article className="rounded-md border border-neutral-200 bg-white p-4 shadow-sm">
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
           <p className="font-mono text-sm font-bold text-neutral-900">{formatToken(appt.token_number)}</p>

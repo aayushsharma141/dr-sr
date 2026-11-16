@@ -317,7 +317,7 @@ export function ReceptionBillingPage() {
             </div>
             <div>
               <h1 className="text-xl font-bold tracking-tight text-slate-900">
-                Billing &amp; Payments
+                Billing &amp; Checkout
               </h1>
               <p className="text-xs text-slate-500">
                 {canCheckout
@@ -354,8 +354,8 @@ export function ReceptionBillingPage() {
               type="button"
               onClick={() => handleTabChange('checkout')}
               className={`flex items-center gap-2 border-b-2 px-5 py-3 text-sm font-bold transition-all ${activeTab === 'checkout'
-                  ? 'border-emerald-800 text-emerald-900'
-                  : 'border-transparent text-slate-500 hover:text-slate-800'
+                ? 'border-emerald-800 text-emerald-900'
+                : 'border-transparent text-slate-500 hover:text-slate-800'
                 }`}
             >
               <IconRupee className="h-4 w-4" />
@@ -366,8 +366,8 @@ export function ReceptionBillingPage() {
             type="button"
             onClick={() => handleTabChange('ledger')}
             className={`flex items-center gap-2 border-b-2 px-5 py-3 text-sm font-bold transition-all ${activeTab === 'ledger'
-                ? 'border-emerald-800 text-emerald-900'
-                : 'border-transparent text-slate-500 hover:text-slate-800'
+              ? 'border-emerald-800 text-emerald-900'
+              : 'border-transparent text-slate-500 hover:text-slate-800'
               }`}
           >
             <IconReceipt className="h-4 w-4" />
@@ -377,8 +377,8 @@ export function ReceptionBillingPage() {
             type="button"
             onClick={() => handleTabChange('dues')}
             className={`flex items-center gap-2 border-b-2 px-5 py-3 text-sm font-bold transition-all ${activeTab === 'dues'
-                ? 'border-emerald-800 text-emerald-900'
-                : 'border-transparent text-slate-500 hover:text-slate-800'
+              ? 'border-emerald-800 text-emerald-900'
+              : 'border-transparent text-slate-500 hover:text-slate-800'
               }`}
           >
             <IconClock className="h-4 w-4" />
@@ -695,8 +695,8 @@ export function ReceptionBillingPage() {
                               type="button"
                               onClick={() => setPaymentMethod(mode)}
                               className={`rounded-xl border py-2.5 text-xs font-bold transition-all ${paymentMethod === mode
-                                  ? 'border-emerald-600 bg-[#124832] text-white shadow-xs'
-                                  : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50'
+                                ? 'border-emerald-600 bg-[#124832] text-white shadow-xs'
+                                : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50'
                                 }`}
                             >
                               {mode}

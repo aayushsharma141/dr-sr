@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState, type DragEvent } from 'react'
 import { useNavigate } from 'react-router'
 import { AppShell } from '../components/AppShell'
 import { Modal } from '../components/Modal'
+import { InlineAlert } from '../components/InlineAlert'
+import { PriorityBadge } from '../components/checkin/PriorityBadge'
 import { DoctorDashboardUnfinishedCard } from '../components/DoctorDashboardUnfinishedCard'
 import { IconBell } from '../components/icons'
 import {
@@ -13,7 +15,7 @@ import {
   useUpdateAppointmentStatus,
 } from '../api/queries'
 import type { DoctorQueueItem } from '../api/types'
-import { formatToken, withDoctorTitle } from '../format'
+import { formatIst, formatToken, withDoctorTitle } from '../format'
 
 type DoctorStatus = 'AVAILABLE' | 'IN_CONSULTATION' | 'ON_BREAK' | 'IN_OT'
 type ViewMode = '3ZONE' | 'KANBAN'
@@ -116,7 +118,8 @@ export function DoctorDashboard() {
   const { data: me } = useMe()
   const { data: doctors } = useDoctors(false)
   const navigate = useNavigate()
-  const { data: queue, isPending, isError, error, refetch } = useDoctorQueue()
+  const { data: queue, isPending, isError, error, refetch, dataUpdatedAt } = useDoctorQueue()
+  const updatedAt = dataUpdatedAt ? new Date(dataUpdatedAt) : null
   const updateStatusMutation = useUpdateAppointmentStatus()
 
   // Find logged in doctor record
@@ -427,7 +430,6 @@ export function DoctorDashboard() {
     context: 'waiting' | 'in_consultation' | 'lab_hold' | 'booked' | 'completed'
   ) => {
     const isSelected = currentChartPatient?.id === item.id
-    const isUrgent = item.notes?.toLowerCase().includes('emergency') || item.notes?.toLowerCase().includes('urgent')
     const isFollowup = item.notes?.toLowerCase().includes('follow') || item.notes?.toLowerCase().includes('f/u')
 
     return (
@@ -466,12 +468,10 @@ export function DoctorDashboard() {
               {formatToken(item.token_number)}
             </span>
 
+            <PriorityBadge level={item.priority_level} reason={item.priority_reason} />
+
             {/* Priority & Type Badges */}
-            {isUrgent ? (
-              <span className="inline-flex items-center gap-1 rounded bg-rose-100 px-2 py-0.5 text-xs font-bold text-rose-800">
-                🚨 Emergency
-              </span>
-            ) : isFollowup ? (
+            {isFollowup ? (
               <span className="inline-flex items-center gap-1 rounded bg-indigo-100 px-2 py-0.5 text-xs font-semibold text-indigo-800">
                 🔄 Follow-up
               </span>
@@ -993,6 +993,11 @@ export function DoctorDashboard() {
                 <p className="text-xs text-slate-500 mt-0.5">
                   Consultation workstation for {doctorName ? withDoctorTitle(doctorName) : 'the clinician'} ({queue?.queue_date || 'Today'})
                 </p>
+                <p className="text-xs text-slate-500">
+                  {updatedAt
+                    ? `Last updated ${updatedAt.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Kolkata' })}`
+                    : 'Loading today’s queue…'}
+                </p>
               </div>
             </div>
 
@@ -1092,18 +1097,25 @@ export function DoctorDashboard() {
           )}
         </header>
 
+        {isError && (
+          <InlineAlert tone="error">
+            Could not refresh the queue. The data below may be out of date
+            {updatedAt ? ` (last updated ${formatIst(updatedAt.toISOString())}).` : '.'} Try again.
+          </InlineAlert>
+        )}
+
         {/* Doctor Incomplete Drafts Card (D-19-24, DWS-02) */}
         <DoctorDashboardUnfinishedCard />
 
         {/* Loading / Error states */}
-        {isPending ? (
+        {isPending && !queue ? (
           <div className="rounded-xl border border-slate-200 bg-white p-12 text-center text-slate-500">
             <span className="inline-block h-6 w-6 animate-spin rounded-full border-2 border-slate-300 border-t-[#8E1C3D] mr-2 align-middle" />
             Loading today&rsquo;s consultation queue...
           </div>
-        ) : isError ? (
+        ) : isError && !queue ? (
           <div className="rounded-xl border border-rose-200 bg-rose-50 p-6 text-center text-rose-800">
-            Failed to load queue: {error.message}
+            Failed to load queue: {error?.message || 'Failed to load queue.'}
           </div>
         ) : !queue ? null : (
           <>

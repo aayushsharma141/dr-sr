@@ -1495,6 +1495,7 @@ export function useRecordPayment() {
       queryClient.invalidateQueries({ queryKey: ['billing', 'visit-dues'] })
       queryClient.invalidateQueries({ queryKey: ['billing', 'receipts-today'] })
       queryClient.invalidateQueries({ queryKey: ['billing', 'ledger'] })
+      queryClient.invalidateQueries({ queryKey: ['visit-bill'] })
     },
   })
 }
@@ -1691,6 +1692,7 @@ export function useCloseVisit() {
       queryClient.invalidateQueries({ queryKey: ['visits', 'list'] })
       queryClient.invalidateQueries({ queryKey: ['billing', 'visit-dues'] })
       queryClient.invalidateQueries({ queryKey: ['timeline', data.patient_id] })
+      queryClient.invalidateQueries({ queryKey: ['visit-bill'] })
     },
   })
 }

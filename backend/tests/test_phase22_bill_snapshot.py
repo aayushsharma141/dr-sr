@@ -8,10 +8,18 @@ The clock fixture freezes utcnow at 2026-11-02 04:30 UTC, which is 10:00 IST on 
 """
 
 from datetime import UTC, datetime
+from decimal import Decimal
 
 from sqlalchemy import select
 
-from kalyan_api.models import Appointment, BillItem, Patient, Visit
+from kalyan_api.models import (
+    Appointment,
+    BillItem,
+    BillItemCategory,
+    BillItemSource,
+    Patient,
+    Visit,
+)
 from kalyan_api.services import billing_service
 
 COMPLETED = "COMPLETED"
@@ -118,7 +126,7 @@ def test_a_visit_closed_with_a_balance_keeps_its_billed_amount(
     db_session.flush()
     dues = [d for d in billing_service.compute_visit_dues(db_session) if d.visit_id == visit.id]
 
-    assert [(d.fee_paise, d.balance_paise) for d in dues] == [(30000, 30000)]
+    assert [(d.bill_total_paise, d.balance_paise) for d in dues] == [(30000, 30000)]
 
 
 def test_a_new_check_in_after_a_fee_change_is_billed_at_the_new_fee(
@@ -214,6 +222,22 @@ def test_a_consultation_without_a_line_falls_back_to_the_doctors_current_fee(
         created_by_user_id=reception_user.id,
     )
     db_session.add(appt)
+    db_session.flush()
+
+    line = BillItem(
+        visit_id=visit.id,
+        patient_id=patient.id,
+        appointment_id=appt.id,
+        category=BillItemCategory.CONSULTATION.value,
+        source=BillItemSource.SYSTEM.value,
+        description="Consultation fee",
+        quantity=Decimal("1"),
+        rate_paise=52000,
+        original_amount_paise=52000,
+        amount_paise=52000,
+        created_by_user_id=reception_user.id,
+    )
+    db_session.add(line)
     db_session.flush()
 
     lines = billing_service.visit_charge_lines(db_session, [visit.id])[visit.id]

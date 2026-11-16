@@ -58,6 +58,29 @@ Out of scope for this phase: cross-department referral/transfer workflow, paymen
 - Exact layout details within the approved UI-SPEC copy and spacing rules.
 - Order of implementation within the waves in `22-DESIGN.md` §8.
 
+### Owner decisions on research items (answered 2026-11-15, owner choices)
+- OD-A: fee adjustment permission stays admin-only; reception has no fee adjustment; doctors waive own fees.
+- OD-B: reception sees prescribed medicine names, quantity and form only, no clinical detail.
+- OD-C: a package bill line is information only: package sessions and money stay on the treatment plan; the visit bill shows a reference line with no amount.
+- OD-D: checkout opens once the consultation is completed; any bill lines on the visit can be paid at checkout.
+- OD-E: quantity x rate rounded to whole paise, round half up.
+- OD-G: a reception user may void a non-consultation line they entered, on the same day, with a reason.
+- OD-H: receipts show totals only, not line items.
+- OD-I: referral report groups by source and referrer, with a date filter; cancelled visits are excluded.
+- OQ-1: medicine lines, bill voids and payment-to-visit linking are in Phase 22 scope (supersedes the deferred entry below).
+- DELETE grant on payments: keep for now; record as a known risk (not removed in this phase).
+
+### Owner decisions on plan-check items (answered 2026-11-16, owner choices)
+- B2 / OD-B quantity: prescriptions store no quantity. Reception sees the prescribed medicine name and form from the prescription and enters the quantity actually supplied when billing. No prescription schema change.
+- B3 / OQ-2: a doctor may add own charges (procedure, service) to a completed consultation while the visit is OPEN; charges lock when the visit closes (Patient Out). A cancelled consultation takes no charges.
+- Q13 (confirmed, no longer PROPOSED): a doctor sees own consultation fee and own charges only; no visit total, no other doctors' or reception lines, no payment controls.
+- Q17 exception (confirmed): the follow-up closure reason keeps its 1000-character limit as an owner-approved exception; all other reason fields cap at 500.
+- Item v (answered 2026-11-16): the administrator may void or change non-consultation bill lines, with a reason. Reception keeps OD-G (own same-day lines only).
+- W4 (answered 2026-11-16): fail closed. A completed consultation with no bill line is refused (error), never billed at the doctor's current fee. Existing tests that create consultations directly must add a line.
+- OD-F (answered 2026-11-16): replace the existing server-link indicator with LANStatusPill, mounted in the app shell.
+- Balance edge rules (answered 2026-11-16, option-a): (i) a doctor-added charge becomes payable when its consultation is completed; (ii) lines of cancelled or reassigned-away consultations are excluded by a join on consultation status, with no rows rewritten; (iii) a visit payment is accepted once at least one consultation of the visit is completed (OD-D).
+- Line edit rules (answered 2026-11-16, option-a): (i) a quantity or rate is corrected in place with a CORRECTION history row, on an open visit, never below what is paid; (iii) no edits after Patient Out, including by the admin; (iv) doctors cannot void or correct lines; (v) the admin may void and change any non-consultation line on an open visit, with a reason; reception keeps OD-G.
+
 </decisions>
 
 <code_context>
@@ -94,7 +117,6 @@ Out of scope for this phase: cross-department referral/transfer workflow, paymen
 
 - Cross-department referral/transfer workflow with its own record (needs its own design).
 - Payment idempotency keys / transaction-status lookup (payment wave).
-- Medicine and particular bill lines, bill voids, and payment-to-visit linking (Wave 3 remainder).
 - Hindi font bundling (UX-05).
 - Reception Reports page contents beyond today's collection summary (Wave 5).
 - Phase 23: Advanced Data Operations.

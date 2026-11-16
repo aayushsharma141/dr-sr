@@ -1,7 +1,7 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { cleanup, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { MemoryRouter } from 'react-router'
+import { MemoryRouter, Route, Routes } from 'react-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ReceptionBillingPage } from '../ReceptionBillingPage'
 import type {
@@ -11,8 +11,10 @@ import type {
   PendingDueOut,
   DoctorOut,
   VisitDetail,
+  VisitDueOut,
   VisitSummary,
 } from '../../api/types'
+import type { VisitBillOut } from '../../api/bill'
 
 const mockMe: Me = {
   id: 2,
@@ -88,6 +90,7 @@ const mockRecordedPayment: PaymentOut = {
   treatment_plan_id: null,
   treatment_plan_name: null,
   appointment_id: null,
+  visit_id: null,
   amount_paise: 40000,
   payment_method: 'CASH',
   notes: 'OPD OPD CONSULTATION',
@@ -140,6 +143,58 @@ const readySummary: VisitSummary = {
   completed_consultations: 1,
   active_consultations: 0,
   outstanding_paise: 40000,
+  token_numbers: [4],
+  last_completed_at: '2026-11-14T05:30:00Z',
+}
+
+const openBill: VisitBillOut = {
+  visit_id: 7,
+  patient_id: 101,
+  patient_urn: 'KH-2026-0001',
+  patient_name: 'Aarav Kumar',
+  status: 'OPEN',
+  visit_date: '2026-11-14',
+  closed_at: null,
+  close_reason: null,
+  locked: false,
+  sections: [
+    {
+      category: 'CONSULTATION',
+      subtotal_paise: 40000,
+      lines: [
+        {
+          id: 31,
+          visit_id: 7,
+          appointment_id: 31,
+          category: 'CONSULTATION',
+          source: 'SYSTEM',
+          description: 'OPD Consultation - Dr. Madan Mohan Dwivedi',
+          quantity: 1,
+          rate_paise: 40000,
+          amount_paise: 40000,
+          original_amount_paise: 40000,
+          status: 'ACTIVE',
+          counts_toward_total: true,
+          created_by_user_id: 2,
+          created_by_username: 'reception',
+          created_at: '2026-11-14T09:00:00Z',
+          history: [],
+        },
+      ],
+    },
+    { category: 'PROCEDURE', subtotal_paise: 0, lines: [] },
+    { category: 'PACKAGE', subtotal_paise: 0, lines: [] },
+    { category: 'MEDICINE', subtotal_paise: 0, lines: [] },
+    { category: 'ADDITIONAL', subtotal_paise: 0, lines: [] },
+  ],
+  bill_total_paise: 40000,
+  paid_paise: 0,
+  due_paise: 40000,
+  payments: [],
+  voided_lines: [],
+  previous_dues: [],
+  previous_dues_total_paise: 0,
+  packages: [],
 }
 
 const openDetail: VisitDetail = {
@@ -243,10 +298,15 @@ describe('ReceptionBillingPage Desk', () => {
     renderPage(mockFetch, queryClient)
 
     // Check Header & Tabs
-    expect(await screen.findByRole('heading', { name: /Billing & Payments/i })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: /Billing & Checkout/i })).toBeInTheDocument()
     expect(await screen.findByRole('button', { name: /Checkout/i })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /Today's Receipts/i })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Today's Receipts/i })).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: /Pending Dues/i })).toBeInTheDocument()
+    expect(
+      await screen.findByText(
+        'Nothing to check out. Patients appear here when their doctor completes the consultation.',
+      ),
+    ).toBeInTheDocument()
 
     // Checkout opens on visits; the patient-only desk is the "Other payment" option.
     await user.click(screen.getByRole('button', { name: /Other payment \(no visit\)/i }))
@@ -324,6 +384,7 @@ describe('ReceptionBillingPage Desk', () => {
       '/api/doctors': () => ({ body: mockDoctors }),
       '/api/visits': () => ({ body: { total: closed ? 0 : 1, visits: closed ? [] : [readySummary] } }),
       '/api/visits/7': () => ({ body: openDetail }),
+      '/api/visits/7/bill': () => ({ body: openBill }),
       'POST /api/visits/7/close': (init) => {
         closeBody = JSON.parse(init?.body as string)
         closed = true
@@ -349,11 +410,14 @@ describe('ReceptionBillingPage Desk', () => {
     renderPage(mockFetch, queryClient)
 
     // The visit waiting for checkout is listed; picking it shows its charges.
-    await user.click(await screen.findByRole('button', { name: /Aarav Kumar/i }))
+    const visitButton = await screen.findByRole('button', { name: /Aarav Kumar/i })
+    expect(screen.getByText(/Token #4/i)).toBeInTheDocument()
+    expect(screen.getByText(/Completed 14 Nov 2026/i)).toBeInTheDocument()
+    await user.click(visitButton)
     expect(await screen.findByRole('heading', { name: /Take payment/i })).toBeInTheDocument()
     expect(screen.getByLabelText(/Amount/i)).toHaveValue(400)
 
-    // Money goes against the consultation, for its full balance.
+    // Money goes against the visit, for its full outstanding balance.
     await user.click(screen.getByRole('button', { name: /Collect ₹400.00 & Issue Receipt/i }))
     await waitFor(() => {
       expect(screen.getByText('REC-2026-0001')).toBeInTheDocument()
@@ -361,14 +425,16 @@ describe('ReceptionBillingPage Desk', () => {
     expect(paymentBody).toEqual(
       expect.objectContaining({
         patient_id: 101,
-        appointment_id: 31,
+        visit_id: 7,
         amount_paise: 40000,
         payment_method: 'CASH',
+        notes: 'Visit 2026-11-14',
       }),
     )
+    expect(paymentBody).not.toHaveProperty('appointment_id')
 
     // Balance still due, so closing needs a reason: the button stays disabled until one is typed.
-    const closeButton = screen.getByRole('button', { name: /Close Visit \/ Patient Out/i })
+    const closeButton = screen.getByRole('button', { name: /^Patient Out$/i })
     expect(closeButton).toBeDisabled()
     await user.type(screen.getByLabelText(/Reason for closing/i), 'Patient will pay on the next visit')
     expect(closeButton).toBeEnabled()
@@ -380,50 +446,264 @@ describe('ReceptionBillingPage Desk', () => {
     expect(closeBody).toEqual({ version_id: 3, reason: 'Patient will pay on the next visit' })
   })
 
-  it("shows reception only today's receipts from the day endpoint, never the full ledger", async () => {
+  it('caps visit payment amount to visit outstanding and validates input', async () => {
+    let paymentCallCount = 0
+
+    const mockFetch = mockApi({
+      '/api/auth/me': () => ({ body: mockMe }),
+      '/api/fees': () => ({ body: [] }),
+      '/api/doctors': () => ({ body: mockDoctors }),
+      '/api/visits': () => ({ body: { total: 1, visits: [readySummary] } }),
+      '/api/visits/7': () => ({ body: openDetail }),
+      '/api/visits/7/bill': () => ({ body: openBill }),
+      'POST /api/payments': () => {
+        paymentCallCount++
+        return { status: 201, body: mockRecordedPayment }
+      },
+      '/api/billing/visit-dues': () => ({ body: [] }),
+      '/api/billing/receipts/today': () => ({ body: [] }),
+      '/api/billing/pending-dues': () => ({ body: [] }),
+    })
+
+    const user = userEvent.setup()
+    renderPage(mockFetch, queryClient)
+
+    await user.click(await screen.findByRole('button', { name: /Aarav Kumar/i }))
+    const amountInput = screen.getByLabelText(/Amount/i)
+    expect(amountInput).toHaveValue(400)
+
+    // Type 600 which exceeds outstanding 400
+    await user.clear(amountInput)
+    await user.type(amountInput, '600')
+
+    const collectBtn = screen.getByRole('button', { name: /Collect ₹600.00 & Issue Receipt/i })
+    await user.click(collectBtn)
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Only ₹400.00 is due on this visit.')
+    expect(paymentCallCount).toBe(0)
+  })
+
+  it('displays server overpayment_rejected error in alert, keeps button enabled, and opens no receipt', async () => {
+    let paymentCallCount = 0
+
+    const mockFetch = mockApi({
+      '/api/auth/me': () => ({ body: mockMe }),
+      '/api/fees': () => ({ body: [] }),
+      '/api/doctors': () => ({ body: mockDoctors }),
+      '/api/visits': () => ({ body: { total: 1, visits: [readySummary] } }),
+      '/api/visits/7': () => ({ body: openDetail }),
+      '/api/visits/7/bill': () => ({ body: openBill }),
+      'POST /api/payments': () => {
+        paymentCallCount++
+        return {
+          status: 422,
+          body: {
+            code: 'overpayment_rejected',
+            message: 'Payment of ₹400.00 exceeds remaining visit outstanding balance.',
+          },
+        }
+      },
+      '/api/billing/visit-dues': () => ({ body: [] }),
+      '/api/billing/receipts/today': () => ({ body: [] }),
+      '/api/billing/pending-dues': () => ({ body: [] }),
+    })
+
+    const user = userEvent.setup()
+    renderPage(mockFetch, queryClient)
+
+    await user.click(await screen.findByRole('button', { name: /Aarav Kumar/i }))
+    const collectBtn = screen.getByRole('button', { name: /Collect ₹400.00 & Issue Receipt/i })
+    await user.click(collectBtn)
+
+    const alert = await screen.findByRole('alert')
+    expect(alert).toHaveTextContent('Payment of ₹400.00 exceeds remaining visit outstanding balance.')
+    expect(collectBtn).toBeEnabled()
+    expect(screen.queryByText('REC-2026-0001')).not.toBeInTheDocument()
+    expect(paymentCallCount).toBe(1)
+  })
+
+  it('preserves form values and shows persistent error without auto-retry on network drop', async () => {
+    let paymentCallCount = 0
+
+    const mockFetch = mockApi({
+      '/api/auth/me': () => ({ body: mockMe }),
+      '/api/fees': () => ({ body: [] }),
+      '/api/doctors': () => ({ body: mockDoctors }),
+      '/api/visits': () => ({ body: { total: 1, visits: [readySummary] } }),
+      '/api/visits/7': () => ({ body: openDetail }),
+      '/api/visits/7/bill': () => ({ body: openBill }),
+      'POST /api/payments': () => {
+        paymentCallCount++
+        throw new Error('Failed to fetch')
+      },
+      '/api/billing/visit-dues': () => ({ body: [] }),
+      '/api/billing/receipts/today': () => ({ body: [] }),
+      '/api/billing/pending-dues': () => ({ body: [] }),
+    })
+
+    const user = userEvent.setup()
+    renderPage(mockFetch, queryClient)
+
+    await user.click(await screen.findByRole('button', { name: /Aarav Kumar/i }))
+
+    const amountInput = screen.getByLabelText(/Amount/i)
+    await user.clear(amountInput)
+    await user.type(amountInput, '350.00')
+
+    await user.click(screen.getByRole('button', { name: 'UPI' }))
+
+    const remarksInput = screen.getByLabelText(/Remarks/i)
+    await user.type(remarksInput, 'UPI-TXN-1234')
+
+    const collectBtn = screen.getByRole('button', { name: /Collect ₹350.00 & Issue Receipt/i })
+    await user.click(collectBtn)
+
+    const alert = await screen.findByRole('alert')
+    expect(alert).toHaveTextContent('Failed to fetch')
+
+    // Preserved values
+    expect(amountInput).toHaveValue(350)
+    expect(screen.getByRole('button', { name: 'UPI' })).toHaveAttribute('aria-pressed', 'true')
+    expect(remarksInput).toHaveValue('UPI-TXN-1234')
+
+    // Button re-enabled
+    expect(collectBtn).toBeEnabled()
+    expect(screen.queryByText('REC-2026-0001')).not.toBeInTheDocument()
+    // Exactly one call made, no auto retry
+    expect(paymentCallCount).toBe(1)
+  })
+
+  it('renders closed visit dues and collects balance with visit_id', async () => {
+    let paymentBody: Record<string, unknown> | null = null
+
+    const mockVisitDues: VisitDueOut[] = [
+      {
+        visit_id: 12,
+        patient_id: 101,
+        patient_urn: 'KH-2026-0001',
+        patient_name: 'Aarav Kumar',
+        doctor_names: ['Dr. Madan Mohan Dwivedi', 'Dr. Sharma'],
+        visit_date: '2026-11-10',
+        bill_total_paise: 50000,
+        paid_paise: 30000,
+        balance_paise: 20000,
+        close_reason: 'Patient will pay later',
+      },
+    ]
+
     const mockFetch = mockApi({
       '/api/auth/me': () => ({ body: mockMe }),
       '/api/fees': () => ({ body: [] }),
       '/api/doctors': () => ({ body: mockDoctors }),
       '/api/visits': () => ({ body: { total: 0, visits: [] } }),
-      '/api/billing/receipts/today': () => ({ body: [mockRecordedPayment] }),
+      '/api/billing/visit-dues': () => ({ body: mockVisitDues }),
+      '/api/billing/receipts/today': () => ({ body: [] }),
+      '/api/billing/pending-dues': () => ({ body: [] }),
+      'POST /api/payments': (init) => {
+        paymentBody = JSON.parse(init?.body as string)
+        return {
+          status: 201,
+          body: {
+            ...mockRecordedPayment,
+            id: 99,
+            receipt_number: 'REC-2026-0099',
+            amount_paise: 20000,
+            visit_id: 12,
+          },
+        }
+      },
+    })
+
+    const user = userEvent.setup()
+    renderPage(mockFetch, queryClient)
+
+    // Switch to Pending Dues tab to view visit balances
+    await user.click(await screen.findByRole('button', { name: /Pending Dues/i }))
+
+    // Visit balances is displayed on the dues tab
+    expect(await screen.findByRole('heading', { name: /Visit balances/i })).toBeInTheDocument()
+    expect(screen.getByText('Dr. Madan Mohan Dwivedi, Dr. Sharma')).toBeInTheDocument()
+    expect(screen.getByText('Patient will pay later')).toBeInTheDocument()
+    expect(screen.getByText('2026-11-10')).toBeInTheDocument()
+
+    // Click collect
+    const collectRowBtn = screen.getByRole('button', { name: /Collect/i })
+    await user.click(collectRowBtn)
+
+    // Form opens with amount prefilled to balance
+    const dueAmountInput = screen.getByLabelText(/Amount/i)
+    expect(dueAmountInput).toHaveValue(200)
+
+    // Cap check: typing 300 shows error and blocks submission
+    await user.clear(dueAmountInput)
+    await user.type(dueAmountInput, '300')
+    const dueSubmitBtn = screen.getByRole('button', { name: /Collect ₹300.00 & Issue Receipt/i })
+    await user.click(dueSubmitBtn)
+    expect(await screen.findByRole('alert')).toHaveTextContent('Only ₹200.00 is owed on this visit.')
+    expect(paymentBody).toBeNull()
+
+    // Set back to 200 and submit
+    await user.clear(dueAmountInput)
+    await user.type(dueAmountInput, '200')
+    await user.click(screen.getByRole('button', { name: /Collect ₹200.00 & Issue Receipt/i }))
+
+    await waitFor(() => {
+      expect(screen.getByText(/Receipt REC-2026-0099 issued for Aarav Kumar/i)).toBeInTheDocument()
+    })
+
+    expect(paymentBody).toEqual({
+      patient_id: 101,
+      visit_id: 12,
+      amount_paise: 20000,
+      payment_method: 'CASH',
+      notes: 'Balance from visit 2026-11-10',
+    })
+    expect(paymentBody).not.toHaveProperty('appointment_id')
+  })
+
+  it('redirects ?tab=ledger on billing URL to /reception/receipts', async () => {
+    const mockFetch = mockApi({
+      '/api/auth/me': () => ({ body: mockMe }),
+      '/api/fees': () => ({ body: [] }),
+      '/api/doctors': () => ({ body: mockDoctors }),
+      '/api/visits': () => ({ body: { total: 0, visits: [] } }),
       '/api/billing/pending-dues': () => ({ body: [] }),
       '/api/billing/visit-dues': () => ({ body: [] }),
     })
 
-    const user = userEvent.setup()
-    renderPage(mockFetch, queryClient)
+    vi.stubGlobal('fetch', mockFetch)
+    render(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter initialEntries={['/reception/billing?tab=ledger']}>
+          <Routes>
+            <Route path="/reception/billing" element={<ReceptionBillingPage />} />
+            <Route path="/reception/receipts" element={<div>Receipts Route Target</div>} />
+          </Routes>
+        </MemoryRouter>
+      </QueryClientProvider>,
+    )
 
-    await user.click(await screen.findByRole('button', { name: /Today's Receipts/i }))
-    expect(await screen.findByText('REC-2026-0001')).toBeInTheDocument()
-
-    const requested = mockFetch.mock.calls.map((call) => String(call[0]))
-    expect(requested.some((url) => url.includes('/api/billing/receipts/today'))).toBe(true)
-    expect(requested.some((url) => url.includes('/api/billing/ledger'))).toBe(false)
+    expect(await screen.findByText('Receipts Route Target')).toBeInTheDocument()
   })
 
-  it('shows admin the oversight view only: no checkout tab, the full ledger, and no collect actions', async () => {
+  it('shows admin the oversight view only: no checkout tab, no ledger tab, only dues and no collect actions', async () => {
     const mockFetch = mockApi({
       '/api/auth/me': () => ({ body: mockAdmin }),
-      '/api/billing/ledger': () => ({ body: [mockRecordedPayment] }),
-      '/api/billing/receipts/today': () => ({ body: [] }),
       '/api/billing/pending-dues': () => ({ body: mockDues }),
       '/api/billing/visit-dues': () => ({ body: [] }),
     })
 
-    const user = userEvent.setup()
     renderPage(mockFetch, queryClient)
 
-    expect(await screen.findByRole('button', { name: /Receipts Ledger/i })).toBeInTheDocument()
+    expect(await screen.findByRole('button', { name: /Pending Dues/i })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /^Checkout$/i })).not.toBeInTheDocument()
-    expect(await screen.findByText('REC-2026-0001')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Receipts/i })).not.toBeInTheDocument()
 
     const requested = mockFetch.mock.calls.map((call) => String(call[0]))
     expect(requested.some((url) => url.includes('/api/billing/receipts/today'))).toBe(false)
-    expect(requested.some((url) => url.includes('/api/billing/ledger'))).toBe(true)
+    expect(requested.some((url) => url.includes('/api/billing/ledger'))).toBe(false)
     expect(requested.some((url) => url.includes('/api/visits'))).toBe(false)
 
-    await user.click(screen.getByRole('button', { name: /Pending Dues/i }))
     await waitFor(() => {
       expect(screen.getByText('Lumbar Spine Rehab Package')).toBeInTheDocument()
     })

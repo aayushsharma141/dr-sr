@@ -329,7 +329,31 @@ Plans:
 
 **Depends on**: Phase 21 build takeover and stabilisation
 
-**Status**: Wave 1 built and deployed; Wave 2 backend done (screens open); Waves 3–5 not started.
+**Status**: Waves 1-5 built and UAT re-run on kalyan_test (22-19, 2026-11-16); deploy state unverified on kalyan_dev; 22-20 deploy pending (migration 0029 and the new frontend/dist together). Features are IMPLEMENTED — NOT VERIFIED until the 22-20 checks on :8000.
+
+**Plans:** 20 plans (remaining work for design Waves 2–5, execution waves 1–13; planned 2026-11-16)
+
+Plans:
+- [ ] 22-01-PLAN.md — Doctor queue: PriorityBadge, pinned consultation, last-updated line (design Wave 2)
+- [ ] 22-02-PLAN.md — Check-in list labels and keyboard tabs, Waiting Room copy, LAN status decision OD-F (design Wave 2)
+- [ ] 22-03-PLAN.md — Baseline run; permissions catalogue bill:write and report:referral (step a)
+- [ ] 22-04-PLAN.md — Migration 0029: bill line status/void/unit/links, payments.visit_id (step b)
+- [ ] 22-05-PLAN.md — Visit-level balance switch with before/after regression and compare script (step c)
+- [ ] 22-06-PLAN.md — Visit payment guard, visit-level dues, fee guard on visit totals (steps c, d)
+- [ ] 22-07-PLAN.md — Checkout and dues forms pay the visit (visit_id); receipts totals only
+- [ ] 22-08-PLAN.md — Reception medicine and particular lines API (step e)
+- [ ] 22-09-PLAN.md — Visit bill view API; checkout list token and completion time
+- [ ] 22-10-PLAN.md — Line-edit decisions; void API (OD-G)
+- [ ] 22-11-PLAN.md — Quantity change API; prescribed-medicine reference (OD-B)
+- [ ] 22-12-PLAN.md — Doctor charges API (procedure, package reference, own view)
+- [ ] 22-13-PLAN.md — Billing & Checkout bill panel, totals, previous dues (design Wave 4)
+- [ ] 22-14-PLAN.md — Bill line actions UI: add medicine/particular, void, change, admin fee correction
+- [ ] 22-15-PLAN.md — Receipts tab and reception Reports tab
+- [ ] 22-16-PLAN.md — Doctor charges panel on the consultation page
+- [ ] 22-17-PLAN.md — Admin referral report API (design Wave 5)
+- [ ] 22-18-PLAN.md — Admin referral report page
+- [ ] 22-19-PLAN.md — UAT re-run on kalyan_test, docs sync, full regression
+- [ ] 22-20-PLAN.md — Approval-gated deploy to kalyan_dev (backup, migrate, compare, build, restart)
 
 ---
 

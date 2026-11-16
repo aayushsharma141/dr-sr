@@ -9,6 +9,7 @@ Guarantees:
 
 import uuid
 from datetime import UTC, datetime
+from decimal import Decimal
 from typing import Any
 
 import pytest
@@ -32,6 +33,10 @@ from kalyan_api.models import (
     Appointment,
     AuthSession,
     BackupSettings,
+    BillItem,
+    BillItemCategory,
+    BillItemSource,
+    BillItemStatus,
     ClinicalEncounter,
     ClinicSettings,
     ConsultationFee,
@@ -297,8 +302,44 @@ def test_rbac_matrix_cell(
                 # Classification applies to a patient already waiting for the doctor.
                 appt.status = "ARRIVED"
                 appt.consultation_status = "WAITING"
-            db_session.add(appt)
-            db_session.flush()
+                db_session.add(appt)
+                db_session.flush()
+            elif row.path.endswith("/bill-items"):
+                visit = Visit(
+                    patient_id=pat.id,
+                    visit_date=app_clock.ist_today(),
+                    status="OPEN",
+                    opened_by_user_id=admin_u.id,
+                )
+                db_session.add(visit)
+                db_session.flush()
+                appt.visit_id = visit.id
+                appt.status = "ARRIVED"
+                appt.consultation_status = "IN_CONSULTATION"
+                db_session.add(appt)
+                db_session.flush()
+                consult_line = BillItem(
+                    visit_id=visit.id,
+                    patient_id=pat.id,
+                    appointment_id=appt.id,
+                    treatment_plan_id=None,
+                    prescription_item_id=None,
+                    category=BillItemCategory.CONSULTATION.value,
+                    source=BillItemSource.SYSTEM.value,
+                    status=BillItemStatus.ACTIVE.value,
+                    description=f"Consultation Fee - {doc_a_obj.name_en}",
+                    unit=None,
+                    quantity=Decimal("1"),
+                    rate_paise=50000,
+                    original_amount_paise=50000,
+                    amount_paise=50000,
+                    created_by_user_id=admin_u.id,
+                )
+                db_session.add(consult_line)
+                db_session.flush()
+            else:
+                db_session.add(appt)
+                db_session.flush()
             target_entity = appt
             resolved_path = row.path.replace("{id}", str(appt.id))
         else:
@@ -809,6 +850,85 @@ def test_rbac_matrix_cell(
         target_entity = visit
         if "{id}" in row.path:
             resolved_path = row.path.replace("{id}", str(visit.id))
+
+    elif "/api/bill-items" in row.path:
+        if identity == "reception" and current_user:
+            rec_user = current_user
+        else:
+            rec_user = make_user(
+                db_session, test_settings, "RECEPTION", f"mat_rec_bi_{uuid.uuid4().hex[:6]}"
+            )
+        pat = Patient(
+            urn=f"KH-2026-BI{uuid.uuid4().hex[:4]}",
+            full_name="Matrix Bill Item Patient",
+            guardian_name="Guardian",
+            gender="M",
+            age_years=30,
+            mobile="9876543210",
+            address="Ara",
+            district="Bhojpur",
+            state="Bihar",
+        )
+        db_session.add(pat)
+        db_session.flush()
+        visit = Visit(
+            patient_id=pat.id,
+            visit_date=app_clock.ist_today(),
+            status="OPEN",
+            opened_by_user_id=rec_user.id,
+        )
+        db_session.add(visit)
+        db_session.flush()
+        doc = Doctor(name_en=f"Dr. Bill Item {uuid.uuid4().hex[:6]}")
+        db_session.add(doc)
+        db_session.flush()
+        appt = Appointment(
+            patient_id=pat.id,
+            doctor_id=doc.id,
+            appointment_date=app_clock.ist_today(),
+            token_number=1,
+            status="ARRIVED",
+            consultation_status="COMPLETED",
+            visit_id=visit.id,
+            created_by_user_id=rec_user.id,
+        )
+        db_session.add(appt)
+        db_session.flush()
+        db_session.add(
+            BillItem(
+                visit_id=visit.id,
+                patient_id=pat.id,
+                appointment_id=appt.id,
+                category=BillItemCategory.CONSULTATION.value,
+                source=BillItemSource.SYSTEM.value,
+                status=BillItemStatus.ACTIVE.value,
+                description="Consultation",
+                quantity=Decimal("1"),
+                rate_paise=30000,
+                original_amount_paise=30000,
+                amount_paise=30000,
+                created_by_user_id=rec_user.id,
+            )
+        )
+        line = BillItem(
+            visit_id=visit.id,
+            patient_id=pat.id,
+            category=BillItemCategory.MEDICINE.value,
+            source=BillItemSource.RECEPTION.value,
+            status=BillItemStatus.ACTIVE.value,
+            description="Paracetamol 500mg",
+            unit="strip",
+            quantity=Decimal("2"),
+            rate_paise=5000,
+            original_amount_paise=10000,
+            amount_paise=10000,
+            created_by_user_id=rec_user.id,
+        )
+        db_session.add(line)
+        db_session.flush()
+        target_entity = line
+        if "{id}" in row.path:
+            resolved_path = row.path.replace("{id}", str(line.id))
 
     elif row.path == "/api/users/bulk-delete":
         make_user(

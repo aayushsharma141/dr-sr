@@ -889,7 +889,31 @@ def run_full_qa():
         record("QUE-09", "Queue", "Cancel waiting patient", "Cancelled", "Failed check-in", "FAIL")
 
     # QUE-10: Transfer patient to Doctor B
-    record("QUE-10", "Queue", "Transfer patient to Doctor B", "Original and new queue history preserved", "Partially implemented (Cancel + join new doctor consultation under same visit; Wave 2 reassign endpoint in progress)", "PARTIALLY IMPLEMENTED")
+    p_reassign = make_patient("Reassign Queue Patient")
+    res_r = reception_client.post("/api/appointments/walk-in", json={
+        "patient_id": p_reassign["id"],
+        "doctor_id": dr_anil.id,
+        "department_id": gen_med_dept.id,
+        "referral_source": "SELF",
+    })
+    r_appt = res_r.json() if res_r.status_code == 201 else None
+    if r_appt:
+        res_re = reception_client.post(f"/api/appointments/{r_appt['id']}/reassign", json={
+            "version_id": r_appt["version_id"],
+            "new_doctor_id": dr_bharati.id,
+            "new_department_id": dr_bharati_dept.id,
+            "reason": "Eye complaint, referred to Dr Bharati",
+        })
+        if res_re.status_code == 201:
+            successor = res_re.json()
+            if successor["doctor_id"] == dr_bharati.id and successor["visit_id"] == r_appt["visit_id"] and successor["consultation_status"] == "WAITING":
+                record("QUE-10", "Queue", "Transfer patient to Doctor B", "Original and new queue history preserved", f"Reassigned to Dr B (appt #{successor['id']}, token #{successor['token_number']})", "PASS")
+            else:
+                record("QUE-10", "Queue", "Transfer patient to Doctor B", "Original and new queue history preserved", f"Unexpected successor payload: {successor}", "FAIL")
+        else:
+            record("QUE-10", "Queue", "Transfer patient to Doctor B", "Original and new queue history preserved", f"HTTP {res_re.status_code}: {res_re.text}", "FAIL")
+    else:
+        record("QUE-10", "Queue", "Transfer patient to Doctor B", "Original and new queue history preserved", "Check-in failed", "FAIL")
 
     # QUE-11: Complete patient consultation -> Eligible for billing
     res = reception_client.get("/api/visits?ready_for_checkout=true")
@@ -968,14 +992,21 @@ def run_full_qa():
     else:
         record("PRI-03", "Priority", "Mark Emergency", "Saved", f"HTTP {res.status_code}", "FAIL")
 
-    # PRI-08: Doctor acknowledges alert
-    record("PRI-08", "Priority", "Doctor acknowledges alert", "Acknowledgement timestamp saved", "Not implemented (Scheduled for Phase 22 Wave 2 doctor acknowledgement endpoint)", "NOT IMPLEMENTED")
-
     # PRI-09: Doctor does not acknowledge -> Alert remains visible
     if pri_appt.get("alert_acknowledged_at") is None and pri_appt.get("emergency_alerted_at") is not None:
         record("PRI-09", "Priority", "Doctor does not acknowledge alert", "Alert remains visible (alert_acknowledged_at=null)", "Alert remains unacknowledged", "PASS")
     else:
         record("PRI-09", "Priority", "Alert remains visible", "Unacknowledged", "Failed", "FAIL")
+
+    # PRI-08: Doctor acknowledges alert
+    res_ack = dr_a_client.post(f"/api/appointments/{pri_appt['id']}/acknowledge-alert", json={
+        "version_id": pri_appt["version_id"],
+    })
+    if res_ack.status_code == 200 and res_ack.json().get("alert_acknowledged_at") is not None:
+        pri_appt = res_ack.json()
+        record("PRI-08", "Priority", "Doctor acknowledges alert", "Acknowledgement timestamp saved", f"Acknowledged at: {pri_appt['alert_acknowledged_at']}", "PASS")
+    else:
+        record("PRI-08", "Priority", "Doctor acknowledges alert", "Acknowledgement timestamp saved", f"HTTP {res_ack.status_code}: {res_ack.text}", "FAIL")
 
     # PRI-10: Change Priority to Normal
     res = reception_client.patch(f"/api/appointments/{pri_appt['id']}/priority", json={
@@ -1197,17 +1228,67 @@ def run_full_qa():
     # FEE-02: Select Follow-up -> Normal fee remains ₹500
     record("FEE-02", "Fee", "Select Follow-up", "Normal fee remains ₹500 (OD-22-05: visit_kind never alters fee)", "Verified: follow-up consultation owes default doctor fee", "PASS")
 
+    # Create appointment for fee adjustment testing
+    p_fee = make_patient("Fee Adjustment Patient")
+    res_fee = reception_client.post("/api/appointments/walk-in", json={
+        "patient_id": p_fee["id"],
+        "doctor_id": dr_anil.id,
+        "department_id": gen_med_dept.id,
+        "referral_source": "SELF",
+    })
+    fee_appt = res_fee.json()
+    dr_a_client.patch(f"/api/appointments/{fee_appt['id']}/status", json={
+        "status": "IN_CONSULTATION",
+        "version_id": fee_appt["version_id"],
+    })
+    dr_a_client.patch(f"/api/appointments/{fee_appt['id']}/status", json={
+        "status": "DONE",
+        "version_id": fee_appt["version_id"] + 1,
+    })
+
     # FEE-03: Doctor reduces fee to ₹300
-    record("FEE-03", "Fee", "Doctor reduces fee to ₹300", "Revised fee ₹300", "Not implemented (Scheduled for Phase 22 Wave 3: T22-08 fee adjustment)", "NOT IMPLEMENTED")
+    res_adj3 = dr_a_client.post(f"/api/appointments/{fee_appt['id']}/fee-adjustment", json={
+        "kind": "DISCOUNT",
+        "new_amount_paise": 30000,
+        "reason": "Senior citizen discount",
+    })
+    if res_adj3.status_code == 201 and res_adj3.json()["new_amount_paise"] == 30000:
+        record("FEE-03", "Fee", "Doctor reduces fee to ₹300", "Revised fee ₹300", "Revised fee ₹300 saved via DISCOUNT", "PASS")
+    else:
+        record("FEE-03", "Fee", "Doctor reduces fee to ₹300", "Revised fee ₹300", f"HTTP {res_adj3.status_code}: {res_adj3.text}", "FAIL")
 
     # FEE-04: Doctor waives fee -> Fee becomes ₹0
-    record("FEE-04", "Fee", "Doctor waives fee", "Fee becomes ₹0 with mandatory reason", "Not implemented (Scheduled for Phase 22 Wave 3: T22-08 fee waiver)", "NOT IMPLEMENTED")
+    res_adj4 = dr_a_client.post(f"/api/appointments/{fee_appt['id']}/fee-adjustment", json={
+        "kind": "WAIVER",
+        "new_amount_paise": 0,
+        "reason": "BPL card holder waiver",
+    })
+    if res_adj4.status_code == 201 and res_adj4.json()["new_amount_paise"] == 0:
+        record("FEE-04", "Fee", "Doctor waives fee", "Fee becomes ₹0 with mandatory reason", "Fee waived to ₹0 with reason", "PASS")
+    else:
+        record("FEE-04", "Fee", "Doctor waives fee", "Fee becomes ₹0 with mandatory reason", f"HTTP {res_adj4.status_code}: {res_adj4.text}", "FAIL")
 
     # FEE-05: Reception adjusts without permission -> Rejected
-    record("FEE-05", "Fee", "Reception adjusts fee without permission", "Rejected (HTTP 403)", "Not implemented (Permission bill:adjust scheduled for Phase 22 Wave 3)", "NOT IMPLEMENTED")
+    res_adj5 = reception_client.post(f"/api/appointments/{fee_appt['id']}/fee-adjustment", json={
+        "kind": "WAIVER",
+        "new_amount_paise": 0,
+        "reason": "Reception waiver attempt",
+    })
+    if res_adj5.status_code == 403:
+        record("FEE-05", "Fee", "Reception adjusts fee without permission", "Rejected (HTTP 403)", "HTTP 403 Forbidden", "PASS")
+    else:
+        record("FEE-05", "Fee", "Reception adjusts fee without permission", "Rejected (HTTP 403)", f"HTTP {res_adj5.status_code}", "FAIL")
 
-    # FEE-06: Reception adjusts with permission and reason
-    record("FEE-06", "Fee", "Reception adjusts with permission and reason", "Adjustment saved and audited", "Not implemented (Scheduled for Phase 22 Wave 3: T22-08)", "NOT IMPLEMENTED")
+    # FEE-06: Reception has no fee adjustment (OD-A); admin correction with reason is saved and audited
+    res_adj6 = admin_client.post(f"/api/appointments/{fee_appt['id']}/fee-correction", json={
+        "kind": "CORRECTION",
+        "new_amount_paise": 40000,
+        "reason": "Admin fee correction to ₹400",
+    })
+    if res_adj6.status_code == 201 and res_adj6.json()["new_amount_paise"] == 40000:
+        record("FEE-06", "Fee", "Reception has no fee adjustment (OD-A); admin correction with reason is saved and audited", "Adjustment saved and audited", "Admin correction to ₹400 saved and audited", "PASS")
+    else:
+        record("FEE-06", "Fee", "Reception has no fee adjustment (OD-A); admin correction with reason is saved and audited", "Adjustment saved and audited", f"HTTP {res_adj6.status_code}: {res_adj6.text}", "FAIL")
 
     # FEE-07: Change Doctor A's standard fee to ₹600 -> Existing bill remains ₹500
     # Note: As documented in 22-DESIGN.md line 63, the current system reads doctor fee live from Doctor.default_fee_paise
@@ -1233,7 +1314,16 @@ def run_full_qa():
     record("FEE-08", "Fee", "Check in another patient with new standard fee", "New fee applied to new checkin", "Verified: newly checked-in patients take current fee", "PASS")
 
     # FEE-09: Review adjustment history
-    record("FEE-09", "Fee", "Review adjustment history", "Original and revised amounts visible", "Not implemented (Scheduled for Phase 22 Wave 3: bill_item_adjustments)", "NOT IMPLEMENTED")
+    res_f9 = reception_client.get(f"/api/visits/{fee_appt['visit_id']}/bill")
+    if res_f9.status_code == 200:
+        b_data = res_f9.json()
+        c_lines = next((s["lines"] for s in b_data["sections"] if s["category"] == "CONSULTATION"), [])
+        if c_lines and len(c_lines[0].get("history", [])) > 0:
+            record("FEE-09", "Fee", "Review adjustment history", "Original and revised amounts visible", f"{len(c_lines[0]['history'])} adjustment history entries visible", "PASS")
+        else:
+            record("FEE-09", "Fee", "Review adjustment history", "Original and revised amounts visible", "No adjustment history found", "FAIL")
+    else:
+        record("FEE-09", "Fee", "Review adjustment history", "Original and revised amounts visible", f"HTTP {res_f9.status_code}", "FAIL")
 
     # ---------------------------------------------------------
     # SECTION I: Medicine & Service Billing (MED-01 to MED-12)
@@ -1245,18 +1335,84 @@ def run_full_qa():
         record("MED-01", "Medicine", "Doctor prescribes medicine", "Saved", "Failed in DOC-05", "FAIL")
 
     # MED-02: Open reception billing -> Prescription visible for reference
-    # Note: Reception has clinical default-deny (D-04). Dedicated pharmacy read view is scheduled for Phase 22 Wave 4.
-    record("MED-02", "Medicine", "Open reception billing", "Prescription visible for reference", "Not implemented (Reception clinical default-deny D-04; pharmacy reference endpoint scheduled for Phase 22 Wave 4)", "NOT IMPLEMENTED")
+    # Re-worded per OD-B, B2
+    res_rx_ref = reception_client.get(f"/api/visits/{doc_appt['visit_id']}/prescribed-medicines")
+    rx_items_ref = res_rx_ref.json() if res_rx_ref.status_code == 200 else []
+    if res_rx_ref.status_code == 200 and len(rx_items_ref) > 0:
+        has_clinical = any("dosage" in it or "instructions" in it or "quantity" in it for it in rx_items_ref)
+        if not has_clinical:
+            record("MED-02", "Medicine", "Reception sees prescribed medicine name and form only and types the quantity supplied (OD-B, B2)", "Prescription visible for reference", f"HTTP 200, {len(rx_items_ref)} items visible for reference", "PASS")
+        else:
+            record("MED-02", "Medicine", "Reception sees prescribed medicine name and form only and types the quantity supplied (OD-B, B2)", "Prescription visible for reference", "Clinical fields leaked in response", "FAIL")
+    else:
+        record("MED-02", "Medicine", "Reception sees prescribed medicine name and form only and types the quantity supplied (OD-B, B2)", "Prescription visible for reference", f"HTTP {res_rx_ref.status_code}", "FAIL")
 
     # MED-03: Medicine not purchased -> No medicine charge
     record("MED-03", "Medicine", "Medicine not purchased", "No medicine charge added automatically", "OD-22-13: Prescribing a medicine never automatically adds a charge", "PASS")
 
-    # MED-04 to MED-08: Reception adds medicine lines, rate, manual medicine, additional service
-    record("MED-04", "Medicine", "Reception adds medicine", "Bill line created", "Not implemented (Scheduled for Phase 22 Wave 3 & 4: T22-07/T22-08 bill_items)", "NOT IMPLEMENTED")
-    record("MED-05", "Medicine", "Enter quantity 2, rate ₹50", "Total ₹100", "Not implemented (Scheduled for Phase 22 Wave 3: bill_items qty*rate)", "NOT IMPLEMENTED")
-    record("MED-06", "Medicine", "Patient purchases only some medicines", "Only supplied items charged", "Not implemented (Scheduled for Phase 22 Wave 4)", "NOT IMPLEMENTED")
-    record("MED-07", "Medicine", "Add manually entered medicine", "Manual line created", "Not implemented (Scheduled for Phase 22 Wave 4)", "NOT IMPLEMENTED")
-    record("MED-08", "Medicine", "Add additional service", "Additional charge added", "Not implemented (Scheduled for Phase 22 Wave 3 & 4)", "NOT IMPLEMENTED")
+    # MED-04: Reception adds medicine
+    rx_item_id = rx_items_ref[0]["prescription_item_id"] if rx_items_ref else None
+    res_med4 = reception_client.post(f"/api/visits/{doc_appt['visit_id']}/bill-items", json={
+        "category": "MEDICINE",
+        "description": rx_items_ref[0]["medicine_name"] if rx_items_ref else "Paracetamol 500mg",
+        "unit": rx_items_ref[0].get("form", "strip"),
+        "quantity": 1,
+        "rate_paise": 5000,
+        "prescription_item_id": rx_item_id,
+    })
+    if res_med4.status_code == 201:
+        med4_line = res_med4.json()
+        record("MED-04", "Medicine", "Reception adds medicine", "Bill line created", f"Created line #{med4_line['id']} ({med4_line['description']})", "PASS")
+    else:
+        record("MED-04", "Medicine", "Reception adds medicine", "Bill line created", f"HTTP {res_med4.status_code}: {res_med4.text}", "FAIL")
+
+    # MED-05: Enter quantity 2, rate ₹50 -> Total ₹100
+    res_med5 = reception_client.post(f"/api/visits/{doc_appt['visit_id']}/bill-items", json={
+        "category": "MEDICINE",
+        "description": "Cetirizine 10mg",
+        "unit": "strip",
+        "quantity": 2,
+        "rate_paise": 5000,
+    })
+    med5_line = res_med5.json() if res_med5.status_code == 201 else None
+    if res_med5.status_code == 201 and med5_line["amount_paise"] == 10000:
+        record("MED-05", "Medicine", "Enter quantity 2, rate ₹50", "Total ₹100", f"Total ₹{med5_line['amount_paise']/100} (2 x ₹50)", "PASS")
+    else:
+        record("MED-05", "Medicine", "Enter quantity 2, rate ₹50", "Total ₹100", f"HTTP {res_med5.status_code}", "FAIL")
+
+    # MED-06: Patient purchases only some medicines
+    res_bill_chk = reception_client.get(f"/api/visits/{doc_appt['visit_id']}/bill").json()
+    med_lines = next((s["lines"] for s in res_bill_chk.get("sections", []) if s["category"] == "MEDICINE"), [])
+    if len(med_lines) == 2:
+        record("MED-06", "Medicine", "Patient purchases only some medicines", "Only supplied items charged", f"{len(med_lines)} supplied medicine lines charged", "PASS")
+    else:
+        record("MED-06", "Medicine", "Patient purchases only some medicines", "Only supplied items charged", f"Count {len(med_lines)} charged", "FAIL")
+
+    # MED-07: Add manually entered medicine
+    res_med7 = reception_client.post(f"/api/visits/{doc_appt['visit_id']}/bill-items", json={
+        "category": "MEDICINE",
+        "description": "OTC Cough Lozenges",
+        "unit": "pack",
+        "quantity": 1,
+        "rate_paise": 4000,
+    })
+    if res_med7.status_code == 201 and res_med7.json()["prescription_item_id"] is None:
+        record("MED-07", "Medicine", "Add manually entered medicine", "Manual line created", f"Manual line #{res_med7.json()['id']} created without prescription link", "PASS")
+    else:
+        record("MED-07", "Medicine", "Add manually entered medicine", "Manual line created", f"HTTP {res_med7.status_code}", "FAIL")
+
+    # MED-08: Add additional service
+    res_med8 = reception_client.post(f"/api/visits/{doc_appt['visit_id']}/bill-items", json={
+        "category": "ADDITIONAL",
+        "description": "Dressing & Bandaging",
+        "unit": "service",
+        "quantity": 1,
+        "rate_paise": 10000,
+    })
+    if res_med8.status_code == 201 and res_med8.json()["amount_paise"] == 10000:
+        record("MED-08", "Medicine", "Add additional service", "Additional charge added", f"Additional charge line #{res_med8.json()['id']} added (₹100)", "PASS")
+    else:
+        record("MED-08", "Medicine", "Add additional service", "Additional charge added", f"HTTP {res_med8.status_code}", "FAIL")
 
     # MED-09: Reception attempts to edit prescription -> Access denied
     if prescription:
@@ -1272,8 +1428,37 @@ def run_full_qa():
         record("MED-09", "Medicine", "Reception edits prescription", "HTTP 403", "Blocked", "BLOCKED")
 
     record("MED-10", "Medicine", "Review medicine billing", "Prescription and sale remain separate", "OD-22-13 invariant verified: prescription is clinical, sale is transactional", "PASS")
-    record("MED-11", "Medicine", "Change quantity", "Total recalculated", "Not implemented (Scheduled for Phase 22 Wave 3 bill_items)", "NOT IMPLEMENTED")
-    record("MED-12", "Medicine", "Attempt negative price or quantity", "Validation blocks entry", "Not implemented (Scheduled for Phase 22 Wave 3 CHECK constraint)", "NOT IMPLEMENTED")
+
+    # MED-11: Change quantity -> Total recalculated
+    if med5_line:
+        res_med11 = reception_client.post(f"/api/bill-items/{med5_line['id']}/correct", json={
+            "quantity": 3,
+            "reason": "Patient requested 3 strips",
+        })
+        if res_med11.status_code == 200 and res_med11.json()["amount_paise"] == 15000:
+            record("MED-11", "Medicine", "Change quantity", "Total recalculated", f"Quantity corrected to 3, new amount ₹{res_med11.json()['amount_paise']/100}", "PASS")
+        else:
+            record("MED-11", "Medicine", "Change quantity", "Total recalculated", f"HTTP {res_med11.status_code}: {res_med11.text}", "FAIL")
+    else:
+        record("MED-11", "Medicine", "Change quantity", "Total recalculated", "Blocked by MED-05", "BLOCKED")
+
+    # MED-12: Attempt negative price or quantity
+    res_neg_q = reception_client.post(f"/api/visits/{doc_appt['visit_id']}/bill-items", json={
+        "category": "MEDICINE",
+        "description": "Invalid Negative Qty",
+        "quantity": -1,
+        "rate_paise": 5000,
+    })
+    res_neg_r = reception_client.post(f"/api/visits/{doc_appt['visit_id']}/bill-items", json={
+        "category": "MEDICINE",
+        "description": "Invalid Negative Rate",
+        "quantity": 1,
+        "rate_paise": -500,
+    })
+    if res_neg_q.status_code == 422 and res_neg_r.status_code == 422:
+        record("MED-12", "Medicine", "Attempt negative price or quantity", "Validation blocks entry", "HTTP 422 validation_error for negative qty and rate", "PASS")
+    else:
+        record("MED-12", "Medicine", "Attempt negative price or quantity", "Validation blocks entry", f"q={res_neg_q.status_code}, r={res_neg_r.status_code}", "FAIL")
 
     # ---------------------------------------------------------
     # SECTION J: Billing, Payment & Checkout (BILL-01 to BILL-19)
@@ -1308,11 +1493,95 @@ def run_full_qa():
     # BILL-02: Review consultation charge -> ₹500 displayed
     record("BILL-02", "Billing", "Review consultation charge", "₹500 displayed", f"₹{b_visit.get('outstanding_paise', 0)/100} displayed", "PASS")
 
-    # BILL-03 to BILL-05: Review service charge, medicine charge, additional service
-    record("BILL-03", "Billing", "Review service charge", "₹300 displayed", "Partially implemented (Treatment plan package fees supported; itemized bill lines scheduled for Wave 3/4)", "PARTIALLY IMPLEMENTED")
-    record("BILL-04", "Billing", "Review medicine charge", "₹100 displayed", "Not implemented (Scheduled for Phase 22 Wave 3/4)", "NOT IMPLEMENTED")
-    record("BILL-05", "Billing", "Add additional service", "₹100 displayed", "Not implemented (Scheduled for Phase 22 Wave 3/4)", "NOT IMPLEMENTED")
-    record("BILL-06", "Billing", "Calculate total", "Total calculated as sum of active charges", "Calculated dynamically from active charge lines", "PASS")
+    # Create separate visit for itemized charges testing (BILL-03 to BILL-06)
+    p_ibill = make_patient("Itemized Bill Patient")
+    res_ibill = reception_client.post("/api/appointments/walk-in", json={
+        "patient_id": p_ibill["id"],
+        "doctor_id": dr_anil.id,
+        "department_id": gen_med_dept.id,
+        "referral_source": "SELF",
+    })
+    ibill_appt = res_ibill.json()
+    dr_a_client.patch(f"/api/appointments/{ibill_appt['id']}/status", json={
+        "status": "IN_CONSULTATION",
+        "version_id": ibill_appt["version_id"],
+    })
+    dr_a_client.patch(f"/api/appointments/{ibill_appt['id']}/status", json={
+        "status": "DONE",
+        "version_id": ibill_appt["version_id"] + 1,
+    })
+
+    # BILL-03: Review service charge (Doctor records procedure charge ₹300)
+    res_b3_post = dr_a_client.post(f"/api/appointments/{ibill_appt['id']}/bill-items", json={
+        "category": "PROCEDURE",
+        "description": "ECG Recording",
+        "unit": "procedure",
+        "quantity": 1,
+        "rate_paise": 30000,
+    })
+    res_b3_bill = reception_client.get(f"/api/visits/{ibill_appt['visit_id']}/bill")
+    if res_b3_post.status_code == 201 and res_b3_bill.status_code == 200:
+        b3_data = res_b3_bill.json()
+        proc_sec = next((s for s in b3_data.get("sections", []) if s["category"] == "PROCEDURE"), None)
+        if proc_sec and proc_sec["subtotal_paise"] == 30000:
+            record("BILL-03", "Billing", "Review service charge", "₹300 displayed", "₹300 PROCEDURE charge displayed in bill", "PASS")
+        else:
+            record("BILL-03", "Billing", "Review service charge", "₹300 displayed", f"Unexpected subtotal {proc_sec.get('subtotal_paise') if proc_sec else 'none'}", "FAIL")
+    else:
+        record("BILL-03", "Billing", "Review service charge", "₹300 displayed", f"HTTP post={res_b3_post.status_code}, get={res_b3_bill.status_code}", "FAIL")
+
+    # BILL-04: Review medicine charge (Reception adds medicine line ₹100)
+    res_b4_post = reception_client.post(f"/api/visits/{ibill_appt['visit_id']}/bill-items", json={
+        "category": "MEDICINE",
+        "description": "Paracetamol 500mg",
+        "unit": "strip",
+        "quantity": 2,
+        "rate_paise": 5000,
+    })
+    res_b4_bill = reception_client.get(f"/api/visits/{ibill_appt['visit_id']}/bill")
+    if res_b4_post.status_code == 201 and res_b4_bill.status_code == 200:
+        b4_data = res_b4_bill.json()
+        med_sec = next((s for s in b4_data.get("sections", []) if s["category"] == "MEDICINE"), None)
+        if med_sec and med_sec["subtotal_paise"] == 10000:
+            record("BILL-04", "Billing", "Review medicine charge", "₹100 displayed", "₹100 MEDICINE charge displayed in bill", "PASS")
+        else:
+            record("BILL-04", "Billing", "Review medicine charge", "₹100 displayed", f"Unexpected subtotal {med_sec.get('subtotal_paise') if med_sec else 'none'}", "FAIL")
+    else:
+        record("BILL-04", "Billing", "Review medicine charge", "₹100 displayed", f"HTTP post={res_b4_post.status_code}, get={res_b4_bill.status_code}", "FAIL")
+
+    # BILL-05: Add additional service (Reception adds additional service ₹100)
+    res_b5_post = reception_client.post(f"/api/visits/{ibill_appt['visit_id']}/bill-items", json={
+        "category": "ADDITIONAL",
+        "description": "Blood Pressure Check & Monitoring",
+        "unit": "service",
+        "quantity": 1,
+        "rate_paise": 10000,
+    })
+    res_b5_bill = reception_client.get(f"/api/visits/{ibill_appt['visit_id']}/bill")
+    if res_b5_post.status_code == 201 and res_b5_bill.status_code == 200:
+        b5_data = res_b5_bill.json()
+        add_sec = next((s for s in b5_data.get("sections", []) if s["category"] == "ADDITIONAL"), None)
+        if add_sec and add_sec["subtotal_paise"] == 10000:
+            record("BILL-05", "Billing", "Add additional service", "₹100 displayed", "₹100 ADDITIONAL service charge added and displayed in bill", "PASS")
+        else:
+            record("BILL-05", "Billing", "Add additional service", "₹100 displayed", f"Unexpected subtotal {add_sec.get('subtotal_paise') if add_sec else 'none'}", "FAIL")
+    else:
+        record("BILL-05", "Billing", "Add additional service", "₹100 displayed", f"HTTP post={res_b5_post.status_code}, get={res_b5_bill.status_code}", "FAIL")
+
+    # BILL-06: Calculate total (Total calculated as sum of active charges)
+    res_b6_bill = reception_client.get(f"/api/visits/{ibill_appt['visit_id']}/bill")
+    b6_data = res_b6_bill.json() if res_b6_bill.status_code == 200 else {}
+    if b6_data.get("bill_total_paise") == 100000:
+        res_void = reception_client.post(f"/api/bill-items/{res_b5_post.json()['id']}/void", json={
+            "reason": "Test charge removed",
+        })
+        b6_after_void = reception_client.get(f"/api/visits/{ibill_appt['visit_id']}/bill").json()
+        if res_void.status_code == 200 and b6_after_void.get("bill_total_paise") == 90000 and len(b6_after_void.get("voided_lines", [])) == 1:
+            record("BILL-06", "Billing", "Calculate total", "Total calculated as sum of active charges", "Sum calculated dynamically across active lines; voided lines excluded", "PASS")
+        else:
+            record("BILL-06", "Billing", "Calculate total", "Total calculated as sum of active charges", f"Void failed: {res_void.status_code}", "FAIL")
+    else:
+        record("BILL-06", "Billing", "Calculate total", "Total calculated as sum of active charges", f"Total was {b6_data.get('bill_total_paise')}", "FAIL")
 
     # Partial payment drill: Bill = ₹500. Let's do partial payments: ₹200, ₹200, ₹100 -> Total ₹500.
     # BILL-08: Collect partial payment ₹200
@@ -1570,7 +1839,10 @@ def run_full_qa():
             record("AUD-03", "Audit", "Change priority", "Audited", "Event logged", "PASS")
 
         # AUD-04: Adjust consultation fee
-        record("AUD-04", "Audit", "Adjust consultation fee", "Original and revised amount recorded", "Not implemented (Scheduled for Phase 22 Wave 3)", "NOT IMPLEMENTED")
+        if "BILL_ITEM_ADJUSTED" in actions:
+            record("AUD-04", "Audit", "Adjust consultation fee", "Original and revised amount recorded", "BILL_ITEM_ADJUSTED event found", "PASS")
+        else:
+            record("AUD-04", "Audit", "Adjust consultation fee", "Original and revised amount recorded", "No BILL_ITEM_ADJUSTED event found", "FAIL")
 
         # AUD-05: Record payment
         if "PAYMENT_RECORDED" in actions or "payment.create" in actions:
@@ -1593,7 +1865,10 @@ def run_full_qa():
             record("AUD-07", "Audit", "Cancel appointment", "Audited", "Event logged", "PASS")
 
         # AUD-08: Transfer doctor
-        record("AUD-08", "Audit", "Transfer doctor", "Transfer history recorded", "Partially implemented (Doctor appointment cancellations and additions audited)", "PARTIALLY IMPLEMENTED")
+        if "APPOINTMENT_REASSIGNED" in actions:
+            record("AUD-08", "Audit", "Transfer doctor", "Transfer history recorded", "APPOINTMENT_REASSIGNED event found", "PASS")
+        else:
+            record("AUD-08", "Audit", "Transfer doctor", "Transfer history recorded", "No APPOINTMENT_REASSIGNED event found", "FAIL")
 
         # AUD-09: Attempt unauthorized operation -> Security event logged
         record("AUD-09", "Audit", "Attempt unauthorized operation", "Security event logged", "Logged via security_policy_service & request log", "PASS")
@@ -1763,8 +2038,40 @@ def run_full_qa():
         record("SCENARIO-01", "Scenarios", "Scenario 1", "Succeeds", "Registration failed", "FAIL")
 
     # Scenario 2 — Existing patient with free follow-up
-    # In current implementation, fee waiver is scheduled for Phase 22 Wave 3
-    record("SCENARIO-02", "Scenarios", "Scenario 2 — Existing patient with free follow-up", "Follow-up check-in with fee waiver and checkout without fee", "Partially implemented (Follow-up check-in works; fee waiver endpoint is Wave 3)", "PARTIALLY IMPLEMENTED")
+    p_sc2 = make_patient("Followup Scenario Patient")
+    res_sc2 = reception_client.post("/api/appointments/walk-in", json={
+        "patient_id": p_sc2["id"],
+        "doctor_id": dr_anil.id,
+        "department_id": gen_med_dept.id,
+        "referral_source": "SELF",
+        "visit_kind": "FOLLOW_UP",
+    })
+    if res_sc2.status_code == 201:
+        sc2_appt = res_sc2.json()
+        dr_a_client.patch(f"/api/appointments/{sc2_appt['id']}/status", json={
+            "status": "IN_CONSULTATION",
+            "version_id": sc2_appt["version_id"],
+        })
+        dr_a_client.patch(f"/api/appointments/{sc2_appt['id']}/status", json={
+            "status": "DONE",
+            "version_id": sc2_appt["version_id"] + 1,
+        })
+        res_w = dr_a_client.post(f"/api/appointments/{sc2_appt['id']}/fee-adjustment", json={
+            "kind": "WAIVER",
+            "new_amount_paise": 0,
+            "reason": "Routine follow-up within 7 days — consultation fee waived",
+        })
+        v_sc2 = reception_client.get(f"/api/visits/{sc2_appt['visit_id']}").json()
+        close_res = reception_client.post(f"/api/visits/{sc2_appt['visit_id']}/close", json={
+            "version_id": v_sc2["version_id"],
+            "reason": "",
+        })
+        if res_w.status_code == 201 and close_res.status_code == 200 and close_res.json()["status"] == "CLOSED":
+            record("SCENARIO-02", "Scenarios", "Scenario 2 — Existing patient with free follow-up", "Follow-up check-in with fee waiver and checkout without fee", "PASS: Follow-up check-in, doctor fee waiver, and zero-fee checkout verified", "PASS")
+        else:
+            record("SCENARIO-02", "Scenarios", "Scenario 2 — Existing patient with free follow-up", "Follow-up check-in with fee waiver and checkout without fee", f"Waive={res_w.status_code}, Close={close_res.status_code}", "FAIL")
+    else:
+        record("SCENARIO-02", "Scenarios", "Scenario 2 — Existing patient with free follow-up", "Check-in succeeds", f"HTTP {res_sc2.status_code}", "FAIL")
 
     # Scenario 3 — Emergency patient
     # Check in emergency -> notification -> acknowledge -> consultation & billing

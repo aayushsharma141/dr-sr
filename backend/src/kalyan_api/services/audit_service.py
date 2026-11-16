@@ -64,6 +64,12 @@ class AuditAction(StrEnum):
     # Phase 22 Wave 2: emergency acknowledgement and doctor-to-doctor reassignment (QUE-10)
     APPOINTMENT_ALERT_ACKNOWLEDGED = "APPOINTMENT_ALERT_ACKNOWLEDGED"
     APPOINTMENT_REASSIGNED = "APPOINTMENT_REASSIGNED"
+    # Phase 22 Wave 3: consultation fee adjustment (OD-22-11, AUD-04)
+    BILL_ITEM_ADJUSTED = "BILL_ITEM_ADJUSTED"
+    # Phase 22 Wave 5: reception bill lines (OD-22-13, OD-22-14)
+    BILL_ITEM_ADDED = "BILL_ITEM_ADDED"
+    # Phase 22 Wave 7: bill item void (OD-G, OD-22-15)
+    BILL_ITEM_VOIDED = "BILL_ITEM_VOIDED"
     VISIT_OPENED = "VISIT_OPENED"
     VISIT_CLOSED = "VISIT_CLOSED"
     VISIT_CANCELLED = "VISIT_CANCELLED"

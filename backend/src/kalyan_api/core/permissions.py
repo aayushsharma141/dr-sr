@@ -92,6 +92,14 @@ class Permission(StrEnum):
     VISIT_READ = "visit:read"
     VISIT_WRITE = "visit:write"
 
+    # Phase 22 Wave 3: consultation fee adjustment (OD-A). A doctor adjusts only own consultations; the
+    # admin may also correct a fee. Reception is not granted bill:adjust by default (design §6, OD-A).
+    # Reception holds bill:write for bill line items (plan 22-08); Admin holds report:referral (plan 22-17).
+    BILL_CLINICAL = "bill:clinical"
+    BILL_ADJUST = "bill:adjust"
+    BILL_WRITE = "bill:write"
+    REPORT_REFERRAL = "report:referral"
+
 
 # Authoritative role-to-permissions catalog
 ROLE_PERMISSIONS: dict[Role, frozenset[Permission]] = {
@@ -116,6 +124,7 @@ ROLE_PERMISSIONS: dict[Role, frozenset[Permission]] = {
             Permission.PAYMENT_READ,
             Permission.RECEIPT_REPRINT,
             Permission.PAYMENT_REVERSE,
+            Permission.BILL_ADJUST,
             Permission.TIMELINE_READ,
             Permission.AUDIT_READ,
             Permission.BACKUP_RUN,
@@ -131,6 +140,7 @@ ROLE_PERMISSIONS: dict[Role, frozenset[Permission]] = {
             Permission.PATIENT_IMPORT,
             Permission.PATIENT_EXPORT,
             Permission.VISIT_READ,
+            Permission.REPORT_REFERRAL,
         }
     ),
     Role.RECEPTION: frozenset(
@@ -152,11 +162,13 @@ ROLE_PERMISSIONS: dict[Role, frozenset[Permission]] = {
             Permission.TIMELINE_READ,
             Permission.VISIT_READ,
             Permission.VISIT_WRITE,
+            Permission.BILL_WRITE,
         }
     ),
     Role.DOCTOR: frozenset(
         {
             Permission.DASHBOARD_DOCTOR,
+            Permission.BILL_CLINICAL,
             Permission.SETTINGS_READ,
             Permission.DOCTOR_READ,
             Permission.DOCTOR_SETTINGS_WRITE,

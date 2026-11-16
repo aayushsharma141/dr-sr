@@ -4,7 +4,7 @@ Reception and Admin read visits; only Reception closes or cancels them. A visit 
 check-in (see appointments.py), never here.
 """
 
-from datetime import date
+from datetime import date, datetime
 
 from fastapi import APIRouter, Depends, Query, Request
 from sqlalchemy import exists, func, select
@@ -58,6 +58,7 @@ ACTIVE_CONSULTATIONS = (
 
 
 def _to_detail(session, visit: Visit, patient: Patient) -> VisitDetail:
+    totals = billing_service.visit_totals(session, [visit.id])[visit.id]
     lines = billing_service.visit_charge_lines(session, [visit.id])[visit.id]
     line_for = {line.appointment_id: line for line in lines}
     consultations = []
@@ -94,18 +95,45 @@ def _to_detail(session, visit: Visit, patient: Patient) -> VisitDetail:
                 created_by_username=p.created_by_user.username if p.created_by_user else "",
             )
             for p in payments
+            if p.appointment_id is not None
         ],
-        total_paid_paise=sum(p.amount_paise for p in payments if not p.is_reversed),
-        outstanding_paise=sum(line.balance_paise for line in lines),
+        total_paid_paise=totals.paid_paise,
+        outstanding_paise=totals.due_paise,
     )
 
 
 def _to_summaries(session, rows) -> list[VisitSummary]:
     """List rows with who was seen, what is still active and what is due, in few queries."""
-    lines_by_visit = billing_service.visit_charge_lines(session, [v.id for v, _ in rows])
+    visit_ids = [v.id for v, _ in rows]
+    lines_by_visit = billing_service.visit_charge_lines(session, visit_ids)
+    totals_by_visit = billing_service.visit_totals(session, visit_ids)
+
+    appts = session.execute(
+        select(
+            Appointment.visit_id,
+            Appointment.token_number,
+            Appointment.consultation_status,
+            Appointment.status_updated_at,
+        )
+        .where(Appointment.visit_id.in_(visit_ids))
+        .order_by(Appointment.id.asc())
+    ).all()
+
+    tokens_by_visit: dict[int, list[int]] = {v_id: [] for v_id in visit_ids}
+    last_completed_by_visit: dict[int, datetime | None] = {v_id: None for v_id in visit_ids}
+
+    for v_id, token_num, c_status, status_updated_at in appts:
+        if c_status != ConsultationStatus.CANCELLED.value and token_num is not None:
+            tokens_by_visit[v_id].append(token_num)
+        if c_status == ConsultationStatus.COMPLETED.value and status_updated_at is not None:
+            prev = last_completed_by_visit[v_id]
+            if prev is None or status_updated_at > prev:
+                last_completed_by_visit[v_id] = status_updated_at
+
     summaries = []
     for visit, patient in rows:
         lines = lines_by_visit[visit.id]
+        totals = totals_by_visit[visit.id]
         summaries.append(
             VisitSummary(
                 **_to_read(visit, patient).model_dump(),
@@ -118,7 +146,9 @@ def _to_summaries(session, rows) -> list[VisitSummary]:
                 active_consultations=sum(
                     1 for line in lines if line.consultation_status in ACTIVE_CONSULTATIONS
                 ),
-                outstanding_paise=sum(line.balance_paise for line in lines),
+                outstanding_paise=totals.due_paise,
+                token_numbers=tokens_by_visit.get(visit.id, []),
+                last_completed_at=last_completed_by_visit.get(visit.id),
             )
         )
     return summaries

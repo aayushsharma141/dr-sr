@@ -112,9 +112,9 @@
     "section": "Patient",
     "action": "Register a new patient",
     "expected": "Patient record created with permanent URN",
-    "actual": "HTTP 201, URN=KH-26-P-11-00001",
+    "actual": "HTTP 201, URN=KH-26-P-11-00069",
     "status": "PASS",
-    "evidence": "HTTP 201, URN=KH-26-P-11-00001"
+    "evidence": "HTTP 201, URN=KH-26-P-11-00069"
   },
   {
     "test_id": "PAT-02",
@@ -175,18 +175,18 @@
     "section": "Patient",
     "action": "Search by name",
     "expected": "Matching patients displayed",
-    "actual": "Found 1 matches",
+    "actual": "Found 3 matches",
     "status": "PASS",
-    "evidence": "Found 1 matches"
+    "evidence": "Found 3 matches"
   },
   {
     "test_id": "PAT-09",
     "section": "Patient",
     "action": "Search by mobile number",
     "expected": "Correct patient displayed",
-    "actual": "Found 1 matches",
+    "actual": "Found 3 matches",
     "status": "PASS",
-    "evidence": "Found 1 matches"
+    "evidence": "Found 3 matches"
   },
   {
     "test_id": "PAT-10",
@@ -202,18 +202,18 @@
     "section": "Patient",
     "action": "Create another visit for existing patient",
     "expected": "Same URN, new visit ID",
-    "actual": "URN=KH-26-P-11-00001, VisitID=117",
+    "actual": "URN=KH-26-P-11-00069, VisitID=57",
     "status": "PASS",
-    "evidence": "URN=KH-26-P-11-00001, VisitID=117"
+    "evidence": "URN=KH-26-P-11-00069, VisitID=57"
   },
   {
     "test_id": "PAT-12",
     "section": "Patient",
     "action": "Register two patients simultaneously",
     "expected": "Unique URNs generated under concurrency",
-    "actual": "URN1=KH-26-P-11-00003, URN2=KH-26-P-11-00002",
+    "actual": "URN1=KH-26-P-11-00070, URN2=KH-26-P-11-00071",
     "status": "PASS",
-    "evidence": "URN1=KH-26-P-11-00003, URN2=KH-26-P-11-00002"
+    "evidence": "URN1=KH-26-P-11-00070, URN2=KH-26-P-11-00071"
   },
   {
     "test_id": "PAT-13",
@@ -238,45 +238,45 @@
     "section": "Appointments",
     "action": "Book appointment by phone",
     "expected": "Appointment saved (source=PHONE, token=null)",
-    "actual": "HTTP 201, ID=256",
+    "actual": "HTTP 201, ID=72",
     "status": "PASS",
-    "evidence": "HTTP 201, ID=256"
+    "evidence": "HTTP 201, ID=72"
   },
   {
     "test_id": "APT-02",
     "section": "Appointments",
     "action": "Create walk-in booking",
     "expected": "Appointment saved with token",
-    "actual": "HTTP 201, Token=3",
+    "actual": "HTTP 201, Token=51",
     "status": "PASS",
-    "evidence": "HTTP 201, Token=3"
+    "evidence": "HTTP 201, Token=51"
   },
   {
     "test_id": "APT-03",
     "section": "Appointments",
     "action": "Assign doctor",
     "expected": "Correct doctor displayed",
-    "actual": "doctor_id=795",
+    "actual": "doctor_id=1",
     "status": "PASS",
-    "evidence": "doctor_id=795"
+    "evidence": "doctor_id=1"
   },
   {
     "test_id": "APT-04",
     "section": "Appointments",
     "action": "View today's appointments",
     "expected": "Correct list displayed",
-    "actual": "HTTP 200, 5 appointments",
+    "actual": "HTTP 200, 71 appointments",
     "status": "PASS",
-    "evidence": "HTTP 200, 5 appointments"
+    "evidence": "HTTP 200, 71 appointments"
   },
   {
     "test_id": "APT-05",
     "section": "Appointments",
     "action": "Check in scheduled patient",
     "expected": "Appointment linked to visit & token generated",
-    "actual": "Token=4, VisitID=119",
+    "actual": "Token=52, VisitID=59",
     "status": "PASS",
-    "evidence": "Token=4, VisitID=119"
+    "evidence": "Token=52, VisitID=59"
   },
   {
     "test_id": "APT-06",
@@ -301,9 +301,9 @@
     "section": "Appointments",
     "action": "Reschedule appointment",
     "expected": "New date saved; history retained",
-    "actual": "HTTP 201, New Appt ID=261, Date=2026-11-16",
+    "actual": "HTTP 201, New Appt ID=77, Date=2026-11-17",
     "status": "PASS",
-    "evidence": "HTTP 201, New Appt ID=261, Date=2026-11-16"
+    "evidence": "HTTP 201, New Appt ID=77, Date=2026-11-17"
   },
   {
     "test_id": "APT-09",
@@ -355,18 +355,18 @@
     "section": "CheckIn",
     "action": "Register new patient at checkin",
     "expected": "New URN & token generated in 1 transaction",
-    "actual": "URN=KH-26-P-11-00009, Token=5",
+    "actual": "URN=KH-26-P-11-00077, Token=53",
     "status": "PASS",
-    "evidence": "URN=KH-26-P-11-00009, Token=5"
+    "evidence": "URN=KH-26-P-11-00077, Token=53"
   },
   {
     "test_id": "CHK-04",
     "section": "CheckIn",
     "action": "Check in existing patient",
     "expected": "Existing URN reused",
-    "actual": "URN=KH-26-P-11-00010",
+    "actual": "URN=KH-26-P-11-00078",
     "status": "PASS",
-    "evidence": "URN=KH-26-P-11-00010"
+    "evidence": "URN=KH-26-P-11-00078"
   },
   {
     "test_id": "CHK-05",
@@ -391,27 +391,27 @@
     "section": "CheckIn",
     "action": "Select consulting doctor",
     "expected": "Correct doctor assigned",
-    "actual": "doctor_id=795",
+    "actual": "doctor_id=1",
     "status": "PASS",
-    "evidence": "doctor_id=795"
+    "evidence": "doctor_id=1"
   },
   {
     "test_id": "CHK-08",
     "section": "CheckIn",
     "action": "Check in patient",
     "expected": "Token generated",
-    "actual": "Token #5",
+    "actual": "Token #53",
     "status": "PASS",
-    "evidence": "Token #5"
+    "evidence": "Token #53"
   },
   {
     "test_id": "CHK-09",
     "section": "CheckIn",
     "action": "Assign another doctor",
     "expected": "Independent doctor token sequence",
-    "actual": "Dr Bharati Token=2",
+    "actual": "Dr Bharati Token=14",
     "status": "PASS",
-    "evidence": "Dr Bharati Token=2"
+    "evidence": "Dr Bharati Token=14"
   },
   {
     "test_id": "CHK-10",
@@ -472,36 +472,36 @@
     "section": "Queue",
     "action": "Check in patients for Doctor A",
     "expected": "Queue entries created for Doctor A",
-    "actual": "13 waiting patients in Doctor A queue",
+    "actual": "44 waiting patients in Doctor A queue",
     "status": "PASS",
-    "evidence": "13 waiting patients in Doctor A queue"
+    "evidence": "44 waiting patients in Doctor A queue"
   },
   {
     "test_id": "QUE-02",
     "section": "Queue",
     "action": "Check in patients for Doctor B",
     "expected": "Separate queue created for Doctor B",
-    "actual": "4 waiting patients in Doctor B queue",
+    "actual": "14 waiting patients in Doctor B queue",
     "status": "PASS",
-    "evidence": "4 waiting patients in Doctor B queue"
+    "evidence": "14 waiting patients in Doctor B queue"
   },
   {
     "test_id": "QUE-03",
     "section": "Queue",
     "action": "Open Doctor A workspace",
     "expected": "Only authorized Doctor A queue visible",
-    "actual": "Dr A sees only own queue (13 waiting)",
+    "actual": "Dr A sees only own queue (44 waiting)",
     "status": "PASS",
-    "evidence": "Dr A sees only own queue (13 waiting)"
+    "evidence": "Dr A sees only own queue (44 waiting)"
   },
   {
     "test_id": "QUE-04",
     "section": "Queue",
     "action": "Open reception queue",
     "expected": "All authorized doctors visible to reception",
-    "actual": "21 total appointments",
+    "actual": "87 total appointments",
     "status": "PASS",
-    "evidence": "21 total appointments"
+    "evidence": "87 total appointments"
   },
   {
     "test_id": "QUE-05",
@@ -553,18 +553,18 @@
     "section": "Queue",
     "action": "Transfer patient to Doctor B",
     "expected": "Original and new queue history preserved",
-    "actual": "Partially implemented (Cancel + join new doctor consultation under same visit; Wave 2 reassign endpoint in progress)",
-    "status": "PARTIALLY IMPLEMENTED",
-    "evidence": "Partially implemented (Cancel + join new doctor consultation under same visit; Wave 2 reassign endpoint in progress)"
+    "actual": "Reassigned to Dr B (appt #93, token #17)",
+    "status": "PASS",
+    "evidence": "Reassigned to Dr B (appt #93, token #17)"
   },
   {
     "test_id": "QUE-11",
     "section": "Queue",
     "action": "Complete patient consultation",
     "expected": "Patient becomes eligible for billing (ready_for_checkout)",
-    "actual": "HTTP 200, 1 visits ready",
+    "actual": "HTTP 200, 8 visits ready",
     "status": "PASS",
-    "evidence": "HTTP 200, 1 visits ready"
+    "evidence": "HTTP 200, 8 visits ready"
   },
   {
     "test_id": "QUE-12",
@@ -634,18 +634,9 @@
     "section": "Priority",
     "action": "Mark Emergency notifies doctor",
     "expected": "emergency_alerted_at timestamp set",
-    "actual": "Alerted at: 2026-11-15T09:07:12.906582Z",
+    "actual": "Alerted at: 2026-11-16T01:58:03.893748Z",
     "status": "PASS",
-    "evidence": "Alerted at: 2026-11-15T09:07:12.906582Z"
-  },
-  {
-    "test_id": "PRI-08",
-    "section": "Priority",
-    "action": "Doctor acknowledges alert",
-    "expected": "Acknowledgement timestamp saved",
-    "actual": "Not implemented (Scheduled for Phase 22 Wave 2 doctor acknowledgement endpoint)",
-    "status": "NOT IMPLEMENTED",
-    "evidence": "Not implemented (Scheduled for Phase 22 Wave 2 doctor acknowledgement endpoint)"
+    "evidence": "Alerted at: 2026-11-16T01:58:03.893748Z"
   },
   {
     "test_id": "PRI-09",
@@ -655,6 +646,15 @@
     "actual": "Alert remains unacknowledged",
     "status": "PASS",
     "evidence": "Alert remains unacknowledged"
+  },
+  {
+    "test_id": "PRI-08",
+    "section": "Priority",
+    "action": "Doctor acknowledges alert",
+    "expected": "Acknowledgement timestamp saved",
+    "actual": "Acknowledged at: 2026-11-16T01:58:03.911163Z",
+    "status": "PASS",
+    "evidence": "Acknowledged at: 2026-11-16T01:58:03.911163Z"
   },
   {
     "test_id": "PRI-10",
@@ -670,18 +670,18 @@
     "section": "Priority",
     "action": "Change classifications audited",
     "expected": "Audit events stored in consultation_priority_events",
-    "actual": "3 priority history events in DB",
+    "actual": "4 priority history events in DB",
     "status": "PASS",
-    "evidence": "3 priority history events in DB"
+    "evidence": "4 priority history events in DB"
   },
   {
     "test_id": "PRI-12",
     "section": "Priority",
     "action": "Reorder queue after priority change",
     "expected": "Original token unchanged",
-    "actual": "Token remained #16",
+    "actual": "Token remained #65",
     "status": "PASS",
-    "evidence": "Token remained #16"
+    "evidence": "Token remained #65"
   },
   {
     "test_id": "PRI-13",
@@ -733,9 +733,9 @@
     "section": "Consultation",
     "action": "Doctor opens assigned patient",
     "expected": "Correct clinical record opens",
-    "actual": "HTTP 200, appt_id=277",
+    "actual": "HTTP 200, appt_id=95",
     "status": "PASS",
-    "evidence": "HTTP 200, appt_id=277"
+    "evidence": "HTTP 200, appt_id=95"
   },
   {
     "test_id": "DOC-02",
@@ -769,18 +769,18 @@
     "section": "Consultation",
     "action": "Create prescription",
     "expected": "Prescription saved with items",
-    "actual": "Prescription ID=55, 2 items",
+    "actual": "Prescription ID=3, 2 items",
     "status": "PASS",
-    "evidence": "Prescription ID=55, 2 items"
+    "evidence": "Prescription ID=3, 2 items"
   },
   {
     "test_id": "DOC-06",
     "section": "Consultation",
     "action": "Add treatment plan",
     "expected": "Treatment plan linked to patient",
-    "actual": "Plan ID=92",
+    "actual": "Plan ID=5",
     "status": "PASS",
-    "evidence": "Plan ID=92"
+    "evidence": "Plan ID=5"
   },
   {
     "test_id": "DOC-07",
@@ -823,18 +823,18 @@
     "section": "Consultation",
     "action": "Doctor refers patient to another doctor",
     "expected": "Same visit retained across doctor consultations",
-    "actual": "Visit ID=135",
+    "actual": "Visit ID=76",
     "status": "PASS",
-    "evidence": "Visit ID=135"
+    "evidence": "Visit ID=76"
   },
   {
     "test_id": "DOC-12",
     "section": "Consultation",
     "action": "Two doctors consult same patient",
     "expected": "Separate consultations under one visit",
-    "actual": "Verified via Visit ID 135 containing multiple consultations",
+    "actual": "Verified via Visit ID 76 containing multiple consultations",
     "status": "PASS",
-    "evidence": "Verified via Visit ID 135 containing multiple consultations"
+    "evidence": "Verified via Visit ID 76 containing multiple consultations"
   },
   {
     "test_id": "FEE-01",
@@ -859,45 +859,45 @@
     "section": "Fee",
     "action": "Doctor reduces fee to \u20b9300",
     "expected": "Revised fee \u20b9300",
-    "actual": "Not implemented (Scheduled for Phase 22 Wave 3: T22-08 fee adjustment)",
-    "status": "NOT IMPLEMENTED",
-    "evidence": "Not implemented (Scheduled for Phase 22 Wave 3: T22-08 fee adjustment)"
+    "actual": "Revised fee \u20b9300 saved via DISCOUNT",
+    "status": "PASS",
+    "evidence": "Revised fee \u20b9300 saved via DISCOUNT"
   },
   {
     "test_id": "FEE-04",
     "section": "Fee",
     "action": "Doctor waives fee",
     "expected": "Fee becomes \u20b90 with mandatory reason",
-    "actual": "Not implemented (Scheduled for Phase 22 Wave 3: T22-08 fee waiver)",
-    "status": "NOT IMPLEMENTED",
-    "evidence": "Not implemented (Scheduled for Phase 22 Wave 3: T22-08 fee waiver)"
+    "actual": "Fee waived to \u20b90 with reason",
+    "status": "PASS",
+    "evidence": "Fee waived to \u20b90 with reason"
   },
   {
     "test_id": "FEE-05",
     "section": "Fee",
     "action": "Reception adjusts fee without permission",
     "expected": "Rejected (HTTP 403)",
-    "actual": "Not implemented (Permission bill:adjust scheduled for Phase 22 Wave 3)",
-    "status": "NOT IMPLEMENTED",
-    "evidence": "Not implemented (Permission bill:adjust scheduled for Phase 22 Wave 3)"
+    "actual": "HTTP 403 Forbidden",
+    "status": "PASS",
+    "evidence": "HTTP 403 Forbidden"
   },
   {
     "test_id": "FEE-06",
     "section": "Fee",
-    "action": "Reception adjusts with permission and reason",
+    "action": "Reception has no fee adjustment (OD-A); admin correction with reason is saved and audited",
     "expected": "Adjustment saved and audited",
-    "actual": "Not implemented (Scheduled for Phase 22 Wave 3: T22-08)",
-    "status": "NOT IMPLEMENTED",
-    "evidence": "Not implemented (Scheduled for Phase 22 Wave 3: T22-08)"
+    "actual": "Admin correction to \u20b9400 saved and audited",
+    "status": "PASS",
+    "evidence": "Admin correction to \u20b9400 saved and audited"
   },
   {
     "test_id": "FEE-07",
     "section": "Fee",
     "action": "Change doctor standard fee to \u20b9600",
     "expected": "Existing bill remains \u20b9500",
-    "actual": "DEFECT DETECTED: Existing bill fee shifted to \u20b9600.0 (Live lookup defect K-63)",
-    "status": "FAIL",
-    "evidence": "Live fee lookup alters past bills without fee snapshot table"
+    "actual": "Fee remained \u20b9500 (Snapshot preserved)",
+    "status": "PASS",
+    "evidence": "Fee remained \u20b9500 (Snapshot preserved)"
   },
   {
     "test_id": "FEE-08",
@@ -913,27 +913,27 @@
     "section": "Fee",
     "action": "Review adjustment history",
     "expected": "Original and revised amounts visible",
-    "actual": "Not implemented (Scheduled for Phase 22 Wave 3: bill_item_adjustments)",
-    "status": "NOT IMPLEMENTED",
-    "evidence": "Not implemented (Scheduled for Phase 22 Wave 3: bill_item_adjustments)"
+    "actual": "3 adjustment history entries visible",
+    "status": "PASS",
+    "evidence": "3 adjustment history entries visible"
   },
   {
     "test_id": "MED-01",
     "section": "Medicine",
     "action": "Doctor prescribes medicine",
     "expected": "Prescription saved",
-    "actual": "Prescription #55 with 2 items",
+    "actual": "Prescription #3 with 2 items",
     "status": "PASS",
-    "evidence": "Prescription #55 with 2 items"
+    "evidence": "Prescription #3 with 2 items"
   },
   {
     "test_id": "MED-02",
     "section": "Medicine",
-    "action": "Open reception billing",
+    "action": "Reception sees prescribed medicine name and form only and types the quantity supplied (OD-B, B2)",
     "expected": "Prescription visible for reference",
-    "actual": "Not implemented (Reception clinical default-deny D-04; pharmacy reference endpoint scheduled for Phase 22 Wave 4)",
-    "status": "NOT IMPLEMENTED",
-    "evidence": "Not implemented (Reception clinical default-deny D-04; pharmacy reference endpoint scheduled for Phase 22 Wave 4)"
+    "actual": "HTTP 200, 2 items visible for reference",
+    "status": "PASS",
+    "evidence": "HTTP 200, 2 items visible for reference"
   },
   {
     "test_id": "MED-03",
@@ -949,45 +949,45 @@
     "section": "Medicine",
     "action": "Reception adds medicine",
     "expected": "Bill line created",
-    "actual": "Not implemented (Scheduled for Phase 22 Wave 3 & 4: T22-07/T22-08 bill_items)",
-    "status": "NOT IMPLEMENTED",
-    "evidence": "Not implemented (Scheduled for Phase 22 Wave 3 & 4: T22-07/T22-08 bill_items)"
+    "actual": "Created line #100 (Paracetamol 500mg)",
+    "status": "PASS",
+    "evidence": "Created line #100 (Paracetamol 500mg)"
   },
   {
     "test_id": "MED-05",
     "section": "Medicine",
     "action": "Enter quantity 2, rate \u20b950",
     "expected": "Total \u20b9100",
-    "actual": "Not implemented (Scheduled for Phase 22 Wave 3: bill_items qty*rate)",
-    "status": "NOT IMPLEMENTED",
-    "evidence": "Not implemented (Scheduled for Phase 22 Wave 3: bill_items qty*rate)"
+    "actual": "Total \u20b9100.0 (2 x \u20b950)",
+    "status": "PASS",
+    "evidence": "Total \u20b9100.0 (2 x \u20b950)"
   },
   {
     "test_id": "MED-06",
     "section": "Medicine",
     "action": "Patient purchases only some medicines",
     "expected": "Only supplied items charged",
-    "actual": "Not implemented (Scheduled for Phase 22 Wave 4)",
-    "status": "NOT IMPLEMENTED",
-    "evidence": "Not implemented (Scheduled for Phase 22 Wave 4)"
+    "actual": "2 supplied medicine lines charged",
+    "status": "PASS",
+    "evidence": "2 supplied medicine lines charged"
   },
   {
     "test_id": "MED-07",
     "section": "Medicine",
     "action": "Add manually entered medicine",
     "expected": "Manual line created",
-    "actual": "Not implemented (Scheduled for Phase 22 Wave 4)",
-    "status": "NOT IMPLEMENTED",
-    "evidence": "Not implemented (Scheduled for Phase 22 Wave 4)"
+    "actual": "Manual line #102 created without prescription link",
+    "status": "PASS",
+    "evidence": "Manual line #102 created without prescription link"
   },
   {
     "test_id": "MED-08",
     "section": "Medicine",
     "action": "Add additional service",
     "expected": "Additional charge added",
-    "actual": "Not implemented (Scheduled for Phase 22 Wave 3 & 4)",
-    "status": "NOT IMPLEMENTED",
-    "evidence": "Not implemented (Scheduled for Phase 22 Wave 3 & 4)"
+    "actual": "Additional charge line #103 added (\u20b9100)",
+    "status": "PASS",
+    "evidence": "Additional charge line #103 added (\u20b9100)"
   },
   {
     "test_id": "MED-09",
@@ -1012,27 +1012,27 @@
     "section": "Medicine",
     "action": "Change quantity",
     "expected": "Total recalculated",
-    "actual": "Not implemented (Scheduled for Phase 22 Wave 3 bill_items)",
-    "status": "NOT IMPLEMENTED",
-    "evidence": "Not implemented (Scheduled for Phase 22 Wave 3 bill_items)"
+    "actual": "Quantity corrected to 3, new amount \u20b9150.0",
+    "status": "PASS",
+    "evidence": "Quantity corrected to 3, new amount \u20b9150.0"
   },
   {
     "test_id": "MED-12",
     "section": "Medicine",
     "action": "Attempt negative price or quantity",
     "expected": "Validation blocks entry",
-    "actual": "Not implemented (Scheduled for Phase 22 Wave 3 CHECK constraint)",
-    "status": "NOT IMPLEMENTED",
-    "evidence": "Not implemented (Scheduled for Phase 22 Wave 3 CHECK constraint)"
+    "actual": "HTTP 422 validation_error for negative qty and rate",
+    "status": "PASS",
+    "evidence": "HTTP 422 validation_error for negative qty and rate"
   },
   {
     "test_id": "BILL-01",
     "section": "Billing",
     "action": "Complete consultation appears in billing",
     "expected": "Patient appears with collectable consultation",
-    "actual": "Visit 137, Outstanding=\u20b9500.0",
+    "actual": "Visit 79, Outstanding=\u20b9500.0",
     "status": "PASS",
-    "evidence": "Visit 137, Outstanding=\u20b9500.0"
+    "evidence": "Visit 79, Outstanding=\u20b9500.0"
   },
   {
     "test_id": "BILL-02",
@@ -1048,36 +1048,36 @@
     "section": "Billing",
     "action": "Review service charge",
     "expected": "\u20b9300 displayed",
-    "actual": "Partially implemented (Treatment plan package fees supported; itemized bill lines scheduled for Wave 3/4)",
-    "status": "PARTIALLY IMPLEMENTED",
-    "evidence": "Partially implemented (Treatment plan package fees supported; itemized bill lines scheduled for Wave 3/4)"
+    "actual": "\u20b9300 PROCEDURE charge displayed in bill",
+    "status": "PASS",
+    "evidence": "\u20b9300 PROCEDURE charge displayed in bill"
   },
   {
     "test_id": "BILL-04",
     "section": "Billing",
     "action": "Review medicine charge",
     "expected": "\u20b9100 displayed",
-    "actual": "Not implemented (Scheduled for Phase 22 Wave 3/4)",
-    "status": "NOT IMPLEMENTED",
-    "evidence": "Not implemented (Scheduled for Phase 22 Wave 3/4)"
+    "actual": "\u20b9100 MEDICINE charge displayed in bill",
+    "status": "PASS",
+    "evidence": "\u20b9100 MEDICINE charge displayed in bill"
   },
   {
     "test_id": "BILL-05",
     "section": "Billing",
     "action": "Add additional service",
     "expected": "\u20b9100 displayed",
-    "actual": "Not implemented (Scheduled for Phase 22 Wave 3/4)",
-    "status": "NOT IMPLEMENTED",
-    "evidence": "Not implemented (Scheduled for Phase 22 Wave 3/4)"
+    "actual": "\u20b9100 ADDITIONAL service charge added and displayed in bill",
+    "status": "PASS",
+    "evidence": "\u20b9100 ADDITIONAL service charge added and displayed in bill"
   },
   {
     "test_id": "BILL-06",
     "section": "Billing",
     "action": "Calculate total",
     "expected": "Total calculated as sum of active charges",
-    "actual": "Calculated dynamically from active charge lines",
+    "actual": "Sum calculated dynamically across active lines; voided lines excluded",
     "status": "PASS",
-    "evidence": "Calculated dynamically from active charge lines"
+    "evidence": "Sum calculated dynamically across active lines; voided lines excluded"
   },
   {
     "test_id": "BILL-08",
@@ -1129,9 +1129,9 @@
     "section": "Billing",
     "action": "Print receipt",
     "expected": "Correct amount and patient details",
-    "actual": "Receipt #RCP-2026-2027-0001, Amount=\u20b9200.0",
+    "actual": "Receipt #RCP-2026-2027-0011, Amount=\u20b9200.0",
     "status": "PASS",
-    "evidence": "Receipt #RCP-2026-2027-0001, Amount=\u20b9200.0"
+    "evidence": "Receipt #RCP-2026-2027-0011, Amount=\u20b9200.0"
   },
   {
     "test_id": "BILL-13",
@@ -1201,9 +1201,9 @@
     "section": "Ledger",
     "action": "Check in returning patient",
     "expected": "Previous financial history visible",
-    "actual": "2 pending package dues listed",
+    "actual": "6 pending package dues listed",
     "status": "PASS",
-    "evidence": "2 pending package dues listed"
+    "evidence": "6 pending package dues listed"
   },
   {
     "test_id": "LED-02",
@@ -1264,9 +1264,9 @@
     "section": "Ledger",
     "action": "Collect payment against old due/package",
     "expected": "Package due decremented by paid amount",
-    "actual": "Paid \u20b91,000, Receipt=RCP-2026-2027-0004",
+    "actual": "Paid \u20b91,000, Receipt=RCP-2026-2027-0014",
     "status": "PASS",
-    "evidence": "Paid \u20b91,000, Receipt=RCP-2026-2027-0004"
+    "evidence": "Paid \u20b91,000, Receipt=RCP-2026-2027-0014"
   },
   {
     "test_id": "LED-09",
@@ -1282,9 +1282,9 @@
     "section": "Ledger",
     "action": "View ledger",
     "expected": "Every transaction has correct reference (receipt #, patient, time)",
-    "actual": "HTTP 200, 4 receipts today",
+    "actual": "HTTP 200, 14 receipts today",
     "status": "PASS",
-    "evidence": "HTTP 200, 4 receipts today"
+    "evidence": "HTTP 200, 14 receipts today"
   },
   {
     "test_id": "LED-11",
@@ -1327,9 +1327,9 @@
     "section": "Audit",
     "action": "Adjust consultation fee",
     "expected": "Original and revised amount recorded",
-    "actual": "Not implemented (Scheduled for Phase 22 Wave 3)",
-    "status": "NOT IMPLEMENTED",
-    "evidence": "Not implemented (Scheduled for Phase 22 Wave 3)"
+    "actual": "BILL_ITEM_ADJUSTED event found",
+    "status": "PASS",
+    "evidence": "BILL_ITEM_ADJUSTED event found"
   },
   {
     "test_id": "AUD-05",
@@ -1363,9 +1363,9 @@
     "section": "Audit",
     "action": "Transfer doctor",
     "expected": "Transfer history recorded",
-    "actual": "Partially implemented (Doctor appointment cancellations and additions audited)",
-    "status": "PARTIALLY IMPLEMENTED",
-    "evidence": "Partially implemented (Doctor appointment cancellations and additions audited)"
+    "actual": "APPOINTMENT_REASSIGNED event found",
+    "status": "PASS",
+    "evidence": "APPOINTMENT_REASSIGNED event found"
   },
   {
     "test_id": "AUD-09",
@@ -1516,9 +1516,9 @@
     "section": "Backup",
     "action": "Create manual backup",
     "expected": "Backup file generated",
-    "actual": "HTTP 201, Filename=kalyan_backup_20261115_090715_uat_backup.tar.gz",
+    "actual": "HTTP 201, Filename=kalyan_backup_20261116_015805_uat_backup.tar.gz",
     "status": "PASS",
-    "evidence": "HTTP 201, Filename=kalyan_backup_20261115_090715_uat_backup.tar.gz"
+    "evidence": "HTTP 201, Filename=kalyan_backup_20261116_015805_uat_backup.tar.gz"
   },
   {
     "test_id": "BAK-02",
@@ -1606,9 +1606,9 @@
     "section": "Scenarios",
     "action": "Scenario 2 \u2014 Existing patient with free follow-up",
     "expected": "Follow-up check-in with fee waiver and checkout without fee",
-    "actual": "Partially implemented (Follow-up check-in works; fee waiver endpoint is Wave 3)",
-    "status": "PARTIALLY IMPLEMENTED",
-    "evidence": "Partially implemented (Follow-up check-in works; fee waiver endpoint is Wave 3)"
+    "actual": "PASS: Follow-up check-in, doctor fee waiver, and zero-fee checkout verified",
+    "status": "PASS",
+    "evidence": "PASS: Follow-up check-in, doctor fee waiver, and zero-fee checkout verified"
   },
   {
     "test_id": "SCENARIO-03",

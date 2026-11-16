@@ -268,3 +268,147 @@ def test_downgrade_0025_refuses_while_visits_exist(owner_engine: Engine, test_se
         session.close()
         transaction.rollback()
         connection.close()
+
+
+# ----------------------------------------------------------- summary fields (Plan 22-09)
+
+
+def test_visit_summary_checkout_token_numbers_and_completion_time(
+    doctor_a_user, reception_user, db_session, login_client
+):
+    """Task 3: VisitSummary populates token_numbers and last_completed_at for checkout list."""
+    from decimal import Decimal
+    from kalyan_api.models import BillItem, BillItemCategory, BillItemSource
+    from kalyan_api.routers.visits import _to_summaries
+
+    patient = _patient(db_session, "T3A")
+    visit = _visit(db_session, patient, reception_user)
+
+    # 1. Single completed consultation with token 7
+    appt = Appointment(
+        patient_id=patient.id,
+        doctor_id=doctor_a_user.doctor_id,
+        appointment_date=VISIT_DATE,
+        token_number=7,
+        status="ARRIVED",
+        consultation_status=ConsultationStatus.COMPLETED.value,
+        visit_id=visit.id,
+        created_by_user_id=reception_user.id,
+        status_updated_at=datetime(2026, 11, 2, 11, 30, tzinfo=UTC),
+    )
+    db_session.add(appt)
+    db_session.flush()
+
+    line = BillItem(
+        visit_id=visit.id,
+        patient_id=patient.id,
+        appointment_id=appt.id,
+        category=BillItemCategory.CONSULTATION.value,
+        source=BillItemSource.SYSTEM.value,
+        description="Consultation",
+        quantity=Decimal("1"),
+        rate_paise=30000,
+        original_amount_paise=30000,
+        amount_paise=30000,
+        created_by_user_id=reception_user.id,
+    )
+    db_session.add(line)
+    db_session.flush()
+
+    summaries = _to_summaries(db_session, [(visit, patient)])
+    assert len(summaries) == 1
+    s = summaries[0]
+    assert s.token_numbers == [7]
+    assert s.last_completed_at == appt.status_updated_at
+
+
+def test_visit_summary_cancelled_token_excluded(
+    doctor_a_user, doctor_b_user, reception_user, db_session
+):
+    """Task 3: Cancelled consultation token is excluded; completed token is kept."""
+    from decimal import Decimal
+    from kalyan_api.models import BillItem, BillItemCategory, BillItemSource
+    from kalyan_api.routers.visits import _to_summaries
+
+    patient = _patient(db_session, "T3B")
+    visit = _visit(db_session, patient, reception_user)
+
+    # Cancelled consultation with token 3
+    appt_cancelled = Appointment(
+        patient_id=patient.id,
+        doctor_id=doctor_a_user.doctor_id,
+        appointment_date=VISIT_DATE,
+        token_number=3,
+        status="ARRIVED",
+        consultation_status=ConsultationStatus.CANCELLED.value,
+        visit_id=visit.id,
+        created_by_user_id=reception_user.id,
+        status_updated_at=datetime(2026, 11, 2, 10, 0, tzinfo=UTC),
+    )
+    # Completed consultation with token 4
+    appt_completed = Appointment(
+        patient_id=patient.id,
+        doctor_id=doctor_b_user.doctor_id,
+        appointment_date=VISIT_DATE,
+        token_number=4,
+        status="ARRIVED",
+        consultation_status=ConsultationStatus.COMPLETED.value,
+        visit_id=visit.id,
+        created_by_user_id=reception_user.id,
+        status_updated_at=datetime(2026, 11, 2, 11, 0, tzinfo=UTC),
+    )
+    db_session.add_all([appt_cancelled, appt_completed])
+    db_session.flush()
+
+    line = BillItem(
+        visit_id=visit.id,
+        patient_id=patient.id,
+        appointment_id=appt_completed.id,
+        category=BillItemCategory.CONSULTATION.value,
+        source=BillItemSource.SYSTEM.value,
+        description="Consultation",
+        quantity=Decimal("1"),
+        rate_paise=30000,
+        original_amount_paise=30000,
+        amount_paise=30000,
+        created_by_user_id=reception_user.id,
+    )
+    db_session.add(line)
+    db_session.flush()
+
+    summaries = _to_summaries(db_session, [(visit, patient)])
+    assert len(summaries) == 1
+    s = summaries[0]
+    assert s.token_numbers == [4]
+    assert s.last_completed_at == appt_completed.status_updated_at
+
+
+def test_visit_summary_no_completed_consultation_has_null_completion_time(
+    doctor_a_user, reception_user, db_session
+):
+    """Task 3: Visit with no completed consultation has last_completed_at null."""
+    from kalyan_api.routers.visits import _to_summaries
+
+    patient = _patient(db_session, "T3C")
+    visit = _visit(db_session, patient, reception_user)
+
+    # Waiting consultation with token 5
+    appt = Appointment(
+        patient_id=patient.id,
+        doctor_id=doctor_a_user.doctor_id,
+        appointment_date=VISIT_DATE,
+        token_number=5,
+        status="ARRIVED",
+        consultation_status=ConsultationStatus.WAITING.value,
+        visit_id=visit.id,
+        created_by_user_id=reception_user.id,
+    )
+    db_session.add(appt)
+    db_session.flush()
+
+    summaries = _to_summaries(db_session, [(visit, patient)])
+    assert len(summaries) == 1
+    s = summaries[0]
+    assert s.token_numbers == [5]
+    assert s.last_completed_at is None
+

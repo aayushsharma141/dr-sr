@@ -151,6 +151,7 @@ describe('Administration Module Registry Invariants', () => {
     expect(findAdminModuleForPath('/admin/templates')?.module.id).toBe('print-templates')
     expect(findAdminModuleForPath('/admin/doctors')?.module.id).toBe('doctors-fees')
     expect(findAdminModuleForPath('/admin/patients/correct')?.module.id).toBe('patient-correct')
+    expect(findAdminModuleForPath('/admin/reports/referrals')?.module.id).toBe('referral-report')
     expect(findAdminModuleForPath('/admin/imports')).toBeNull()
     expect(findAdminModuleForPath('/admin/exports')).toBeNull()
     expect(findAdminModuleForPath('/admin/billing')?.module.id).toBe('billing-reversals')
@@ -253,6 +254,7 @@ describe('Administration Dashboard & Single Sidebar Layout', () => {
 
     expect(within(primaryNav).getByRole('link', { name: 'Patient Records' })).toHaveAttribute('href', '/reception/patients')
     expect(within(primaryNav).getByRole('link', { name: /Corrections/ })).toHaveAttribute('href', '/admin/patients/correct')
+    expect(within(primaryNav).getByRole('link', { name: /Referral Report/ })).toHaveAttribute('href', '/admin/reports/referrals')
     expect(within(primaryNav).queryByRole('link', { name: /Import Centre|Export Centre/ })).toBeNull()
 
     expect(within(primaryNav).getByRole('link', { name: /Receipts/ })).toHaveAttribute('href', '/admin/billing')

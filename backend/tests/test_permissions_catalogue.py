@@ -107,6 +107,7 @@ def test_golden_role_permissions_snapshot() -> None:
                 Permission.PAYMENT_READ,
                 Permission.RECEIPT_REPRINT,
                 Permission.PAYMENT_REVERSE,
+                Permission.BILL_ADJUST,  # Phase 22 Wave 3, OD-22-11 (design §6)
                 Permission.TIMELINE_READ,
                 Permission.AUDIT_READ,
                 Permission.BACKUP_RUN,
@@ -122,6 +123,7 @@ def test_golden_role_permissions_snapshot() -> None:
                 Permission.PATIENT_IMPORT,
                 Permission.PATIENT_EXPORT,
                 Permission.VISIT_READ,
+                Permission.REPORT_REFERRAL,
             }
         ),
         Role.RECEPTION: frozenset(
@@ -143,11 +145,13 @@ def test_golden_role_permissions_snapshot() -> None:
                 Permission.TIMELINE_READ,
                 Permission.VISIT_READ,
                 Permission.VISIT_WRITE,
+                Permission.BILL_WRITE,
             }
         ),
         Role.DOCTOR: frozenset(
             {
                 Permission.DASHBOARD_DOCTOR,
+                Permission.BILL_CLINICAL,  # Phase 22 Wave 3, OD-22-11 (design §6)
                 Permission.SETTINGS_READ,
                 Permission.DOCTOR_READ,
                 Permission.DOCTOR_SETTINGS_WRITE,
@@ -191,3 +195,47 @@ def test_admin_does_not_have_patient_update() -> None:
     assert Permission.PATIENT_CORRECT not in ROLE_PERMISSIONS[Role.DOCTOR]
     assert Permission.PATIENT_IMPORT not in ROLE_PERMISSIONS[Role.DOCTOR]
     assert Permission.PATIENT_EXPORT not in ROLE_PERMISSIONS[Role.DOCTOR]
+
+
+def test_bill_write_restricted_exclusively_to_reception() -> None:
+    """Phase 22 / OD-22-13: Reception is the only role permitted to add bill line items."""
+    for role, perms in ROLE_PERMISSIONS.items():
+        if role == Role.RECEPTION:
+            assert Permission.BILL_WRITE in perms
+        else:
+            assert Permission.BILL_WRITE not in perms, f"{role} must NOT have bill:write"
+
+
+def test_bill_adjust_restricted_exclusively_to_admin() -> None:
+    """Phase 22 / OD-A / FEE-05: Fee adjustments/corrections are restricted exclusively to ADMIN."""
+    for role, perms in ROLE_PERMISSIONS.items():
+        if role == Role.ADMIN:
+            assert Permission.BILL_ADJUST in perms
+        else:
+            assert Permission.BILL_ADJUST not in perms, f"{role} must NOT have bill:adjust"
+
+
+def test_bill_clinical_restricted_exclusively_to_doctor() -> None:
+    """Phase 22 / OD-22-11: Doctor consultation fee adjustment is restricted exclusively to DOCTOR."""
+    for role, perms in ROLE_PERMISSIONS.items():
+        if role == Role.DOCTOR:
+            assert Permission.BILL_CLINICAL in perms
+        else:
+            assert Permission.BILL_CLINICAL not in perms, f"{role} must NOT have bill:clinical"
+
+
+def test_report_referral_restricted_exclusively_to_admin() -> None:
+    """Phase 22 / OD-22-21: Referral report is restricted exclusively to ADMIN."""
+    for role, perms in ROLE_PERMISSIONS.items():
+        if role == Role.ADMIN:
+            assert Permission.REPORT_REFERRAL in perms
+        else:
+            assert Permission.REPORT_REFERRAL not in perms, f"{role} must NOT have report:referral"
+
+
+def test_reception_has_no_prescription_permissions() -> None:
+    """D-04 / MED-09: Reception default-deny for clinical encounters, notes, and prescriptions."""
+    reception_perms = ROLE_PERMISSIONS[Role.RECEPTION]
+    assert Permission.PRESCRIPTION_READ not in reception_perms
+    assert Permission.PRESCRIPTION_WRITE not in reception_perms
+

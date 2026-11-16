@@ -203,11 +203,13 @@ describe('Clinical Encounter Workspace Test Suite', () => {
     sessionStorage.clear()
   })
 
-  function renderWorkspace(encounterId: number = 10) {
+  function renderWorkspace(routeOrId: number | string = 10) {
+    const path = typeof routeOrId === 'number' ? `/doctor/encounters/${routeOrId}` : routeOrId
     return render(
       <QueryClientProvider client={queryClient}>
-        <MemoryRouter initialEntries={[`/doctor/encounters/${encounterId}`]}>
+        <MemoryRouter initialEntries={[path]}>
           <Routes>
+            <Route path="/doctor/encounters/new" element={<ClinicalEncounterWorkspace />} />
             <Route path="/doctor/encounters/:id" element={<ClinicalEncounterWorkspace />} />
             <Route path="/doctor" element={<div>Doctor Dashboard</div>} />
           </Routes>
@@ -234,6 +236,46 @@ describe('Clinical Encounter Workspace Test Suite', () => {
           status: 200,
           headers: new Headers({ 'content-type': 'application/json' }),
           text: () => Promise.resolve(JSON.stringify(mockMeDoctor)),
+        })
+      }
+      if (urlStr.includes('/api/encounters') && init?.method === 'POST') {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          headers: new Headers({ 'content-type': 'application/json' }),
+          text: () => Promise.resolve(JSON.stringify(enc)),
+        })
+      }
+      if (urlStr.includes('/bill-items')) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          headers: new Headers({ 'content-type': 'application/json' }),
+          text: () =>
+            Promise.resolve(
+              JSON.stringify({
+                consultation_line: {
+                  id: 1,
+                  visit_id: 10,
+                  appointment_id: 5,
+                  category: 'CONSULTATION',
+                  source: 'SYSTEM',
+                  description: 'Consultation Fee - Dr. Dwivedi',
+                  unit: null,
+                  quantity: '1.00',
+                  rate_paise: 50000,
+                  amount_paise: 50000,
+                  original_amount_paise: 50000,
+                  status: 'ACTIVE',
+                  counts_toward_total: true,
+                  created_by_user_id: 2,
+                  created_by_username: 'reception',
+                  created_at: '2026-11-16T09:00:00Z',
+                  history: [],
+                },
+                doctor_lines: [],
+              })
+            ),
         })
       }
       if (urlStr.includes('/api/doctors')) {
@@ -501,6 +543,28 @@ describe('Clinical Encounter Workspace Test Suite', () => {
       expect(
         screen.getByText(/This patient has no earlier consultation records in Kalyan Hospital/i)
       ).toBeInTheDocument()
+    })
+
+    it('renders doctor charges panel in the aside for existing encounter /doctor/encounters/:id', async () => {
+      const mockFetch = setupDefaultFetchMocks()
+      vi.stubGlobal('fetch', mockFetch)
+
+      renderWorkspace(10)
+
+      const chargesPanel = await screen.findByTestId('doctor-charges-panel')
+      expect(chargesPanel).toBeInTheDocument()
+      expect(within(chargesPanel).getByText(/₹500\.00, billed at check-in/i)).toBeInTheDocument()
+    })
+
+    it('renders doctor charges panel in the aside for new consultation /doctor/encounters/new?appointment_id=5&patient_id=101', async () => {
+      const mockFetch = setupDefaultFetchMocks()
+      vi.stubGlobal('fetch', mockFetch)
+
+      renderWorkspace('/doctor/encounters/new?appointment_id=5&patient_id=101')
+
+      const chargesPanel = await screen.findByTestId('doctor-charges-panel')
+      expect(chargesPanel).toBeInTheDocument()
+      expect(within(chargesPanel).getByText(/₹500\.00, billed at check-in/i)).toBeInTheDocument()
     })
   })
 

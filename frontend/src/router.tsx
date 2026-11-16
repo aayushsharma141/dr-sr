@@ -205,6 +205,15 @@ export const router = createBrowserRouter([
             },
           },
           {
+            path: '/admin/reports/referrals',
+            lazy: async () => {
+              const { ReferralReportPage } = await import('./pages/admin/ReferralReportPage')
+              return {
+                Component: ReferralReportPage,
+              }
+            },
+          },
+          {
             // Patient Import Centre merged into Backup & Restore module; keep old links working.
             path: '/admin/imports',
             element: <Navigate to="/admin/backups?action=import" replace />,
@@ -225,6 +234,15 @@ export const router = createBrowserRouter([
               const { ReceptionBillingPage } = await import('./pages/ReceptionBillingPage')
               return {
                 Component: ReceptionBillingPage,
+              }
+            },
+          },
+          {
+            path: '/reception/receipts',
+            lazy: async () => {
+              const { ReceiptsPage } = await import('./pages/ReceiptsPage')
+              return {
+                Component: ReceiptsPage,
               }
             },
           },
@@ -273,6 +291,15 @@ export const router = createBrowserRouter([
               const { WaitingRoom } = await import('./pages/WaitingRoom')
               return {
                 Component: WaitingRoom,
+              }
+            },
+          },
+          {
+            path: '/reception/reports',
+            lazy: async () => {
+              const { ReceptionReportsPage } = await import('./pages/ReceptionReportsPage')
+              return {
+                Component: ReceptionReportsPage,
               }
             },
           },

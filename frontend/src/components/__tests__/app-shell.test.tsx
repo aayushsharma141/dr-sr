@@ -78,7 +78,7 @@ describe('AppShell clinical navigation hierarchy', () => {
       'Patient Records',
       'Appointments',
       'Waiting Room',
-      'Billing & Payments',
+      'Billing & Checkout',
     ])
     expect(links.map((l) => l.getAttribute('href'))).toEqual([
       '/reception/tokens',
@@ -93,11 +93,12 @@ describe('AppShell clinical navigation hierarchy', () => {
     expect(within(primaryNav).getByRole('link', { name: 'Appointments' })).toHaveAttribute('aria-current', 'page')
     expect(document.title).toBe('Appointments – Kalyan Hospital')
 
+    expect(within(primaryNav).queryByRole('link', { name: 'Billing & Payments' })).not.toBeInTheDocument()
     expect(within(primaryNav).queryByRole('link', { name: 'Physiotherapy Treatment' })).not.toBeInTheDocument()
     expect(within(primaryNav).queryByRole('link', { name: 'Follow-ups' })).not.toBeInTheDocument()
   })
 
-  it('keeps Check-in & Token and Billing & Payments highlighted on their own pages', () => {
+  it('keeps Check-in & Token and Billing & Checkout highlighted on their own pages', () => {
     renderShell('RECEPTION', '/reception/tokens?patient_id=4&appointment_id=104')
     let primaryNav = screen.getByRole('navigation', { name: 'Primary navigation' })
     expect(within(primaryNav).getByRole('link', { name: 'Check-in & Token' })).toHaveAttribute('aria-current', 'page')
@@ -106,7 +107,8 @@ describe('AppShell clinical navigation hierarchy', () => {
 
     renderShell('RECEPTION', '/reception/billing?tab=dues')
     primaryNav = screen.getByRole('navigation', { name: 'Primary navigation' })
-    expect(within(primaryNav).getByRole('link', { name: 'Billing & Payments' })).toHaveAttribute('aria-current', 'page')
+    expect(within(primaryNav).getByRole('link', { name: 'Billing & Checkout' })).toHaveAttribute('aria-current', 'page')
+    expect(within(primaryNav).queryByRole('link', { name: 'Billing & Payments' })).not.toBeInTheDocument()
   })
 
   it('keeps Patient Records active and names the page Edit Patient while a patient is edited', () => {
@@ -143,6 +145,7 @@ describe('AppShell clinical navigation hierarchy', () => {
     expect(document.title).toBe('Follow-ups – Kalyan Hospital')
     expect(within(primaryNav).queryByRole('link', { name: 'Appointments' })).not.toBeInTheDocument()
     expect(within(primaryNav).queryByRole('link', { name: 'Patient Registration' })).not.toBeInTheDocument()
+    expect(within(primaryNav).queryByRole('link', { name: 'Billing & Checkout' })).not.toBeInTheDocument()
     expect(within(primaryNav).queryByRole('link', { name: 'Billing & Payments' })).not.toBeInTheDocument()
   })
 
@@ -347,56 +350,27 @@ describe('AppShell clinical navigation hierarchy', () => {
     expect(screen.getByText('Asha Kumari')).toBeInTheDocument()
   })
 
-  describe('central server status at the foot of the sidebar', () => {
-    afterEach(() => {
-      vi.unstubAllGlobals()
+  describe('LAN status pill mounted in the app shell (OD-F option-b)', () => {
+    it('shows Online when health probe succeeds', () => {
+      renderShell('ADMIN', '/admin')
+      expect(screen.getByRole('status', { name: /LAN status: Connected/i })).toBeInTheDocument()
+      expect(screen.getByText('Online')).toBeInTheDocument()
     })
 
-    const statusIn = () => within(screen.getByRole('complementary', { name: 'Primary navigation' }))
-
-    it('is green only when the server confirms its database', async () => {
-      const fetchMock = vi.fn(async () =>
-        new Response(JSON.stringify({ status: 'ok', db: 'ok', setup_required: false }), { status: 200 }),
-      )
-      vi.stubGlobal('fetch', fetchMock)
+    it('shows Disconnected as soon as workstation loses network', () => {
       renderShell('ADMIN', '/admin')
-
-      expect(await statusIn().findByText('LAN connected')).toBeInTheDocument()
-      expect(fetchMock).toHaveBeenCalledWith('/api/health', expect.objectContaining({ cache: 'no-store' }))
-    })
-
-    it('reports the database as unavailable when the health check fails on the server', async () => {
-      vi.stubGlobal('fetch', vi.fn(async () => new Response('error', { status: 500 })))
-      renderShell('ADMIN', '/admin')
-
-      expect(await statusIn().findByRole('status')).toHaveTextContent('Database unavailable')
-      expect(statusIn().queryByText('LAN connected')).not.toBeInTheDocument()
-    })
-
-    it('reports the server as unreachable when the request cannot reach it', async () => {
-      vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new TypeError('Failed to fetch')))
-      renderShell('ADMIN', '/admin')
-
-      expect(await statusIn().findByRole('status')).toHaveTextContent('Server unreachable')
-    })
-
-    it('shows Offline as soon as the workstation loses its network', async () => {
-      vi.stubGlobal(
-        'fetch',
-        vi.fn(async () => new Response(JSON.stringify({ status: 'ok', db: 'ok' }), { status: 200 })),
-      )
-      renderShell('ADMIN', '/admin')
-      expect(await statusIn().findByText('LAN connected')).toBeInTheDocument()
+      expect(screen.getByText('Online')).toBeInTheDocument()
 
       act(() => {
         window.dispatchEvent(new Event('offline'))
       })
-      expect(statusIn().getByRole('status')).toHaveTextContent('Offline')
+      expect(screen.getByRole('status', { name: /LAN status: Disconnected/i })).toBeInTheDocument()
+      expect(screen.getByText('Disconnected')).toBeInTheDocument()
 
       act(() => {
         window.dispatchEvent(new Event('online'))
       })
-      expect(await statusIn().findByText('LAN connected')).toBeInTheDocument()
+      expect(screen.getByText('Online')).toBeInTheDocument()
     })
   })
 })

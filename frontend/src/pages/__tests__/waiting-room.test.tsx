@@ -1,4 +1,4 @@
-import { cleanup, render, screen, within } from '@testing-library/react'
+import { act, cleanup, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { MemoryRouter } from 'react-router'
@@ -184,5 +184,54 @@ describe('WaitingRoom', () => {
 
     expect(state.cancelMutate).not.toHaveBeenCalled()
     expect(screen.getByRole('alert')).toHaveTextContent('at least 3 characters')
+  })
+
+  it('shows distinct empty copy for each column when empty', () => {
+    state.appointments = []
+    renderPage()
+
+    expect(screen.getByText('No one is waiting.')).toBeInTheDocument()
+    expect(screen.getByText('No one is in a cabin.')).toBeInTheDocument()
+    expect(screen.getByText('No consultations completed yet today.')).toBeInTheDocument()
+  })
+
+  it('maintains doctor filter, department filter and search after actions', async () => {
+    state.appointments = [
+      appt({
+        id: 1,
+        token_number: 1,
+        doctor_id: 1,
+        department_id: 10,
+        patient_name: 'Anita Devi',
+        patient_urn: 'KH-001',
+      }),
+    ]
+    renderPage()
+
+    await userEvent.selectOptions(screen.getByLabelText('Doctor'), '1')
+    await userEvent.selectOptions(screen.getByLabelText('Department'), '10')
+    await userEvent.type(screen.getByRole('searchbox'), 'Anita')
+
+    expect(screen.getByText('Anita Devi')).toBeInTheDocument()
+
+    // Trigger cancel consultation
+    await userEvent.click(screen.getByRole('button', { name: 'Cancel consultation' }))
+    await userEvent.type(screen.getByLabelText('Reason for cancelling'), 'Patient had an emergency')
+    await userEvent.click(screen.getAllByRole('button', { name: 'Cancel consultation' }).at(-1)!)
+
+    expect(state.cancelMutate).toHaveBeenCalledTimes(1)
+
+    // Simulate onSuccess
+    const onSuccess = state.cancelMutate.mock.calls[0][1]?.onSuccess
+    if (onSuccess) {
+      act(() => {
+        onSuccess()
+      })
+    }
+
+    // Verify filter inputs are still retained
+    expect(screen.getByLabelText('Doctor')).toHaveValue('1')
+    expect(screen.getByLabelText('Department')).toHaveValue('10')
+    expect(screen.getByRole('searchbox')).toHaveValue('Anita')
   })
 })

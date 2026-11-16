@@ -391,6 +391,7 @@ def ensure_consultation_line(session: Session, appt: Appointment, principal: Pri
         description="Consultation fee",
         quantity=Decimal("1"),
         rate_paise=fee,
+        original_amount_paise=fee,
         amount_paise=fee,
         created_by_user_id=principal.user_id,
     )

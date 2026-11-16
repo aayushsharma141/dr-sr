@@ -70,6 +70,12 @@ class VisitSummary(VisitRead):
         ..., ge=0, description="Consultations still waiting or in progress"
     )
     outstanding_paise: int = Field(..., ge=0)
+    token_numbers: list[int] = Field(
+        default_factory=list, description="Tokens of non-cancelled consultations, check-in order"
+    )
+    last_completed_at: datetime | None = Field(
+        default=None, description="Latest completion time among completed consultations"
+    )
 
 
 class VisitDetail(VisitRead):

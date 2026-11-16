@@ -25,6 +25,8 @@ from kalyan_api.routers.assets import router as assets_router
 from kalyan_api.routers.audit import router as audit_router
 from kalyan_api.routers.auth import router as auth_router
 from kalyan_api.routers.billing import router as billing_router
+from kalyan_api.routers.bill_items import router as bill_items_router
+from kalyan_api.routers.fee_adjustments import router as fee_adjustments_router
 from kalyan_api.routers.departments import router as departments_router
 from kalyan_api.routers.doctors import router as doctors_router
 from kalyan_api.routers.encounters import router as encounters_router
@@ -35,6 +37,7 @@ from kalyan_api.routers.imports import router as imports_router
 from kalyan_api.routers.operations import router as operations_router
 from kalyan_api.routers.patients import router as patients_router
 from kalyan_api.routers.prescriptions import router as prescriptions_router
+from kalyan_api.routers.reports import router as reports_router
 from kalyan_api.routers.roles import router as roles_router
 from kalyan_api.routers.security import router as security_router
 from kalyan_api.routers.sessions import router as sessions_router
@@ -179,6 +182,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(treatment_plans_router, prefix="/api")
     app.include_router(treatment_sessions_router, prefix="/api")
     app.include_router(billing_router, prefix="/api")
+    app.include_router(fee_adjustments_router, prefix="/api")
+    app.include_router(bill_items_router, prefix="/api")
     app.include_router(timeline_router, prefix="/api")
     app.include_router(audit_router, prefix="/api")
     app.include_router(operations_router, prefix="/api")
@@ -186,6 +191,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(sessions_router, prefix="/api")
     app.include_router(security_router, prefix="/api")
     app.include_router(system_router, prefix="/api")
+    app.include_router(reports_router, prefix="/api")
 
     # SPA frontend distribution serving (app.frontend)
     dist_dir = resolved_settings.frontend_dist

@@ -18,6 +18,9 @@ class PaymentCreate(BaseModel):
     appointment_id: int | None = Field(
         default=None, gt=0, description="Optional linked appointment ID"
     )
+    visit_id: int | None = Field(
+        default=None, gt=0, description="Optional linked visit ID"
+    )
     amount_paise: int = Field(gt=0, description="Payment amount in integer paise")
     payment_method: Literal["CASH", "UPI", "CARD"] = Field(
         description="Payment mode used (CASH, UPI, CARD)"
@@ -40,6 +43,7 @@ class PaymentOut(BaseModel):
     treatment_plan_id: int | None = None
     treatment_plan_name: str | None = None
     appointment_id: int | None = None
+    visit_id: int | None = None
     amount_paise: int
     payment_method: str
     notes: str | None = None
@@ -98,13 +102,12 @@ class VisitDueOut(BaseModel):
     """A consultation fee still owed on a visit that was closed with a balance (RF-23)."""
 
     visit_id: int
-    appointment_id: int
     patient_id: int
     patient_urn: str
     patient_name: str
-    doctor_name_en: str
+    doctor_names: list[str]
     visit_date: date
-    fee_paise: int
+    bill_total_paise: int
     paid_paise: int
     balance_paise: int
     close_reason: str | None = None

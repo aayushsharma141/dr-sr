@@ -1,4 +1,4 @@
-import { useMemo, useState, type FormEvent } from 'react'
+import { useMemo, useRef, useState, type FormEvent } from 'react'
 import {
   useAppointments,
   useRescheduleAppointment,
@@ -30,21 +30,21 @@ function statusView(a: Appointment): { label: string; style: string } {
     case 'BOOKED':
       return { label: 'Booked', style: 'bg-sky-50 text-sky-800 ring-sky-200' }
     case 'NO_SHOW':
-      return { label: 'Not arrived', style: 'bg-slate-100 text-slate-700 ring-slate-200' }
+      return { label: 'No-show', style: 'bg-slate-100 text-slate-700 ring-slate-200' }
     case 'CANCELLED':
-      return { label: 'Cancelled', style: 'bg-red-50 text-red-800 ring-red-200' }
+      return { label: 'Cancelled', style: 'bg-slate-100 text-slate-600 ring-slate-200' }
     case 'RESCHEDULED':
       return { label: 'Rescheduled', style: 'bg-slate-100 text-slate-600 ring-slate-200' }
     case 'DONE':
-      return { label: 'Seen by doctor', style: 'bg-emerald-50 text-emerald-800 ring-emerald-200' }
+      return { label: 'Completed', style: 'bg-emerald-50 text-emerald-800 ring-emerald-200' }
     case 'IN_CONSULTATION':
-      return { label: 'With doctor', style: 'bg-violet-50 text-violet-800 ring-violet-200' }
+      return { label: 'In Cabin', style: 'bg-violet-50 text-violet-800 ring-violet-200' }
     default:
       return a.consultation_status === 'COMPLETED'
-        ? { label: 'Seen by doctor', style: 'bg-emerald-50 text-emerald-800 ring-emerald-200' }
+        ? { label: 'Completed', style: 'bg-emerald-50 text-emerald-800 ring-emerald-200' }
         : a.consultation_status === 'IN_CONSULTATION'
-          ? { label: 'With doctor', style: 'bg-violet-50 text-violet-800 ring-violet-200' }
-          : { label: 'Waiting', style: 'bg-amber-50 text-amber-900 ring-amber-200' }
+          ? { label: 'In Cabin', style: 'bg-violet-50 text-violet-800 ring-violet-200' }
+          : { label: 'Waiting', style: 'bg-slate-100 text-slate-800 ring-slate-200' }
   }
 }
 
@@ -113,6 +113,26 @@ export function TodayAppointmentsPanel({
     { key: 'checked', label: 'Checked in' },
     { key: 'all', label: 'All' },
   ]
+  const tabRefs = useRef<(HTMLButtonElement | null)[]>([])
+
+  const handleTabKeyDown = (e: React.KeyboardEvent, index: number) => {
+    let nextIndex: number | null = null
+    if (e.key === 'ArrowRight') {
+      nextIndex = (index + 1) % tabs.length
+    } else if (e.key === 'ArrowLeft') {
+      nextIndex = (index - 1 + tabs.length) % tabs.length
+    } else if (e.key === 'Home') {
+      nextIndex = 0
+    } else if (e.key === 'End') {
+      nextIndex = tabs.length - 1
+    }
+
+    if (nextIndex !== null) {
+      e.preventDefault()
+      setView(tabs[nextIndex].key)
+      tabRefs.current[nextIndex]?.focus()
+    }
+  }
 
   return (
     <section
@@ -133,12 +153,17 @@ export function TodayAppointmentsPanel({
         </div>
 
         <div role="tablist" aria-label="Which appointments" className="flex gap-1 rounded-lg bg-slate-100 p-1">
-          {tabs.map((t) => (
+          {tabs.map((t, idx) => (
             <button
               key={t.key}
+              ref={(el) => {
+                tabRefs.current[idx] = el
+              }}
               type="button"
               role="tab"
               aria-selected={view === t.key}
+              tabIndex={view === t.key ? 0 : -1}
+              onKeyDown={(e) => handleTabKeyDown(e, idx)}
               onClick={() => setView(t.key)}
               className={`flex-1 rounded-md px-2 py-1.5 text-xs font-bold transition-colors ${
                 view === t.key ? 'bg-white text-[#5D0B26] shadow-2xs' : 'text-slate-600 hover:text-slate-900'
@@ -291,7 +316,7 @@ function AppointmentRow({
             <>
               <RowButton onClick={() => onAction('no-show')}>No-show</RowButton>
               <RowButton onClick={() => onAction('reschedule')}>Reschedule</RowButton>
-              <RowButton onClick={() => onAction('cancel')}>Cancel</RowButton>
+              <RowButton onClick={() => onAction('cancel')}>Cancel booking</RowButton>
             </>
           )}
           {waiting && canCheckIn && (

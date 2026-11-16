@@ -1659,6 +1659,556 @@
         "title": "BatchSummaryResponse",
         "type": "object"
       },
+      "BillLineCorrectRequest": {
+        "additionalProperties": false,
+        "description": "Payload for correcting quantity and/or rate on a non-consultation line (MED-11).",
+        "properties": {
+          "quantity": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "maximum": 99999999.99,
+                "type": "number"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Quantity"
+          },
+          "rate_paise": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rate Paise"
+          },
+          "reason": {
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "reason"
+        ],
+        "title": "BillLineCorrectRequest",
+        "type": "object"
+      },
+      "BillLineCreate": {
+        "additionalProperties": false,
+        "description": "Payload for reception adding a bill line (medicine or additional particular).",
+        "properties": {
+          "category": {
+            "enum": [
+              "MEDICINE",
+              "ADDITIONAL"
+            ],
+            "title": "Category",
+            "type": "string"
+          },
+          "description": {
+            "title": "Description",
+            "type": "string"
+          },
+          "prescription_item_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Prescription Item Id"
+          },
+          "quantity": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "maximum": 99999999.99,
+                "type": "number"
+              },
+              {
+                "type": "string"
+              }
+            ],
+            "title": "Quantity"
+          },
+          "rate_paise": {
+            "minimum": 0.0,
+            "title": "Rate Paise",
+            "type": "integer"
+          },
+          "unit": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unit"
+          }
+        },
+        "required": [
+          "category",
+          "description",
+          "quantity",
+          "rate_paise"
+        ],
+        "title": "BillLineCreate",
+        "type": "object"
+      },
+      "BillLineHistoryOut": {
+        "description": "Adjustment history row for a bill line item (OD-22-15, FEE-09 read path).",
+        "properties": {
+          "actor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "readOnly": true,
+            "title": "Actor"
+          },
+          "actor_user_id": {
+            "title": "Actor User Id",
+            "type": "integer"
+          },
+          "actor_username": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Actor Username"
+          },
+          "bill_item_id": {
+            "title": "Bill Item Id",
+            "type": "integer"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
+          "new": {
+            "readOnly": true,
+            "title": "New",
+            "type": "integer"
+          },
+          "new_amount_paise": {
+            "title": "New Amount Paise",
+            "type": "integer"
+          },
+          "new_quantity": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "New Quantity"
+          },
+          "new_rate_paise": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "New Rate Paise"
+          },
+          "old": {
+            "readOnly": true,
+            "title": "Old",
+            "type": "integer"
+          },
+          "old_amount_paise": {
+            "title": "Old Amount Paise",
+            "type": "integer"
+          },
+          "old_quantity": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Old Quantity"
+          },
+          "old_rate_paise": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Old Rate Paise"
+          },
+          "reason": {
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "bill_item_id",
+          "kind",
+          "old_amount_paise",
+          "new_amount_paise",
+          "reason",
+          "actor_user_id",
+          "created_at",
+          "old",
+          "new",
+          "actor"
+        ],
+        "title": "BillLineHistoryOut",
+        "type": "object"
+      },
+      "BillLineOut": {
+        "description": "Bill line item presentation model (MED-04, MED-05, OD-22-14, OD-22-15).",
+        "properties": {
+          "amount_paise": {
+            "title": "Amount Paise",
+            "type": "integer"
+          },
+          "appointment_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Appointment Id"
+          },
+          "category": {
+            "title": "Category",
+            "type": "string"
+          },
+          "counts_toward_total": {
+            "default": false,
+            "title": "Counts Toward Total",
+            "type": "boolean"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "created_by_user_id": {
+            "title": "Created By User Id",
+            "type": "integer"
+          },
+          "created_by_username": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created By Username"
+          },
+          "description": {
+            "title": "Description",
+            "type": "string"
+          },
+          "history": {
+            "items": {
+              "$ref": "#/components/schemas/BillLineHistoryOut"
+            },
+            "title": "History",
+            "type": "array"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "original_amount_paise": {
+            "title": "Original Amount Paise",
+            "type": "integer"
+          },
+          "prescription_item_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Prescription Item Id"
+          },
+          "quantity": {
+            "title": "Quantity",
+            "type": "string"
+          },
+          "rate_paise": {
+            "title": "Rate Paise",
+            "type": "integer"
+          },
+          "source": {
+            "title": "Source",
+            "type": "string"
+          },
+          "staff": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "readOnly": true,
+            "title": "Staff"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "unit": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unit"
+          },
+          "visit_id": {
+            "title": "Visit Id",
+            "type": "integer"
+          },
+          "void_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Void Reason"
+          },
+          "voided_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Voided At"
+          },
+          "voided_by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "readOnly": true,
+            "title": "Voided By"
+          },
+          "voided_by_user_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Voided By User Id"
+          },
+          "voided_by_username": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Voided By Username"
+          }
+        },
+        "required": [
+          "id",
+          "visit_id",
+          "category",
+          "source",
+          "description",
+          "quantity",
+          "rate_paise",
+          "amount_paise",
+          "original_amount_paise",
+          "status",
+          "created_by_user_id",
+          "created_at",
+          "staff",
+          "voided_by"
+        ],
+        "title": "BillLineOut",
+        "type": "object"
+      },
+      "BillLineVoidRequest": {
+        "additionalProperties": false,
+        "description": "Payload for voiding a non-consultation bill line (OD-G, BILL-06).",
+        "properties": {
+          "reason": {
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "reason"
+        ],
+        "title": "BillLineVoidRequest",
+        "type": "object"
+      },
+      "BillPaymentOut": {
+        "description": "Payment record on a visit or its appointments.",
+        "properties": {
+          "amount_paise": {
+            "title": "Amount Paise",
+            "type": "integer"
+          },
+          "appointment_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Appointment Id"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "created_by_username": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created By Username"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "is_reversed": {
+            "title": "Is Reversed",
+            "type": "boolean"
+          },
+          "payment_method": {
+            "title": "Payment Method",
+            "type": "string"
+          },
+          "receipt_number": {
+            "title": "Receipt Number",
+            "type": "string"
+          },
+          "visit_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Visit Id"
+          }
+        },
+        "required": [
+          "id",
+          "receipt_number",
+          "amount_paise",
+          "payment_method",
+          "is_reversed",
+          "created_at"
+        ],
+        "title": "BillPaymentOut",
+        "type": "object"
+      },
+      "BillSectionOut": {
+        "description": "Grouped bill section for OD-22-14 bill view.",
+        "properties": {
+          "category": {
+            "title": "Category",
+            "type": "string"
+          },
+          "lines": {
+            "items": {
+              "$ref": "#/components/schemas/BillLineOut"
+            },
+            "title": "Lines",
+            "type": "array"
+          },
+          "subtotal_paise": {
+            "title": "Subtotal Paise",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "category",
+          "subtotal_paise"
+        ],
+        "title": "BillSectionOut",
+        "type": "object"
+      },
       "BillingConfigurationOut": {
         "additionalProperties": false,
         "description": "How billing works on this system today. Read-only: these are not editable settings.",
@@ -2807,6 +3357,31 @@
         "title": "DepartmentUpdate",
         "type": "object"
       },
+      "DoctorChargesOut": {
+        "additionalProperties": false,
+        "description": "Doctor's own read view of charges on own consultation (Q13, UI-SPEC S6).\n\nStrictly NO visit total, NO payments, NO reception lines or other doctors' lines.",
+        "properties": {
+          "consultation_line": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BillLineOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "doctor_lines": {
+            "items": {
+              "$ref": "#/components/schemas/BillLineOut"
+            },
+            "title": "Doctor Lines",
+            "type": "array"
+          }
+        },
+        "title": "DoctorChargesOut",
+        "type": "object"
+      },
       "DoctorCreate": {
         "additionalProperties": false,
         "description": "Payload for creating a new doctor profile.",
@@ -3038,6 +3613,86 @@
           "updated_at"
         ],
         "title": "DoctorFollowUpResponse",
+        "type": "object"
+      },
+      "DoctorLineCreate": {
+        "additionalProperties": false,
+        "description": "Payload for doctor adding a procedure or package reference charge to own consultation.",
+        "properties": {
+          "category": {
+            "enum": [
+              "PROCEDURE",
+              "PACKAGE"
+            ],
+            "title": "Category",
+            "type": "string"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "quantity": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "maximum": 99999999.99,
+                "type": "number"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Quantity"
+          },
+          "rate_paise": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rate Paise"
+          },
+          "treatment_plan_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Treatment Plan Id"
+          },
+          "unit": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unit"
+          }
+        },
+        "required": [
+          "category"
+        ],
+        "title": "DoctorLineCreate",
         "type": "object"
       },
       "DoctorMeSettingsUpdate": {
@@ -4202,6 +4857,89 @@
         "title": "ExportScope",
         "type": "object"
       },
+      "FeeAdjustmentOut": {
+        "properties": {
+          "actor_user_id": {
+            "title": "Actor User Id",
+            "type": "integer"
+          },
+          "appointment_id": {
+            "title": "Appointment Id",
+            "type": "integer"
+          },
+          "bill_item_id": {
+            "title": "Bill Item Id",
+            "type": "integer"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
+          "new_amount_paise": {
+            "title": "New Amount Paise",
+            "type": "integer"
+          },
+          "old_amount_paise": {
+            "title": "Old Amount Paise",
+            "type": "integer"
+          },
+          "reason": {
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "bill_item_id",
+          "appointment_id",
+          "kind",
+          "old_amount_paise",
+          "new_amount_paise",
+          "reason",
+          "actor_user_id",
+          "created_at"
+        ],
+        "title": "FeeAdjustmentOut",
+        "type": "object"
+      },
+      "FeeAdjustmentRequest": {
+        "description": "Discount, waive or correct the fee of one consultation, with a reason.",
+        "properties": {
+          "kind": {
+            "enum": [
+              "DISCOUNT",
+              "WAIVER",
+              "CORRECTION"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "new_amount_paise": {
+            "description": "The fee after the change, in paise",
+            "minimum": 0.0,
+            "title": "New Amount Paise",
+            "type": "integer"
+          },
+          "reason": {
+            "description": "Why the fee changed",
+            "maxLength": 500,
+            "minLength": 3,
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "new_amount_paise",
+          "reason"
+        ],
+        "title": "FeeAdjustmentRequest",
+        "type": "object"
+      },
       "FeeCreate": {
         "additionalProperties": false,
         "description": "Payload for creating a consultation fee schedule entry.",
@@ -5216,6 +5954,60 @@
         "title": "OverviewAlertOut",
         "type": "object"
       },
+      "PackageInfoOut": {
+        "description": "Information-only treatment package summary (LED-03..07, OD-C, D-04).",
+        "properties": {
+          "agreed_price_paise": {
+            "title": "Agreed Price Paise",
+            "type": "integer"
+          },
+          "balance_paise": {
+            "title": "Balance Paise",
+            "type": "integer"
+          },
+          "completed_sessions": {
+            "title": "Completed Sessions",
+            "type": "integer"
+          },
+          "paid_paise": {
+            "title": "Paid Paise",
+            "type": "integer"
+          },
+          "plan_name": {
+            "title": "Plan Name",
+            "type": "string"
+          },
+          "remaining_sessions": {
+            "title": "Remaining Sessions",
+            "type": "integer"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "total_sessions": {
+            "title": "Total Sessions",
+            "type": "integer"
+          },
+          "treatment_plan_id": {
+            "title": "Treatment Plan Id",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "treatment_plan_id",
+          "plan_name",
+          "status",
+          "total_sessions",
+          "completed_sessions",
+          "remaining_sessions",
+          "agreed_price_paise",
+          "paid_paise",
+          "balance_paise"
+        ],
+        "title": "PackageInfoOut",
+        "type": "object"
+      },
       "PasswordPolicyOut": {
         "additionalProperties": false,
         "description": "Password length bounds a user must satisfy when choosing a new password.",
@@ -5805,6 +6597,19 @@
             ],
             "description": "Optional linked treatment package ID",
             "title": "Treatment Plan Id"
+          },
+          "visit_id": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Optional linked visit ID",
+            "title": "Visit Id"
           }
         },
         "required": [
@@ -5958,6 +6763,17 @@
               }
             ],
             "title": "Treatment Plan Name"
+          },
+          "visit_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Visit Id"
           }
         },
         "required": [
@@ -6111,6 +6927,37 @@
           "maximum"
         ],
         "title": "PolicyFieldLimits",
+        "type": "object"
+      },
+      "PrescribedMedicineOut": {
+        "additionalProperties": false,
+        "description": "Prescription medicine reference projected for reception billing (OD-B, B2, D-04).\n\nStrictly limited to prescription_item_id, medicine_name, and form.\nClinical details (dosage, frequency, duration, route, instructions) and quantity are excluded.",
+        "properties": {
+          "form": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Form"
+          },
+          "medicine_name": {
+            "title": "Medicine Name",
+            "type": "string"
+          },
+          "prescription_item_id": {
+            "title": "Prescription Item Id",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "prescription_item_id",
+          "medicine_name"
+        ],
+        "title": "PrescribedMedicineOut",
         "type": "object"
       },
       "PrescriptionCancelRequest": {
@@ -6770,6 +7617,50 @@
         "title": "PrescriptionUpdate",
         "type": "object"
       },
+      "PreviousDueOut": {
+        "description": "Outstanding balance of a previous closed visit of the same patient (OD-22-17).",
+        "properties": {
+          "balance": {
+            "readOnly": true,
+            "title": "Balance",
+            "type": "integer"
+          },
+          "balance_paise": {
+            "title": "Balance Paise",
+            "type": "integer"
+          },
+          "doctor_names": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Doctor Names",
+            "type": "array"
+          },
+          "due_paise": {
+            "readOnly": true,
+            "title": "Due Paise",
+            "type": "integer"
+          },
+          "visit_date": {
+            "format": "date",
+            "title": "Visit Date",
+            "type": "string"
+          },
+          "visit_id": {
+            "title": "Visit Id",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "visit_id",
+          "visit_date",
+          "balance_paise",
+          "balance",
+          "due_paise"
+        ],
+        "title": "PreviousDueOut",
+        "type": "object"
+      },
       "PrintTemplateRead": {
         "description": "Bilingual print template configuration schema (SET-01, BIL-04).",
         "properties": {
@@ -7222,6 +8113,70 @@
           "role"
         ],
         "title": "ReceptionOverviewResponse",
+        "type": "object"
+      },
+      "ReferralReportOut": {
+        "description": "Referral report response envelope.",
+        "properties": {
+          "date_from": {
+            "format": "date",
+            "title": "Date From",
+            "type": "string"
+          },
+          "date_to": {
+            "format": "date",
+            "title": "Date To",
+            "type": "string"
+          },
+          "rows": {
+            "items": {
+              "$ref": "#/components/schemas/ReferralReportRow"
+            },
+            "title": "Rows",
+            "type": "array"
+          },
+          "total_visits": {
+            "title": "Total Visits",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "date_from",
+          "date_to",
+          "rows",
+          "total_visits"
+        ],
+        "title": "ReferralReportOut",
+        "type": "object"
+      },
+      "ReferralReportRow": {
+        "description": "One referral source aggregate row.",
+        "properties": {
+          "referrer_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Referrer Name"
+          },
+          "source": {
+            "title": "Source",
+            "type": "string"
+          },
+          "visit_count": {
+            "title": "Visit Count",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "source",
+          "visit_count"
+        ],
+        "title": "ReferralReportRow",
         "type": "object"
       },
       "ReferralSource": {
@@ -9034,6 +9989,142 @@
         "title": "ValidationSummaryResponse",
         "type": "object"
       },
+      "VisitBillOut": {
+        "description": "Comprehensive bill view for Billing & Checkout panel (UI-SPEC S4, OD-22-14).",
+        "properties": {
+          "bill_total_paise": {
+            "title": "Bill Total Paise",
+            "type": "integer"
+          },
+          "close_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Close Reason"
+          },
+          "closed_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Closed At"
+          },
+          "due_paise": {
+            "title": "Due Paise",
+            "type": "integer"
+          },
+          "locked": {
+            "title": "Locked",
+            "type": "boolean"
+          },
+          "packages": {
+            "items": {
+              "$ref": "#/components/schemas/PackageInfoOut"
+            },
+            "title": "Packages",
+            "type": "array"
+          },
+          "paid_paise": {
+            "title": "Paid Paise",
+            "type": "integer"
+          },
+          "patient_id": {
+            "title": "Patient Id",
+            "type": "integer"
+          },
+          "patient_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Patient Name"
+          },
+          "patient_urn": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Patient Urn"
+          },
+          "payments": {
+            "items": {
+              "$ref": "#/components/schemas/BillPaymentOut"
+            },
+            "title": "Payments",
+            "type": "array"
+          },
+          "previous_dues": {
+            "items": {
+              "$ref": "#/components/schemas/PreviousDueOut"
+            },
+            "title": "Previous Dues",
+            "type": "array"
+          },
+          "previous_dues_total_paise": {
+            "default": 0,
+            "title": "Previous Dues Total Paise",
+            "type": "integer"
+          },
+          "sections": {
+            "items": {
+              "$ref": "#/components/schemas/BillSectionOut"
+            },
+            "title": "Sections",
+            "type": "array"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "visit_date": {
+            "format": "date",
+            "title": "Visit Date",
+            "type": "string"
+          },
+          "visit_id": {
+            "title": "Visit Id",
+            "type": "integer"
+          },
+          "voided_lines": {
+            "items": {
+              "$ref": "#/components/schemas/BillLineOut"
+            },
+            "title": "Voided Lines",
+            "type": "array"
+          }
+        },
+        "required": [
+          "visit_id",
+          "patient_id",
+          "status",
+          "visit_date",
+          "locked",
+          "sections",
+          "bill_total_paise",
+          "paid_paise",
+          "due_paise"
+        ],
+        "title": "VisitBillOut",
+        "type": "object"
+      },
       "VisitCancelRequest": {
         "description": "Payload to cancel a visit in which nobody was seen.",
         "properties": {
@@ -9327,12 +10418,12 @@
       "VisitDueOut": {
         "description": "A consultation fee still owed on a visit that was closed with a balance (RF-23).",
         "properties": {
-          "appointment_id": {
-            "title": "Appointment Id",
-            "type": "integer"
-          },
           "balance_paise": {
             "title": "Balance Paise",
+            "type": "integer"
+          },
+          "bill_total_paise": {
+            "title": "Bill Total Paise",
             "type": "integer"
           },
           "close_reason": {
@@ -9346,13 +10437,12 @@
             ],
             "title": "Close Reason"
           },
-          "doctor_name_en": {
-            "title": "Doctor Name En",
-            "type": "string"
-          },
-          "fee_paise": {
-            "title": "Fee Paise",
-            "type": "integer"
+          "doctor_names": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Doctor Names",
+            "type": "array"
           },
           "paid_paise": {
             "title": "Paid Paise",
@@ -9382,13 +10472,12 @@
         },
         "required": [
           "visit_id",
-          "appointment_id",
           "patient_id",
           "patient_urn",
           "patient_name",
-          "doctor_name_en",
+          "doctor_names",
           "visit_date",
-          "fee_paise",
+          "bill_total_paise",
           "paid_paise",
           "balance_paise"
         ],
@@ -9579,6 +10668,19 @@
             "title": "Id",
             "type": "integer"
           },
+          "last_completed_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Latest completion time among completed consultations",
+            "title": "Last Completed At"
+          },
           "opened_at": {
             "format": "date-time",
             "title": "Opened At",
@@ -9608,6 +10710,14 @@
           "status": {
             "title": "Status",
             "type": "string"
+          },
+          "token_numbers": {
+            "description": "Tokens of non-cancelled consultations, check-in order",
+            "items": {
+              "type": "integer"
+            },
+            "title": "Token Numbers",
+            "type": "array"
           },
           "version_id": {
             "title": "Version Id",
@@ -11226,6 +12336,100 @@
         ]
       }
     },
+    "/api/appointments/{id}/bill-items": {
+      "get": {
+        "description": "Doctor reads own consultation fee with adjustment history and own charges (Q13, UI-SPEC S6).\n\nStrictly NO visit total, NO payments, NO reception lines.",
+        "operationId": "get_doctor_bill_items_api_appointments__id__bill_items_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "title": "Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DoctorChargesOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Doctor Bill Items",
+        "tags": [
+          "billing"
+        ]
+      },
+      "post": {
+        "description": "Doctor adds a procedure or package reference charge to own consultation (design \u00a76, OD-22-14, OD-C).",
+        "operationId": "add_doctor_bill_item_api_appointments__id__bill_items_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "title": "Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DoctorLineCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BillLineOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Add Doctor Bill Item",
+        "tags": [
+          "billing"
+        ]
+      }
+    },
     "/api/appointments/{id}/check-in": {
       "post": {
         "description": "Check a booked patient in on arrival: visit, token and waiting list (RF-12).",
@@ -11276,6 +12480,112 @@
         "summary": "Check In Appointment",
         "tags": [
           "appointments"
+        ]
+      }
+    },
+    "/api/appointments/{id}/fee-adjustment": {
+      "post": {
+        "description": "A doctor discounts or waives the fee of own consultation, with a reason (OD-22-11).",
+        "operationId": "discount_or_waive_own_fee_api_appointments__id__fee_adjustment_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "title": "Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FeeAdjustmentRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FeeAdjustmentOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Discount Or Waive Own Fee",
+        "tags": [
+          "billing"
+        ]
+      }
+    },
+    "/api/appointments/{id}/fee-correction": {
+      "post": {
+        "description": "The administrator discounts, waives or corrects any consultation fee, with a reason.",
+        "operationId": "adjust_any_consultation_fee_api_appointments__id__fee_correction_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "title": "Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FeeAdjustmentRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FeeAdjustmentOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Adjust Any Consultation Fee",
+        "tags": [
+          "billing"
         ]
       }
     },
@@ -11858,6 +13168,218 @@
         "summary": "Get Me",
         "tags": [
           "auth"
+        ]
+      }
+    },
+    "/api/bill-items/{id}/admin-correct": {
+      "post": {
+        "description": "Admin corrects quantity/rate of any non-consultation line on open visit (owner decision (v)).",
+        "operationId": "admin_correct_bill_item_api_bill_items__id__admin_correct_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "title": "Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BillLineCorrectRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BillLineOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Admin Correct Bill Item",
+        "tags": [
+          "billing"
+        ]
+      }
+    },
+    "/api/bill-items/{id}/admin-void": {
+      "post": {
+        "description": "Admin voids any non-consultation line on an open visit (owner decision (v)).",
+        "operationId": "admin_void_bill_item_api_bill_items__id__admin_void_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "title": "Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BillLineVoidRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BillLineOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Admin Void Bill Item",
+        "tags": [
+          "billing"
+        ]
+      }
+    },
+    "/api/bill-items/{id}/correct": {
+      "post": {
+        "description": "Reception corrects quantity/rate of own same-day bill line (MED-11).",
+        "operationId": "correct_bill_item_api_bill_items__id__correct_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "title": "Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BillLineCorrectRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BillLineOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Correct Bill Item",
+        "tags": [
+          "billing"
+        ]
+      }
+    },
+    "/api/bill-items/{id}/void": {
+      "post": {
+        "description": "Reception voids its own same-day bill line (OD-G, BILL-06).",
+        "operationId": "void_bill_item_api_bill_items__id__void_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "title": "Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BillLineVoidRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BillLineOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Void Bill Item",
+        "tags": [
+          "billing"
         ]
       }
     },
@@ -14983,6 +16505,100 @@
         ]
       }
     },
+    "/api/reports/referrals": {
+      "get": {
+        "description": "Aggregate OPD visits by referral source and referrer name for a date range.",
+        "operationId": "get_referral_report_api_reports_referrals_get",
+        "parameters": [
+          {
+            "description": "Start date (inclusive)",
+            "in": "query",
+            "name": "date_from",
+            "required": true,
+            "schema": {
+              "description": "Start date (inclusive)",
+              "format": "date",
+              "title": "Date From",
+              "type": "string"
+            }
+          },
+          {
+            "description": "End date (inclusive)",
+            "in": "query",
+            "name": "date_to",
+            "required": true,
+            "schema": {
+              "description": "End date (inclusive)",
+              "format": "date",
+              "title": "Date To",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Optional referral source or NOT_RECORDED",
+            "in": "query",
+            "name": "source",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Optional referral source or NOT_RECORDED",
+              "title": "Source"
+            }
+          },
+          {
+            "description": "Optional referrer name substring",
+            "in": "query",
+            "name": "referrer",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Optional referrer name substring",
+              "title": "Referrer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReferralReportOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Referral Report",
+        "tags": [
+          "reports"
+        ]
+      }
+    },
     "/api/roles/permissions": {
       "get": {
         "description": "Return the fixed roles, every permission, and which permissions each role holds.",
@@ -16573,6 +18189,102 @@
         ]
       }
     },
+    "/api/visits/{id}/bill": {
+      "get": {
+        "description": "Read full visit bill breakdown, grouped by OD-22-14 sections.",
+        "operationId": "get_visit_bill_api_visits__id__bill_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "title": "Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VisitBillOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Visit Bill",
+        "tags": [
+          "billing"
+        ]
+      }
+    },
+    "/api/visits/{id}/bill-items": {
+      "post": {
+        "description": "Reception adds a medicine or additional line item to an open visit.",
+        "operationId": "add_bill_item_api_visits__id__bill_items_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "title": "Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BillLineCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BillLineOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Add Bill Item",
+        "tags": [
+          "billing"
+        ]
+      }
+    },
     "/api/visits/{id}/cancel": {
       "post": {
         "description": "Cancel a visit in which nobody was seen; every consultation must already be cancelled.",
@@ -16676,6 +18388,53 @@
         "summary": "Close Visit",
         "tags": [
           "visits"
+        ]
+      }
+    },
+    "/api/visits/{id}/prescribed-medicines": {
+      "get": {
+        "description": "Reception reads prescribed medicine references for billing (OD-B, B2, D-04).\n\nStrictly projected to prescription_item_id, medicine_name, and form.\nOnly items from AUTHORISED prescriptions on this visit's consultations are returned.",
+        "operationId": "get_prescribed_medicines_api_visits__id__prescribed_medicines_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "title": "Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/PrescribedMedicineOut"
+                  },
+                  "title": "Response Get Prescribed Medicines Api Visits  Id  Prescribed Medicines Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Prescribed Medicines",
+        "tags": [
+          "billing"
         ]
       }
     }
