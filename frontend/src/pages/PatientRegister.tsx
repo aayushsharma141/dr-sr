@@ -1,5 +1,5 @@
 import { useState, type FormEvent, type ReactNode, useEffect, useRef, useMemo } from 'react'
-import { Link, useNavigate, useParams } from 'react-router'
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router'
 import {
   useRegisterPatient,
   useUpdatePatient,
@@ -77,6 +77,8 @@ const existingPhotoUrl = (p: PatientOut) => (p.photo_path ? `/api/patients/${p.i
 export function PatientRegister() {
   const { data: me } = useMe()
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+  const appointmentId = searchParams.get('appointment_id')
   const { id: editIdParam } = useParams<{ id: string }>()
   const isEditMode = editIdParam !== undefined
   const editId = isEditMode ? Number(editIdParam) : null
@@ -337,9 +339,13 @@ export function PatientRegister() {
   const errorText = (err: unknown) =>
     err instanceof Error && err.message ? err.message : 'unknown error'
 
-  /** Editing is done: back to the patient's record, which shows the notice. */
+  /** Editing is done: back to the patient's record or token desk, which shows the notice. */
   const finishEdit = (notice: string) => {
     skipUnsavedGuardRef.current = true
+    if (appointmentId) {
+      navigate(`/reception/tokens?patient_id=${editId}&appointment_id=${appointmentId}`, { state: { notice } })
+      return
+    }
     navigate(recordPath, { state: { notice } })
   }
 
@@ -750,10 +756,12 @@ export function PatientRegister() {
                 View Patient File &amp; Card
               </button>
               <Link
-                to={`/reception/tokens?patient_id=${createdPatient.id}`}
+                to={appointmentId
+                  ? `/reception/tokens?patient_id=${createdPatient.id}&appointment_id=${appointmentId}`
+                  : `/reception/tokens?patient_id=${createdPatient.id}`}
                 className="inline-flex min-h-11 items-center justify-center rounded-lg border border-[#8E1C3D] bg-white px-4 text-sm font-semibold text-[#5D0B26] transition-colors hover:bg-[#FBF5F7] cursor-pointer"
               >
-                Check In &amp; Issue Token
+                {appointmentId ? 'Complete Check-In & Issue Token' : 'Check In & Issue Token'}
               </Link>
               <Link
                 to={`/reception/patients/${createdPatient.id}/print`}
