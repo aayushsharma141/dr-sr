@@ -13,14 +13,14 @@ Ordering notes:
 
 ## Phases
 
-- [ ] **Phase 11: Decisions Gate, Foundation & Auth** - Open decisions closed, repo/PostgreSQL/Alembic scaffold, individual accounts, role-routed login, server-enforced permissions, optimistic concurrency, and the audit-event writer.
-- [x] **Phase 12: Clinic Settings & Patient Registration** - Clinic details, doctor profiles, fee list, patient registration with atomic URN, search, edit, duplicate warning and photos (print spike starts).
-- [ ] **Phase 13: Appointments & Clinical Encounters** - Per-doctor daily appointments with tokens and status, doctor queue, encounters, finalised notes with addenda.
-- [ ] **Phase 14: Prescriptions, Treatment Plans & Sessions** - Bilingual prescriptions, treatment plans/packages, immutable physiotherapy session log with VAS.
-- [ ] **Phase 15: Billing, Receipts & Reversals** - Integer-paise payments, computed balances, dues list, gap-free receipts with DUPLICATE reprints, admin reversals, unified patient timeline.
-- [ ] **Phase 16: Audit Viewer, Backup/Restore & Integrity** - Audit log viewer, scheduled checksummed backups on a second drive, verified restore, integrity report.
-- [ ] **Phase 17: LAN Deployment, Printer & Acceptance** - One-time server install, auto-recovery after power cut, LAN multi-PC offline operation, real-printer sign-off, full acceptance suite.
-- [ ] **Phase 18: UI/UX Review Hardening** - Receipt printing from the app, native modal dialogs, non-blocking errors, 12px text and contrast floor, bundled Hindi font and language marking, form accessibility, webcam HTTPS decision, headless print verification.
+- [x] **Phase 11: Decisions Gate, Foundation & Auth** - Open decisions closed, repo/PostgreSQL/Alembic scaffold, individual accounts, role-routed login, server-enforced permissions, optimistic concurrency, and the audit-event writer. (completed 2026-10-31)
+- [x] **Phase 12: Clinic Settings & Patient Registration** - Clinic details, doctor profiles, fee list, patient registration with atomic URN, search, edit, duplicate warning and photos (print spike starts). (completed 2026-11-01)
+- [x] **Phase 13: Appointments & Clinical Encounters** - Per-doctor daily appointments with tokens and status, doctor queue, encounters, finalised notes with addenda. (completed 2026-11-01)
+- [x] **Phase 14: Prescriptions, Treatment Plans & Sessions** - Bilingual prescriptions, treatment plans/packages, immutable physiotherapy session log with VAS. (completed 2026-11-02)
+- [x] **Phase 15: Billing, Receipts & Reversals** - Integer-paise payments, computed balances, dues list, gap-free receipts with DUPLICATE reprints, admin reversals, unified patient timeline. (completed 2026-11-02)
+- [x] **Phase 16: Audit Viewer, Backup/Restore & Integrity** - Audit log viewer, scheduled checksummed backups on a second drive, verified restore, integrity report. (completed 2026-11-04)
+- [x] **Phase 17: LAN Deployment, Printer & Acceptance** - One-time server install, auto-recovery after power cut, LAN multi-PC offline operation, real-printer sign-off, full acceptance suite. (completed 2026-11-05)
+- [x] **Phase 18: UI/UX Review Hardening** - Receipt printing from the app, native modal dialogs, non-blocking errors, 12px text and contrast floor, bundled Hindi font and language marking, form accessibility, webcam HTTPS decision, headless print verification. (completed 2026-11-05)
 - [x] **Phase 19: Universal Consultation Workspace** - One consultation for Physiotherapy and Ophthalmology: real drafts with auto-save, new and follow-up encounters, versioned specialty templates, vitals, integrated prescription, follow-up recommendations, read-all edit-own access, one login at a time and a printed summary. (completed 2026-11-06)
 - [x] **Phase 20: Admin Data Governance & Asset Management** - Patient demographic correction with audit; CSV/XLSX import centre (8-stage staging pipeline: upload → inspect → map → validate → resolve → preview → commit → reconcile); controlled patient export (permission-checked, field-selective, audited); hospital identity and logo/asset CRUD with version history; bilingual print template management per document type (prescription, receipt, registration card); five-section Admin navigation reorganization (Hospital Configuration, Patient & Data Management, Users/Security/Governance, System & Maintenance). Uses existing RBAC; no new permission system. All existing admin pages preserved and reorganized, not removed. (completed 2026-11-08)
 - [x] **Phase 22: Integrated OPD Workflow** - Check-in with Referred By and classification, emergency acknowledgement, same-visit reassignment, fee-snapshot bill lines, checkout and receipts. (completed 2026-11-16)
@@ -314,12 +314,12 @@ Plans:
 
 **Depends on**: Current build in tree (Phase 20 foundation)
 
-**Plans:** 2 plans
+**Plans:** 2/2 plans complete
 
 Plans:
 
-- [ ] 21-01-PLAN.md — Reconcile admin navigation architecture test with real AdminDashboard component shape and types (Wave 1)
-- [ ] 21-02-PLAN.md — Full-stack regression verification gate (Vitest 54/54 suites, pytest 1,064 tests, typecheck) (Wave 2)
+- [x] 21-01-PLAN.md — Reconcile admin navigation architecture test with real AdminDashboard component shape and types (Wave 1)
+- [x] 21-02-PLAN.md — Full-stack regression verification gate (Vitest 54/54 suites, pytest 1,064 tests, typecheck) (Wave 2)
 
 ---
 

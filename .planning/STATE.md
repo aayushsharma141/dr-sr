@@ -2,20 +2,20 @@
 gsd_state_version: "1.0"
 milestone: v3.0
 milestone_name: Centralized LAN Web Platform
-current_phase: 22
-current_phase_name: Integrated OPD Workflow
-status: complete
-stopped_at: Phase 22 complete (Plans 22-01..22-20 executed; backup verified, migration 0029 active, balance comparison clean, frontend dist rebuilt, server live on :8000)
-last_updated: "2026-11-16T08:15:00.000Z"
+current_phase: 23
+current_phase_name: Advanced Data Operations
+status: ready_to_plan
+last_updated: "2026-11-16T11:00:00.000Z"
 last_activity: 2026-11-16
-last_activity_desc: Phase 22 fully executed across all 20 plans; live multi-station UAT 100% green (182/182 passed); deployment to kalyan_dev complete on :8000.
+last_activity_desc: Phase 22 verified and complete; transitioned to Phase 23 (Advanced Data Operations)
 progress:
   total_phases: 13
   completed_phases: 12
   total_plans: 88
   completed_plans: 88
   percent: 100
-  active_phase: 22
+  active_phase: 23
+stopped_at: "Phase 22 verified and closed; advancing to Phase 23 (Advanced Data Operations)"
 ---
 
 # Project State: Kalyan Hospital Patient & Physiotherapy Management
@@ -25,13 +25,13 @@ progress:
 See: `.planning/PROJECT.md` and root `PRD.md` (v3.0 baseline).
 
 **Core value:** Reliable, internet-free shared patient records for reception and doctors across the hospital LAN, enforced by server-side permissions, with auditable changes and a backup proven to restore.
-**Current focus:** Phase 22 — Integrated OPD Workflow (Complete — Deployed on :8000)
+**Current focus:** Phase 23 — Advanced Data Operations
 
 ## Current Position
 
-Phase: 22 (Integrated OPD Workflow) — Complete (Deployed on :8000)
-Status: All 20 plans executed; live multi-station UAT completed (182 passed); backup verified; kalyan_dev balances verified; frontend dist rebuilt; server running on :8000.
-Last activity: 2026-11-16 — Plan 22-20 deployment to kalyan_dev completed on port 8000
+Phase: 23 (Advanced Data Operations) — Ready to Plan
+Status: Phase 22 fully complete and verified; ready for Phase 23 discussion and specification
+Last activity: 2026-11-16 — Phase 22 verified and complete; advancing to Phase 23
 
 ## Phase Overview
 
