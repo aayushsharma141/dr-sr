@@ -557,6 +557,13 @@ export interface DepartmentOut {
   name_hi: string | null
   description: string | null
   is_active: boolean
+  merged_into_id?: number | null
+  merged_into_urn?: string | null
+  merged_at?: string | null
+  merge_reason?: string | null
+  is_archived?: boolean
+  archived_at?: string | null
+  archive_reason?: string | null
   version_id: number
 }
 
@@ -568,6 +575,13 @@ export interface DepartmentCreate {
 
 export interface DepartmentUpdate extends DepartmentCreate {
   is_active: boolean
+  merged_into_id?: number | null
+  merged_into_urn?: string | null
+  merged_at?: string | null
+  merge_reason?: string | null
+  is_archived?: boolean
+  archived_at?: string | null
+  archive_reason?: string | null
   version_id: number
 }
 
@@ -594,6 +608,13 @@ export interface DoctorOut {
   cabin_code?: string | null
   default_fee_paise: number
   is_active: boolean
+  merged_into_id?: number | null
+  merged_into_urn?: string | null
+  merged_at?: string | null
+  merge_reason?: string | null
+  is_archived?: boolean
+  archived_at?: string | null
+  archive_reason?: string | null
   version_id: number
   created_at: string
   updated_at: string
@@ -616,6 +637,13 @@ export interface DoctorUpdate {
   cabin_code?: string | null
   default_fee_paise: number
   is_active: boolean
+  merged_into_id?: number | null
+  merged_into_urn?: string | null
+  merged_at?: string | null
+  merge_reason?: string | null
+  is_archived?: boolean
+  archived_at?: string | null
+  archive_reason?: string | null
   version_id: number
 }
 
@@ -629,6 +657,13 @@ export interface FeeOut {
   name: string
   fee_paise: number
   is_active: boolean
+  merged_into_id?: number | null
+  merged_into_urn?: string | null
+  merged_at?: string | null
+  merge_reason?: string | null
+  is_archived?: boolean
+  archived_at?: string | null
+  archive_reason?: string | null
   version_id: number
   created_at: string
   updated_at: string
@@ -666,6 +701,13 @@ export interface PatientOut {
   notes: string | null
   photo_path: string | null
   is_active: boolean
+  merged_into_id?: number | null
+  merged_into_urn?: string | null
+  merged_at?: string | null
+  merge_reason?: string | null
+  is_archived?: boolean
+  archived_at?: string | null
+  archive_reason?: string | null
   version_id: number
   created_at: string
   updated_at: string
