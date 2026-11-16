@@ -100,6 +100,11 @@ class Permission(StrEnum):
     BILL_WRITE = "bill:write"
     REPORT_REFERRAL = "report:referral"
 
+    # Phase 23: Advanced Data Operations (D-23-01)
+    PATIENT_MERGE = "patient:merge"
+    PATIENT_ARCHIVE = "patient:archive"
+    WORKSTATION_READ = "workstation:read"
+
 
 # Authoritative role-to-permissions catalog
 ROLE_PERMISSIONS: dict[Role, frozenset[Permission]] = {
@@ -141,6 +146,9 @@ ROLE_PERMISSIONS: dict[Role, frozenset[Permission]] = {
             Permission.PATIENT_EXPORT,
             Permission.VISIT_READ,
             Permission.REPORT_REFERRAL,
+            Permission.PATIENT_MERGE,
+            Permission.PATIENT_ARCHIVE,
+            Permission.WORKSTATION_READ,
         }
     ),
     Role.RECEPTION: frozenset(
@@ -190,4 +198,8 @@ ROLE_PERMISSIONS: dict[Role, frozenset[Permission]] = {
 }
 
 # Mapping of future permissions reserved for upcoming phases
-RESERVED: dict[Permission, str] = {}
+RESERVED: dict[Permission, str] = {
+    Permission.PATIENT_MERGE: "Phase 23: Duplicate patient merge (plan 23-02)",
+    Permission.PATIENT_ARCHIVE: "Phase 23: Filtered bulk archival (plan 23-04)",
+    Permission.WORKSTATION_READ: "Phase 23: LAN workstation status monitoring (plan 23-04)",
+}

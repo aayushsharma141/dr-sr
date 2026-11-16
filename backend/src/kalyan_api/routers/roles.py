@@ -44,6 +44,7 @@ NOUN_GROUPS: dict[str, str] = {
     "backup": "Backup & restore",
     "integrity": "System",
     "system": "System",
+    "workstation": "System",
 }
 
 PERMISSION_LABELS: dict[Permission, str] = {
@@ -96,6 +97,9 @@ PERMISSION_LABELS: dict[Permission, str] = {
     Permission.PATIENT_CORRECT: "Correct patient demographics",
     Permission.PATIENT_IMPORT: "Import patients",
     Permission.PATIENT_EXPORT: "Export patient data",
+    Permission.PATIENT_MERGE: "Merge duplicate patient records",
+    Permission.PATIENT_ARCHIVE: "Archive and unarchive patient records",
+    Permission.WORKSTATION_READ: "View active LAN workstations",
 }
 
 

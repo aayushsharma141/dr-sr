@@ -529,6 +529,8 @@ class Patient(Base):
         Index("ix_patients_mobile", "mobile"),
         Index("ix_patients_full_name", "full_name"),
         Index("ix_patients_legacy_urn", "legacy_urn"),
+        Index("ix_patients_merged_into_id", "merged_into_id"),
+        Index("ix_patients_is_archived", "is_archived"),
     )
 
     id: Mapped[int] = mapped_column(BigInteger, Identity(always=False), primary_key=True)
@@ -556,6 +558,24 @@ class Patient(Base):
     is_active: Mapped[bool] = mapped_column(
         Boolean, default=True, server_default=text("true"), nullable=False
     )
+    # Phase 23: Alias-pointer duplicate merge and filtered soft-archival
+    merged_into_id: Mapped[int | None] = mapped_column(
+        BigInteger, ForeignKey("patients.id", ondelete="RESTRICT"), nullable=True
+    )
+    merged_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    merged_by_user_id: Mapped[int | None] = mapped_column(
+        BigInteger, ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    merge_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+    is_archived: Mapped[bool] = mapped_column(
+        Boolean, default=False, server_default=text("false"), nullable=False
+    )
+    archived_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    archived_by_user_id: Mapped[int | None] = mapped_column(
+        BigInteger, ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    archive_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+
     version_id: Mapped[int] = mapped_column(Integer, default=1, server_default="1", nullable=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
@@ -2136,3 +2156,33 @@ class IntegrityRun(Base):
     checks: Mapped[list] = mapped_column(JSONB, nullable=False)
 
     __table_args__ = (Index("ix_integrity_runs_generated_at", "generated_at"),)
+
+
+class Workstation(Base):
+    """LAN terminal workstation registry and heartbeat status (Phase 23)."""
+
+    __tablename__ = "workstations"
+    __table_args__ = (
+        Index("ix_workstations_hostname", "hostname"),
+        Index("ix_workstations_last_seen_at", "last_seen_at"),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, Identity(always=False), primary_key=True)
+    hostname: Mapped[str] = mapped_column(String(120), unique=True, nullable=False)
+    ip_address: Mapped[str] = mapped_column(String(64), nullable=False)
+    terminal_name: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    app_version: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    last_seen_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    last_user_id: Mapped[int | None] = mapped_column(
+        BigInteger, ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    last_username: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )

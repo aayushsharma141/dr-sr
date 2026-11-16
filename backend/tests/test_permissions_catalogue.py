@@ -124,6 +124,9 @@ def test_golden_role_permissions_snapshot() -> None:
                 Permission.PATIENT_EXPORT,
                 Permission.VISIT_READ,
                 Permission.REPORT_REFERRAL,
+                Permission.PATIENT_MERGE,
+                Permission.PATIENT_ARCHIVE,
+                Permission.WORKSTATION_READ,
             }
         ),
         Role.RECEPTION: frozenset(

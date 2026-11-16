@@ -339,6 +339,8 @@ RUNTIME_TABLE_GRANTS: dict[str, tuple[str, ...]] = {
     "bill_items": ("SELECT", "INSERT", "UPDATE"),
     # Adjustment history is append-only (Phase 22, migration 0028).
     "bill_item_adjustments": ("SELECT", "INSERT"),
+    # LAN Workstation heartbeat registry (Phase 23, migration 0030).
+    "workstations": ("SELECT", "INSERT", "UPDATE", "DELETE"),
 }
 
 
