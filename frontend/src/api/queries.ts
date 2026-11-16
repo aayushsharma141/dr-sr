@@ -1015,7 +1015,8 @@ export function useFinaliseEncounter() {
       const body = typeof param === 'number' ? undefined : param.body
       return apiFetch<EncounterRead>(`/encounters/${id}/finalise`, {
         method: 'POST',
-        body: body ? JSON.stringify(body) : undefined,
+        // apiFetch encodes the body as JSON itself; encoding here too sent a JSON string (422).
+        body,
       })
     },
     onSuccess: (data) => {
@@ -1706,12 +1707,10 @@ export function useUpdatePrintTemplate() {
       docType: string
       payload: PrintTemplateUpdatePayload
     }) =>
+      // apiFetch sets the JSON content type and encodes the body itself.
       apiFetch<PrintTemplateOut>(`/api/admin/templates/${docType}`, {
         method: 'PATCH',
-        body: JSON.stringify(payload),
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        body: payload,
       }),
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['admin', 'templates'] })

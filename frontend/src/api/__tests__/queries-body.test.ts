@@ -7,6 +7,8 @@ import {
   useReversePayment,
   useCreateBackup,
   useRestoreBackup,
+  useFinaliseEncounter,
+  useUpdatePrintTemplate,
 } from '../queries'
 
 function wrapper() {
@@ -105,6 +107,37 @@ describe('mutation request bodies (real apiFetch, fetch stubbed)', () => {
     })
 
     const { parsed } = sentBody(fetchMock)
+    expect(typeof parsed).toBe('object')
+    expect(parsed).toEqual(payload)
+  })
+  it('useFinaliseEncounter sends its body as an object (a string was rejected with 422)', async () => {
+    const fetchMock = stubFetch(200, { id: 122, patient_id: 392 })
+    const body = { symptoms: 'Low back pain', diagnosis: 'Mechanical LBP', version_id: 2 }
+    const { result } = renderHook(() => useFinaliseEncounter(), { wrapper: wrapper() })
+
+    await act(async () => {
+      await result.current.mutateAsync({ id: 122, body })
+    })
+
+    const [url] = fetchMock.mock.calls[0] as unknown as [string, RequestInit]
+    expect(url).toBe('/api/encounters/122/finalise')
+    const { init, parsed } = sentBody(fetchMock)
+    expect(init.method).toBe('POST')
+    expect(typeof parsed).toBe('object')
+    expect(parsed).toEqual(body)
+  })
+
+  it('useUpdatePrintTemplate sends its payload as an object', async () => {
+    const fetchMock = stubFetch(200, { doc_type: 'prescription' })
+    const payload = { header_en: 'Kalyan Hospital', version: 3 }
+    const { result } = renderHook(() => useUpdatePrintTemplate(), { wrapper: wrapper() })
+
+    await act(async () => {
+      await result.current.mutateAsync({ docType: 'prescription', payload })
+    })
+
+    const { init, parsed } = sentBody(fetchMock)
+    expect(init.method).toBe('PATCH')
     expect(typeof parsed).toBe('object')
     expect(parsed).toEqual(payload)
   })
