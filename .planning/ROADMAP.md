@@ -359,6 +359,16 @@ Plans:
 
 ### Phase 23: Advanced Data Operations
 
-**Goal**: Duplicate patient detection and merge workflow (high-risk FK cascade; dedicated transaction design); bulk archive and bulk delete for eligible records; extended data-edit permission controls; LAN workstation status monitoring.
+**Goal**: Duplicate patient detection and merge workflow (Alias Pointer architecture; trigger immutability preserved); bulk archive for eligible records with hard financial dues guard; extended data-edit permission controls; LAN workstation status monitoring.
 
-**Depends on**: Phase 21 stable data foundation
+**Depends on**: Phase 22 stable foundation
+
+**Plans:** 5 plans (Waves 1-4)
+
+Plans:
+
+- [ ] 23-01-PLAN.md — Migration 0030, Models & RBAC Permissions Matrix (Wave 1)
+- [ ] 23-02-PLAN.md — Duplicate Detection, Open Visit Guard & Alias-Pointer Merge/Unmerge Service (Wave 2)
+- [ ] 23-03-PLAN.md — Consolidated Patient Aggregations (Timeline, Visits, Dues) & Merged URN Routing (Wave 2)
+- [ ] 23-04-PLAN.md — Filtered Bulk Archival, Hard Financial Dues Guard & Workstation Monitoring Backend (Wave 3)
+- [ ] 23-05-PLAN.md — Frontend Admin UI (/admin/duplicates, /admin/patients/archive, /admin/workstations) & Verification Gate (Wave 4)
