@@ -30,6 +30,11 @@ class PatientOut(BaseModel):
     version_id: int
     created_at: datetime
     updated_at: datetime
+    merged_into_id: int | None = None
+    merged_into_urn: str | None = None
+    merged_at: datetime | None = None
+    is_archived: bool = False
+    archived_at: datetime | None = None
 
 
 class PatientCountResponse(BaseModel):
@@ -106,3 +111,74 @@ class AdminPatientDemographicCorrection(BaseModel):
     district: str = Field(default="Bhojpur", min_length=2, max_length=64)
     state: str = Field(default="Bihar", min_length=2, max_length=64)
     emergency_contact: str | None = Field(default=None, max_length=120)
+
+
+# Phase 23: Duplicate Detection & Merge Schemas
+class DuplicateCandidatePair(BaseModel):
+    """A pair of active patient records identified as potential duplicates."""
+
+    master: PatientOut
+    duplicate: PatientOut
+    similarity_score: float
+    match_reason: str
+    master_visit_count: int = 0
+    duplicate_visit_count: int = 0
+    has_open_visit: bool = False
+    open_visit_details: str | None = None
+
+
+class PatientMergeRequest(BaseModel):
+    """Payload for merging a secondary duplicate patient into a master patient."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    master_patient_id: int = Field(..., gt=0)
+    secondary_patient_id: int = Field(..., gt=0)
+    reason: str = Field(..., min_length=3, max_length=1000)
+    demographic_overrides: dict[str, str | int | None] | None = None
+
+
+class PatientMergeResult(BaseModel):
+    """Result of an alias-pointer patient merge."""
+
+    master: PatientOut
+    secondary: PatientOut
+    message: str
+
+
+class PatientUnmergeRequest(BaseModel):
+    """Payload for undoing an alias-pointer merge."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    reason: str = Field(..., min_length=3, max_length=1000)
+
+
+# Phase 23: Filtered Bulk Archival Schemas
+class ArchivalCandidateItem(BaseModel):
+    """A patient candidate for bulk archival."""
+
+    patient: PatientOut
+    last_activity_date: date | None = None
+    visit_count: int = 0
+    total_dues_paise: int = 0
+    can_archive: bool = True
+    blocking_reason: str | None = None
+
+
+class BulkArchiveRequest(BaseModel):
+    """Payload for administratively archiving a batch of eligible patients."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    patient_ids: list[int] = Field(..., min_length=1, max_length=500)
+    reason: str = Field(..., min_length=3, max_length=1000)
+
+
+class BulkArchiveResult(BaseModel):
+    """Summary of bulk archival operation."""
+
+    archived_count: int
+    skipped_count: int
+    skipped_details: list[dict[str, str | int]] = []
+    message: str

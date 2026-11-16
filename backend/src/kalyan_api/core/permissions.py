@@ -199,7 +199,6 @@ ROLE_PERMISSIONS: dict[Role, frozenset[Permission]] = {
 
 # Mapping of future permissions reserved for upcoming phases
 RESERVED: dict[Permission, str] = {
-    Permission.PATIENT_MERGE: "Phase 23: Duplicate patient merge (plan 23-02)",
     Permission.PATIENT_ARCHIVE: "Phase 23: Filtered bulk archival (plan 23-04)",
     Permission.WORKSTATION_READ: "Phase 23: LAN workstation status monitoring (plan 23-04)",
 }

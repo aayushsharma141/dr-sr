@@ -15,9 +15,13 @@ from kalyan_api.db.session import SessionDep
 from kalyan_api.models import Patient
 from kalyan_api.schemas.patients import (
     AdminPatientDemographicCorrection,
+    DuplicateCandidatePair,
+    PatientMergeRequest,
+    PatientMergeResult,
     PatientOut,
+    PatientUnmergeRequest,
 )
-from kalyan_api.services import audit_service
+from kalyan_api.services import audit_service, patient_merge_service
 from kalyan_api.services.audit_service import AuditAction
 
 router = APIRouter(prefix="/admin/patients", tags=["admin-patients"])
@@ -131,3 +135,49 @@ def correct_patient_demographics(
     )
 
     return PatientOut.model_validate(patient)
+
+
+@router.get(
+    "/duplicates",
+    dependencies=[Depends(require(Permission.PATIENT_MERGE))],
+    response_model=list[DuplicateCandidatePair],
+)
+def get_duplicate_candidates(
+    session: SessionDep,
+    limit: int = Query(50, ge=1, le=100),
+) -> list[DuplicateCandidatePair]:
+    """Retrieve list of suspected duplicate patient pairs matching mobile and similar names."""
+    return patient_merge_service.find_duplicate_candidates(session, limit=limit)
+
+
+@router.post(
+    "/merge",
+    dependencies=[Depends(require(Permission.PATIENT_MERGE))],
+    response_model=PatientMergeResult,
+)
+def merge_patients_endpoint(
+    request: Request,
+    payload: PatientMergeRequest,
+    session: SessionDep,
+    principal: Principal = Depends(current_principal),
+) -> PatientMergeResult:
+    """Administratively merge duplicate secondary patient into master patient."""
+    return patient_merge_service.merge_patients(session, principal, request, payload)
+
+
+@router.post(
+    "/{id}/unmerge",
+    dependencies=[Depends(require(Permission.PATIENT_MERGE))],
+    response_model=PatientOut,
+)
+def unmerge_patient_endpoint(
+    id: int,
+    request: Request,
+    payload: PatientUnmergeRequest,
+    session: SessionDep,
+    principal: Principal = Depends(current_principal),
+) -> PatientOut:
+    """Reverse a prior patient merge, reactivating the secondary record."""
+    return patient_merge_service.unmerge_patient(
+        session, principal, request, patient_id=id, reason=payload.reason
+    )
