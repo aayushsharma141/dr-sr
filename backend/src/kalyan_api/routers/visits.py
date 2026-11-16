@@ -188,7 +188,11 @@ def list_visits(
     """List visits, newest first."""
     filters = []
     if patient_id is not None:
-        filters.append(Visit.patient_id == patient_id)
+        merged_ids = session.scalars(
+            select(Patient.id).where(Patient.merged_into_id == patient_id)
+        ).all()
+        effective_ids = [patient_id, *merged_ids]
+        filters.append(Visit.patient_id.in_(effective_ids))
     if status is not None:
         filters.append(Visit.status == status.value)
     if visit_date is not None:

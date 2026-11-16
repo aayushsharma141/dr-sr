@@ -437,8 +437,12 @@ def patient_previous_dues(
     session: Session, patient_id: int, exclude_visit_id: int | None = None
 ) -> list[PreviousDueOut]:
     """Outstanding dues on previously closed visits of the same patient (OD-22-17)."""
+    merged_ids = session.scalars(
+        select(Patient.id).where(Patient.merged_into_id == patient_id)
+    ).all()
+    effective_ids = [patient_id, *merged_ids]
     stmt = select(Visit).where(
-        Visit.patient_id == patient_id,
+        Visit.patient_id.in_(effective_ids),
         Visit.status == VisitStatus.CLOSED.value,
     )
     if exclude_visit_id is not None:

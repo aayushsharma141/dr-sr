@@ -156,7 +156,23 @@ def list_or_search_patients(
         .offset(offset)
     )
     results = session.scalars(stmt).all()
-    return [PatientOut.model_validate(p) for p in results]
+
+    # Batch lookup master URNs for merged records if any
+    merged_master_ids = {p.merged_into_id for p in results if p.merged_into_id is not None}
+    master_urn_map: dict[int, str] = {}
+    if merged_master_ids:
+        masters = session.execute(
+            select(Patient.id, Patient.urn).where(Patient.id.in_(merged_master_ids))
+        ).all()
+        master_urn_map = {m_id: m_urn for m_id, m_urn in masters}
+
+    out_list: list[PatientOut] = []
+    for p in results:
+        p_out = PatientOut.model_validate(p)
+        if p.merged_into_id and p.merged_into_id in master_urn_map:
+            p_out.merged_into_urn = master_urn_map[p.merged_into_id]
+        out_list.append(p_out)
+    return out_list
 
 
 @router.get(
@@ -186,7 +202,12 @@ def get_patient_by_id(
     patient = session.get(Patient, id)
     if not patient:
         raise ApiError(status_code=404, code="not_found", message=f"Patient #{id} not found")
-    return PatientOut.model_validate(patient)
+    out = PatientOut.model_validate(patient)
+    if patient.merged_into_id:
+        master = session.get(Patient, patient.merged_into_id)
+        if master:
+            out.merged_into_urn = master.urn
+    return out
 
 
 @router.patch(

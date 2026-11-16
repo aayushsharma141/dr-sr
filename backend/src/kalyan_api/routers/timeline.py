@@ -63,12 +63,19 @@ def get_patient_timeline(
             status_code=404, code="patient_not_found", message="Active patient not found."
         )
 
+    # Master patient timeline consolidates clinical encounters, visits, and billing records
+    # from any alias-pointer merged records (MERGE-05).
+    merged_ids = session.scalars(
+        select(Patient.id).where(Patient.merged_into_id == patient_id)
+    ).all()
+    effective_patient_ids = [patient_id, *merged_ids]
+
     items: list[TimelineItemOut] = []
 
     # 1. Appointments
     appt_stmt = (
         select(Appointment)
-        .where(Appointment.patient_id == patient_id)
+        .where(Appointment.patient_id.in_(effective_patient_ids))
         .options(selectinload(Appointment.doctor))
     )
     if principal.role == Role.DOCTOR:
@@ -115,7 +122,7 @@ def get_patient_timeline(
         enc_scope = row_scope(principal, ScopeFamily.CLINICAL_READ, ClinicalEncounter.doctor_id)
         enc_stmt = (
             select(ClinicalEncounter)
-            .where(ClinicalEncounter.patient_id == patient_id, enc_scope)
+            .where(ClinicalEncounter.patient_id.in_(effective_patient_ids), enc_scope)
             .options(
                 selectinload(ClinicalEncounter.doctor),
                 selectinload(ClinicalEncounter.addenda),
@@ -158,7 +165,7 @@ def get_patient_timeline(
         rx_scope = row_scope(principal, ScopeFamily.CLINICAL_READ, Prescription.doctor_id)
         rx_stmt = (
             select(Prescription)
-            .where(Prescription.patient_id == patient_id, rx_scope)
+            .where(Prescription.patient_id.in_(effective_patient_ids), rx_scope)
             .options(
                 selectinload(Prescription.doctor),
                 selectinload(Prescription.items),
@@ -193,7 +200,7 @@ def get_patient_timeline(
     can_see_billing = Permission.PAYMENT_READ in principal.permissions
     plan_stmt = (
         select(TreatmentPlan)
-        .where(TreatmentPlan.patient_id == patient_id)
+        .where(TreatmentPlan.patient_id.in_(effective_patient_ids))
         .options(selectinload(TreatmentPlan.doctor))
     )
     plans = session.execute(plan_stmt).scalars().all()
@@ -243,7 +250,7 @@ def get_patient_timeline(
     )
     sess_stmt = (
         select(TreatmentSession)
-        .where(TreatmentSession.patient_id == patient_id, sess_scope)
+        .where(TreatmentSession.patient_id.in_(effective_patient_ids), sess_scope)
         .options(
             selectinload(TreatmentSession.treatment_plan),
             selectinload(TreatmentSession.doctor),
@@ -317,7 +324,7 @@ def get_patient_timeline(
     if can_see_billing:
         pay_stmt = (
             select(Payment)
-            .where(Payment.patient_id == patient_id)
+            .where(Payment.patient_id.in_(effective_patient_ids))
             .options(
                 selectinload(Payment.treatment_plan),
                 selectinload(Payment.created_by_user),

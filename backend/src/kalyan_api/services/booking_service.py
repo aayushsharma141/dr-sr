@@ -109,11 +109,17 @@ def create_booking(
     """Create a BOOKED appointment after the booking checks; raise ApiError if one fails."""
     # Lock the patient row to serialise concurrent bookings (FB-03).
     patient = session.get(Patient, patient_id, with_for_update=True)
-    if not patient or not patient.is_active:
+    if not patient:
         raise ApiError(
             status_code=404,
             code="patient_not_found",
-            message="Patient not found or inactive.",
+            message="Patient not found.",
+        )
+    if not patient.is_active or patient.merged_into_id is not None or patient.is_archived:
+        raise ApiError(
+            status_code=400,
+            code="patient_inactive_or_merged",
+            message="Patient record is deactivated, merged, or archived. Cannot book appointments.",
         )
 
     doctor = lock_doctor_for_booking(session, doctor_id)
@@ -616,6 +622,14 @@ def check_in(
     status-change path sends none.
     """
     validate_booking_transition(appt, AppointmentStatus.ARRIVED, principal)
+
+    patient = session.get(Patient, appt.patient_id)
+    if not patient or not patient.is_active or patient.merged_into_id is not None or patient.is_archived:
+        raise ApiError(
+            status_code=400,
+            code="patient_inactive_or_merged",
+            message="Patient record is deactivated, merged, or archived. Cannot check in.",
+        )
 
     # A NO_SHOW does not count for the duplicate rule (BR-006), so the patient may have been
     # booked again with this doctor today. Checking the missed booking in as well would put two
