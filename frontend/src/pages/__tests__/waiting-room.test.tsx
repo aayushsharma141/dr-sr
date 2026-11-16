@@ -2,6 +2,7 @@ import { act, cleanup, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { MemoryRouter } from 'react-router'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import type { Appointment } from '../../api/types'
 
 const state: {
@@ -15,6 +16,8 @@ const state: {
 }
 
 vi.mock('../../api/queries', () => ({
+  useMe: () => ({ data: { full_name: 'Reception Staff', role: 'RECEPTION' } }),
+  useLogout: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useAppointments: () => ({ data: { total: state.appointments.length, appointments: state.appointments }, dataUpdatedAt: Date.parse('2026-11-15T04:30:00Z'), isError: false }),
   useDoctors: () => ({
     data: [
@@ -66,10 +69,15 @@ function appt(overrides: Partial<Appointment>): Appointment {
 }
 
 function renderPage() {
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false } },
+  })
   return render(
-    <MemoryRouter>
-      <WaitingRoom />
-    </MemoryRouter>,
+    <QueryClientProvider client={queryClient}>
+      <MemoryRouter>
+        <WaitingRoom />
+      </MemoryRouter>
+    </QueryClientProvider>,
   )
 }
 
@@ -127,7 +135,7 @@ describe('WaitingRoom', () => {
     ]
     renderPage()
 
-    await userEvent.type(screen.getByRole('searchbox'), 'sita')
+    await userEvent.type(screen.getByLabelText(/Search by name, URN or token/i), 'sita')
 
     expect(screen.getByText('Sita Devi')).toBeInTheDocument()
     expect(screen.queryByText('Ram Kumar')).not.toBeInTheDocument()
@@ -210,7 +218,7 @@ describe('WaitingRoom', () => {
 
     await userEvent.selectOptions(screen.getByLabelText('Doctor'), '1')
     await userEvent.selectOptions(screen.getByLabelText('Department'), '10')
-    await userEvent.type(screen.getByRole('searchbox'), 'Anita')
+    await userEvent.type(screen.getByLabelText(/Search by name, URN or token/i), 'Anita')
 
     expect(screen.getByText('Anita Devi')).toBeInTheDocument()
 
@@ -232,6 +240,6 @@ describe('WaitingRoom', () => {
     // Verify filter inputs are still retained
     expect(screen.getByLabelText('Doctor')).toHaveValue('1')
     expect(screen.getByLabelText('Department')).toHaveValue('10')
-    expect(screen.getByRole('searchbox')).toHaveValue('Anita')
+    expect(screen.getByLabelText(/Search by name, URN or token/i)).toHaveValue('Anita')
   })
 })

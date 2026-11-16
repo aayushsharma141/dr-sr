@@ -1,7 +1,8 @@
 import { useMemo, useState } from 'react'
 import type * as React from 'react'
 import { Link } from 'react-router'
-import { useAppointments, useDepartments, useDoctorDepartments, useDoctors, useReassignAppointment, useUpdateAppointmentStatus } from '../api/queries'
+import { AppShell } from '../components/AppShell'
+import { useAppointments, useDepartments, useDoctorDepartments, useDoctors, useMe, useReassignAppointment, useUpdateAppointmentStatus } from '../api/queries'
 import type { Appointment, PriorityLevel } from '../api/types'
 import { ApiError } from '../api/client'
 import { InlineAlert } from '../components/InlineAlert'
@@ -43,6 +44,7 @@ function matchesSearch(a: Appointment, query: string): boolean {
 }
 
 export function WaitingRoom() {
+  const { data: me } = useMe()
   const today = useMemo(() => istToday(), [])
   const list = useAppointments({ appointment_date: today }, { refetchInterval: 10000 })
   const doctors = useDoctors(true)
@@ -69,7 +71,8 @@ export function WaitingRoom() {
   const updatedAt = list.dataUpdatedAt ? new Date(list.dataUpdatedAt) : null
 
   return (
-    <section aria-labelledby="waiting-room-title" className="space-y-4">
+    <AppShell name={me?.full_name || 'Reception Staff'} role={me?.role || 'RECEPTION'}>
+      <section aria-labelledby="waiting-room-title" className="space-y-4">
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <h1 id="waiting-room-title" className="text-base font-bold text-neutral-900">Waiting Room</h1>
@@ -144,6 +147,7 @@ export function WaitingRoom() {
         </Column>
       </div>
     </section>
+    </AppShell>
   )
 }
 

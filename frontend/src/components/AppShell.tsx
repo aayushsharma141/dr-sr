@@ -95,6 +95,8 @@ type NavigationIcon =
   | 'rupee'
   | 'consultation'
   | 'settings'
+  | 'receipt'
+  | 'report'
 
 interface NavigationItem {
   key: string
@@ -156,6 +158,20 @@ const RECEPTION_NAVIGATION: NavigationItem[] = [
     description: 'Collect fees at checkout, issue receipts, see dues and close visits',
     path: '/reception/billing',
     icon: 'rupee',
+  },
+  {
+    key: 'receipts',
+    label: 'Receipts',
+    description: "Today's receipts desk: reprint duplicate receipts and view transaction history",
+    path: '/reception/receipts',
+    icon: 'receipt',
+  },
+  {
+    key: 'reports',
+    label: 'Reports',
+    description: "Today's collection summary and daily cashier reporting",
+    path: '/reception/reports',
+    icon: 'report',
   },
 ]
 
@@ -324,6 +340,25 @@ function NavIcon({ name }: { name: NavigationIcon }) {
           <line x1="9" y1="16" x2="13" y2="16" />
         </svg>
       )
+    case 'receipt':
+      return (
+        <svg {...shared}>
+          <path d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1Z" />
+          <path d="M14 8H8" />
+          <path d="M16 12H8" />
+          <path d="M13 16H8" />
+        </svg>
+      )
+    case 'report':
+      return (
+        <svg {...shared}>
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+          <polyline points="14 2 14 8 20 8" />
+          <line x1="16" y1="13" x2="8" y2="13" />
+          <line x1="16" y1="17" x2="8" y2="17" />
+          <polyline points="10 9 9 9 8 9" />
+        </svg>
+      )
     case 'settings':
     default:
       return (
@@ -374,8 +409,14 @@ function breadcrumbsFor(pathname: string, search: string, role: Role): Crumb[] {
     // Same tab rule as the page: a doctor sees Follow-ups unless they chose Schedule.
     const tab = new URLSearchParams(search).get('tab')
     crumbs.push({ label: role === 'DOCTOR' ? (tab === 'today' ? 'Schedule' : 'Follow-ups') : 'Appointments' })
+  } else if (pathname === '/reception/waiting') {
+    crumbs.push({ label: 'Waiting Room' })
   } else if (pathname === '/reception/billing') {
     crumbs.push({ label: 'Billing & Checkout' })
+  } else if (pathname === '/reception/receipts') {
+    crumbs.push({ label: 'Receipts' })
+  } else if (pathname === '/reception/reports') {
+    crumbs.push({ label: 'Reports' })
   } else if (pathname === '/doctor/treatment-plans' || /^\/doctor\/treatment-plans\/\d+$/.test(pathname)) {
     crumbs.push({ label: 'Physiotherapy Treatment' })
   } else if (pathname === '/doctor/encounters/new') {

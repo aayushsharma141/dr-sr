@@ -79,6 +79,8 @@ describe('AppShell clinical navigation hierarchy', () => {
       'Appointments',
       'Waiting Room',
       'Billing & Checkout',
+      'Receipts',
+      'Reports',
     ])
     expect(links.map((l) => l.getAttribute('href'))).toEqual([
       '/reception/tokens',
@@ -88,6 +90,8 @@ describe('AppShell clinical navigation hierarchy', () => {
       '/reception/waiting',
       // Opens Checkout, not the Dues tab.
       '/reception/billing',
+      '/reception/receipts',
+      '/reception/reports',
     ])
     expect(within(primaryNav).getByText('RECEPTION DESK')).toBeInTheDocument()
     expect(within(primaryNav).getByRole('link', { name: 'Appointments' })).toHaveAttribute('aria-current', 'page')

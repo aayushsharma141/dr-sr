@@ -1,7 +1,7 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { cleanup, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { MemoryRouter, Route, Routes } from 'react-router'
+import { MemoryRouter } from 'react-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ReceptionBillingPage } from '../ReceptionBillingPage'
 import type {
@@ -300,7 +300,7 @@ describe('ReceptionBillingPage Desk', () => {
     // Check Header & Tabs
     expect(await screen.findByRole('heading', { name: /Billing & Checkout/i })).toBeInTheDocument()
     expect(await screen.findByRole('button', { name: /Checkout/i })).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: /Today's Receipts/i })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Today's Receipts/i })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /Pending Dues/i })).toBeInTheDocument()
     expect(
       await screen.findByText(
@@ -661,49 +661,50 @@ describe('ReceptionBillingPage Desk', () => {
     expect(paymentBody).not.toHaveProperty('appointment_id')
   })
 
-  it('redirects ?tab=ledger on billing URL to /reception/receipts', async () => {
+  it("shows reception only today's receipts from the day endpoint, never the full ledger", async () => {
     const mockFetch = mockApi({
       '/api/auth/me': () => ({ body: mockMe }),
       '/api/fees': () => ({ body: [] }),
       '/api/doctors': () => ({ body: mockDoctors }),
       '/api/visits': () => ({ body: { total: 0, visits: [] } }),
+      '/api/billing/receipts/today': () => ({ body: [mockRecordedPayment] }),
       '/api/billing/pending-dues': () => ({ body: [] }),
       '/api/billing/visit-dues': () => ({ body: [] }),
     })
 
-    vi.stubGlobal('fetch', mockFetch)
-    render(
-      <QueryClientProvider client={queryClient}>
-        <MemoryRouter initialEntries={['/reception/billing?tab=ledger']}>
-          <Routes>
-            <Route path="/reception/billing" element={<ReceptionBillingPage />} />
-            <Route path="/reception/receipts" element={<div>Receipts Route Target</div>} />
-          </Routes>
-        </MemoryRouter>
-      </QueryClientProvider>,
-    )
+    const user = userEvent.setup()
+    renderPage(mockFetch, queryClient)
 
-    expect(await screen.findByText('Receipts Route Target')).toBeInTheDocument()
+    await user.click(await screen.findByRole('button', { name: /Today's Receipts/i }))
+    expect(await screen.findByText('REC-2026-0001')).toBeInTheDocument()
+
+    const requested = mockFetch.mock.calls.map((call) => String(call[0]))
+    expect(requested.some((url) => url.includes('/api/billing/receipts/today'))).toBe(true)
+    expect(requested.some((url) => url.includes('/api/billing/ledger'))).toBe(false)
   })
 
-  it('shows admin the oversight view only: no checkout tab, no ledger tab, only dues and no collect actions', async () => {
+  it('shows admin the oversight view only: no checkout tab, the full ledger, and no collect actions', async () => {
     const mockFetch = mockApi({
       '/api/auth/me': () => ({ body: mockAdmin }),
+      '/api/billing/ledger': () => ({ body: [mockRecordedPayment] }),
+      '/api/billing/receipts/today': () => ({ body: [] }),
       '/api/billing/pending-dues': () => ({ body: mockDues }),
       '/api/billing/visit-dues': () => ({ body: [] }),
     })
 
+    const user = userEvent.setup()
     renderPage(mockFetch, queryClient)
 
-    expect(await screen.findByRole('button', { name: /Pending Dues/i })).toBeInTheDocument()
+    expect(await screen.findByRole('button', { name: /Receipts Ledger/i })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /^Checkout$/i })).not.toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: /Receipts/i })).not.toBeInTheDocument()
+    expect(await screen.findByText('REC-2026-0001')).toBeInTheDocument()
 
     const requested = mockFetch.mock.calls.map((call) => String(call[0]))
     expect(requested.some((url) => url.includes('/api/billing/receipts/today'))).toBe(false)
-    expect(requested.some((url) => url.includes('/api/billing/ledger'))).toBe(false)
+    expect(requested.some((url) => url.includes('/api/billing/ledger'))).toBe(true)
     expect(requested.some((url) => url.includes('/api/visits'))).toBe(false)
 
+    await user.click(screen.getByRole('button', { name: /Pending Dues/i }))
     await waitFor(() => {
       expect(screen.getByText('Lumbar Spine Rehab Package')).toBeInTheDocument()
     })
