@@ -135,6 +135,11 @@ def upgrade() -> None:
     op.create_index("ix_workstations_hostname", "workstations", ["hostname"])
     op.create_index("ix_workstations_last_seen_at", "workstations", ["last_seen_at"])
 
+    bind = op.get_bind()
+    if bind.dialect.name == "postgresql":
+        op.execute("GRANT SELECT, INSERT, UPDATE, DELETE ON workstations TO kalyan_app;")
+        op.execute("GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO kalyan_app;")
+
 
 def downgrade() -> None:
     bind = op.get_bind()

@@ -23,14 +23,16 @@ from kalyan_api import clock
 from kalyan_api.config import Settings
 from kalyan_api.core.permissions import Permission
 from kalyan_api.core.policy import require
-from kalyan_api.core.principal import get_current_settings
+from kalyan_api.core.principal import Principal, current_principal, get_current_settings
 from kalyan_api.db.migrate import alembic_config
 from kalyan_api.db.session import SessionDep
 from kalyan_api.models import BackupRun, BackupSettings
 from kalyan_api.schemas.system import ServiceCheckOut, StorageVolumeOut, SystemStatusOut
-from kalyan_api.services import backup_schedule_service
+from kalyan_api.schemas.workstations import WorkstationHeartbeatIn, WorkstationOut
+from kalyan_api.services import backup_schedule_service, workstation_service
 
 router = APIRouter(prefix="/system", tags=["system"])
+workstations_router = APIRouter(prefix="/admin/workstations", tags=["admin-workstations"])
 
 # Captured when the API module is imported, i.e. at server process start-up.
 PROCESS_STARTED_AT: datetime = datetime.now(UTC)
@@ -213,3 +215,41 @@ def get_system_status(request: Request, session: SessionDep) -> SystemStatusOut:
             *_backup_checks(session, settings),
         ],
     )
+
+
+@router.post(
+    "/heartbeat",
+    response_model=WorkstationOut,
+)
+def record_heartbeat_endpoint(
+    request: Request,
+    payload: WorkstationHeartbeatIn,
+    session: SessionDep,
+    principal: Principal = Depends(current_principal),
+) -> WorkstationOut:
+    """Ingest periodic heartbeat from hospital LAN workstation."""
+    return workstation_service.record_heartbeat(session, principal, request, payload)
+
+
+@workstations_router.get(
+    "",
+    dependencies=[Depends(require(Permission.WORKSTATION_READ))],
+    response_model=list[WorkstationOut],
+)
+def list_admin_workstations_endpoint(
+    session: SessionDep,
+) -> list[WorkstationOut]:
+    """Retrieve list of hospital LAN workstations and current live connectivity status."""
+    return workstation_service.list_workstations(session)
+
+
+@router.get(
+    "/workstations",
+    dependencies=[Depends(require(Permission.WORKSTATION_READ))],
+    response_model=list[WorkstationOut],
+)
+def list_system_workstations_endpoint(
+    session: SessionDep,
+) -> list[WorkstationOut]:
+    """Retrieve list of hospital LAN workstations and current live connectivity status."""
+    return workstation_service.list_workstations(session)

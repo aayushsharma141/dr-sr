@@ -154,6 +154,14 @@ class PatientUnmergeRequest(BaseModel):
     reason: str = Field(..., min_length=3, max_length=1000)
 
 
+class PatientUnarchiveRequest(BaseModel):
+    """Payload for restoring an archived patient."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    reason: str = Field(..., min_length=3, max_length=1000)
+
+
 # Phase 23: Filtered Bulk Archival Schemas
 class ArchivalCandidateItem(BaseModel):
     """A patient candidate for bulk archival."""

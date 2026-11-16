@@ -15,13 +15,17 @@ from kalyan_api.db.session import SessionDep
 from kalyan_api.models import Patient
 from kalyan_api.schemas.patients import (
     AdminPatientDemographicCorrection,
+    ArchivalCandidateItem,
+    BulkArchiveRequest,
+    BulkArchiveResult,
     DuplicateCandidatePair,
     PatientMergeRequest,
     PatientMergeResult,
     PatientOut,
+    PatientUnarchiveRequest,
     PatientUnmergeRequest,
 )
-from kalyan_api.services import audit_service, patient_merge_service
+from kalyan_api.services import audit_service, patient_archive_service, patient_merge_service
 from kalyan_api.services.audit_service import AuditAction
 
 router = APIRouter(prefix="/admin/patients", tags=["admin-patients"])
@@ -179,5 +183,60 @@ def unmerge_patient_endpoint(
 ) -> PatientOut:
     """Reverse a prior patient merge, reactivating the secondary record."""
     return patient_merge_service.unmerge_patient(
+        session, principal, request, patient_id=id, reason=payload.reason
+    )
+
+
+@router.get(
+    "/archival-candidates",
+    dependencies=[Depends(require(Permission.PATIENT_ARCHIVE))],
+    response_model=list[ArchivalCandidateItem],
+)
+def get_archival_candidates_endpoint(
+    session: SessionDep,
+    inactivity_years: int = Query(3, ge=1, le=20),
+    district: str | None = Query(None),
+    zero_visits_only: bool = Query(False),
+    limit: int = Query(50, ge=1, le=200),
+) -> list[ArchivalCandidateItem]:
+    """Retrieve candidate inactive patient records eligible for archival."""
+    return patient_archive_service.find_archival_candidates(
+        session,
+        inactivity_years=inactivity_years,
+        district=district,
+        zero_visits_only=zero_visits_only,
+        limit=limit,
+    )
+
+
+@router.post(
+    "/bulk-archive",
+    dependencies=[Depends(require(Permission.PATIENT_ARCHIVE))],
+    response_model=BulkArchiveResult,
+)
+def bulk_archive_endpoint(
+    request: Request,
+    payload: BulkArchiveRequest,
+    session: SessionDep,
+    principal: Principal = Depends(current_principal),
+) -> BulkArchiveResult:
+    """Administratively bulk-archive patient records with hard financial dues enforcement."""
+    return patient_archive_service.bulk_archive_patients(session, principal, request, payload)
+
+
+@router.post(
+    "/{id}/unarchive",
+    dependencies=[Depends(require(Permission.PATIENT_ARCHIVE))],
+    response_model=PatientOut,
+)
+def unarchive_patient_endpoint(
+    id: int,
+    request: Request,
+    payload: PatientUnarchiveRequest,
+    session: SessionDep,
+    principal: Principal = Depends(current_principal),
+) -> PatientOut:
+    """Restore an archived patient record to active status."""
+    return patient_archive_service.unarchive_patient(
         session, principal, request, patient_id=id, reason=payload.reason
     )
