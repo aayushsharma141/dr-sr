@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import type * as React from 'react'
-import { Link } from 'react-router'
+import { Link, useSearchParams } from 'react-router'
 import { AppShell } from '../components/AppShell'
 import { useAppointments, useDepartments, useDoctorDepartments, useDoctors, useMe, useReassignAppointment, useUpdateAppointmentStatus } from '../api/queries'
 import type { Appointment, PriorityLevel } from '../api/types'
@@ -50,7 +50,26 @@ export function WaitingRoom() {
   const doctors = useDoctors(true)
   const departments = useDepartments()
 
-  const [doctorFilter, setDoctorFilter] = useState('')
+  const [searchParams, setSearchParams] = useSearchParams()
+  const rawDoctorId = searchParams.get('doctor_id') ?? ''
+  const validDoctorId = /^[1-9]\d*$/.test(rawDoctorId) ? rawDoctorId : ''
+  const doctorFilter =
+    !validDoctorId || (doctors.isError && !doctors.data)
+      ? ''
+      : doctors.data !== undefined && !doctors.data.some((d) => String(d.id) === validDoctorId)
+        ? ''
+        : validDoctorId
+  const setDoctorFilter = (val: string) => {
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev)
+        if (val) next.set('doctor_id', val)
+        else next.delete('doctor_id')
+        return next
+      },
+      { replace: true },
+    )
+  }
   const [departmentFilter, setDepartmentFilter] = useState('')
   const [search, setSearch] = useState('')
 
@@ -155,7 +174,7 @@ function Column({ title, count, emptyText, children }: { title: string; count: n
   return (
     <div className="flex max-h-[70vh] flex-col rounded-lg border border-neutral-200 bg-neutral-50">
       <div className="flex items-center justify-between border-b border-neutral-200 px-4 py-2">
-        <h2 className="text-xs font-bold uppercase tracking-wider text-neutral-600">{title}</h2>
+        <h2 className="text-xs font-bold text-neutral-600">{title}</h2>
         <span className="font-mono text-sm text-neutral-700">{count}</span>
       </div>
       <div className="space-y-2 overflow-y-auto p-4">

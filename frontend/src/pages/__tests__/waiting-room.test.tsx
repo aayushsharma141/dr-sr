@@ -1,16 +1,23 @@
 import { act, cleanup, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { MemoryRouter } from 'react-router'
+import { MemoryRouter, useLocation } from 'react-router'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import type { Appointment } from '../../api/types'
 
+const DEFAULT_DOCTORS = [
+  { id: 1, name_en: 'Dr. Anil', is_active: true },
+  { id: 2, name_en: 'Dr. Bharati', is_active: true },
+]
+
 const state: {
   appointments: Appointment[]
+  doctorsQuery: { data: typeof DEFAULT_DOCTORS | undefined; isError?: boolean }
   reassignMutate: ReturnType<typeof vi.fn>
   cancelMutate: ReturnType<typeof vi.fn>
 } = {
   appointments: [],
+  doctorsQuery: { data: DEFAULT_DOCTORS },
   reassignMutate: vi.fn(),
   cancelMutate: vi.fn(),
 }
@@ -19,12 +26,7 @@ vi.mock('../../api/queries', () => ({
   useMe: () => ({ data: { full_name: 'Reception Staff', role: 'RECEPTION' } }),
   useLogout: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useAppointments: () => ({ data: { total: state.appointments.length, appointments: state.appointments }, dataUpdatedAt: Date.parse('2026-11-15T04:30:00Z'), isError: false }),
-  useDoctors: () => ({
-    data: [
-      { id: 1, name_en: 'Dr. Anil', is_active: true },
-      { id: 2, name_en: 'Dr. Bharati', is_active: true },
-    ],
-  }),
+  useDoctors: () => state.doctorsQuery,
   useDepartments: () => ({
     data: [
       { id: 10, name_en: 'General OPD', is_active: true },
@@ -68,13 +70,21 @@ function appt(overrides: Partial<Appointment>): Appointment {
   } as Appointment
 }
 
-function renderPage() {
+let latestSearch = ''
+function SearchSpy() {
+  latestSearch = useLocation().search
+  return null
+}
+
+function renderPage(initialEntry = '/reception/waiting') {
+  latestSearch = ''
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false } },
   })
   return render(
     <QueryClientProvider client={queryClient}>
-      <MemoryRouter>
+      <MemoryRouter initialEntries={[initialEntry]}>
+        <SearchSpy />
         <WaitingRoom />
       </MemoryRouter>
     </QueryClientProvider>,
@@ -90,6 +100,7 @@ describe('WaitingRoom', () => {
   afterEach(() => {
     cleanup()
     state.appointments = []
+    state.doctorsQuery = { data: DEFAULT_DOCTORS }
   })
 
   it('orders waiting patients: emergency by classification time, then priority, then normal', () => {
@@ -241,5 +252,75 @@ describe('WaitingRoom', () => {
     expect(screen.getByLabelText('Doctor')).toHaveValue('1')
     expect(screen.getByLabelText('Department')).toHaveValue('10')
     expect(screen.getByLabelText(/Search by name, URN or token/i)).toHaveValue('Anita')
+  })
+
+  it('pre-filters cards and Doctor select when opened with ?doctor_id=2', () => {
+    state.appointments = [
+      appt({ id: 1, token_number: 1, doctor_id: 1, doctor_name_en: 'Dr. Anil', patient_name: 'Anil Patient' }),
+      appt({ id: 2, token_number: 2, doctor_id: 2, doctor_name_en: 'Dr. Bharati', patient_name: 'Bharati Patient' }),
+    ]
+    renderPage('/reception/waiting?doctor_id=2')
+
+    expect(screen.getByLabelText('Doctor')).toHaveValue('2')
+    expect(screen.getByText('Bharati Patient')).toBeInTheDocument()
+    expect(screen.queryByText('Anil Patient')).not.toBeInTheDocument()
+  })
+
+  it.each(['abc', '0', '02', '999'])(
+    'falls back to all doctors when ?doctor_id=%s is invalid or unknown',
+    (rawId) => {
+      state.appointments = [
+        appt({ id: 1, token_number: 1, doctor_id: 1, doctor_name_en: 'Dr. Anil', patient_name: 'Anil Patient' }),
+        appt({ id: 2, token_number: 2, doctor_id: 2, doctor_name_en: 'Dr. Bharati', patient_name: 'Bharati Patient' }),
+      ]
+      renderPage(`/reception/waiting?doctor_id=${rawId}`)
+
+      expect(screen.getByLabelText('Doctor')).toHaveValue('')
+      expect(screen.getByText('Anil Patient')).toBeInTheDocument()
+      expect(screen.getByText('Bharati Patient')).toBeInTheDocument()
+    },
+  )
+
+  it('falls back to all doctors when useDoctors errors without data', () => {
+    state.doctorsQuery = { data: undefined, isError: true }
+    state.appointments = [
+      appt({ id: 1, token_number: 1, doctor_id: 1, doctor_name_en: 'Dr. Anil', patient_name: 'Anil Patient' }),
+      appt({ id: 2, token_number: 2, doctor_id: 2, doctor_name_en: 'Dr. Bharati', patient_name: 'Bharati Patient' }),
+    ]
+    renderPage('/reception/waiting?doctor_id=2')
+
+    expect(screen.getByLabelText('Doctor')).toHaveValue('')
+    expect(screen.getByText('Anil Patient')).toBeInTheDocument()
+    expect(screen.getByText('Bharati Patient')).toBeInTheDocument()
+  })
+
+  it('preserves validated doctor_id while doctors are still loading', () => {
+    state.doctorsQuery = { data: undefined, isError: false }
+    state.appointments = [
+      appt({ id: 1, token_number: 1, doctor_id: 1, doctor_name_en: 'Dr. Anil', patient_name: 'Anil Patient' }),
+      appt({ id: 2, token_number: 2, doctor_id: 2, doctor_name_en: 'Dr. Bharati', patient_name: 'Bharati Patient' }),
+    ]
+    renderPage('/reception/waiting?doctor_id=2')
+
+    expect(screen.getByText('Bharati Patient')).toBeInTheDocument()
+    expect(screen.queryByText('Anil Patient')).not.toBeInTheDocument()
+  })
+
+  it('updates displayed queue and URL query param when changing the Doctor select', async () => {
+    state.appointments = [
+      appt({ id: 1, token_number: 1, doctor_id: 1, doctor_name_en: 'Dr. Anil', patient_name: 'Anil Patient' }),
+      appt({ id: 2, token_number: 2, doctor_id: 2, doctor_name_en: 'Dr. Bharati', patient_name: 'Bharati Patient' }),
+    ]
+    renderPage('/reception/waiting')
+
+    await userEvent.selectOptions(screen.getByLabelText('Doctor'), '2')
+    expect(latestSearch).toBe('?doctor_id=2')
+    expect(screen.getByText('Bharati Patient')).toBeInTheDocument()
+    expect(screen.queryByText('Anil Patient')).not.toBeInTheDocument()
+
+    await userEvent.selectOptions(screen.getByLabelText('Doctor'), '')
+    expect(latestSearch).toBe('')
+    expect(screen.getByText('Anil Patient')).toBeInTheDocument()
+    expect(screen.getByText('Bharati Patient')).toBeInTheDocument()
   })
 })
