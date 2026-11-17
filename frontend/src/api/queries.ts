@@ -216,13 +216,14 @@ export function useSetupStatus() {
   })
 }
 
-export function useOverview<T extends AreaOverview = AreaOverview>(area: string) {
+export function useOverview<T extends AreaOverview = AreaOverview>(area: string, options?: { refetchInterval?: number | false }) {
   return useQuery({
     queryKey: ['overview', area],
     queryFn: async (): Promise<T> => {
       return await apiFetch<T>(`/${area}/overview`)
     },
     retry: false,
+    refetchInterval: options?.refetchInterval ?? false,
   })
 }
 
@@ -684,11 +685,12 @@ export function useAssignDoctorDepartments() {
   })
 }
 
-export function useDoctors(activeOnly: boolean = false) {
+export function useDoctors(activeOnly: boolean = false, options?: { enabled?: boolean }) {
   return useQuery({
     queryKey: ['doctors', { activeOnly }],
     queryFn: () =>
       apiFetch<DoctorOut[]>(activeOnly ? '/doctors' : '/doctors?include_inactive=true'),
+    enabled: options?.enabled ?? true,
   })
 }
 
@@ -741,11 +743,12 @@ export function useUpdateDoctorMeSettings() {
  * GET /fees. activeOnly=false sends include_inactive=true (all fees, ordered by id);
  * activeOnly=true returns active fees only.
  */
-export function useFees(activeOnly: boolean = false) {
+export function useFees(activeOnly: boolean = false, options?: { enabled?: boolean }) {
   return useQuery({
     queryKey: ['fees', { activeOnly }],
     queryFn: () =>
       apiFetch<FeeOut[]>(activeOnly ? '/fees' : '/fees?include_inactive=true'),
+    enabled: options?.enabled ?? true,
   })
 }
 
@@ -790,6 +793,7 @@ export function useRegisterPatient() {
       }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['patients'] })
+      qc.invalidateQueries({ queryKey: ['overview', 'reception'] })
     },
   })
 }
@@ -806,13 +810,19 @@ export function useCheckDuplicate(name: string, mobile: string, enabled: boolean
   })
 }
 
-export function usePatients(q: string = '', limit: number = 20, offset: number = 0) {
+export function usePatients(
+  q: string = '',
+  limit: number = 20,
+  offset: number = 0,
+  options?: { enabled?: boolean },
+) {
   return useQuery({
     queryKey: ['patients', { q, limit, offset }],
     queryFn: () =>
       apiFetch<PatientOut[]>(
         `/patients?q=${encodeURIComponent(q)}&limit=${limit}&offset=${offset}`,
       ),
+    enabled: options?.enabled ?? true,
   })
 }
 
@@ -920,6 +930,7 @@ export function useCreateOpdArrival() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['opd-arrivals'] })
       qc.invalidateQueries({ queryKey: ['appointments'] })
+      qc.invalidateQueries({ queryKey: ['overview', 'reception'] })
     },
   })
 }
@@ -934,6 +945,7 @@ export function useRegisterOpdArrival() {
       qc.invalidateQueries({ queryKey: ['appointments'] })
       qc.invalidateQueries({ queryKey: ['doctor-queue'] })
       qc.invalidateQueries({ queryKey: ['patients'] })
+      qc.invalidateQueries({ queryKey: ['overview', 'reception'] })
       qc.setQueryData(['appointment', appointment.id], appointment)
     },
   })
@@ -949,6 +961,22 @@ export function useUpdateOpdArrivalPriority() {
       qc.invalidateQueries({ queryKey: ['opd-arrivals'] })
       qc.invalidateQueries({ queryKey: ['appointments'] })
       qc.invalidateQueries({ queryKey: ['doctor-queue'] })
+      qc.invalidateQueries({ queryKey: ['overview', 'reception'] })
+    },
+  })
+}
+
+export function useCancelOpdArrival() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, body }: { id: number; body: { version_id: number; reason: string } }) =>
+      apiFetch<OpdArrival>(`/opd-arrivals/${id}/cancel`, { method: 'POST', body }),
+    onSuccess: (arrival) => {
+      qc.setQueryData(['opd-arrival', arrival.id], arrival)
+      qc.invalidateQueries({ queryKey: ['opd-arrivals'] })
+      qc.invalidateQueries({ queryKey: ['appointments'] })
+      qc.invalidateQueries({ queryKey: ['doctor-queue'] })
+      qc.invalidateQueries({ queryKey: ['overview', 'reception'] })
     },
   })
 }
@@ -972,6 +1000,7 @@ export function useBookAppointment() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['appointments'] })
       qc.invalidateQueries({ queryKey: ['doctor-queue'] })
+      qc.invalidateQueries({ queryKey: ['overview', 'reception'] })
     },
   })
 }
@@ -986,6 +1015,7 @@ export function useWalkIn() {
       qc.invalidateQueries({ queryKey: ['appointments'] })
       qc.invalidateQueries({ queryKey: ['doctor-queue'] })
       qc.invalidateQueries({ queryKey: ['visits'] })
+      qc.invalidateQueries({ queryKey: ['overview', 'reception'] })
     },
   })
 }
@@ -996,8 +1026,11 @@ export function useRescheduleAppointment() {
   return useMutation({
     mutationFn: ({ id, body }: { id: number; body: RescheduleRequest }) =>
       apiFetch<Appointment>(`/appointments/${id}/reschedule`, { method: 'POST', body }),
-    onSuccess: () => {
+    onSuccess: (_, vars) => {
+      qc.invalidateQueries({ queryKey: ['appointment', vars.id] })
       qc.invalidateQueries({ queryKey: ['appointments'] })
+      qc.invalidateQueries({ queryKey: ['doctor-queue'] })
+      qc.invalidateQueries({ queryKey: ['overview', 'reception'] })
     },
   })
 }
@@ -1013,6 +1046,7 @@ export function useCheckInNewPatient() {
       qc.invalidateQueries({ queryKey: ['doctor-queue'] })
       qc.invalidateQueries({ queryKey: ['visits'] })
       qc.invalidateQueries({ queryKey: ['patients'] })
+      qc.invalidateQueries({ queryKey: ['overview', 'reception'] })
     },
   })
 }
@@ -1041,6 +1075,9 @@ export function useReassignAppointment() {
       qc.setQueryData(['appointment', data.id], data)
       qc.invalidateQueries({ queryKey: ['appointments'] })
       qc.invalidateQueries({ queryKey: ['doctor-queue'] })
+      qc.invalidateQueries({ queryKey: ['visits'] })
+      qc.invalidateQueries({ queryKey: ['visit-bill'] })
+      qc.invalidateQueries({ queryKey: ['overview', 'reception'] })
     },
   })
 }
@@ -1055,6 +1092,7 @@ export function useUpdatePriority() {
       qc.setQueryData(['appointment', data.id], data)
       qc.invalidateQueries({ queryKey: ['appointments'] })
       qc.invalidateQueries({ queryKey: ['doctor-queue'] })
+      qc.invalidateQueries({ queryKey: ['overview', 'reception'] })
     },
   })
 }
@@ -1070,6 +1108,7 @@ export function useCheckIn() {
       qc.invalidateQueries({ queryKey: ['appointments'] })
       qc.invalidateQueries({ queryKey: ['doctor-queue'] })
       qc.invalidateQueries({ queryKey: ['visits'] })
+      qc.invalidateQueries({ queryKey: ['overview', 'reception'] })
     },
   })
 }
@@ -1086,6 +1125,9 @@ export function useUpdateAppointmentStatus() {
       qc.setQueryData(['appointment', data.id], data)
       qc.invalidateQueries({ queryKey: ['appointments'] })
       qc.invalidateQueries({ queryKey: ['doctor-queue'] })
+      qc.invalidateQueries({ queryKey: ['visits'] })
+      qc.invalidateQueries({ queryKey: ['visit-bill'] })
+      qc.invalidateQueries({ queryKey: ['overview', 'reception'] })
     },
   })
 }
@@ -1532,10 +1574,11 @@ export function usePayment(id: number | null | undefined) {
   })
 }
 
-export function usePendingDues() {
+export function usePendingDues(options?: { enabled?: boolean }) {
   return useQuery({
     queryKey: ['billing', 'pending-dues'],
     queryFn: () => apiFetch<PendingDueOut[]>('/api/billing/pending-dues'),
+    enabled: options?.enabled ?? true,
   })
 }
 
@@ -1549,14 +1592,12 @@ export function useRecordPayment() {
       }),
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['payments'] })
-      queryClient.invalidateQueries({ queryKey: ['billing', 'pending-dues'] })
+      queryClient.invalidateQueries({ queryKey: ['billing'] })
       queryClient.invalidateQueries({ queryKey: ['treatment-plans'] })
       queryClient.invalidateQueries({ queryKey: ['timeline', variables.patient_id] })
       queryClient.invalidateQueries({ queryKey: ['visits'] })
-      queryClient.invalidateQueries({ queryKey: ['billing', 'visit-dues'] })
-      queryClient.invalidateQueries({ queryKey: ['billing', 'receipts-today'] })
-      queryClient.invalidateQueries({ queryKey: ['billing', 'ledger'] })
       queryClient.invalidateQueries({ queryKey: ['visit-bill'] })
+      queryClient.invalidateQueries({ queryKey: ['overview'] })
     },
   })
 }
@@ -1574,6 +1615,9 @@ export function useReversePayment() {
       queryClient.invalidateQueries({ queryKey: ['billing'] })
       queryClient.invalidateQueries({ queryKey: ['treatment-plans'] })
       queryClient.invalidateQueries({ queryKey: ['timeline'] })
+      queryClient.invalidateQueries({ queryKey: ['visits'] })
+      queryClient.invalidateQueries({ queryKey: ['visit-bill'] })
+      queryClient.invalidateQueries({ queryKey: ['overview', 'reception'] })
     },
   })
 }
@@ -1720,7 +1764,10 @@ export interface VisitListFilter {
 }
 
 /** GET /visits: reception and admin read. Ready for checkout = open, a completed consultation, none active. */
-export function useVisits(filter: VisitListFilter = {}) {
+export function useVisits(
+  filter: VisitListFilter = {},
+  options?: { enabled?: boolean; refetchInterval?: number | false },
+) {
   return useQuery({
     queryKey: ['visits', 'list', filter],
     queryFn: () => {
@@ -1730,15 +1777,24 @@ export function useVisits(filter: VisitListFilter = {}) {
       if (filter.status) params.set('status', filter.status)
       return apiFetch<VisitListResponse>(`/api/visits?${params.toString()}`)
     },
+    enabled: options?.enabled ?? true,
+    refetchInterval: options?.refetchInterval ?? false,
   })
 }
 
 /** GET /visits/{id}: the visit with its consultations, payments and the balance still due. */
-export function useVisit(id: number | null | undefined) {
+export function useVisit(
+  id: number | null | undefined,
+  options?: {
+    enabled?: boolean
+    refetchInterval?: number | false | ((query: { state: { data?: VisitDetail } }) => number | false)
+  },
+) {
   return useQuery({
     queryKey: ['visits', 'detail', id],
     queryFn: () => apiFetch<VisitDetail>(`/api/visits/${id}`),
-    enabled: typeof id === 'number' && id > 0,
+    enabled: Boolean(id && id > 0) && (options?.enabled ?? true),
+    refetchInterval: options?.refetchInterval ?? false,
   })
 }
 
@@ -1754,15 +1810,17 @@ export function useCloseVisit() {
       queryClient.invalidateQueries({ queryKey: ['billing', 'visit-dues'] })
       queryClient.invalidateQueries({ queryKey: ['timeline', data.patient_id] })
       queryClient.invalidateQueries({ queryKey: ['visit-bill'] })
+      queryClient.invalidateQueries({ queryKey: ['overview', 'reception'] })
     },
   })
 }
 
 /** GET /billing/visit-dues: fees still owed on visits closed with a balance. */
-export function useVisitDues() {
+export function useVisitDues(options?: { enabled?: boolean }) {
   return useQuery({
     queryKey: ['billing', 'visit-dues'],
     queryFn: () => apiFetch<VisitDueOut[]>('/api/billing/visit-dues'),
+    enabled: options?.enabled ?? true,
   })
 }
 
