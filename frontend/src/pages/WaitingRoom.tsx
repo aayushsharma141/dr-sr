@@ -3,13 +3,14 @@ import type * as React from 'react'
 import { Link, useSearchParams } from 'react-router'
 import { useQueryClient } from '@tanstack/react-query'
 import { AppShell } from '../components/AppShell'
-import { useAppointments, useDepartments, useDoctorDepartments, useDoctors, useMe, useReassignAppointment, useUpdateAppointmentStatus } from '../api/queries'
+import { useAppointments, useDepartments, useDoctorDepartments, useDoctors, useMe, useReassignAppointment, useUpdateAppointmentStatus, useVisits } from '../api/queries'
 import type { Appointment, PriorityLevel } from '../api/types'
 import { ApiError, isVersionConflict } from '../api/client'
 import { InlineAlert } from '../components/InlineAlert'
 import { Modal } from '../components/Modal'
 import { PriorityBadge } from '../components/checkin/PriorityBadge'
-import { formatIst, formatToken, istToday } from '../format'
+import { AppointmentStatusBadge, getWaitingElapsedMinutes, useIstToday } from '../components/reception/AppointmentStatusBadge'
+import { formatIst, formatToken } from '../format'
 
 /**
  * Waiting Room (design §7 item 5, S2 in the UI-SPEC). Reception's queue-management workspace.
@@ -45,13 +46,6 @@ function isWaitingRow(a: Appointment): boolean {
   return (a.status === 'ARRIVED' || a.status === 'CHECKED_IN' || a.status === 'WAITING') && a.consultation_status === 'WAITING'
 }
 
-function getElapsedMinutes(isoString?: string | null): number | null {
-  if (!isoString) return null
-  const then = Date.parse(isoString)
-  if (Number.isNaN(then)) return null
-  return Math.max(0, Math.floor((Date.now() - then) / 60000))
-}
-
 function matchesSearch(a: Appointment, query: string): boolean {
   if (!query) return true
   const q = query.trim().toLowerCase()
@@ -64,8 +58,14 @@ function matchesSearch(a: Appointment, query: string): boolean {
 
 export function WaitingRoom() {
   const { data: me } = useMe()
-  const today = useMemo(() => istToday(), [])
+  const permissions = me?.permissions ?? []
+  const canReassign = permissions.includes('visit:write')
+  const canCancel = permissions.includes('appointment:write')
+  const canCollect = permissions.includes('payment:create')
+
+  const today = useIstToday()
   const list = useAppointments({ appointment_date: today }, { refetchInterval: 10000 })
+  const readyVisitsQuery = useVisits({ readyForCheckout: true }, { refetchInterval: 10_000 })
   const doctors = useDoctors(true)
   const departments = useDepartments()
 
@@ -93,6 +93,25 @@ export function WaitingRoom() {
   const [search, setSearch] = useState('')
 
   const all = useMemo(() => list.data?.appointments ?? [], [list.data?.appointments])
+
+  const readyVisitIds = useMemo(
+    () => new Set((readyVisitsQuery.data?.visits ?? []).map((v) => v.id)),
+    [readyVisitsQuery.data?.visits],
+  )
+
+  const activeVisitIds = useMemo(() => {
+    const ids = new Set<number>()
+    for (const a of all) {
+      if (
+        a.visit_id != null &&
+        a.status !== 'CANCELLED' &&
+        (a.consultation_status === 'WAITING' || a.consultation_status === 'IN_CONSULTATION')
+      ) {
+        ids.add(a.visit_id)
+      }
+    }
+    return ids
+  }, [all])
 
   // Compute 1-based positions independently per doctor before display filters so searching never fakes Position 1.
   const positionByAppointmentId = useMemo(() => {
@@ -198,12 +217,18 @@ export function WaitingRoom() {
         >
           <Column title="Waiting" count={waiting.length} emptyText="No one is waiting.">
             {waiting.map((a, index) => (
-              <WaitingCard key={a.id} appt={a} position={positionByAppointmentId.get(a.id) ?? index + 1} />
+              <WaitingCard
+                key={a.id}
+                appt={a}
+                position={positionByAppointmentId.get(a.id) ?? index + 1}
+                canReassign={canReassign}
+                canCancel={canCancel}
+              />
             ))}
           </Column>
           <Column title="In Cabin" count={inCabin.length} emptyText="No one is in a cabin.">
             {inCabin.map((a) => (
-              <InCabinCard key={a.id} appt={a} />
+              <InCabinCard key={a.id} appt={a} canCancel={canCancel} />
             ))}
           </Column>
           <Column
@@ -212,16 +237,25 @@ export function WaitingRoom() {
             emptyText="No consultations completed yet today."
             emptyHint="Completed visits appear here ready for checkout."
             emptyAction={
-              <Link
-                to="/reception/billing"
-                className="inline-flex min-h-9 items-center rounded-md border border-neutral-300 bg-white px-3 text-xs font-semibold text-brand-700 hover:bg-neutral-100"
-              >
-                Open Billing &amp; Checkout →
-              </Link>
+              canCollect ? (
+                <Link
+                  to="/reception/billing"
+                  className="inline-flex min-h-9 items-center rounded-md border border-neutral-300 bg-white px-3 text-xs font-semibold text-brand-700 hover:bg-neutral-100"
+                >
+                  Open Billing &amp; Checkout →
+                </Link>
+              ) : undefined
             }
           >
             {completed.map((a) => (
-              <CompletedCard key={a.id} appt={a} />
+              <CompletedCard
+                key={a.id}
+                appt={a}
+                readyVisitsLoaded={readyVisitsQuery.isSuccess}
+                isReadyForCheckout={a.visit_id != null && readyVisitIds.has(a.visit_id)}
+                hasOtherActiveConsultation={a.visit_id != null && activeVisitIds.has(a.visit_id)}
+                canCollect={canCollect}
+              />
             ))}
           </Column>
         </div>
@@ -246,7 +280,7 @@ function Column({
   children: React.ReactNode
 }) {
   return (
-    <section aria-label={title} className="flex max-h-[70vh] flex-col rounded-lg border border-neutral-200 bg-neutral-50">
+    <section aria-label={title} className="flex lg:max-h-[70vh] flex-col rounded-lg border border-neutral-200 bg-neutral-50">
       <div className="flex items-center justify-between border-b border-neutral-200 px-3 py-2">
         <h2 className="text-xs font-bold text-neutral-700">{title}</h2>
         <span className="font-mono text-xs font-semibold text-neutral-700">{count}</span>
@@ -320,10 +354,12 @@ function CardFrame({
 
 function CancelConsultationForm({
   appt,
+  canCancel,
   leading,
   extraAction,
 }: {
   appt: Appointment
+  canCancel: boolean
   leading?: React.ReactNode
   extraAction?: React.ReactNode
 }) {
@@ -387,20 +423,24 @@ function CancelConsultationForm({
     <div>
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex flex-wrap items-center gap-2">{leading}</div>
-        <div className="flex flex-wrap items-center gap-1.5">
-          {extraAction}
-          <button
-            type="button"
-            aria-expanded={cancelOpen}
-            onClick={toggle}
-            className="min-h-9 rounded-md border border-neutral-300 bg-white px-2.5 text-xs font-semibold text-neutral-800 hover:bg-neutral-50"
-          >
-            Cancel consultation
-          </button>
-        </div>
+        {(extraAction || canCancel) && (
+          <div className="flex flex-wrap items-center gap-1.5">
+            {extraAction}
+            {canCancel && (
+              <button
+                type="button"
+                aria-expanded={cancelOpen}
+                onClick={toggle}
+                className="min-h-9 rounded-md border border-neutral-300 bg-white px-2.5 text-xs font-semibold text-neutral-800 hover:bg-neutral-50"
+              >
+                Cancel consultation
+              </button>
+            )}
+          </div>
+        )}
       </div>
 
-      {cancelOpen && (
+      {canCancel && cancelOpen && (
         <form onSubmit={submitCancel} className="mt-2 space-y-2 border-t border-neutral-100 pt-2">
           <label className="block text-xs font-semibold text-neutral-700">
             Reason for cancelling
@@ -429,9 +469,20 @@ function CancelConsultationForm({
   )
 }
 
-function WaitingCard({ appt, position }: { appt: Appointment; position: number }) {
+function WaitingCard({
+  appt,
+  position,
+  canReassign,
+  canCancel,
+}: {
+  appt: Appointment
+  position: number
+  canReassign: boolean
+  canCancel: boolean
+}) {
   const [reassignOpen, setReassignOpen] = useState(false)
-  const elapsed = getElapsedMinutes(appt.check_in_at ?? appt.status_updated_at ?? appt.created_at)
+  const hasWaitAnchor = Boolean(appt.check_in_at ?? appt.status_updated_at ?? appt.created_at)
+  const elapsed = hasWaitAnchor ? getWaitingElapsedMinutes(appt) : null
 
   return (
     <CardFrame
@@ -453,27 +504,33 @@ function WaitingCard({ appt, position }: { appt: Appointment; position: number }
     >
       <CancelConsultationForm
         appt={appt}
+        canCancel={canCancel}
         leading={<span className="text-xs font-medium text-neutral-600">Position {position}</span>}
         extraAction={
-          <button
-            type="button"
-            onClick={() => setReassignOpen(true)}
-            className="min-h-9 rounded-md border border-neutral-300 bg-white px-2.5 text-xs font-semibold text-neutral-800 hover:bg-neutral-50"
-          >
-            Reassign
-          </button>
+          canReassign ? (
+            <button
+              type="button"
+              onClick={() => setReassignOpen(true)}
+              className="min-h-9 rounded-md border border-neutral-300 bg-white px-2.5 text-xs font-semibold text-neutral-800 hover:bg-neutral-50"
+            >
+              Reassign
+            </button>
+          ) : undefined
         }
       />
 
-      {reassignOpen && (
+      {canReassign && reassignOpen && (
         <ReassignDialog appt={appt} onClose={() => setReassignOpen(false)} />
       )}
     </CardFrame>
   )
 }
 
-function InCabinCard({ appt }: { appt: Appointment }) {
-  const elapsed = getElapsedMinutes(appt.status_updated_at ?? appt.created_at)
+function InCabinCard({ appt, canCancel }: { appt: Appointment; canCancel: boolean }) {
+  const hasAnchor = Boolean(appt.status_updated_at ?? appt.created_at)
+  const elapsed = hasAnchor
+    ? getWaitingElapsedMinutes({ status_updated_at: appt.status_updated_at, created_at: appt.created_at })
+    : null
 
   return (
     <CardFrame
@@ -482,11 +539,10 @@ function InCabinCard({ appt }: { appt: Appointment }) {
     >
       <CancelConsultationForm
         appt={appt}
+        canCancel={canCancel}
         leading={
           <>
-            <span className="inline-flex items-center rounded-full border border-consult-200 bg-consult-100 px-2 py-0.5 text-xs font-semibold text-consult-900">
-              Consultation in progress
-            </span>
+            <AppointmentStatusBadge status="IN_CABIN" label="Consultation in progress" />
             <span className="text-xs text-neutral-600">Completed by doctor</span>
           </>
         }
@@ -495,19 +551,62 @@ function InCabinCard({ appt }: { appt: Appointment }) {
   )
 }
 
-function CompletedCard({ appt }: { appt: Appointment }) {
+function CompletedCard({
+  appt,
+  readyVisitsLoaded,
+  isReadyForCheckout,
+  hasOtherActiveConsultation,
+  canCollect,
+}: {
+  appt: Appointment
+  readyVisitsLoaded: boolean
+  isReadyForCheckout: boolean
+  hasOtherActiveConsultation: boolean
+  canCollect: boolean
+}) {
+  const billingHref = `/reception/billing?appointment_id=${appt.id}&patient_id=${appt.patient_id}`
+  const isReadyFallback = !readyVisitsLoaded || appt.visit_id == null || isReadyForCheckout
+
   return (
     <CardFrame appt={appt}>
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <span className="inline-flex items-center rounded-full border border-emerald-200 bg-emerald-100 px-2 py-0.5 text-xs font-semibold text-emerald-900">
-          Ready for checkout
-        </span>
-        <Link
-          to={`/reception/billing?appointment_id=${appt.id}&patient_id=${appt.patient_id}`}
-          className="inline-flex min-h-9 items-center rounded-md bg-emerald-700 px-3 text-xs font-semibold text-white hover:bg-emerald-800"
-        >
-          Collect payment →
-        </Link>
+        {isReadyFallback ? (
+          <>
+            <AppointmentStatusBadge status="COMPLETED" label="Ready for checkout" />
+            {canCollect && (
+              <Link
+                to={billingHref}
+                className="inline-flex min-h-9 items-center rounded-md bg-emerald-700 px-3 text-xs font-semibold text-white hover:bg-emerald-800"
+              >
+                Collect payment →
+              </Link>
+            )}
+          </>
+        ) : hasOtherActiveConsultation ? (
+          <>
+            <AppointmentStatusBadge status="WAITING" label="Other consultation active" />
+            {canCollect && (
+              <Link
+                to={billingHref}
+                className="inline-flex min-h-9 items-center rounded-md border border-neutral-300 bg-white px-2.5 text-xs font-semibold text-neutral-800 hover:bg-neutral-50"
+              >
+                Open billing →
+              </Link>
+            )}
+          </>
+        ) : (
+          <>
+            <AppointmentStatusBadge status="BOOKED" label="Closed / settled" />
+            {canCollect && (
+              <Link
+                to={billingHref}
+                className="inline-flex min-h-9 items-center rounded-md border border-neutral-300 bg-white px-2.5 text-xs font-semibold text-neutral-800 hover:bg-neutral-50"
+              >
+                View bill →
+              </Link>
+            )}
+          </>
+        )}
       </div>
     </CardFrame>
   )
@@ -524,6 +623,9 @@ function ReassignDialog({ appt, onClose }: { appt: Appointment; onClose: () => v
 
   const targetId = targetDoctorId ? Number(targetDoctorId) : null
   const targetDepartments = useDoctorDepartments(targetId)
+  // TanStack Query v5 reports isPending=true while disabled (targetId === null); guard on targetId !== null.
+  const targetDepartmentsUnavailable =
+    targetId !== null && (targetDepartments.isPending || targetDepartments.isError)
   const sameDepartment =
     targetDepartments.data?.some((d) => d.id === appt.department_id) ?? false
   const needsDepartment = targetId !== null && targetDepartments.isSuccess && !sameDepartment
@@ -534,6 +636,9 @@ function ReassignDialog({ appt, onClose }: { appt: Appointment; onClose: () => v
     e.preventDefault()
     if (targetId === null) {
       setError('Choose the doctor to move the patient to.')
+      return
+    }
+    if (targetDepartmentsUnavailable) {
       return
     }
     if (needsDepartment && !departmentId) {
@@ -591,6 +696,7 @@ function ReassignDialog({ appt, onClose }: { appt: Appointment; onClose: () => v
             onChange={(e) => {
               setTargetDoctorId(e.target.value)
               setDepartmentId('')
+              setError(null)
             }}
             className="mt-1 w-full min-h-[44px] rounded-md border border-neutral-300 bg-white px-3 text-sm"
           >
@@ -600,6 +706,21 @@ function ReassignDialog({ appt, onClose }: { appt: Appointment; onClose: () => v
             ))}
           </select>
         </label>
+
+        {targetId !== null && targetDepartments.isError && (
+          <InlineAlert tone="error">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <span>Could not load departments for the selected doctor.</span>
+              <button
+                type="button"
+                onClick={() => void targetDepartments.refetch()}
+                className="min-h-8 rounded border border-red-300 bg-white px-2.5 text-xs font-semibold text-red-700 hover:bg-red-50"
+              >
+                Retry
+              </button>
+            </div>
+          </InlineAlert>
+        )}
 
         {needsDepartment && (
           <label className="block text-sm font-semibold text-neutral-700">
@@ -638,7 +759,7 @@ function ReassignDialog({ appt, onClose }: { appt: Appointment; onClose: () => v
           </button>
           <button
             type="submit"
-            disabled={reassign.isPending}
+            disabled={reassign.isPending || targetDepartmentsUnavailable}
             className="min-h-[44px] rounded-md bg-danger-600 px-4 text-sm font-semibold text-white disabled:opacity-70"
           >
             {reassign.isPending ? 'Reassigning…' : 'Reassign & issue new token'}

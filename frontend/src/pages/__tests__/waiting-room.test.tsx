@@ -11,22 +11,41 @@ const DEFAULT_DOCTORS = [
   { id: 2, name_en: 'Dr. Bharati', is_active: true },
 ]
 
+const DEFAULT_PERMISSIONS = ['visit:write', 'appointment:write', 'payment:create']
+
+type DoctorDepartmentsResult = {
+  data?: { id: number; name_en: string }[]
+  isSuccess?: boolean
+  isPending?: boolean
+  isError?: boolean
+  refetch: ReturnType<typeof vi.fn>
+}
+
 const state: {
   appointments: Appointment[]
+  permissions: string[]
   doctorsQuery: { data: typeof DEFAULT_DOCTORS | undefined; isError?: boolean }
+  visitsQuery: { data?: { total: number; visits: { id: number }[] }; isSuccess: boolean; isPending?: boolean; isError?: boolean }
+  doctorDepartmentsOverride: ((doctorId: number | null) => DoctorDepartmentsResult) | null
+  doctorDepartmentsRefetch: ReturnType<typeof vi.fn>
   reassignMutate: ReturnType<typeof vi.fn>
   cancelMutate: ReturnType<typeof vi.fn>
 } = {
   appointments: [],
+  permissions: DEFAULT_PERMISSIONS,
   doctorsQuery: { data: DEFAULT_DOCTORS },
+  visitsQuery: { data: { total: 1, visits: [{ id: 500 }] }, isSuccess: true },
+  doctorDepartmentsOverride: null,
+  doctorDepartmentsRefetch: vi.fn(),
   reassignMutate: vi.fn(),
   cancelMutate: vi.fn(),
 }
 
 vi.mock('../../api/queries', () => ({
-  useMe: () => ({ data: { full_name: 'Reception Staff', role: 'RECEPTION' } }),
+  useMe: () => ({ data: { full_name: 'Reception Staff', role: 'RECEPTION', permissions: state.permissions } }),
   useLogout: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useAppointments: () => ({ data: { total: state.appointments.length, appointments: state.appointments }, dataUpdatedAt: Date.parse('2026-11-15T04:30:00Z'), isError: false }),
+  useVisits: () => state.visitsQuery,
   useDoctors: () => state.doctorsQuery,
   useDepartments: () => ({
     data: [
@@ -35,9 +54,16 @@ vi.mock('../../api/queries', () => ({
     ],
   }),
   // Dr. Bharati belongs to Ophthalmology only; Dr. Anil belongs to General OPD.
+  // Mirrors TanStack Query v5 where a disabled query (doctorId === null) has isPending: true.
   useDoctorDepartments: (doctorId: number | null) => {
-    if (doctorId === 2) return { data: [{ id: 20, name_en: 'Ophthalmology' }], isSuccess: true }
-    return { data: [{ id: 10, name_en: 'General OPD' }], isSuccess: true }
+    if (state.doctorDepartmentsOverride) return state.doctorDepartmentsOverride(doctorId)
+    if (doctorId === null) {
+      return { data: undefined, isSuccess: false, isPending: true, isError: false, refetch: state.doctorDepartmentsRefetch }
+    }
+    if (doctorId === 2) {
+      return { data: [{ id: 20, name_en: 'Ophthalmology' }], isSuccess: true, isPending: false, isError: false, refetch: state.doctorDepartmentsRefetch }
+    }
+    return { data: [{ id: 10, name_en: 'General OPD' }], isSuccess: true, isPending: false, isError: false, refetch: state.doctorDepartmentsRefetch }
   },
   useReassignAppointment: () => ({ mutate: state.reassignMutate, isPending: false }),
   useUpdateAppointmentStatus: () => ({ mutate: state.cancelMutate, isPending: false }),
@@ -49,6 +75,7 @@ function appt(overrides: Partial<Appointment>): Appointment {
   return {
     id: 1,
     department_id: 10,
+    visit_id: 500,
     patient_id: 1,
     patient_urn: 'KH-2026-0001',
     patient_name: 'Ram Kumar',
@@ -96,12 +123,16 @@ describe('WaitingRoom', () => {
   beforeEach(() => {
     state.reassignMutate.mockReset()
     state.cancelMutate.mockReset()
+    state.doctorDepartmentsRefetch.mockReset()
   })
 
   afterEach(() => {
     cleanup()
     state.appointments = []
+    state.permissions = DEFAULT_PERMISSIONS
     state.doctorsQuery = { data: DEFAULT_DOCTORS }
+    state.visitsQuery = { data: { total: 1, visits: [{ id: 500 }] }, isSuccess: true }
+    state.doctorDepartmentsOverride = null
   })
 
   it('orders waiting patients: emergency by classification time, then priority, then normal', () => {
@@ -496,5 +527,154 @@ describe('WaitingRoom', () => {
 
     expect(screen.queryByRole('button', { name: /call patient|call next|\bcall\b/i })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /complete|mark completed/i })).not.toBeInTheDocument()
+  })
+
+  it('ReassignDialog stays clickable before selecting a doctor, disables submit while loading departments, and shows error alert with Retry on fetch failure', async () => {
+    state.appointments = [appt({ id: 1, token_number: 1, department_id: 10, doctor_id: 1 })]
+    state.doctorDepartmentsOverride = (doctorId) => {
+      if (doctorId === null) {
+        return { data: undefined, isSuccess: false, isPending: true, isError: false, refetch: state.doctorDepartmentsRefetch }
+      }
+      return { data: undefined, isSuccess: false, isPending: true, isError: false, refetch: state.doctorDepartmentsRefetch }
+    }
+    const { rerender } = renderPage()
+
+    await userEvent.click(screen.getByRole('button', { name: 'Reassign' }))
+    const dialog = screen.getByRole('dialog', { hidden: true })
+    const submitBtn = within(dialog).getByRole('button', { name: 'Reassign & issue new token' })
+
+    // Even though disabled TanStack Query v5 returns isPending: true when doctorId === null, submit stays enabled for validation.
+    expect(submitBtn).toBeEnabled()
+    await userEvent.click(submitBtn)
+    expect(within(dialog).getByRole('alert')).toHaveTextContent('Choose the doctor to move the patient to.')
+    expect(state.reassignMutate).not.toHaveBeenCalled()
+
+    // Selecting a doctor while its departments are loading disables submit.
+    await userEvent.selectOptions(within(dialog).getByLabelText('Move to doctor'), '2')
+    expect(submitBtn).toBeDisabled()
+
+    // Transitioning to error keeps submit disabled and renders an InlineAlert + Retry calling refetch().
+    state.doctorDepartmentsOverride = (doctorId) => {
+      if (doctorId === null) {
+        return { data: undefined, isSuccess: false, isPending: true, isError: false, refetch: state.doctorDepartmentsRefetch }
+      }
+      return { data: undefined, isSuccess: false, isPending: false, isError: true, refetch: state.doctorDepartmentsRefetch }
+    }
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    rerender(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter initialEntries={['/reception/waiting']}>
+          <SearchSpy />
+          <WaitingRoom />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    )
+
+    expect(submitBtn).toBeDisabled()
+    const retryBtn = within(dialog).getByRole('button', { name: 'Retry' })
+    expect(retryBtn.closest('[role="alert"]')).toBeInTheDocument()
+    await userEvent.click(retryBtn)
+    expect(state.doctorDepartmentsRefetch).toHaveBeenCalledTimes(1)
+  })
+
+  it('gates Reassign, Cancel consultation, and Collect payment / billing links on permissions', () => {
+    state.appointments = [
+      appt({ id: 1, token_number: 1, patient_name: 'Waiting Patient', consultation_status: 'WAITING' }),
+      appt({ id: 2, token_number: 2, patient_name: 'Cabin Patient', consultation_status: 'IN_CONSULTATION' }),
+      appt({ id: 3, token_number: 3, patient_name: 'Done Patient', consultation_status: 'COMPLETED', visit_id: 500 }),
+    ]
+
+    // Missing visit:write hides Reassign only
+    state.permissions = ['appointment:write', 'payment:create']
+    renderPage()
+    expect(screen.queryByRole('button', { name: 'Reassign' })).not.toBeInTheDocument()
+    expect(screen.getAllByRole('button', { name: 'Cancel consultation' })).toHaveLength(2)
+    expect(screen.getByRole('link', { name: /Collect payment/i })).toBeInTheDocument()
+    cleanup()
+
+    // Missing appointment:write hides Cancel consultation on both Waiting and In Cabin
+    state.permissions = ['visit:write', 'payment:create']
+    renderPage()
+    expect(screen.getByRole('button', { name: 'Reassign' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Cancel consultation' })).not.toBeInTheDocument()
+    expect(screen.getByText('Position 1')).toBeInTheDocument()
+    expect(screen.getByText('Consultation in progress')).toBeInTheDocument()
+    cleanup()
+
+    // Missing payment:create hides Collect payment on Completed card
+    state.permissions = ['visit:write', 'appointment:write']
+    renderPage()
+    expect(screen.getByText('Ready for checkout')).toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: /Collect payment/i })).not.toBeInTheDocument()
+    cleanup()
+
+    // Missing payment:create also hides empty-state Open Billing & Checkout link
+    state.appointments = [appt({ id: 1, token_number: 1, patient_name: 'Waiting Patient', consultation_status: 'WAITING' })]
+    state.permissions = ['visit:write', 'appointment:write']
+    renderPage()
+    expect(screen.queryByRole('link', { name: /Open Billing & Checkout/i })).not.toBeInTheDocument()
+  })
+
+  it('distinguishes Ready for checkout, Other consultation active, Closed / settled, and loading fallback on CompletedCard', () => {
+    state.visitsQuery = { data: { total: 1, visits: [{ id: 500 }] }, isSuccess: true }
+    state.appointments = [
+      // Visit 500: in readyVisits -> Ready for checkout
+      appt({ id: 10, token_number: 1, patient_id: 101, patient_name: 'Ready Patient', visit_id: 500, consultation_status: 'COMPLETED' }),
+      // Visit 501: not in readyVisits, another consultation still IN_CONSULTATION -> Other consultation active
+      appt({ id: 11, token_number: 2, patient_id: 102, patient_name: 'Multi Doctor Patient', visit_id: 501, doctor_id: 1, consultation_status: 'COMPLETED' }),
+      appt({ id: 12, token_number: 3, patient_id: 102, patient_name: 'Multi Doctor Patient', visit_id: 501, doctor_id: 2, doctor_name_en: 'Dr. Bharati', consultation_status: 'IN_CONSULTATION' }),
+      // Visit 502: not in readyVisits, no other active consultation -> Closed / settled
+      appt({ id: 13, token_number: 4, patient_id: 103, patient_name: 'Settled Patient', visit_id: 502, consultation_status: 'COMPLETED' }),
+      // No visit_id -> graceful fallback to Ready for checkout
+      appt({ id: 14, token_number: 5, patient_id: 104, patient_name: 'Legacy Patient', visit_id: null, consultation_status: 'COMPLETED' }),
+    ]
+    renderPage()
+
+    const completedColumn = screen.getByRole('region', { name: 'Completed' })
+
+    const readyCard = within(completedColumn).getByText('Ready Patient').closest('article')!
+    expect(within(readyCard).getByText('Ready for checkout')).toBeInTheDocument()
+    expect(within(readyCard).getByRole('link', { name: 'Collect payment →' })).toHaveAttribute(
+      'href',
+      '/reception/billing?appointment_id=10&patient_id=101',
+    )
+
+    const multiCard = within(completedColumn).getByText('Multi Doctor Patient').closest('article')!
+    expect(within(multiCard).getByText('Other consultation active')).toBeInTheDocument()
+    expect(within(multiCard).queryByText('Ready for checkout')).not.toBeInTheDocument()
+    expect(within(multiCard).getByRole('link', { name: 'Open billing →' })).toHaveAttribute(
+      'href',
+      '/reception/billing?appointment_id=11&patient_id=102',
+    )
+
+    const settledCard = within(completedColumn).getByText('Settled Patient').closest('article')!
+    expect(within(settledCard).getByText('Closed / settled')).toBeInTheDocument()
+    expect(within(settledCard).queryByText('Ready for checkout')).not.toBeInTheDocument()
+    expect(within(settledCard).getByRole('link', { name: 'View bill →' })).toHaveAttribute(
+      'href',
+      '/reception/billing?appointment_id=13&patient_id=103',
+    )
+
+    const legacyCard = within(completedColumn).getByText('Legacy Patient').closest('article')!
+    expect(within(legacyCard).getByText('Ready for checkout')).toBeInTheDocument()
+    expect(within(legacyCard).getByRole('link', { name: 'Collect payment →' })).toBeInTheDocument()
+    cleanup()
+
+    // While useVisits hasn't loaded yet, falls back gracefully to Ready for checkout / Collect payment
+    state.visitsQuery = { data: undefined, isSuccess: false, isPending: true }
+    state.appointments = [
+      appt({ id: 13, token_number: 4, patient_id: 103, patient_name: 'Settled Patient', visit_id: 502, consultation_status: 'COMPLETED' }),
+    ]
+    renderPage()
+    const loadingCard = screen.getByText('Settled Patient').closest('article')!
+    expect(within(loadingCard).getByText('Ready for checkout')).toBeInTheDocument()
+    expect(within(loadingCard).getByRole('link', { name: 'Collect payment →' })).toBeInTheDocument()
+  })
+
+  it('scopes column max height to lg:max-h-[70vh] for mobile/tablet stacked layouts', () => {
+    renderPage()
+    const waitingRegion = screen.getByRole('region', { name: 'Waiting' })
+    expect(waitingRegion).toHaveClass('lg:max-h-[70vh]')
+    expect(waitingRegion).not.toHaveClass('max-h-[70vh]')
   })
 })
