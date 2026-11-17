@@ -86,6 +86,21 @@ export function BillPanel({
   const safePayingNow = Math.max(0, payingNowPaise)
   const remainingOnVisit = Math.max(0, bill.due_paise - safePayingNow)
   const totalOutstanding = remainingOnVisit + bill.previous_dues_total_paise
+  const discountsPaise = bill.sections.reduce(
+    (sum, section) =>
+      sum +
+      section.lines.reduce((lineSum, line) => {
+        if (
+          line.status !== 'ACTIVE' ||
+          !line.counts_toward_total ||
+          !line.history?.some((h) => h.kind === 'DISCOUNT' || h.kind === 'WAIVER')
+        ) {
+          return lineSum
+        }
+        return lineSum + Math.max(0, (line.original_amount_paise ?? line.amount_paise) - line.amount_paise)
+      }, 0),
+    0,
+  )
 
   const isOwnSameDay = (line: BillLineOut) => {
     if (line.source !== 'RECEPTION') return false
@@ -112,6 +127,51 @@ export function BillPanel({
         </div>
       )}
 
+      {/* Checkout Summary Strip */}
+      <section
+        data-testid="checkout-summary-strip"
+        aria-label="Checkout summary"
+        className="grid grid-cols-2 gap-2.5 sm:grid-cols-4"
+      >
+        <div className="rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 shadow-xs">
+          <p className="text-xs font-semibold text-slate-600">Bill Total</p>
+          <p className="mt-0.5 font-mono text-sm font-bold tabular-nums text-slate-900">
+            {formatPaise(bill.bill_total_paise)}
+          </p>
+        </div>
+        <div className="rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 shadow-xs">
+          <div className="flex items-baseline justify-between gap-1">
+            <p className="text-xs font-semibold text-slate-600">Discounts</p>
+            {discountsPaise > 0 && (
+              <span className="text-xs font-medium text-emerald-800">included</span>
+            )}
+          </div>
+          <p
+            className={`mt-0.5 font-mono text-sm font-bold tabular-nums ${
+              discountsPaise > 0 ? 'text-emerald-800' : 'text-slate-900'
+            }`}
+          >
+            {formatPaise(discountsPaise)}
+          </p>
+        </div>
+        <div className="rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 shadow-xs">
+          <p className="text-xs font-semibold text-slate-600">Paid</p>
+          <p className="mt-0.5 font-mono text-sm font-bold tabular-nums text-emerald-800">
+            {formatPaise(bill.paid_paise)}
+          </p>
+        </div>
+        <div className="rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 shadow-xs">
+          <p className="text-xs font-semibold text-slate-600">Balance Due</p>
+          <p
+            className={`mt-0.5 font-mono text-sm font-bold tabular-nums ${
+              bill.due_paise > 0 ? 'text-red-700' : 'text-slate-900'
+            }`}
+          >
+            {formatPaise(bill.due_paise)}
+          </p>
+        </div>
+      </section>
+
       {/* Bill sections card */}
       <section className="space-y-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-xs">
         <div className="border-b border-slate-100 pb-2">
@@ -131,7 +191,7 @@ export function BillPanel({
             return (
               <div key={category} className="space-y-2">
                 <div className="flex items-center justify-between border-b border-slate-100 py-1.5">
-                  <h4 className="text-xs font-bold uppercase tracking-wider text-slate-700">
+                  <h4 className="text-xs font-bold text-slate-700">
                     {title}
                   </h4>
                   <span className="font-mono text-xs font-bold tabular-nums text-slate-900">
@@ -313,7 +373,7 @@ export function BillPanel({
 
       {/* Totals block in exact order (UI-SPEC S4 §7) */}
       <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs space-y-3">
-        <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700 border-b border-slate-100 pb-2">
+        <h3 className="text-xs font-bold text-slate-700 border-b border-slate-100 pb-2">
           Totals &amp; Settlement
         </h3>
         <div className="space-y-2">
@@ -324,6 +384,13 @@ export function BillPanel({
               {formatPaise(bill.bill_total_paise)}
             </span>
           </div>
+
+          {discountsPaise > 0 && (
+            <div className="flex items-center justify-between text-xs text-emerald-800">
+              <span className="font-medium">Discounts applied (included above)</span>
+              <span className="font-mono font-bold tabular-nums">{formatPaise(discountsPaise)}</span>
+            </div>
+          )}
 
           {/* 2. Paid earlier */}
           <div className="flex items-center justify-between text-sm">
@@ -447,7 +514,7 @@ export function BillPanel({
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs">
-              <thead className="border-b border-slate-200 bg-slate-50 font-bold uppercase tracking-wider text-slate-600">
+              <thead className="border-b border-slate-200 bg-slate-50 font-bold text-slate-600">
                 <tr>
                   <th className="px-3 py-2">Receipt #</th>
                   <th className="px-3 py-2">Time (IST)</th>
