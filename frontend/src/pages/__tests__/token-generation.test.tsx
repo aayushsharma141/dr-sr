@@ -102,6 +102,23 @@ const checkedIn: Appointment = {
   version_id: 2,
 }
 
+const sitaArrival: OpdArrival = {
+  id: 900,
+  full_name: 'Sita Devi',
+  age_years: 41,
+  mobile: '9876500011',
+  doctor_id: 10,
+  doctor_name_en: 'Dr. Anil Kumar',
+  department_id: 1,
+  department_name: 'Physiotherapy',
+  appointment_date: istToday(),
+  token_number: 14,
+  priority_level: 'NORMAL',
+  status: 'TO_ARRIVE',
+  version_id: 1,
+  created_at: '2026-11-16T03:00:00Z',
+}
+
 const jsonResponse = (status: number, body: unknown) => ({
   ok: status >= 200 && status < 300,
   status,
@@ -135,7 +152,8 @@ function installApi(options: {
       writes.push({ method, url, body: init?.body ? JSON.parse(init.body as string) : null })
       return Promise.resolve(options.write?.(url, method) ?? jsonResponse(500, { message: 'unexpected write' }))
     }
-    if (url.includes('/api/opd-arrivals')) return Promise.resolve(jsonResponse(200, { total: options.arrivals?.length ?? 0, arrivals: options.arrivals ?? [] }))
+    if (url.includes('/api/opd-arrivals'))
+      return Promise.resolve(jsonResponse(200, { total: options.arrivals?.length ?? 0, arrivals: options.arrivals ?? [] }))
     if (url.includes('/api/auth/me')) return Promise.resolve(jsonResponse(200, mockMe))
     if (url.includes('/api/departments/1/doctors')) return Promise.resolve(jsonResponse(200, mockDoctors))
     if (url.includes('/api/departments')) return Promise.resolve(jsonResponse(200, mockDepartments))
@@ -143,9 +161,9 @@ function installApi(options: {
       return Promise.resolve(
         jsonResponse(200, { has_duplicate: options.duplicate != null, matching_patient: options.duplicate ?? null }),
       )
-    if (/\/api\/patients\/101$/.test(url)) return Promise.resolve(jsonResponse(200, mockPatient))
+    if (url.endsWith('/api/patients/101')) return Promise.resolve(jsonResponse(200, mockPatient))
     if (url.includes('/api/patients')) return Promise.resolve(jsonResponse(200, [mockPatient]))
-    if (/\/api\/appointments\/501$/.test(url)) return Promise.resolve(jsonResponse(200, rameshBooking))
+    if (url.endsWith('/api/appointments/501')) return Promise.resolve(jsonResponse(200, rameshBooking))
     if (url.includes('/api/appointments') && url.includes('patient_id=101'))
       return Promise.resolve(
         jsonResponse(200, { appointments: options.bookings ?? [], total: options.bookings?.length ?? 0 }),
@@ -158,13 +176,15 @@ function installApi(options: {
   return { writes }
 }
 
-function renderDesk(route = '/reception/tokens') {
+type DeskEntry = string | { pathname: string; state?: unknown }
+
+function renderDesk(entry: DeskEntry = '/reception/tokens') {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
   })
   render(
     <QueryClientProvider client={queryClient}>
-      <MemoryRouter initialEntries={[route]}>
+      <MemoryRouter initialEntries={[entry]}>
         <TokenGenerationPage />
       </MemoryRouter>
     </QueryClientProvider>,
@@ -194,7 +214,19 @@ async function selectExistingPatient(user: User) {
   await screen.findByText(/Confirm with the patient that these details are theirs/i)
 }
 
-const submitButton = () => screen.getByRole('button', { name: /Create Entry & Generate Token|Check in & Send to Waiting/i })
+const submitButton = () => screen.getByRole('button', { name: /^Generate Token$|^Check in & Generate Token$/i })
+
+function getStepItems() {
+  return within(screen.getByRole('list', { name: 'Check-in steps' })).getAllByRole('listitem')
+}
+
+function assertNoBillingLinksInDesk() {
+  const desk = screen.getByRole('main')
+  expect(within(desk).queryByRole('link', { name: /billing|receipt/i })).not.toBeInTheDocument()
+  for (const link of within(desk).queryAllByRole('link')) {
+    expect(link.getAttribute('href') ?? '').not.toContain('/reception/billing')
+  }
+}
 
 describe('QueueTicketPreview Component', () => {
   it('renders notched ticket with monotonic token format and doctor queue stats', () => {
@@ -217,7 +249,7 @@ describe('QueueTicketPreview Component', () => {
   })
 })
 
-describe('Check-in & Token desk (phase 22)', () => {
+describe('Check-in & Token desk', () => {
   beforeEach(() => {
     vi.restoreAllMocks()
   })
@@ -227,55 +259,75 @@ describe('Check-in & Token desk (phase 22)', () => {
     vi.restoreAllMocks()
   })
 
-  it('shows the two-panel OPD token desk and patient flow', async () => {
-    installApi({ today: [rameshBooking] })
+  it('shows two-step indicator, compact Step 01 controls, live token preview, and no dead Search patient button', async () => {
+    const existingTokenAppt: Appointment = {
+      ...rameshBooking,
+      token_number: 1,
+      status: 'ARRIVED',
+      consultation_status: 'WAITING',
+    }
+    installApi({ today: [existingTokenAppt] })
     const user = renderDesk()
 
     expect(screen.getByRole('heading', { name: 'Check-in & Token' })).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: /Today's appointments/i })).toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: /Create OPD Token/i })).toBeInTheDocument()
-    expect(screen.getByRole('region', { name: /Patient flow/i })).toBeInTheDocument()
-    expect(await screen.findByText('Ramesh Kumar')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Create OPD Token' })).toBeInTheDocument()
 
-    // New patient is a real choice on this page: the form appears here, nothing navigates away.
+    // Step 01 is active initially in the two-step indicator
+    const [step1, step2] = getStepItems()
+    expect(step1).toHaveAttribute('aria-current', 'step')
+    expect(step1).toHaveTextContent(/01.*Patient & Visit/)
+    expect(step2).not.toHaveAttribute('aria-current')
+    expect(step2).toHaveTextContent(/02.*Token & Check-in/)
+
+    // Compact inline next-token preview starts at #-- and updates to #2 when doctor is chosen
+    expect(screen.getByTestId('next-token-preview')).toHaveTextContent('#--')
+    expect(screen.getByText('Preview only')).toBeInTheDocument()
+    await chooseDoctor(user)
+    expect(screen.getByTestId('next-token-preview')).toHaveTextContent('#2')
+
+    // New patient / Existing patient toggle works inline without a dead Search patient button
     expect(screen.getByRole('button', { name: /New patient/i })).toHaveAttribute('aria-pressed', 'true')
     expect(screen.getByLabelText(/Patient name \*/i)).toBeInTheDocument()
+
     await user.click(screen.getByRole('button', { name: /Existing patient/i }))
-    expect(screen.getByLabelText(/Search patient by URN, name or mobile/i)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Existing patient/i })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByText('Find existing patient')).toBeInTheDocument()
+    expect(screen.getByPlaceholderText('Enter mobile number or hospital URN')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Search patient' })).not.toBeInTheDocument()
+
     await user.click(screen.getByRole('button', { name: /New patient/i }))
     expect(screen.getByLabelText(/Patient name \*/i)).toBeInTheDocument()
   })
 
-  it('creates a pending To Arrive entry before full patient registration', async () => {
+  it('moves new patient from Step 01 to Step 02 arrival summary and resets cleanly on Next patient', async () => {
     const { writes } = installApi({
-      write: () =>
-        jsonResponse(201, {
-          id: 900,
-          full_name: 'Sita Devi',
-          age_years: 41,
-          mobile: '9876500011',
-          doctor_id: 10,
-          doctor_name_en: 'Dr. Anil Kumar',
-          department_id: 1,
-          department_name: 'Physiotherapy',
-          appointment_date: istToday(),
-          token_number: 14,
-          priority_level: 'NORMAL',
-          status: 'TO_ARRIVE',
-          version_id: 1,
-          created_at: '2026-11-16T03:00:00Z',
-        }),
+      write: () => jsonResponse(201, sitaArrival),
     })
     const user = renderDesk()
 
     await fillNewPatient(user)
     await chooseDoctor(user)
     expect(screen.getByText(/Consultation fee/)).toHaveTextContent('₹400.00')
-    expect(submitButton()).toHaveTextContent('Create Entry & Generate Token')
+    expect(submitButton()).toHaveTextContent('Generate Token')
     expect(submitButton()).toBeEnabled()
     await user.click(submitButton())
 
-    expect(await screen.findByText('Token #14 added to To Arrive. Complete registration from today\'s queue.')).toBeInTheDocument()
+    // Swaps left card to Step 02
+    expect(await screen.findByRole('heading', { name: 'Token Generated' })).toBeInTheDocument()
+    const [step1, step2] = getStepItems()
+    expect(step1).not.toHaveAttribute('aria-current')
+    expect(step2).toHaveAttribute('aria-current', 'step')
+
+    expect(screen.getByTestId('issued-token')).toHaveTextContent('#14')
+    expect(screen.getByText('To arrive · Pending full registration')).toBeInTheDocument()
+    expect(screen.getByText('Dr. Anil Kumar')).toBeInTheDocument()
+    expect(screen.getByText('Physiotherapy')).toBeInTheDocument()
+
+    const regLink = screen.getByRole('link', { name: /Complete Registration & Check In/i })
+    expect(regLink).toHaveAttribute('href', '/reception/patients/new?arrival_id=900&doctor_id=10')
+    expect(screen.getByRole('button', { name: /Print Token/i })).toBeInTheDocument()
+    assertNoBillingLinksInDesk()
 
     expect(writes).toHaveLength(1)
     expect(writes[0].url).toContain('/api/opd-arrivals')
@@ -287,35 +339,145 @@ describe('Check-in & Token desk (phase 22)', () => {
       department_id: 1,
       priority_level: 'NORMAL',
     })
+
+    // Next patient returns cleanly to Step 01 with cleared inputs
+    await user.click(screen.getByRole('button', { name: 'Next patient' }))
+    expect(screen.getByRole('heading', { name: 'Create OPD Token' })).toBeInTheDocument()
+    const [resetStep1, resetStep2] = getStepItems()
+    expect(resetStep1).toHaveAttribute('aria-current', 'step')
+    expect(resetStep2).not.toHaveAttribute('aria-current')
+    expect(screen.getByLabelText(/Patient name \*/i)).toHaveValue('')
+    expect(screen.getByLabelText(/Age \(years\) \*/i)).toHaveValue(null)
+    expect(screen.getByLabelText(/Phone number \*/i)).toHaveValue('')
   })
 
-  it('creates a tokenized To Arrive entry for an existing patient', async () => {
+  it('moves existing patient walk-in from Step 01 to Step 02 checked-in summary without billing links', async () => {
     const { writes } = installApi({
-      write: () => jsonResponse(201, { ...checkedIn, id: 502, status: 'TO_ARRIVE', source: 'WALK_IN', visit_kind: null }),
+      write: () => jsonResponse(201, { ...checkedIn, id: 502, status: 'CHECKED_IN', source: 'WALK_IN', visit_kind: 'NEW' }),
     })
     const user = renderDesk()
 
     await selectExistingPatient(user)
     await chooseDoctor(user)
+    await user.click(
+      within(screen.getByRole('group', { name: 'Consultation type' })).getByRole('button', { name: 'New consultation' }),
+    )
+    expect(submitButton()).toHaveTextContent('Check in & Generate Token')
     expect(submitButton()).toBeEnabled()
     await user.click(submitButton())
 
-    expect(await screen.findByText(/Token created; awaiting check-in/i)).toBeInTheDocument()
-    expect(writes[0].url).toMatch(/\/api\/appointments$/)
+    expect(await screen.findByRole('heading', { name: 'Token Generated' })).toBeInTheDocument()
+    const [step1, step2] = getStepItems()
+    expect(step1).not.toHaveAttribute('aria-current')
+    expect(step2).toHaveAttribute('aria-current', 'step')
+
+    expect(screen.getByText('Checked In · Waiting for doctor')).toBeInTheDocument()
+    expect(screen.getByTestId('issued-token')).toHaveTextContent('#14')
+    expect(screen.getByText('Dr. Anil Kumar')).toBeInTheDocument()
+    expect(screen.getByText('Physiotherapy')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Print Token/i })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Patient file' })).toHaveAttribute('href', '/reception/patients/101')
+    expect(screen.getByRole('button', { name: 'Check in next patient' })).toBeInTheDocument()
+    assertNoBillingLinksInDesk()
+
+    expect(writes).toHaveLength(1)
+    expect(writes[0].url.endsWith('/api/appointments/walk-in')).toBe(true)
     expect(writes[0].body).toMatchObject({
       patient_id: 101,
       doctor_id: 10,
       department_id: 1,
-      appointment_date: istToday(),
-      issue_token: true,
       priority_level: 'NORMAL',
+    })
+  })
+
+  it('opens the Print OPD Token modal from Step 02, triggers window.print, and closes cleanly', async () => {
+    const printSpy = vi.spyOn(window, 'print').mockImplementation(() => {})
+    installApi({
+      write: () => jsonResponse(201, { ...checkedIn, id: 502, status: 'CHECKED_IN', source: 'WALK_IN', visit_kind: 'NEW' }),
+    })
+    const user = renderDesk()
+
+    await selectExistingPatient(user)
+    await chooseDoctor(user)
+    await user.click(
+      within(screen.getByRole('group', { name: 'Consultation type' })).getByRole('button', { name: 'New consultation' }),
+    )
+    await user.click(submitButton())
+    await screen.findByRole('heading', { name: 'Token Generated' })
+
+    await user.click(screen.getByRole('button', { name: /Print Token/i }))
+
+    const dialog = await screen.findByRole('dialog', { name: 'Print OPD Token' })
+    expect(within(dialog).getByTestId('print-slip-token')).toHaveTextContent('#14')
+    expect(within(dialog).getByText('Ramesh Kumar')).toBeInTheDocument()
+    expect(within(dialog).getByText('KH-2026-0001')).toBeInTheDocument()
+    expect(within(dialog).getByText('Dr. Anil Kumar')).toBeInTheDocument()
+    expect(within(dialog).getByText('Physiotherapy')).toBeInTheDocument()
+
+    await user.click(within(dialog).getByRole('button', { name: /Print Slip/i }))
+    expect(printSpy).toHaveBeenCalledTimes(1)
+
+    await user.click(within(dialog).getByRole('button', { name: 'Close' }))
+    expect(screen.queryByRole('dialog', { name: 'Print OPD Token' })).not.toBeInTheDocument()
+  })
+
+  it('checks in an unarrived BOOKED appointment directly from the default To Arrive tab and preserves booking priority', async () => {
+    const priorityBooking: Appointment = {
+      ...rameshBooking,
+      priority_level: 'PRIORITY',
+      priority_reason: 'Senior citizen',
+    }
+    const priorityCheckedIn: Appointment = {
+      ...checkedIn,
+      priority_level: 'PRIORITY',
+      priority_reason: 'Senior citizen',
+    }
+    const { writes } = installApi({
+      bookings: [priorityBooking],
+      today: [priorityBooking],
+      write: () => jsonResponse(200, priorityCheckedIn),
+    })
+    const user = renderDesk()
+
+    // Default tab is To Arrive; unarrived BOOKED appointment appears directly with a Check in button
+    expect(screen.getByRole('tab', { name: /To Arrive/i })).toHaveAttribute('aria-selected', 'true')
+    const row = (await screen.findByText('Ramesh Kumar')).closest('tr') as HTMLElement
+    await user.click(within(row).getByRole('button', { name: 'Check in' }))
+
+    expect(screen.getByText(/Booked appointment with/)).toHaveTextContent('Dr. Anil Kumar at 10:30')
+    expect(screen.queryByLabelText(/Consulting doctor \*/i)).not.toBeInTheDocument()
+    expect(screen.getByLabelText('Priority *')).toHaveValue('PRIORITY')
+    expect(screen.getByLabelText(/Reason for priority \*/i)).toHaveValue('Senior citizen')
+
+    await user.click(
+      within(screen.getByRole('group', { name: 'Consultation type' })).getByRole('button', { name: 'New consultation' }),
+    )
+    expect(submitButton()).toHaveTextContent('Check in & Generate Token')
+    await waitFor(() => expect(submitButton()).toBeEnabled())
+    await user.click(submitButton())
+
+    await waitFor(() => expect(writes).toHaveLength(1))
+    expect(await screen.findByRole('heading', { name: 'Token Generated' })).toBeInTheDocument()
+    expect(screen.getByText('Checked In · Waiting for doctor')).toBeInTheDocument()
+    expect(screen.getByTestId('issued-token')).toHaveTextContent('#14')
+    expect(writes[0].url).toContain('/api/appointments/501/check-in')
+    expect(writes[0].body).toMatchObject({
+      version_id: 1,
+      referral_source: 'SELF',
+      visit_kind: 'NEW',
+      priority_level: 'PRIORITY',
+      priority_reason: 'Senior citizen',
     })
   })
 
   it('needs a reason before marking a patient Emergency, and sends it', async () => {
     const { writes } = installApi({
       write: () =>
-      jsonResponse(201, { id: 900, full_name: 'Sita Devi', age_years: 41, mobile: '9876500011', doctor_id: 10, doctor_name_en: 'Dr. Anil Kumar', department_id: 1, department_name: 'Physiotherapy', appointment_date: istToday(), token_number: 14, priority_level: 'EMERGENCY', priority_reason: 'Severe acute pain', status: 'TO_ARRIVE', version_id: 1, created_at: '2026-11-16T03:00:00Z' }),
+        jsonResponse(201, {
+          ...sitaArrival,
+          priority_level: 'EMERGENCY',
+          priority_reason: 'Severe acute pain',
+        }),
     })
     const user = renderDesk()
 
@@ -327,29 +489,10 @@ describe('Check-in & Token desk (phase 22)', () => {
     await user.type(screen.getByLabelText(/Reason for emergency \*/i), 'Severe acute pain')
     await user.click(submitButton())
 
-    expect(await screen.findByText('Token #14 added to To Arrive. Complete registration from today\'s queue.')).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Token Generated' })).toBeInTheDocument()
+    expect(screen.getByTestId('issued-token')).toHaveTextContent('#14')
+    expect(screen.getByText('Severe acute pain')).toBeInTheDocument()
     expect(writes[0].body).toMatchObject({ priority_level: 'EMERGENCY', priority_reason: 'Severe acute pain' })
-  })
-
-  it("checks in a booking picked from today's appointments", async () => {
-    const { writes } = installApi({ today: [rameshBooking], write: () => jsonResponse(200, checkedIn) })
-    const user = renderDesk()
-
-    await user.click(screen.getByRole('tab', { name: /All/ }))
-    const row = (await screen.findByText('Ramesh Kumar')).closest('tr') as HTMLElement
-    await user.type(within(row).getByRole('textbox', { name: /Verify Ramesh Kumar/i }), '9876543210')
-    await user.click(within(row).getByRole('button', { name: 'Check in' }))
-
-    expect(screen.getByText(/Booked appointment with/)).toHaveTextContent('Dr. Anil Kumar at 10:30')
-    expect(screen.queryByLabelText(/Consulting doctor \*/i)).not.toBeInTheDocument()
-    await user.click(within(screen.getByRole('group', { name: 'Consultation type' })).getByRole('button', { name: 'New consultation' }))
-    expect(submitButton()).toHaveTextContent('Check in & Send to Waiting')
-    await user.click(submitButton())
-
-    await waitFor(() => expect(writes).toHaveLength(1))
-    expect(await screen.findByText(/^Patient checked in$/i)).toBeInTheDocument()
-    expect(writes[0].url).toContain('/api/appointments/501/check-in')
-    expect(writes[0].body).toMatchObject({ version_id: 1, referral_source: 'SELF', visit_kind: 'NEW' })
   })
 
   it('opens with the patient and booking chosen when sent from Check In elsewhere', async () => {
@@ -359,6 +502,19 @@ describe('Check-in & Token desk (phase 22)', () => {
     expect(await screen.findByText(/Booked appointment with/)).toHaveTextContent('Dr. Anil Kumar')
     expect(screen.getByText('KH-2026-0001')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /Existing patient/i })).toHaveAttribute('aria-pressed', 'true')
+  })
+
+  it('preserves and dismisses location.state.notice banner', async () => {
+    installApi({})
+    const user = renderDesk({
+      pathname: '/reception/tokens',
+      state: { notice: 'Patient registered and checked in (Token #14).' },
+    })
+
+    const status = within(screen.getByRole('main')).getByRole('status')
+    expect(status).toHaveTextContent('Patient registered and checked in (Token #14).')
+    await user.click(within(status).getByRole('button', { name: 'Dismiss notification' }))
+    expect(screen.queryByText('Patient registered and checked in (Token #14).')).not.toBeInTheDocument()
   })
 
   it('points a walk-in for an already booked patient at their booking', async () => {
@@ -385,10 +541,13 @@ describe('Check-in & Token desk (phase 22)', () => {
 
     await user.click(screen.getByRole('button', { name: /Check in their booking instead/i }))
     expect(screen.getByText(/Booked appointment with/)).toBeInTheDocument()
-    await user.click(within(screen.getByRole('group', { name: 'Consultation type' })).getByRole('button', { name: 'New consultation' }))
+    await user.click(
+      within(screen.getByRole('group', { name: 'Consultation type' })).getByRole('button', { name: 'New consultation' }),
+    )
     await user.click(submitButton())
     await waitFor(() => expect(writes.some((w) => w.url.includes('/check-in'))).toBe(true))
-    expect(await screen.findByText(/^Patient checked in$/i)).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Token Generated' })).toBeInTheDocument()
+    expect(screen.getByText('Checked In · Waiting for doctor')).toBeInTheDocument()
     expect(writes.map((w) => w.url).at(-1)).toContain('/api/appointments/501/check-in')
   })
 
@@ -408,6 +567,7 @@ describe('Check-in & Token desk (phase 22)', () => {
 
     expect(await screen.findByRole('alert')).toHaveTextContent('still has an open visit')
     expect(screen.queryByTestId('issued-token')).not.toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Create OPD Token' })).toBeInTheDocument()
   })
 
   it('offers the registered patient when a new patient matches one', async () => {
@@ -424,17 +584,16 @@ describe('Check-in & Token desk (phase 22)', () => {
     expect(await screen.findByText(/Confirm with the patient that these details are theirs/i)).toBeInTheDocument()
   })
 
-  it('marks a booking as not arrived from the list', async () => {
+  it('marks an unarrived booking as no-show via More menuitem from To Arrive', async () => {
     const { writes } = installApi({
       today: [rameshBooking],
       write: () => jsonResponse(200, { ...rameshBooking, status: 'NO_SHOW', version_id: 2 }),
     })
     const user = renderDesk()
 
-    await user.click(screen.getByRole('tab', { name: /All/ }))
     const row = (await screen.findByText('Ramesh Kumar')).closest('tr') as HTMLElement
-    await user.click(within(row).getByText('More'))
-    await user.click(screen.getByRole('button', { name: 'No-show' }))
+    await user.click(within(row).getByRole('button', { name: 'More' }))
+    await user.click(screen.getByRole('menuitem', { name: 'No-show' }))
     await user.click(screen.getByRole('button', { name: 'Mark no-show' }))
 
     await waitFor(() => expect(writes).toHaveLength(1))
@@ -443,30 +602,5 @@ describe('Check-in & Token desk (phase 22)', () => {
       body: { status: 'NO_SHOW', version_id: 1 },
     })
     expect(writes[0].url).toContain('/api/appointments/501/status')
-  })
-
-  it('renders next available token preview and existing patient search matching OPD check-in design', async () => {
-    // Ramesh has token 1 today with Dr. Anil Kumar (id 10)
-    const existingTokenAppt: Appointment = {
-      ...rameshBooking,
-      token_number: 1,
-      status: 'ARRIVED',
-    }
-    installApi({ today: [existingTokenAppt] })
-    const user = renderDesk()
-
-    // 1. Initial next token preview is #-- before doctor selection
-    expect(screen.getByTestId('next-token-preview')).toHaveTextContent('#--')
-    expect(screen.getByText('Preview only. Assigned when created.')).toBeInTheDocument()
-
-    // 2. Select Dr. Anil Kumar -> next available token preview updates to #02
-    await chooseDoctor(user)
-    expect(screen.getByTestId('next-token-preview')).toHaveTextContent('#02')
-
-    // 3. Switch to Existing patient -> verify search heading and placeholder
-    await user.click(screen.getByRole('button', { name: /Existing patient/i }))
-    expect(screen.getByText('Find existing patient')).toBeInTheDocument()
-    expect(screen.getByPlaceholderText('Enter mobile number or hospital URN')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Search patient' })).toBeInTheDocument()
   })
 })
