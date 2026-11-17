@@ -1,3 +1,0 @@
-"""
-Application Service Layer Package
-"""

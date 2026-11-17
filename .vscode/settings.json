@@ -1,14 +1,41 @@
 {
-  "python.defaultInterpreterPath": "${workspaceFolder}\\.venv\\Scripts\\python.exe",
+  "python.defaultInterpreterPath": "${workspaceFolder}\\backend\\.venv\\Scripts\\python.exe",
   "python.terminal.activateEnvironment": true,
-  "python.analysis.extraPaths": [],
-  "python.analysis.venvPath": "${workspaceFolder}",
+  "python.analysis.extraPaths": [
+    "${workspaceFolder}\\backend\\src"
+  ],
+  "python.analysis.venvPath": "${workspaceFolder}\\backend",
   "python.analysis.venv": ".venv",
   "python.analysis.typeCheckingMode": "basic",
   "python.testing.pytestEnabled": true,
-  "python.testing.pytestArgs": ["tests"],
+  "python.testing.pytestArgs": ["backend/tests"],
   "python.testing.unittestEnabled": false,
   "[python]": {
     "editor.formatOnSave": true
+  },
+  "files.watcherExclude": {
+    "**/.git/**": true,
+    "**/.venv/**": true,
+    "**/backend/.venv/**": true,
+    "**/node_modules/**": true,
+    "**/frontend/node_modules/**": true,
+    "**/dist/**": true,
+    "**/legacy/**": true,
+    "**/graphify-out/**": true,
+    "**/.pytest_cache/**": true,
+    "**/.ruff_cache/**": true,
+    "**/.archify/**": true,
+    "**/unsloth_compiled_cache/**": true
+  },
+  "search.exclude": {
+    "**/.venv": true,
+    "**/backend/.venv": true,
+    "**/node_modules": true,
+    "**/frontend/node_modules": true,
+    "**/dist": true,
+    "**/legacy": true,
+    "**/graphify-out": true,
+    "**/.archify": true,
+    "**/unsloth_compiled_cache": true
   }
 }
