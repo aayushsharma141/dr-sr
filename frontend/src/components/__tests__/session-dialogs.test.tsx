@@ -64,6 +64,22 @@ describe('appointment booking dialog', () => {
     expect(screen.getByLabelText('Appointment Date')).toHaveValue('2026-11-06')
   })
 
+  it('pre-fills initialDate when today or in the future and enforces IST min date', () => {
+    vi.useFakeTimers({ toFake: ['Date'], now: new Date('2026-11-17T06:00:00Z') })
+    render(<AppointmentBookingModal isOpen initialDate="2026-11-20" onClose={vi.fn()} />)
+    const dateInput = screen.getByLabelText('Appointment Date')
+    expect(dateInput).toHaveValue('2026-11-20')
+    expect(dateInput).toHaveAttribute('min', '2026-11-17')
+  })
+
+  it('clamps past initialDate to today in IST', () => {
+    vi.useFakeTimers({ toFake: ['Date'], now: new Date('2026-11-17T06:00:00Z') })
+    render(<AppointmentBookingModal isOpen initialDate="2026-11-10" onClose={vi.fn()} />)
+    const dateInput = screen.getByLabelText('Appointment Date')
+    expect(dateInput).toHaveValue('2026-11-17')
+    expect(dateInput).toHaveAttribute('min', '2026-11-17')
+  })
+
   it('names the patient search and lets the keyboard pick a result', async () => {
     const user = userEvent.setup()
     render(<AppointmentBookingModal isOpen onClose={vi.fn()} />)

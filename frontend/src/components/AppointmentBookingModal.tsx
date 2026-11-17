@@ -8,6 +8,7 @@ interface AppointmentBookingModalProps {
   isOpen: boolean
   onClose: () => void
   initialPatient?: PatientOut | null
+  initialDate?: string
   onSuccess?: () => void
 }
 
@@ -15,6 +16,7 @@ export function AppointmentBookingModal({
   isOpen,
   onClose,
   initialPatient,
+  initialDate,
   onSuccess,
 }: AppointmentBookingModalProps) {
   const [patientSearch, setPatientSearch] = useState('')
@@ -23,7 +25,10 @@ export function AppointmentBookingModal({
   )
   const [selectedDepartmentId, setSelectedDepartmentId] = useState<number | ''>('')
   const [selectedDoctorId, setSelectedDoctorId] = useState<number | ''>('')
-  const [appointmentDate, setAppointmentDate] = useState(istToday)
+  const [appointmentDate, setAppointmentDate] = useState(() => {
+    const today = istToday()
+    return initialDate && initialDate >= today ? initialDate : today
+  })
   const [expectedTime, setExpectedTime] = useState('')
   const [notes, setNotes] = useState('')
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
@@ -132,7 +137,7 @@ export function AppointmentBookingModal({
 
             {/* Patient Selector */}
             <div>
-              <label htmlFor="patient-search" className="block text-xs font-semibold text-neutral-700 uppercase mb-1">
+              <label htmlFor="patient-search" className="block text-xs font-semibold text-neutral-700 mb-1">
                 Patient
               </label>
               {selectedPatient ? (
@@ -186,7 +191,7 @@ export function AppointmentBookingModal({
 
             {/* Department first, then its assigned doctors */}
             <div>
-              <label htmlFor="department-select" className="block text-xs font-semibold text-neutral-700 uppercase mb-1">
+              <label htmlFor="department-select" className="block text-xs font-semibold text-neutral-700 mb-1">
                 Department / Specialty
               </label>
               <select
@@ -208,7 +213,7 @@ export function AppointmentBookingModal({
               </select>
             </div>
             <div>
-              <label htmlFor="doctor-select" className="block text-xs font-semibold text-neutral-700 uppercase mb-1">
+              <label htmlFor="doctor-select" className="block text-xs font-semibold text-neutral-700 mb-1">
                 Consulting Doctor
               </label>
               <select
@@ -233,12 +238,13 @@ export function AppointmentBookingModal({
 
             {/* Date Selector */}
             <div>
-              <label htmlFor="date-input" className="block text-xs font-semibold text-neutral-700 uppercase mb-1">
+              <label htmlFor="date-input" className="block text-xs font-semibold text-neutral-700 mb-1">
                 Appointment Date
               </label>
               <input
                 id="date-input"
                 type="date"
+                min={istToday()}
                 value={appointmentDate}
                 onChange={(e) => setAppointmentDate(e.target.value)}
                 required
@@ -248,7 +254,7 @@ export function AppointmentBookingModal({
 
             {/* Expected time: shown to spot late arrivals; the doctor still sees patients by token. */}
             <div>
-              <label htmlFor="expected-time-input" className="block text-xs font-semibold text-neutral-700 uppercase mb-1">
+              <label htmlFor="expected-time-input" className="block text-xs font-semibold text-neutral-700 mb-1">
                 Expected Time (Optional)
               </label>
               <input
@@ -262,7 +268,7 @@ export function AppointmentBookingModal({
 
             {/* Notes */}
             <div>
-              <label htmlFor="notes-input" className="block text-xs font-semibold text-neutral-700 uppercase mb-1">
+              <label htmlFor="notes-input" className="block text-xs font-semibold text-neutral-700 mb-1">
                 Notes (Optional)
               </label>
               <textarea
