@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { cleanup, render, screen, waitFor } from '@testing-library/react'
+import { cleanup, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -242,11 +242,11 @@ function mockApi(routes: Record<string, Route>) {
   })
 }
 
-function renderPage(fetchMock: ReturnType<typeof mockApi>, client: QueryClient) {
+function renderPage(fetchMock: ReturnType<typeof mockApi>, client: QueryClient, initialRoute = '/reception/billing') {
   vi.stubGlobal('fetch', fetchMock)
   return render(
     <QueryClientProvider client={client}>
-      <MemoryRouter initialEntries={['/reception/billing']}>
+      <MemoryRouter initialEntries={[initialRoute]}>
         <ReceptionBillingPage />
       </MemoryRouter>
     </QueryClientProvider>,
@@ -284,6 +284,16 @@ describe('ReceptionBillingPage Desk', () => {
       '/api/doctors': () => ({ body: mockDoctors }),
       '/api/patients': () => ({ body: [mockPatient] }),
       '/api/visits': () => ({ body: { total: 0, visits: [] } }),
+      '/api/appointments': () => ({
+        body: {
+          total: 3,
+          appointments: [
+            { id: 11, status: 'DONE', consultation_status: 'COMPLETED' },
+            { id: 12, status: 'COMPLETED', consultation_status: 'COMPLETED' },
+            { id: 13, status: 'CANCELLED', consultation_status: 'CANCELLED' },
+          ],
+        },
+      }),
       'POST /api/payments': (init) => {
         capturedPayload = JSON.parse(init?.body as string)
         return { status: 201, body: mockRecordedPayment }
@@ -299,17 +309,35 @@ describe('ReceptionBillingPage Desk', () => {
 
     // Check Header & Tabs
     expect(await screen.findByRole('heading', { name: /Billing & Checkout/i })).toBeInTheDocument()
-    expect(await screen.findByRole('button', { name: /Checkout/i })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /Today's Receipts/i })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /Pending Dues/i })).toBeInTheDocument()
-    expect(
-      await screen.findByText(
-        'Nothing to check out. Patients appear here when their doctor completes the consultation.',
-      ),
-    ).toBeInTheDocument()
+    const financialTabs = screen.getByRole('navigation', { name: /Reception Desk Financial Tabs/i })
+    expect(await within(financialTabs).findByRole('link', { name: /Billing & Checkout/i })).toBeInTheDocument()
+    expect(within(financialTabs).getByRole('link', { name: /^Pending Dues$/i })).toBeInTheDocument()
 
-    // Checkout opens on visits; the patient-only desk is the "Other payment" option.
-    await user.click(screen.getByRole('button', { name: /Other payment \(no visit\)/i }))
+    // Sidebar-duplicated shortcuts and top Add item button are absent inside <main>.
+    const main = screen.getByRole('main')
+    expect(within(main).queryByRole('link', { name: /Appointments/i })).not.toBeInTheDocument()
+    expect(within(main).queryByRole('link', { name: /Check-in & Token/i })).not.toBeInTheDocument()
+    expect(within(main).queryByRole('button', { name: /Add item/i })).not.toBeInTheDocument()
+
+    // Compact empty state summarizes daily completed consultations, pending dues, and quick actions.
+    const emptyState = await screen.findByTestId('checkout-empty-state')
+    expect(screen.queryByTestId('checkout-split-workspace')).not.toBeInTheDocument()
+    expect(
+      within(emptyState).getByRole('heading', { name: /No visits awaiting checkout/i }),
+    ).toBeInTheDocument()
+    await waitFor(() => {
+      expect(within(emptyState).getByText('Completed consultations today').parentElement).toHaveTextContent('2')
+      expect(within(emptyState).getByText('Pending dues').parentElement).toHaveTextContent('1')
+      expect(within(emptyState).getByText('₹4,000.00 outstanding')).toBeInTheDocument()
+    })
+    expect(within(emptyState).getByRole('link', { name: /View Pending Dues/i })).toHaveAttribute(
+      'href',
+      '/reception/billing?tab=dues',
+    )
+
+    // Standalone non-visit billing opens via Direct payment (no visit).
+    await user.click(within(emptyState).getByRole('button', { name: /Direct payment \(no visit\)/i }))
+    expect(screen.getByRole('heading', { name: /Direct Payment \(No Visit\)/i })).toBeInTheDocument()
 
     // Search and select patient
     const searchInput = screen.getByPlaceholderText(/Search patient by Name, Mobile or Patient ID/i)
@@ -364,7 +392,9 @@ describe('ReceptionBillingPage Desk', () => {
     })
 
     // Switch to Pending Dues tab
-    const duesTab = screen.getByRole('button', { name: /Pending Dues/i })
+    const duesTab = within(
+      screen.getByRole('navigation', { name: /Reception Desk Financial Tabs/i }),
+    ).getByRole('link', { name: /^Pending Dues$/i })
     await user.click(duesTab)
 
     await waitFor(() => {
@@ -383,6 +413,12 @@ describe('ReceptionBillingPage Desk', () => {
       '/api/fees': () => ({ body: [] }),
       '/api/doctors': () => ({ body: mockDoctors }),
       '/api/visits': () => ({ body: { total: closed ? 0 : 1, visits: closed ? [] : [readySummary] } }),
+      '/api/appointments': () => ({
+        body: {
+          total: 1,
+          appointments: [{ id: 31, status: 'DONE', consultation_status: 'COMPLETED' }],
+        },
+      }),
       '/api/visits/7': () => ({ body: openDetail }),
       '/api/visits/7/bill': () => ({ body: openBill }),
       'POST /api/visits/7/close': (init) => {
@@ -596,6 +632,7 @@ describe('ReceptionBillingPage Desk', () => {
       '/api/fees': () => ({ body: [] }),
       '/api/doctors': () => ({ body: mockDoctors }),
       '/api/visits': () => ({ body: { total: 0, visits: [] } }),
+      '/api/appointments': () => ({ body: { total: 0, appointments: [] } }),
       '/api/billing/visit-dues': () => ({ body: mockVisitDues }),
       '/api/billing/receipts/today': () => ({ body: [] }),
       '/api/billing/pending-dues': () => ({ body: [] }),
@@ -618,7 +655,10 @@ describe('ReceptionBillingPage Desk', () => {
     renderPage(mockFetch, queryClient)
 
     // Switch to Pending Dues tab to view visit balances
-    await user.click(await screen.findByRole('button', { name: /Pending Dues/i }))
+    const financialTabs = await screen.findByRole('navigation', {
+      name: /Reception Desk Financial Tabs/i,
+    })
+    await user.click(within(financialTabs).getByRole('link', { name: /^Pending Dues$/i }))
 
     // Visit balances is displayed on the dues tab
     expect(await screen.findByRole('heading', { name: /Visit balances/i })).toBeInTheDocument()
@@ -672,10 +712,8 @@ describe('ReceptionBillingPage Desk', () => {
       '/api/billing/visit-dues': () => ({ body: [] }),
     })
 
-    const user = userEvent.setup()
-    renderPage(mockFetch, queryClient)
+    renderPage(mockFetch, queryClient, '/reception/billing?tab=ledger')
 
-    await user.click(await screen.findByRole('button', { name: /Today's Receipts/i }))
     expect(await screen.findByText('REC-2026-0001')).toBeInTheDocument()
 
     const requested = mockFetch.mock.calls.map((call) => String(call[0]))
@@ -695,8 +733,8 @@ describe('ReceptionBillingPage Desk', () => {
     const user = userEvent.setup()
     renderPage(mockFetch, queryClient)
 
-    expect(await screen.findByRole('button', { name: /Receipts Ledger/i })).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: /^Checkout$/i })).not.toBeInTheDocument()
+    expect(await screen.findByRole('link', { name: /Receipts Ledger/i })).toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: /^Checkout$/i })).not.toBeInTheDocument()
     expect(await screen.findByText('REC-2026-0001')).toBeInTheDocument()
 
     const requested = mockFetch.mock.calls.map((call) => String(call[0]))
@@ -704,10 +742,108 @@ describe('ReceptionBillingPage Desk', () => {
     expect(requested.some((url) => url.includes('/api/billing/ledger'))).toBe(true)
     expect(requested.some((url) => url.includes('/api/visits'))).toBe(false)
 
-    await user.click(screen.getByRole('button', { name: /Pending Dues/i }))
+    await user.click(screen.getByRole('link', { name: /Pending Dues/i }))
     await waitFor(() => {
       expect(screen.getByText('Lumbar Spine Rehab Package')).toBeInTheDocument()
     })
     expect(screen.queryByRole('button', { name: /Collect Payment/i })).not.toBeInTheDocument()
+  })
+
+  it('starts in unselected queue, expands split workspace on visit click, and returns via Back to queue', async () => {
+    const mockFetch = mockApi({
+      '/api/auth/me': () => ({ body: mockMe }),
+      '/api/fees': () => ({ body: [] }),
+      '/api/doctors': () => ({ body: mockDoctors }),
+      '/api/visits': () => ({ body: { total: 1, visits: [readySummary] } }),
+      '/api/visits/7': () => ({ body: openDetail }),
+      '/api/visits/7/bill': () => ({ body: openBill }),
+      '/api/billing/visit-dues': () => ({ body: [] }),
+      '/api/billing/receipts/today': () => ({ body: [] }),
+      '/api/billing/pending-dues': () => ({ body: [] }),
+    })
+
+    const user = userEvent.setup()
+    renderPage(mockFetch, queryClient)
+
+    const unselectedQueue = await screen.findByTestId('checkout-queue-unselected')
+    expect(unselectedQueue).toBeInTheDocument()
+    expect(screen.queryByTestId('checkout-split-workspace')).not.toBeInTheDocument()
+
+    await user.click(within(unselectedQueue).getByRole('button', { name: /Aarav Kumar/i }))
+
+    const splitWorkspace = await screen.findByTestId('checkout-split-workspace')
+    expect(splitWorkspace).toBeInTheDocument()
+    expect(screen.queryByTestId('checkout-queue-unselected')).not.toBeInTheDocument()
+    expect(await within(splitWorkspace).findByTestId('checkout-summary-strip')).toBeInTheDocument()
+    expect(within(splitWorkspace).getByRole('heading', { name: /^Visit Bill$/i })).toBeInTheDocument()
+    expect(within(splitWorkspace).getByRole('heading', { name: /^Take payment$/i })).toBeInTheDocument()
+    expect(
+      within(splitWorkspace).getByRole('heading', { name: /^Close Visit \/ Patient Out$/i }),
+    ).toBeInTheDocument()
+
+    await user.click(within(splitWorkspace).getByRole('button', { name: /Back to queue/i }))
+
+    expect(await screen.findByTestId('checkout-queue-unselected')).toBeInTheDocument()
+    expect(screen.queryByTestId('checkout-split-workspace')).not.toBeInTheDocument()
+  })
+
+  it('shows Add medicine and Add particular only after selecting a visit', async () => {
+    const meWithBillWrite: Me = {
+      ...mockMe,
+      permissions: [...mockMe.permissions, 'bill:write'],
+    }
+
+    const mockFetch = mockApi({
+      '/api/auth/me': () => ({ body: meWithBillWrite }),
+      '/api/fees': () => ({ body: [] }),
+      '/api/doctors': () => ({ body: mockDoctors }),
+      '/api/visits': () => ({ body: { total: 1, visits: [readySummary] } }),
+      '/api/visits/7': () => ({ body: openDetail }),
+      '/api/visits/7/bill': () => ({ body: openBill }),
+      '/api/billing/visit-dues': () => ({ body: [] }),
+      '/api/billing/receipts/today': () => ({ body: [] }),
+      '/api/billing/pending-dues': () => ({ body: [] }),
+    })
+
+    const user = userEvent.setup()
+    renderPage(mockFetch, queryClient)
+
+    const unselectedQueue = await screen.findByTestId('checkout-queue-unselected')
+    expect(screen.queryByRole('button', { name: /Add medicine/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Add particular/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Add item/i })).not.toBeInTheDocument()
+
+    await user.click(within(unselectedQueue).getByRole('button', { name: /Aarav Kumar/i }))
+
+    expect(await screen.findByRole('button', { name: /^Add medicine$/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /^Add particular$/i })).toBeInTheDocument()
+  })
+
+  it('shows alert error state instead of empty state on queue fetch failure while keeping Direct payment clickable', async () => {
+    const mockFetch = mockApi({
+      '/api/auth/me': () => ({ body: mockMe }),
+      '/api/fees': () => ({ body: [] }),
+      '/api/doctors': () => ({ body: mockDoctors }),
+      '/api/visits': () => ({
+        status: 500,
+        body: { code: 'internal_error', message: 'Checkout queue unavailable' },
+      }),
+      '/api/billing/visit-dues': () => ({ body: [] }),
+      '/api/billing/receipts/today': () => ({ body: [] }),
+      '/api/billing/pending-dues': () => ({ body: [] }),
+    })
+
+    const user = userEvent.setup()
+    renderPage(mockFetch, queryClient)
+
+    const alert = await screen.findByRole('alert')
+    expect(alert).toHaveTextContent('Checkout queue unavailable')
+    expect(screen.queryByText(/No visits awaiting checkout/i)).not.toBeInTheDocument()
+    expect(screen.queryByTestId('checkout-empty-state')).not.toBeInTheDocument()
+
+    const directPayBtn = screen.getByRole('button', { name: /Direct payment \(no visit\)/i })
+    expect(directPayBtn).toBeEnabled()
+    await user.click(directPayBtn)
+    expect(screen.getByRole('heading', { name: /Direct Payment \(No Visit\)/i })).toBeInTheDocument()
   })
 })
