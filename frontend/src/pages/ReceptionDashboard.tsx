@@ -1,6 +1,6 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { Link } from 'react-router'
-import { istToday, formatPaise } from '../format'
+import { formatPaise } from '../format'
 import {
   IconCheck,
   IconClock,
@@ -12,7 +12,12 @@ import {
   IconRefresh,
 } from '../components/icons'
 import { PriorityBadge } from '../components/checkin/PriorityBadge'
-import { useAppointments, useDoctors, useOverview } from '../api/queries'
+import {
+  AppointmentStatusBadge,
+  getWaitingElapsedMinutes,
+  useIstToday,
+} from '../components/reception/AppointmentStatusBadge'
+import { useAppointments, useDoctors, useOpdArrivals, useOverview } from '../api/queries'
 import type { ReceptionOverview, Appointment, PriorityLevel } from '../api/types'
 
 const PREVIEW_LIMIT = 5
@@ -27,13 +32,6 @@ function formatUpdatedAt(timestamp: number): string {
   return timestamp
     ? new Date(timestamp).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })
     : 'Not updated'
-}
-
-function getElapsedMinutes(isoString?: string | null): number {
-  if (!isoString) return 0
-  const then = Date.parse(isoString)
-  if (Number.isNaN(then)) return 0
-  return Math.max(0, Math.floor((Date.now() - then) / 60000))
 }
 
 function parseTimestampOrMax(isoString?: string | null): number {
@@ -117,9 +115,17 @@ interface ReceptionDashboardProps {
 }
 
 export function ReceptionDashboard({ overview: initialOverview }: ReceptionDashboardProps) {
-  const todayStr = useMemo(() => istToday(), [])
+  const {
+    data: liveOverview,
+    refetch: refetchOverview,
+    dataUpdatedAt: summaryUpdatedAt,
+    isRefetchError: summaryRefetchError,
+  } = useOverview<ReceptionOverview>('reception', { refetchInterval: 30000 })
+  const overview = liveOverview || initialOverview
 
-  // Live polling for appointments queue (every 10s) and overview (every 30s)
+  const todayStr = useIstToday(overview?.business_date)
+
+  // Live polling for appointments queue (10s), pending arrivals (10s), and overview (30s)
   const {
     data: appointmentsData,
     isLoading: queueLoading,
@@ -129,14 +135,19 @@ export function ReceptionDashboard({ overview: initialOverview }: ReceptionDashb
   } = useAppointments({ appointment_date: todayStr })
 
   const {
-    data: liveOverview,
-    refetch: refetchOverview,
-    dataUpdatedAt: summaryUpdatedAt,
-    isRefetchError: summaryRefetchError,
-  } = useOverview<ReceptionOverview>('reception', { refetchInterval: 30000 })
-  const overview = liveOverview || initialOverview
+    data: arrivalsData,
+    refetch: refetchArrivals,
+  } = useOpdArrivals(todayStr)
 
   const { data: doctors } = useDoctors(true)
+
+  // Unfreeze 30-minute wait alerts even when TanStack Query structural sharing preserves array refs.
+  const [clockNow, setClockNow] = useState(() => Date.now())
+  useEffect(() => {
+    const id = setInterval(() => setClockNow(Date.now()), 60_000)
+    return () => clearInterval(id)
+  }, [])
+  const nowTick = Math.max(clockNow, queueUpdatedAt || 0)
 
   const [isRefreshing, setIsRefreshing] = useState(false)
   const [refreshMessage, setRefreshMessage] = useState<string | null>(null)
@@ -145,8 +156,16 @@ export function ReceptionDashboard({ overview: initialOverview }: ReceptionDashb
     setIsRefreshing(true)
     setRefreshMessage(null)
     try {
-      const [queueResult, summaryResult] = await Promise.all([refetchQueue(), refetchOverview()])
-      const failedSections = [queueResult.isError && 'queue', summaryResult.isError && 'summary'].filter(Boolean)
+      const [queueResult, summaryResult, arrivalsResult] = await Promise.all([
+        refetchQueue(),
+        refetchOverview(),
+        refetchArrivals(),
+      ])
+      const failedSections = [
+        queueResult.isError && 'queue',
+        summaryResult.isError && 'summary',
+        arrivalsResult.isError && 'arrivals',
+      ].filter(Boolean)
       setRefreshMessage(
         failedSections.length
           ? `${failedSections.join(' and ')} refresh failed. Last successful values are still shown.`
@@ -160,6 +179,14 @@ export function ReceptionDashboard({ overview: initialOverview }: ReceptionDashb
   }
 
   const allAppointments = useMemo(() => appointmentsData?.appointments ?? [], [appointmentsData])
+  const activeVisitsAppts = useMemo(
+    () => allAppointments.filter((a) => !isCancelledOrClosed(a)),
+    [allAppointments],
+  )
+  const pendingArrivals = useMemo(
+    () => (arrivalsData?.arrivals ?? []).filter((a) => a.status === 'TO_ARRIVE'),
+    [arrivalsData],
+  )
 
   const waitingAppts = useMemo(() => allAppointments.filter(isWaitingAppointment), [allAppointments])
   const inConsultationAppts = useMemo(() => allAppointments.filter(isInCabinAppointment), [allAppointments])
@@ -167,12 +194,8 @@ export function ReceptionDashboard({ overview: initialOverview }: ReceptionDashb
   const bookedAppts = useMemo(() => allAppointments.filter(isBookedAppointment), [allAppointments])
 
   const delayedAppts = useMemo(
-    () =>
-      waitingAppts.filter((a) => {
-        const ts = a.status_updated_at || a.check_in_at || a.created_at
-        return getElapsedMinutes(ts) >= 30
-      }),
-    [waitingAppts],
+    () => waitingAppts.filter((a) => getWaitingElapsedMinutes(a, nowTick) >= 30),
+    [waitingAppts, nowTick],
   )
 
   const sortedWaitingAppts = useMemo(
@@ -190,6 +213,19 @@ export function ReceptionDashboard({ overview: initialOverview }: ReceptionDashb
   const previewQueue = useMemo(() => activeQueue.slice(0, PREVIEW_LIMIT), [activeQueue])
 
   const doctorWorkloadRows = useMemo(() => {
+    if (doctors && appointmentsData) {
+      return doctors.map((doc) => {
+        const docWaiting = sortedWaitingAppts.filter((a) => a.doctor_id === doc.id)
+        const docInCabin = sortedInConsultationAppts.filter((a) => a.doctor_id === doc.id)
+        return {
+          doctor_id: doc.id,
+          name: doc.name_en,
+          waitingCount: docWaiting.length,
+          inCabinCount: docInCabin.length,
+          nextToken: docWaiting.find((a) => a.token_number != null)?.token_number ?? null,
+        }
+      })
+    }
     if (overview.doctors_today && overview.doctors_today.length > 0) {
       return overview.doctors_today.map((doc) => ({
         doctor_id: doc.doctor_id,
@@ -199,18 +235,14 @@ export function ReceptionDashboard({ overview: initialOverview }: ReceptionDashb
         nextToken: doc.next_token ?? null,
       }))
     }
-    return (doctors ?? []).map((doc) => {
-      const docWaiting = sortedWaitingAppts.filter((a) => a.doctor_id === doc.id)
-      const docInCabin = sortedInConsultationAppts.filter((a) => a.doctor_id === doc.id)
-      return {
-        doctor_id: doc.id,
-        name: doc.name_en,
-        waitingCount: docWaiting.length,
-        inCabinCount: docInCabin.length,
-        nextToken: docWaiting.find((a) => a.token_number != null)?.token_number ?? null,
-      }
-    })
-  }, [overview.doctors_today, doctors, sortedWaitingAppts, sortedInConsultationAppts])
+    return (doctors ?? []).map((doc) => ({
+      doctor_id: doc.id,
+      name: doc.name_en,
+      waitingCount: 0,
+      inCabinCount: 0,
+      nextToken: null,
+    }))
+  }, [doctors, appointmentsData, overview.doctors_today, sortedWaitingAppts, sortedInConsultationAppts])
 
   const grossPaise = overview.collections_today?.gross_paise ?? 0
   const reversedPaise = overview.collections_today?.reversed_paise ?? 0
@@ -219,7 +251,8 @@ export function ReceptionDashboard({ overview: initialOverview }: ReceptionDashb
   const attentionCount =
     (delayedAppts.length > 0 ? 1 : 0) +
     (outstandingDuesPaise > 0 ? 1 : 0) +
-    (bookedAppts.length > 0 ? 1 : 0)
+    (bookedAppts.length > 0 ? 1 : 0) +
+    (pendingArrivals.length > 0 ? 1 : 0)
 
   return (
     <div className="w-full space-y-4 pb-8">
@@ -258,12 +291,14 @@ export function ReceptionDashboard({ overview: initialOverview }: ReceptionDashb
         </p>
       )}
       {queueError && !refreshMessage && (
-        <p role="status" className="text-sm text-amber-900">
+        <p role="alert" className="rounded-lg border border-amber-300 bg-amber-50 px-3.5 py-2 text-sm text-amber-900">
           Queue refresh failed. {allAppointments.length ? 'Last successful queue is still shown.' : 'Try refreshing the queue.'}
         </p>
       )}
       {summaryRefetchError && !refreshMessage && (
-        <p className="text-sm text-amber-900">Summary refresh failed. Last successful values are still shown.</p>
+        <p role="alert" className="rounded-lg border border-amber-300 bg-amber-50 px-3.5 py-2 text-sm text-amber-900">
+          Summary refresh failed. Last successful values are still shown.
+        </p>
       )}
 
       {/* 2. Six Compact Operational KPI Cards */}
@@ -273,13 +308,13 @@ export function ReceptionDashboard({ overview: initialOverview }: ReceptionDashb
           className="text-left bg-white px-3.5 py-2.5 rounded-xl border border-neutral-200 hover:border-neutral-400 transition-colors shadow-2xs hover:shadow-xs group"
         >
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-neutral-600">Registrations</span>
+            <span className="text-xs font-semibold text-neutral-600">Active Visits</span>
             <span className="p-1.5 rounded-lg bg-sky-50 text-sky-700 group-hover:scale-105 transition-transform">
               <IconUserPlus size={15} />
             </span>
           </div>
           <div className="mt-1 text-xl font-bold leading-tight text-neutral-900">
-            {overview.registrations_today ?? allAppointments.length}
+            {activeVisitsAppts.length}
           </div>
           <p className="text-xs text-neutral-600 mt-0.5">Walk-in + booked</p>
         </Link>
@@ -378,7 +413,7 @@ export function ReceptionDashboard({ overview: initialOverview }: ReceptionDashb
             </h2>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5">
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-2.5">
             {delayedAppts.length > 0 && (
               <div className="p-2.5 bg-white rounded-lg border border-amber-300 flex items-center justify-between gap-2 shadow-2xs">
                 <div>
@@ -427,6 +462,23 @@ export function ReceptionDashboard({ overview: initialOverview }: ReceptionDashb
                   className="px-2.5 py-1 text-xs font-semibold bg-sky-100 text-sky-900 hover:bg-sky-200 rounded transition-colors shrink-0"
                 >
                   Check in
+                </Link>
+              </div>
+            )}
+
+            {pendingArrivals.length > 0 && (
+              <div className="p-2.5 bg-white rounded-lg border border-amber-200 flex items-center justify-between gap-2 shadow-2xs">
+                <div>
+                  <p className="text-xs font-bold text-amber-900">
+                    {pendingArrivals.length} walk-in patient(s) awaiting full registration
+                  </p>
+                  <p className="text-xs text-neutral-600">Temporary tokens issued</p>
+                </div>
+                <Link
+                  to="/reception/tokens"
+                  className="px-2.5 py-1 text-xs font-semibold bg-amber-100 text-amber-900 hover:bg-amber-200 rounded transition-colors shrink-0"
+                >
+                  Register
                 </Link>
               </div>
             )}
@@ -506,7 +558,7 @@ export function ReceptionDashboard({ overview: initialOverview }: ReceptionDashb
                 ) : (
                   previewQueue.map((appt) => {
                     const inCabin = isInCabinAppointment(appt)
-                    const elapsed = getElapsedMinutes(appt.status_updated_at || appt.check_in_at || appt.created_at)
+                    const elapsed = getWaitingElapsedMinutes(appt, nowTick)
                     const isDelayed = !inCabin && elapsed >= 30
 
                     return (
@@ -544,18 +596,12 @@ export function ReceptionDashboard({ overview: initialOverview }: ReceptionDashb
                         <td className="py-2.5 px-3.5">
                           {inCabin ? (
                             <div className="flex flex-col items-start gap-0.5">
-                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-consult-100 text-consult-900 border border-consult-200">
-                                <span className="w-1.5 h-1.5 rounded-full bg-consult-600 animate-pulse" />
-                                In Cabin
-                              </span>
+                              <AppointmentStatusBadge status="IN_CABIN" />
                               <span className="text-xs font-medium text-consult-800">In consultation</span>
                             </div>
                           ) : (
                             <div className="flex flex-col items-start gap-0.5">
-                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-900 border border-amber-200">
-                                <span className="w-1.5 h-1.5 rounded-full bg-amber-600 animate-pulse" />
-                                Waiting
-                              </span>
+                              <AppointmentStatusBadge status="WAITING" />
                               <span
                                 className={`inline-flex items-center gap-1 text-xs ${
                                   isDelayed ? 'font-bold text-amber-800' : 'font-medium text-neutral-700'

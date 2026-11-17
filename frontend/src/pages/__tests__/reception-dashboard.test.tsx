@@ -4,12 +4,16 @@ import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ReceptionDashboard } from '../ReceptionDashboard'
-import type { ReceptionOverview, Appointment, DoctorOut } from '../../api/types'
+import type { ReceptionOverview, Appointment, DoctorOut, OpdArrival } from '../../api/types'
 import { istToday } from '../../format'
 
 const mockApiState = vi.hoisted(() => ({
   failReceptionOverview: false,
+  failAppointments: false,
+  failArrivals: false,
   appointmentsOverride: null as Appointment[] | null,
+  arrivalsOverride: null as OpdArrival[] | null,
+  overviewOverride: null as ReceptionOverview | null,
 }))
 
 const minutesAgo = (mins: number) => new Date(Date.now() - mins * 60000).toISOString()
@@ -363,15 +367,21 @@ const mockDoctors: DoctorOut[] = [
 vi.mock('../../api/client', () => ({
   apiFetch: vi.fn(async (url: string) => {
     if (url.includes('/appointments')) {
+      if (mockApiState.failAppointments) throw new Error('appointments unavailable')
       const appointments = mockApiState.appointmentsOverride ?? mockAppointments
       return { total: appointments.length, appointments }
+    }
+    if (url.includes('/opd-arrivals')) {
+      if (mockApiState.failArrivals) throw new Error('arrivals unavailable')
+      const arrivals = mockApiState.arrivalsOverride ?? []
+      return { total: arrivals.length, arrivals }
     }
     if (url.includes('/doctors')) {
       return mockDoctors
     }
     if (url.includes('/reception/overview')) {
       if (mockApiState.failReceptionOverview) throw new Error('local server unavailable')
-      return mockOverview
+      return mockApiState.overviewOverride ?? mockOverview
     }
     return {}
   }),
@@ -379,7 +389,7 @@ vi.mock('../../api/client', () => ({
   setCsrfToken: vi.fn(),
 }))
 
-function renderDashboard() {
+function renderDashboard(overview: ReceptionOverview = mockOverview) {
   const qc = new QueryClient({
     defaultOptions: {
       queries: { retry: false, gcTime: 0 },
@@ -389,7 +399,7 @@ function renderDashboard() {
   return render(
     <QueryClientProvider client={qc}>
       <MemoryRouter>
-        <ReceptionDashboard overview={mockOverview} />
+        <ReceptionDashboard overview={overview} />
       </MemoryRouter>
     </QueryClientProvider>,
   )
@@ -399,7 +409,11 @@ describe('ReceptionDashboard Component', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     mockApiState.failReceptionOverview = false
+    mockApiState.failAppointments = false
+    mockApiState.failArrivals = false
     mockApiState.appointmentsOverride = null
+    mockApiState.arrivalsOverride = null
+    mockApiState.overviewOverride = null
   })
 
   afterEach(() => {
@@ -427,9 +441,10 @@ describe('ReceptionDashboard Component', () => {
 
     await screen.findByText('Asha Devi')
 
-    const registrationsLink = screen.getByRole('link', { name: /registrations/i })
-    expect(registrationsLink).toHaveAttribute('href', '/reception/appointments')
-    expect(registrationsLink).toHaveTextContent('18')
+    const activeVisitsLink = screen.getByRole('link', { name: /active visits/i })
+    expect(activeVisitsLink).toHaveAttribute('href', '/reception/appointments')
+    expect(activeVisitsLink).toHaveTextContent('9')
+    expect(activeVisitsLink).toHaveTextContent('Walk-in + booked')
 
     const waitingLink = screen.getByRole('link', { name: /waiting.*awaiting consultation/i })
     expect(waitingLink).toHaveAttribute('href', '/reception/waiting')
@@ -598,9 +613,9 @@ describe('ReceptionDashboard Component', () => {
 
     const anilLink = within(workload).getByRole('link', { name: /Dr\. Anil Kumar/ })
     expect(anilLink).toHaveAttribute('href', '/reception/waiting?doctor_id=1')
-    expect(anilLink).toHaveTextContent(/Waiting:\s*2/)
+    expect(anilLink).toHaveTextContent(/Waiting:\s*4/)
     expect(anilLink).toHaveTextContent(/In Cabin:\s*1/)
-    expect(anilLink).toHaveTextContent('Next: #14')
+    expect(anilLink).toHaveTextContent('Next: #20')
 
     const meeraLink = within(workload).getByRole('link', { name: /Dr\. Meera Rao/ })
     expect(meeraLink).toHaveAttribute('href', '/reception/waiting?doctor_id=2')
@@ -624,6 +639,128 @@ describe('ReceptionDashboard Component', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent(/summary refresh failed/i)
     expect(screen.getByRole('alert')).toHaveTextContent(/last successful values are still shown/i)
     expect(screen.getByText('₹2,505.55')).toBeInTheDocument()
+  })
+
+  it('surfaces pending TO_ARRIVE /opd-arrivals in Needs Attention and links to /reception/tokens', async () => {
+    mockApiState.arrivalsOverride = [
+      {
+        id: 1,
+        full_name: 'Sita Walkin',
+        age_years: 34,
+        mobile: '9876500001',
+        doctor_id: 1,
+        doctor_name_en: 'Dr. Anil Kumar',
+        department_id: 1,
+        department_name: 'General Medicine',
+        appointment_date: istToday(),
+        token_number: 21,
+        priority_level: 'NORMAL',
+        status: 'TO_ARRIVE',
+        version_id: 1,
+        created_at: minutesAgo(5),
+      },
+      {
+        id: 2,
+        full_name: 'Ravi Walkin',
+        age_years: 42,
+        mobile: '9876500002',
+        doctor_id: 1,
+        doctor_name_en: 'Dr. Anil Kumar',
+        department_id: 1,
+        department_name: 'General Medicine',
+        appointment_date: istToday(),
+        token_number: 22,
+        priority_level: 'PRIORITY',
+        status: 'TO_ARRIVE',
+        version_id: 1,
+        created_at: minutesAgo(3),
+      },
+      {
+        id: 3,
+        full_name: 'Already Registered',
+        age_years: 29,
+        mobile: '9876500003',
+        doctor_id: 1,
+        doctor_name_en: 'Dr. Anil Kumar',
+        department_id: 1,
+        department_name: 'General Medicine',
+        appointment_date: istToday(),
+        token_number: 23,
+        priority_level: 'NORMAL',
+        status: 'REGISTERED',
+        version_id: 2,
+        created_at: minutesAgo(10),
+      },
+      {
+        id: 4,
+        full_name: 'Cancelled Arrival',
+        age_years: 50,
+        mobile: '9876500004',
+        doctor_id: 1,
+        doctor_name_en: 'Dr. Anil Kumar',
+        department_id: 1,
+        department_name: 'General Medicine',
+        appointment_date: istToday(),
+        token_number: 24,
+        priority_level: 'NORMAL',
+        status: 'CANCELLED',
+        version_id: 2,
+        created_at: minutesAgo(15),
+      },
+    ]
+
+    renderDashboard()
+
+    await screen.findByText('Asha Devi')
+    const attention = screen.getByRole('region', { name: /needs attention/i })
+
+    expect(await within(attention).findByRole('heading', { name: 'Needs Attention (4)' })).toBeInTheDocument()
+    expect(
+      within(attention).getByText('2 walk-in patient(s) awaiting full registration'),
+    ).toBeInTheDocument()
+
+    const registerLink = within(attention).getByRole('link', { name: /register/i })
+    expect(registerLink).toHaveAttribute('href', '/reception/tokens')
+    expect(within(attention).getAllByRole('link')).toHaveLength(4)
+  })
+
+  it('renders the empty Live Queue state when no active patients are present', async () => {
+    mockApiState.appointmentsOverride = []
+
+    renderDashboard()
+
+    const liveQueue = screen.getByRole('region', { name: /live queue/i })
+    expect(await within(liveQueue).findByText('No active patients in queue')).toBeInTheDocument()
+    expect(within(liveQueue).getByText('0 active')).toBeInTheDocument()
+
+    const activeVisitsLink = screen.getByRole('link', { name: /active visits/i })
+    expect(activeVisitsLink).toHaveTextContent('0')
+  })
+
+  it('hides Needs Attention when there are zero alerts', async () => {
+    const clearOverview: ReceptionOverview = {
+      ...mockOverview,
+      outstanding_dues_paise: 0,
+      alerts: [],
+    }
+    mockApiState.appointmentsOverride = []
+    mockApiState.arrivalsOverride = []
+    mockApiState.overviewOverride = clearOverview
+
+    renderDashboard(clearOverview)
+
+    const liveQueue = screen.getByRole('region', { name: /live queue/i })
+    expect(await within(liveQueue).findByText('No active patients in queue')).toBeInTheDocument()
+    expect(screen.queryByRole('region', { name: /needs attention/i })).not.toBeInTheDocument()
+  })
+
+  it('renders queueError banner with role="alert" when appointments fetch fails', async () => {
+    mockApiState.failAppointments = true
+
+    renderDashboard()
+
+    const alert = await screen.findByRole('alert')
+    expect(alert).toHaveTextContent(/queue refresh failed/i)
   })
 
   it('strictly respects role separation: no clinical notes or diagnosis leak', async () => {
