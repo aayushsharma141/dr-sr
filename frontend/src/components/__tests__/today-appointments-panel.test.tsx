@@ -5,6 +5,20 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { TodayAppointmentsPanel } from '../checkin/TodayAppointmentsPanel'
 import type { Appointment, OpdArrival } from '../../api/types'
 
+const {
+  updateStatusSpy,
+  cancelArrivalSpy,
+  rescheduleSpy,
+  updatePrioritySpy,
+  updateArrivalPrioritySpy,
+} = vi.hoisted(() => ({
+  updateStatusSpy: vi.fn(),
+  cancelArrivalSpy: vi.fn(),
+  rescheduleSpy: vi.fn(),
+  updatePrioritySpy: vi.fn(),
+  updateArrivalPrioritySpy: vi.fn(),
+}))
+
 vi.mock('../../api/queries', () => ({
   useAppointments: () => ({
     data: { appointments: state.appointments },
@@ -22,11 +36,11 @@ vi.mock('../../api/queries', () => ({
     refetch: vi.fn(),
     isFetching: false,
   }),
-  useUpdateAppointmentStatus: () => ({ mutateAsync: vi.fn(), isPending: false }),
-  useCancelOpdArrival: () => ({ mutateAsync: vi.fn(), isPending: false }),
-  useRescheduleAppointment: () => ({ mutateAsync: vi.fn(), isPending: false }),
-  useUpdatePriority: () => ({ mutateAsync: vi.fn(), isPending: false }),
-  useUpdateOpdArrivalPriority: () => ({ mutateAsync: vi.fn(), isPending: false }),
+  useUpdateAppointmentStatus: () => ({ mutateAsync: updateStatusSpy, isPending: false }),
+  useCancelOpdArrival: () => ({ mutateAsync: cancelArrivalSpy, isPending: false }),
+  useRescheduleAppointment: () => ({ mutateAsync: rescheduleSpy, isPending: false }),
+  useUpdatePriority: () => ({ mutateAsync: updatePrioritySpy, isPending: false }),
+  useUpdateOpdArrivalPriority: () => ({ mutateAsync: updateArrivalPrioritySpy, isPending: false }),
   useConsultingDoctors: () => ({ options: [], isPending: false }),
 }))
 
@@ -106,37 +120,42 @@ afterEach(() => {
   state.arrivals = []
   state.appointmentsError = null
   state.arrivalsError = null
+  updateStatusSpy.mockReset()
+  cancelArrivalSpy.mockReset()
+  rescheduleSpy.mockReset()
+  updatePrioritySpy.mockReset()
+  updateArrivalPrioritySpy.mockReset()
 })
 
 describe('TodayAppointmentsPanel status labels and colours', () => {
-  it('shows "Checked In" with emerald classes for ARRIVED/WAITING', async () => {
+  it('shows "Checked In" with teal classes for ARRIVED/WAITING', async () => {
     state.appointments = [appt({ id: 1, status: 'ARRIVED', consultation_status: 'WAITING' })]
     renderPanel()
     const allTab = screen.getByRole('tab', { name: /All/ })
     await userEvent.click(allTab)
     const badge = within(screen.getByRole('table')).getByText('Checked In')
-    expect(badge.className).toMatch(/bg-emerald-50/)
-    expect(badge.className).toMatch(/text-emerald-800/)
+    expect(badge.className).toMatch(/bg-teal-50/)
+    expect(badge.className).toMatch(/text-teal-800/)
   })
 
-  it('shows "Checked In" with emerald classes for IN_CONSULTATION status', async () => {
+  it('shows "Checked In" with teal classes for IN_CONSULTATION status', async () => {
     state.appointments = [appt({ id: 2, status: 'IN_CONSULTATION' })]
     renderPanel()
     const allTab = screen.getByRole('tab', { name: /All/ })
     await userEvent.click(allTab)
     const badge = within(screen.getByRole('table')).getByText('Checked In')
-    expect(badge.className).toMatch(/bg-emerald-50/)
-    expect(badge.className).toMatch(/text-emerald-800/)
+    expect(badge.className).toMatch(/bg-teal-50/)
+    expect(badge.className).toMatch(/text-teal-800/)
   })
 
-  it('shows "Checked In" with emerald classes for DONE status', async () => {
+  it('shows "Checked In" with teal classes for DONE status', async () => {
     state.appointments = [appt({ id: 3, status: 'DONE' })]
     renderPanel()
     const allTab = screen.getByRole('tab', { name: /All/ })
     await userEvent.click(allTab)
     const badge = within(screen.getByRole('table')).getByText('Checked In')
-    expect(badge.className).toMatch(/bg-emerald-50/)
-    expect(badge.className).toMatch(/text-emerald-800/)
+    expect(badge.className).toMatch(/bg-teal-50/)
+    expect(badge.className).toMatch(/text-teal-800/)
   })
 
   it('shows an error when pending arrivals fail to load', () => {
@@ -148,15 +167,14 @@ describe('TodayAppointmentsPanel status labels and colours', () => {
     expect(screen.queryByText('No patients today.')).not.toBeInTheDocument()
   })
 
-  it('shows "Cancelled" with slate-600 and no red class for CANCELLED status', async () => {
+  it('shows "Cancelled" with red classes for CANCELLED status', async () => {
     state.appointments = [appt({ id: 5, status: 'CANCELLED' })]
     renderPanel()
     const allTab = screen.getByRole('tab', { name: /All/ })
     await userEvent.click(allTab)
     const badge = within(screen.getByRole('table')).getByText('Cancelled')
-    expect(badge.className).toMatch(/bg-slate-100/)
-    expect(badge.className).toMatch(/text-slate-600/)
-    expect(badge.className).not.toMatch(/red/)
+    expect(badge.className).toMatch(/bg-red-50/)
+    expect(badge.className).toMatch(/text-red-800/)
   })
 
   it('shows "To arrive" with amber classes for pending arrival awaiting registration', () => {
@@ -182,24 +200,34 @@ describe('TodayAppointmentsPanel status labels and colours', () => {
     expect(badge.className).toMatch(/text-amber-800/)
   })
 
-  it('promotes REGISTERED patient directly to Checked In tab', async () => {
-    state.appointments = [appt({ id: 88, status: 'REGISTERED', token_number: 2, patient_name: 'Registered Patient' })]
-    renderPanel()
-    expect(screen.getByRole('tab', { name: /Checked In/ })).toHaveTextContent('1')
-    expect(screen.getByRole('tab', { name: /To Arrive/ })).toHaveTextContent('0')
-    const checkedTab = screen.getByRole('tab', { name: /Checked In/ })
-    await userEvent.click(checkedTab)
+  it('keeps REGISTERED appointment (without consultation_status) in To Arrive with Check in CTA', async () => {
+    const onCheckIn = vi.fn()
+    const registered = appt({
+      id: 88,
+      status: 'REGISTERED',
+      consultation_status: null,
+      token_number: 2,
+      patient_name: 'Registered Patient',
+    })
+    state.appointments = [registered]
+    renderPanel({ onCheckIn })
+    expect(screen.getByRole('tab', { name: /To Arrive/ })).toHaveTextContent('To Arrive (1)')
+    expect(screen.getByRole('tab', { name: /Checked In/ })).toHaveTextContent('Checked In (0)')
     expect(screen.getByText('Registered Patient')).toBeInTheDocument()
-    expect(within(screen.getByRole('table')).getByText('Checked In')).toBeInTheDocument()
+    expect(within(screen.getByRole('table')).getByText('To arrive')).toBeInTheDocument()
+
+    await userEvent.click(screen.getByRole('button', { name: 'Check in' }))
+    expect(onCheckIn).toHaveBeenCalledWith(registered)
   })
 
-  it('promotes tokenized existing patient directly to Checked In tab and uses compact 5-column layout', async () => {
+  it('keeps URN-bearing TO_ARRIVE appointment in To Arrive and uses compact 5-column layout with URN/mobile search', async () => {
     state.appointments = [
       appt({
         id: 9,
         status: 'TO_ARRIVE',
         visit_kind: 'FOLLOW_UP',
         token_number: 2,
+        consultation_status: null,
         patient_name: 'Rahul Kumar',
         patient_urn: 'KH-9876',
         patient_mobile: '9123456789',
@@ -207,10 +235,8 @@ describe('TodayAppointmentsPanel status labels and colours', () => {
       } as Partial<Appointment>),
     ]
     renderPanel()
-    expect(screen.getByRole('tab', { name: /Checked In/ })).toHaveTextContent('1')
-    expect(screen.getByRole('tab', { name: /To Arrive/ })).toHaveTextContent('0')
-    const checkedTab = screen.getByRole('tab', { name: /Checked In/ })
-    await userEvent.click(checkedTab)
+    expect(screen.getByRole('tab', { name: /To Arrive/ })).toHaveTextContent('To Arrive (1)')
+    expect(screen.getByRole('tab', { name: /Checked In/ })).toHaveTextContent('Checked In (0)')
 
     const table = screen.getByRole('table')
     const headers = within(table)
@@ -224,7 +250,7 @@ describe('TodayAppointmentsPanel status labels and colours', () => {
     expect(within(table).queryByText(/9123456789/)).not.toBeInTheDocument()
     expect(within(table).queryByText(/42 yrs/)).not.toBeInTheDocument()
     expect(within(table).queryByText('Normal')).not.toBeInTheDocument()
-    expect(within(table).getByText('Checked In')).toBeInTheDocument()
+    expect(within(table).getByText('To arrive')).toBeInTheDocument()
 
     // Search still matches URN and mobile even though they are omitted from the Patient cell
     const searchInput = screen.getByPlaceholderText(/Search name, URN, mobile or token/i)
@@ -548,6 +574,216 @@ describe('TodayAppointmentsPanel status labels and colours', () => {
     expect(within(row).queryByRole('button')).not.toBeInTheDocument()
     const cells = within(row).getAllByRole('cell')
     expect(cells[4]).toHaveTextContent('—')
+  })
+
+  it('displays RESCHEDULED badge in All tab with mathematically consistent counts', async () => {
+    state.appointments = [
+      appt({ id: 30, status: 'BOOKED', patient_name: 'Booked Pat' }),
+      appt({ id: 31, status: 'RESCHEDULED', patient_name: 'Moved Pat' }),
+      appt({ id: 32, status: 'CANCELLED', patient_name: 'Void Pat' }),
+    ]
+    renderPanel()
+    expect(screen.getByRole('tab', { name: /All/ })).toHaveTextContent('All (3)')
+    expect(screen.getByRole('tab', { name: /To Arrive/ })).toHaveTextContent('To Arrive (1)')
+    expect(screen.getByRole('tab', { name: /Checked In/ })).toHaveTextContent('Checked In (0)')
+    expect(screen.getByText(/1 active · 1 cancelled · 1 rescheduled/)).toBeInTheDocument()
+
+    await userEvent.click(screen.getByRole('tab', { name: /All/ }))
+    const badge = within(screen.getByRole('table')).getByText('Rescheduled')
+    expect(badge.className).toMatch(/bg-purple-50/)
+    expect(badge.className).toMatch(/text-purple-800/)
+  })
+
+  it('enforces exact permission and status gates for Change priority and Cancel arrival', async () => {
+    state.appointments = [
+      appt({ id: 40, status: 'ARRIVED', consultation_status: 'WAITING', token_number: 1, patient_name: 'Waiting Pat' }),
+      appt({ id: 41, status: 'DONE', consultation_status: 'COMPLETED', token_number: 2, patient_name: 'Done Pat' }),
+    ]
+    state.arrivals = [{
+      id: 42,
+      full_name: 'Pending Pat',
+      age_years: 30,
+      mobile: '9876543210',
+      doctor_id: 1,
+      doctor_name_en: 'Dr. Anil',
+      department_id: 10,
+      department_name: 'General',
+      appointment_date: '2026-11-15',
+      token_number: 3,
+      priority_level: 'NORMAL',
+      status: 'TO_ARRIVE',
+      version_id: 1,
+      created_at: '2026-11-15T03:00:00Z',
+    }]
+
+    // canManage=true, canCheckIn=false -> Waiting Pat must NOT have Change priority; Done Pat has none; Pending Pat has both Change priority & Cancel arrival
+    renderPanel({ canManage: true, canCheckIn: false, canRegister: true })
+    await userEvent.click(screen.getByRole('tab', { name: /All/ }))
+
+    const waitingRow = screen.getByText('Waiting Pat').closest('tr')!
+    expect(within(waitingRow).queryByRole('button', { name: 'More' })).not.toBeInTheDocument()
+    const doneRow = screen.getByText('Done Pat').closest('tr')!
+    expect(within(doneRow).queryByRole('button', { name: 'More' })).not.toBeInTheDocument()
+
+    const pendingRow = screen.getByText('Pending Pat').closest('tr')!
+    await userEvent.click(within(pendingRow).getByRole('button', { name: 'More' }))
+    expect(within(pendingRow).getByRole('menuitem', { name: 'Change priority' })).toBeInTheDocument()
+    expect(within(pendingRow).getByRole('menuitem', { name: 'Cancel arrival' })).toBeInTheDocument()
+
+    // canManage=false, canCheckIn=true, canRegister=true -> Pending Pat has NO Cancel arrival and NO Change priority; Waiting Pat HAS Change priority
+    cleanup()
+    renderPanel({ canManage: false, canCheckIn: true, canRegister: true })
+    await userEvent.click(screen.getByRole('tab', { name: /All/ }))
+
+    const pendingRow2 = screen.getByText('Pending Pat').closest('tr')!
+    expect(within(pendingRow2).queryByRole('button', { name: 'More' })).not.toBeInTheDocument()
+
+    const waitingRow2 = screen.getByText('Waiting Pat').closest('tr')!
+    await userEvent.click(within(waitingRow2).getByRole('button', { name: 'More' }))
+    expect(within(waitingRow2).getByRole('menuitem', { name: 'Change priority' })).toBeInTheDocument()
+  })
+
+  it('validates min-3-char reason and sends exact payloads in PriorityModal for arrivals and appointments', async () => {
+    updateArrivalPrioritySpy.mockResolvedValue({})
+    updatePrioritySpy.mockResolvedValue({})
+    state.appointments = [
+      appt({ id: 50, status: 'ARRIVED', consultation_status: 'WAITING', token_number: 2, patient_name: 'Checked Pat', version_id: 4 }),
+    ]
+    state.arrivals = [{
+      id: 51,
+      full_name: 'Arrival Pat',
+      age_years: 28,
+      mobile: '9876543210',
+      doctor_id: 1,
+      doctor_name_en: 'Dr. Anil',
+      department_id: 10,
+      department_name: 'General',
+      appointment_date: '2026-11-15',
+      token_number: 1,
+      priority_level: 'NORMAL',
+      status: 'TO_ARRIVE',
+      version_id: 3,
+      created_at: '2026-11-15T03:00:00Z',
+    }]
+    renderPanel()
+    await userEvent.click(screen.getByRole('tab', { name: /All/ }))
+
+    // Pending arrival priority change -> sends `reason` and rejects < 3 chars
+    const arrivalRow = screen.getByText('Arrival Pat').closest('tr')!
+    await userEvent.click(within(arrivalRow).getByRole('button', { name: 'More' }))
+    await userEvent.click(within(arrivalRow).getByRole('menuitem', { name: 'Change priority' }))
+    await userEvent.selectOptions(screen.getByLabelText('Priority *'), 'EMERGENCY')
+    await userEvent.type(screen.getByLabelText('Reason *'), 'ab')
+    await userEvent.click(screen.getByRole('button', { name: 'Save priority' }))
+    expect(screen.getByRole('alert')).toHaveTextContent(/at least 3 characters/i)
+    expect(updateArrivalPrioritySpy).not.toHaveBeenCalled()
+
+    await userEvent.clear(screen.getByLabelText('Reason *'))
+    await userEvent.type(screen.getByLabelText('Reason *'), 'Acute chest pain')
+    await userEvent.click(screen.getByRole('button', { name: 'Save priority' }))
+    await waitFor(() => expect(updateArrivalPrioritySpy).toHaveBeenCalledTimes(1))
+    expect(updateArrivalPrioritySpy).toHaveBeenCalledWith({
+      id: 51,
+      body: { priority_level: 'EMERGENCY', reason: 'Acute chest pain', version_id: 3 },
+    })
+
+    // Checked-in appointment priority change -> sends `priority_reason`
+    const apptRow = screen.getByText('Checked Pat').closest('tr')!
+    await userEvent.click(within(apptRow).getByRole('button', { name: 'More' }))
+    await userEvent.click(within(apptRow).getByRole('menuitem', { name: 'Change priority' }))
+    await userEvent.selectOptions(screen.getByLabelText('Priority *'), 'PRIORITY')
+    await userEvent.type(screen.getByLabelText('Reason *'), 'Senior citizen')
+    await userEvent.click(screen.getByRole('button', { name: 'Save priority' }))
+    await waitFor(() => expect(updatePrioritySpy).toHaveBeenCalledTimes(1))
+    expect(updatePrioritySpy).toHaveBeenCalledWith({
+      id: 50,
+      body: { priority_level: 'PRIORITY', priority_reason: 'Senior citizen', version_id: 4 },
+    })
+  })
+
+  it('sends exact payloads for CancelForm, NoShowForm, RescheduleForm, and filters by doctor', async () => {
+    updateStatusSpy.mockResolvedValue({})
+    cancelArrivalSpy.mockResolvedValue({})
+    rescheduleSpy.mockResolvedValue({})
+
+    state.appointments = [
+      appt({ id: 60, doctor_id: 1, doctor_name_en: 'Dr. Anil', patient_name: 'Booking One', status: 'BOOKED', version_id: 2 }),
+      appt({ id: 61, doctor_id: 2, doctor_name_en: 'Dr. Priya', patient_name: 'Booking Two', status: 'BOOKED', version_id: 5 }),
+    ]
+    state.arrivals = [{
+      id: 62,
+      full_name: 'Arrival Cancel',
+      age_years: 29,
+      mobile: '9876543210',
+      doctor_id: 1,
+      doctor_name_en: 'Dr. Anil',
+      department_id: 10,
+      department_name: 'General',
+      appointment_date: '2026-11-15',
+      token_number: 1,
+      priority_level: 'NORMAL',
+      status: 'TO_ARRIVE',
+      version_id: 7,
+      created_at: '2026-11-15T03:00:00Z',
+    }]
+    renderPanel()
+
+    // Doctor filter narrows rows and updates tab count + header subtitle
+    const doctorSelect = screen.getByLabelText(/Filter by doctor/i)
+    await userEvent.selectOptions(doctorSelect, '2')
+    expect(screen.getByRole('tab', { name: /To Arrive/ })).toHaveTextContent('To Arrive (1)')
+    expect(screen.getByText('Booking Two')).toBeInTheDocument()
+    expect(screen.queryByText('Booking One')).not.toBeInTheDocument()
+
+    // Reschedule Booking Two
+    const row2 = screen.getByText('Booking Two').closest('tr')!
+    await userEvent.click(within(row2).getByRole('button', { name: 'More' }))
+    await userEvent.click(within(row2).getByRole('menuitem', { name: 'Reschedule' }))
+    const dateInput = screen.getByLabelText(/New date \*/i)
+    await userEvent.clear(dateInput)
+    await userEvent.type(dateInput, '2026-11-18')
+    await userEvent.type(screen.getByLabelText(/^Reason$/i), 'Asked for Wednesday')
+    await userEvent.click(screen.getByRole('button', { name: 'Save new date' }))
+    await waitFor(() => expect(rescheduleSpy).toHaveBeenCalledTimes(1))
+    expect(rescheduleSpy).toHaveBeenCalledWith({
+      id: 61,
+      body: {
+        version_id: 5,
+        appointment_date: '2026-11-18',
+        expected_time: '09:00:00',
+        reason: 'Asked for Wednesday',
+      },
+    })
+
+    // Clear doctor filter -> test No-show & Cancel booking + Cancel arrival
+    await userEvent.selectOptions(doctorSelect, '')
+    const row1 = screen.getByText('Booking One').closest('tr')!
+    await userEvent.click(within(row1).getByRole('button', { name: 'More' }))
+    await userEvent.click(within(row1).getByRole('menuitem', { name: 'No-show' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Mark no-show' }))
+    await waitFor(() => expect(updateStatusSpy).toHaveBeenCalledWith({
+      id: 60,
+      body: { status: 'NO_SHOW', version_id: 2 },
+    }))
+
+    await userEvent.click(within(row1).getByRole('button', { name: 'More' }))
+    await userEvent.click(within(row1).getByRole('menuitem', { name: 'Cancel booking' }))
+    await userEvent.type(screen.getByLabelText('Reason *'), 'Patient called to cancel')
+    await userEvent.click(screen.getByRole('button', { name: 'Cancel booking' }))
+    await waitFor(() => expect(updateStatusSpy).toHaveBeenCalledWith({
+      id: 60,
+      body: { status: 'CANCELLED', version_id: 2, cancellation_reason: 'Patient called to cancel' },
+    }))
+
+    const arrRow = screen.getByText('Arrival Cancel').closest('tr')!
+    await userEvent.click(within(arrRow).getByRole('button', { name: 'More' }))
+    await userEvent.click(within(arrRow).getByRole('menuitem', { name: 'Cancel arrival' }))
+    await userEvent.type(screen.getByLabelText('Reason *'), 'Left clinic early')
+    await userEvent.click(screen.getByRole('button', { name: 'Cancel arrival' }))
+    await waitFor(() => expect(cancelArrivalSpy).toHaveBeenCalledWith({
+      id: 62,
+      body: { version_id: 7, reason: 'Left clinic early' },
+    }))
   })
 })
 

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import {
   useAppointments,
   useConsultingDoctors,
@@ -10,8 +10,9 @@ import {
   useCancelOpdArrival,
 } from '../../api/queries'
 import type { Appointment, OpdArrival, PriorityLevel } from '../../api/types'
-import { formatToken, istToday } from '../../format'
+import { formatToken } from '../../format'
 import { IconSearch, IconX } from '../icons'
+import { AppointmentStatusBadge, type ReceptionStatusKey, useIstToday } from '../reception/AppointmentStatusBadge'
 import { PriorityBadge } from './PriorityBadge'
 
 type ListView = 'all' | 'arrive' | 'checked'
@@ -24,30 +25,23 @@ const INPUT =
 const FILTER_INPUT =
   'min-h-9 w-full rounded-lg border border-slate-300 bg-white px-3 text-xs font-medium text-slate-900 placeholder:text-slate-400 focus:border-[#8E1C3D] focus:outline-none focus:ring-2 focus:ring-[#8E1C3D]/15'
 
+const CHECKED_IN_STATUSES = new Set([
+  'ARRIVED',
+  'CHECKED_IN',
+  'WAITING',
+  'IN_CONSULTATION',
+  'DONE',
+  'COMPLETED',
+])
+
 export function isCancelled(a: Appointment): boolean {
   return a.status === 'CANCELLED' || a.consultation_status === 'CANCELLED'
 }
 
-/** Checked-in / tokenized patients promote to Checked In; unarrived bookings stay in To Arrive */
+/** Checked-in / tokenized consultations promote to Checked In; unarrived/registered bookings stay in To Arrive */
 export function isCheckedIn(a: Appointment, pendingArrival?: OpdArrival): boolean {
   if (isCancelled(a) || pendingArrival != null || a.status === 'RESCHEDULED') return false
-  if ((a.status === 'BOOKED' || a.status === 'NO_SHOW') && a.token_number == null && a.consultation_status == null) {
-    return false
-  }
-  return (
-    a.status === 'REGISTERED' ||
-    Boolean(a.patient_urn) ||
-    (a.visit_kind !== 'NEW' && a.visit_kind != null) ||
-    a.status === 'ARRIVED' ||
-    a.status === 'CHECKED_IN' ||
-    a.status === 'WAITING' ||
-    a.status === 'IN_CONSULTATION' ||
-    a.status === 'DONE' ||
-    a.status === 'COMPLETED' ||
-    a.consultation_status === 'WAITING' ||
-    a.consultation_status === 'IN_CONSULTATION' ||
-    a.consultation_status === 'COMPLETED'
-  )
+  return a.consultation_status != null || CHECKED_IN_STATUSES.has(a.status)
 }
 
 /** Unarrived bookings and unregistered arrivals remain in To Arrive */
@@ -100,15 +94,12 @@ function formatDisplayDate(dateStr: string): string {
   }
 }
 
-/** Exactly 3 statuses required across the OPD desk: To arrive, Checked In, and Cancelled */
-export function statusView(a: Appointment, pendingArrival?: OpdArrival): { label: 'To arrive' | 'Checked In' | 'Cancelled'; style: string } {
-  if (isCancelled(a)) {
-    return { label: 'Cancelled', style: 'bg-slate-100 text-slate-600 ring-slate-200' }
-  }
-  if (isCheckedIn(a, pendingArrival)) {
-    return { label: 'Checked In', style: 'bg-emerald-50 text-emerald-800 ring-emerald-200' }
-  }
-  return { label: 'To arrive', style: 'bg-amber-50 text-amber-800 ring-amber-200' }
+/** Canonical badge status across the OPD desk: To arrive, Checked In, Rescheduled, or Cancelled */
+export function statusKey(a: Appointment, pendingArrival?: OpdArrival): ReceptionStatusKey {
+  if (isCancelled(a)) return 'CANCELLED'
+  if (a.status === 'RESCHEDULED') return 'RESCHEDULED'
+  if (isCheckedIn(a, pendingArrival)) return 'CHECKED_IN'
+  return 'TO_ARRIVE'
 }
 
 function errorText(err: unknown, fallback: string): string {
@@ -136,7 +127,7 @@ export function TodayAppointmentsPanel({
   onRegisterArrival: (arrival: OpdArrival) => void
   onRegisterPatient?: (booking: Appointment) => void
 }) {
-  const today = istToday()
+  const today = useIstToday()
   const { data, isPending, isError, error, refetch, isFetching } = useAppointments({ appointment_date: today })
   const { data: arrivalData, isPending: arrivalsPending, isError: arrivalsError, error: arrivalsErrorValue, refetch: refetchArrivals } = useOpdArrivals(today)
   const [view, setView] = useState<ListView>('arrive')
@@ -202,11 +193,13 @@ export function TodayAppointmentsPanel({
     const arrive = filteredEntries.filter(({ appointment: a, pendingArrival }) => isAwaitingArrival(a, pendingArrival)).length
     const checked = filteredEntries.filter(({ appointment: a, pendingArrival }) => isCheckedIn(a, pendingArrival)).length
     const cancelled = filteredEntries.filter(({ appointment: a }) => isCancelled(a)).length
+    const rescheduled = filteredEntries.filter(({ appointment: a }) => !isCancelled(a) && a.status === 'RESCHEDULED').length
     return {
       all: filteredEntries.length,
       arrive,
       checked,
       cancelled,
+      rescheduled,
     }
   }, [filteredEntries])
 
@@ -269,7 +262,8 @@ export function TodayAppointmentsPanel({
             </h2>
             <p className="mt-0.5 text-xs text-slate-600">
               {formatDisplayDate(today)} · {selectedDoctorName}
-              {counts.cancelled > 0 && ` · ${counts.arrive + counts.checked} active · ${counts.cancelled} cancelled`}
+              {(counts.cancelled > 0 || counts.rescheduled > 0) &&
+                ` · ${counts.arrive + counts.checked} active${counts.cancelled > 0 ? ` · ${counts.cancelled} cancelled` : ''}${counts.rescheduled > 0 ? ` · ${counts.rescheduled} rescheduled` : ''}`}
             </p>
           </div>
           <button type="button" onClick={() => { void refetch(); void refetchArrivals() }} disabled={isFetching} aria-label="Refresh appointments" className="inline-flex min-h-9 items-center rounded-lg border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-700 hover:border-[#8E1C3D] hover:text-[#5D0B26] disabled:opacity-50">
@@ -368,7 +362,7 @@ export function TodayAppointmentsPanel({
                     : 'No appointments today.'}
               </p>
             ) : rows.length > 0 ? (
-              <div className="mb-20 overflow-x-auto rounded-xl border border-slate-200 xl:overflow-visible">
+              <div className="overflow-x-auto rounded-xl border border-slate-200">
                 <table className="w-full border-collapse text-left text-xs">
                   <thead className="bg-slate-50 text-slate-600">
                     <tr>
@@ -383,6 +377,7 @@ export function TodayAppointmentsPanel({
                     {rows.map(({ key, appointment: a, pendingArrival }) => (
                       <AppointmentCard
                         key={key}
+                        today={today}
                         appointment={a}
                         pendingArrival={pendingArrival}
                         cabinCode={doctorCabinMap.get(a.doctor_id)}
@@ -416,6 +411,7 @@ export function TodayAppointmentsPanel({
 }
 
 function AppointmentCard({
+  today,
   appointment: a,
   pendingArrival,
   cabinCode,
@@ -431,6 +427,7 @@ function AppointmentCard({
   onRegisterArrival,
   onRegisterPatient,
 }: {
+  today: string
   appointment: Appointment
   pendingArrival?: OpdArrival
   cabinCode?: string | null
@@ -446,11 +443,64 @@ function AppointmentCard({
   onRegisterArrival: () => void
   onRegisterPatient?: () => void
 }) {
-  const status = statusView(a, pendingArrival)
+  const badgeStatus = statusKey(a, pendingArrival)
   const isAwaiting = isAwaitingArrival(a, pendingArrival)
   const isCancelledRow = isCancelled(a)
   const moreButtonRef = useRef<HTMLButtonElement | null>(null)
   const menuContainerRef = useRef<HTMLDivElement | null>(null)
+  const [menuPos, setMenuPos] = useState<{ top: number; left: number } | null>(null)
+
+  const primaryCta = (() => {
+    if (!isAwaiting) return null
+    if (pendingArrival != null) {
+      return canRegister ? { label: 'Register', onClick: onRegisterArrival } : null
+    }
+    if (
+      a.status === 'BOOKED' ||
+      a.status === 'NO_SHOW' ||
+      a.status === 'REGISTERED' ||
+      (a.status === 'TO_ARRIVE' && Boolean(a.patient_urn))
+    ) {
+      return canCheckIn && onCheckIn ? { label: 'Check in', onClick: onCheckIn } : null
+    }
+    return canRegister && onRegisterPatient ? { label: 'Register', onClick: onRegisterPatient } : null
+  })()
+
+  const menuItems: { label: string; kind: RowAction['kind']; danger?: boolean }[] = []
+  const canChangeArrivalPriority =
+    pendingArrival != null && pendingArrival.status === 'TO_ARRIVE' && canManage
+  const canChangeApptPriority =
+    !pendingArrival &&
+    !isCancelledRow &&
+    (a.consultation_status === 'WAITING' || a.consultation_status === 'IN_CONSULTATION') &&
+    canCheckIn
+  if (canChangeArrivalPriority || canChangeApptPriority) {
+    menuItems.push({ label: 'Change priority', kind: 'priority' })
+  }
+  if (!pendingArrival && canManage && (a.status === 'BOOKED' || a.status === 'TO_ARRIVE')) {
+    menuItems.push({ label: 'No-show', kind: 'no-show' })
+  }
+  if (!pendingArrival && canManage && (a.status === 'BOOKED' || a.status === 'NO_SHOW' || a.status === 'TO_ARRIVE')) {
+    menuItems.push({ label: 'Reschedule', kind: 'reschedule' })
+  }
+  if (pendingArrival != null && pendingArrival.status === 'TO_ARRIVE' && canManage) {
+    menuItems.push({ label: 'Cancel arrival', kind: 'cancel', danger: true })
+  }
+  if (!pendingArrival && canManage && (a.status === 'BOOKED' || a.status === 'TO_ARRIVE' || a.status === 'REGISTERED')) {
+    menuItems.push({ label: 'Cancel booking', kind: 'cancel', danger: true })
+  }
+
+  useLayoutEffect(() => {
+    if (!menuOpen || !moreButtonRef.current) return
+    const rect = moreButtonRef.current.getBoundingClientRect()
+    const menuWidth = 160
+    const estimatedHeight = menuItems.length * 36 + 12
+    const spaceBelow = window.innerHeight - rect.bottom
+    const openUp = spaceBelow < estimatedHeight && rect.top > spaceBelow
+    const top = openUp ? Math.max(8, rect.top - estimatedHeight - 4) : rect.bottom + 4
+    const left = Math.max(8, Math.min(rect.right - menuWidth, window.innerWidth - menuWidth - 8))
+    setMenuPos({ top, left })
+  }, [menuOpen, menuItems.length])
 
   useEffect(() => {
     if (!menuOpen) return
@@ -466,41 +516,20 @@ function AppointmentCard({
         moreButtonRef.current?.focus()
       }
     }
+    const onScrollOrResize = () => {
+      onMenuOpenChange(false)
+    }
     document.addEventListener('pointerdown', onPointerDown)
     document.addEventListener('keydown', onKeyDown)
+    window.addEventListener('scroll', onScrollOrResize, true)
+    window.addEventListener('resize', onScrollOrResize)
     return () => {
       document.removeEventListener('pointerdown', onPointerDown)
       document.removeEventListener('keydown', onKeyDown)
+      window.removeEventListener('scroll', onScrollOrResize, true)
+      window.removeEventListener('resize', onScrollOrResize)
     }
   }, [menuOpen, onMenuOpenChange])
-
-  const primaryCta = (() => {
-    if (!isAwaiting) return null
-    if (pendingArrival != null) {
-      return canRegister ? { label: 'Register', onClick: onRegisterArrival } : null
-    }
-    if (a.status === 'BOOKED' || a.status === 'NO_SHOW') {
-      return canCheckIn && onCheckIn ? { label: 'Check in', onClick: onCheckIn } : null
-    }
-    return canRegister && onRegisterPatient ? { label: 'Register', onClick: onRegisterPatient } : null
-  })()
-
-  const menuItems: { label: string; kind: RowAction['kind']; danger?: boolean }[] = []
-  if (a.token_number != null && !isCancelledRow && canManage) {
-    menuItems.push({ label: 'Change priority', kind: 'priority' })
-  }
-  if (!pendingArrival && canManage && (a.status === 'BOOKED' || a.status === 'TO_ARRIVE')) {
-    menuItems.push({ label: 'No-show', kind: 'no-show' })
-  }
-  if (!pendingArrival && canManage && (a.status === 'BOOKED' || a.status === 'NO_SHOW' || a.status === 'TO_ARRIVE')) {
-    menuItems.push({ label: 'Reschedule', kind: 'reschedule' })
-  }
-  if (pendingArrival != null && isAwaiting && (canManage || canRegister)) {
-    menuItems.push({ label: 'Cancel arrival', kind: 'cancel', danger: true })
-  }
-  if (!pendingArrival && canManage && (a.status === 'BOOKED' || a.status === 'TO_ARRIVE' || a.status === 'REGISTERED')) {
-    menuItems.push({ label: 'Cancel booking', kind: 'cancel', danger: true })
-  }
 
   const showRowControls = action === null || action === 'priority'
 
@@ -519,9 +548,7 @@ function AppointmentCard({
         </td>
         <td className="px-3 py-2.5">
           <div className="flex flex-wrap items-center gap-1.5">
-            <span className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold ring-1 ${status.style}`}>
-              {status.label}
-            </span>
+            <AppointmentStatusBadge status={badgeStatus} />
             <PriorityBadge level={a.priority_level} reason={a.priority_reason} />
           </div>
         </td>
@@ -554,7 +581,12 @@ function AppointmentCard({
                   {menuOpen && (
                     <div
                       role="menu"
-                      className="absolute right-0 top-full z-20 mt-1 flex min-w-[9.5rem] flex-col rounded-lg border border-slate-200 bg-white p-1 shadow-lg"
+                      style={
+                        menuPos
+                          ? { position: 'fixed', top: menuPos.top, left: menuPos.left }
+                          : { position: 'fixed' }
+                      }
+                      className="z-50 flex min-w-[9.5rem] flex-col rounded-lg border border-slate-200 bg-white p-1 shadow-lg"
                     >
                       {menuItems.map((item) => (
                         <button
@@ -601,7 +633,7 @@ function AppointmentCard({
           <td colSpan={5} className="bg-slate-50 p-3">
             {action === 'no-show' && <NoShowForm appointment={a} onDone={() => onAction(null)} />}
             {action === 'cancel' && <CancelForm appointment={a} pendingArrival={pendingArrival} onDone={() => onAction(null)} />}
-            {action === 'reschedule' && <RescheduleForm appointment={a} onDone={() => onAction(null)} />}
+            {action === 'reschedule' && <RescheduleForm today={today} appointment={a} onDone={() => onAction(null)} />}
           </td>
         </tr>
       )}
@@ -644,8 +676,8 @@ function PriorityModal({
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault()
     setError(null)
-    if (!reason.trim()) {
-      setError('A reason is mandatory when changing priority.')
+    if (reason.trim().length < 3) {
+      setError('Enter a reason of at least 3 characters when changing priority.')
       return
     }
     try {
@@ -902,7 +934,7 @@ function CancelForm({
   )
 }
 
-function RescheduleForm({ appointment, onDone }: { appointment: Appointment; onDone: () => void }) {
+function RescheduleForm({ today, appointment, onDone }: { today: string; appointment: Appointment; onDone: () => void }) {
   const reschedule = useRescheduleAppointment()
   const [date, setDate] = useState(appointment.appointment_date)
   const [time, setTime] = useState(appointment.expected_time?.slice(0, 5) ?? '')
@@ -933,10 +965,10 @@ function RescheduleForm({ appointment, onDone }: { appointment: Appointment; onD
         }
       }}
     >
-      <div className="grid grid-cols-2 gap-2">
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
         <label className="block">
           <span className="mb-1 block font-semibold text-slate-700">New date *</span>
-          <input type="date" required min={istToday()} value={date} onChange={(e) => setDate(e.target.value)} className={INPUT} />
+          <input type="date" required min={today} value={date} onChange={(e) => setDate(e.target.value)} className={INPUT} />
         </label>
         <label className="block">
           <span className="mb-1 block font-semibold text-slate-700">Time</span>

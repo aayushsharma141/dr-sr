@@ -1,7 +1,7 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { cleanup, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { MemoryRouter } from 'react-router'
+import { MemoryRouter, useLocation } from 'react-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { TokenGenerationPage } from '../TokenGenerationPage'
 import { QueueTicketPreview } from '../../components/QueueTicketPreview'
@@ -141,6 +141,7 @@ function installApi(options: {
   arrivals?: OpdArrival[]
   bookings?: Appointment[]
   duplicate?: PatientOut | null
+  me?: Me
   write?: (url: string, method: string) => ReturnType<typeof jsonResponse>
 }) {
   const writes: Write[] = []
@@ -154,7 +155,7 @@ function installApi(options: {
     }
     if (url.includes('/api/opd-arrivals'))
       return Promise.resolve(jsonResponse(200, { total: options.arrivals?.length ?? 0, arrivals: options.arrivals ?? [] }))
-    if (url.includes('/api/auth/me')) return Promise.resolve(jsonResponse(200, mockMe))
+    if (url.includes('/api/auth/me')) return Promise.resolve(jsonResponse(200, options.me ?? mockMe))
     if (url.includes('/api/departments/1/doctors')) return Promise.resolve(jsonResponse(200, mockDoctors))
     if (url.includes('/api/departments')) return Promise.resolve(jsonResponse(200, mockDepartments))
     if (url.includes('/api/patients/check-duplicate'))
@@ -173,10 +174,15 @@ function installApi(options: {
     return Promise.reject(new Error(`Unhandled URL: ${url}`))
   })
   vi.stubGlobal('fetch', mockFetch)
-  return { writes }
+  return { writes, mockFetch }
 }
 
 type DeskEntry = string | { pathname: string; state?: unknown }
+
+function LocationProbe() {
+  const loc = useLocation()
+  return <span data-testid="router-search">{loc.search}</span>
+}
 
 function renderDesk(entry: DeskEntry = '/reception/tokens') {
   const queryClient = new QueryClient({
@@ -186,6 +192,7 @@ function renderDesk(entry: DeskEntry = '/reception/tokens') {
     <QueryClientProvider client={queryClient}>
       <MemoryRouter initialEntries={[entry]}>
         <TokenGenerationPage />
+        <LocationProbe />
       </MemoryRouter>
     </QueryClientProvider>,
   )
@@ -195,10 +202,11 @@ function renderDesk(entry: DeskEntry = '/reception/tokens') {
 type User = ReturnType<typeof userEvent.setup>
 
 async function chooseDoctor(user: User) {
+  const select = screen.getByLabelText(/Consulting doctor \*/i)
   await waitFor(() => {
-    expect(screen.getByRole('option', { name: /Dr\. Anil Kumar/ })).toBeInTheDocument()
+    expect(within(select).getByRole('option', { name: /Dr\. Anil Kumar/ })).toBeInTheDocument()
   })
-  await user.selectOptions(screen.getByLabelText(/Consulting doctor \*/i), '1:10')
+  await user.selectOptions(select, '1:10')
 }
 
 async function fillNewPatient(user: User) {
@@ -496,7 +504,7 @@ describe('Check-in & Token desk', () => {
   })
 
   it('opens with the patient and booking chosen when sent from Check In elsewhere', async () => {
-    installApi({ bookings: [rameshBooking] })
+    installApi({ today: [rameshBooking], bookings: [rameshBooking] })
     renderDesk('/reception/tokens?patient_id=101&appointment_id=501')
 
     expect(await screen.findByText(/Booked appointment with/)).toHaveTextContent('Dr. Anil Kumar')
@@ -519,6 +527,7 @@ describe('Check-in & Token desk', () => {
 
   it('points a walk-in for an already booked patient at their booking', async () => {
     const { writes } = installApi({
+      today: [rameshBooking],
       bookings: [rameshBooking],
       write: (url) =>
         url.includes('/check-in')
@@ -532,6 +541,9 @@ describe('Check-in & Token desk', () => {
 
     await selectExistingPatient(user)
     expect(await screen.findByText(/This patient is booked for today/i)).toBeInTheDocument()
+    await user.click(
+      within(screen.getByRole('group', { name: 'Consultation type' })).getByRole('button', { name: 'New consultation' }),
+    )
     await chooseDoctor(user)
     await user.click(submitButton())
 
@@ -562,6 +574,9 @@ describe('Check-in & Token desk', () => {
     const user = renderDesk()
 
     await selectExistingPatient(user)
+    await user.click(
+      within(screen.getByRole('group', { name: 'Consultation type' })).getByRole('button', { name: 'New consultation' }),
+    )
     await chooseDoctor(user)
     await user.click(submitButton())
 
@@ -602,5 +617,248 @@ describe('Check-in & Token desk', () => {
       body: { status: 'NO_SHOW', version_id: 1 },
     })
     expect(writes[0].url).toContain('/api/appointments/501/status')
+  })
+
+  it('requires Consultation type for existing walk-ins and hides Remarks in New patient mode', async () => {
+    installApi({})
+    const user = renderDesk()
+
+    expect(screen.queryByLabelText(/Remarks \(optional\)/i)).not.toBeInTheDocument()
+
+    await selectExistingPatient(user)
+    await chooseDoctor(user)
+    expect(screen.getByLabelText(/Remarks \(optional\)/i)).toBeInTheDocument()
+    expect(submitButton()).toBeDisabled()
+    expect(screen.getByText(/Still needed: consultation type\./i)).toBeInTheDocument()
+
+    await user.click(
+      within(screen.getByRole('group', { name: 'Consultation type' })).getByRole('button', {
+        name: 'Follow-up / Revisit',
+      }),
+    )
+    expect(submitButton()).toBeEnabled()
+  })
+
+  it('checks in REGISTERED and URN-bearing TO_ARRIVE bookings from To Arrive and via existing-patient detection', async () => {
+    const registeredBooking: Appointment = {
+      ...rameshBooking,
+      id: 505,
+      status: 'REGISTERED',
+      token_number: 7,
+      consultation_status: null,
+    }
+    const toArriveBooking: Appointment = {
+      ...rameshBooking,
+      id: 506,
+      status: 'TO_ARRIVE',
+      token_number: 8,
+      consultation_status: null,
+    }
+    const { writes } = installApi({
+      today: [registeredBooking, toArriveBooking],
+      write: () => jsonResponse(200, { ...checkedIn, id: 505 }),
+    })
+    const user = renderDesk()
+
+    const rows = (await screen.findAllByText('Ramesh Kumar')).map((el) => el.closest('tr') as HTMLElement)
+    expect(rows).toHaveLength(2)
+    await user.click(within(rows[0]).getByRole('button', { name: 'Check in' }))
+    expect(screen.getByText(/Booked appointment with/)).toBeInTheDocument()
+
+    await user.click(
+      within(screen.getByRole('group', { name: 'Consultation type' })).getByRole('button', { name: 'New consultation' }),
+    )
+    await user.click(submitButton())
+    await waitFor(() => expect(writes).toHaveLength(1))
+    expect(writes[0].url).toContain('/api/appointments/505/check-in')
+  })
+
+  it('restores collapsible Referred by control and sends referral_source and referrer_name on walk-in', async () => {
+    const { writes } = installApi({
+      write: () =>
+        jsonResponse(201, {
+          ...checkedIn,
+          id: 509,
+          referral_source: 'DOCTOR',
+          referrer_name: 'Dr. Sharma',
+        }),
+    })
+    const user = renderDesk()
+
+    await selectExistingPatient(user)
+    await chooseDoctor(user)
+    await user.click(
+      within(screen.getByRole('group', { name: 'Consultation type' })).getByRole('button', { name: 'New consultation' }),
+    )
+
+    // Collapsed by default showing Self
+    expect(screen.getByText(/Referred by:/i)).toHaveTextContent('Referred by: Self')
+    expect(screen.queryByLabelText(/Referred by \*/i)).not.toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: /Change/i }))
+    const referralSelect = screen.getByLabelText(/Referred by \*/i)
+    await user.selectOptions(referralSelect, 'DOCTOR')
+
+    // Referrer name is required for DOCTOR
+    expect(submitButton()).toBeDisabled()
+    expect(screen.getByText(/Still needed: referrer name/i)).toBeInTheDocument()
+
+    await user.type(screen.getByLabelText(/Referring doctor's name \*/i), 'Dr. Sharma')
+    expect(submitButton()).toBeEnabled()
+    await user.click(submitButton())
+
+    await waitFor(() => expect(writes).toHaveLength(1))
+    expect(writes[0].body).toMatchObject({
+      referral_source: 'DOCTOR',
+      referrer_name: 'Dr. Sharma',
+    })
+  })
+
+  it('resets notDuplicate confirmation when editing patient name or mobile', async () => {
+    installApi({ duplicate: mockPatient })
+    const user = renderDesk()
+
+    await user.type(screen.getByLabelText(/Patient name \*/i), 'Ramesh Kumar')
+    await user.type(screen.getByLabelText(/Age \(years\) \*/i), '45')
+    await user.type(screen.getByLabelText(/Phone number \*/i), '9876543210')
+    await chooseDoctor(user)
+
+    const checkbox = await screen.findByLabelText(/Different patient with same phone number/i)
+    expect(submitButton()).toBeDisabled()
+    await user.click(checkbox)
+    expect(checkbox).toBeChecked()
+    expect(submitButton()).toBeEnabled()
+
+    // Editing fullName resets notDuplicate
+    await user.type(screen.getByLabelText(/Patient name \*/i), ' Jr')
+    const checkboxAfterName = await screen.findByLabelText(/Different patient with same phone number/i)
+    expect(checkboxAfterName).not.toBeChecked()
+    expect(submitButton()).toBeDisabled()
+
+    // Re-checking and editing mobile also resets notDuplicate
+    await user.click(checkboxAfterName)
+    expect(checkboxAfterName).toBeChecked()
+    await user.type(screen.getByLabelText(/Phone number \*/i), '1')
+    const checkboxAfterMobile = await screen.findByLabelText(/Different patient with same phone number/i)
+    expect(checkboxAfterMobile).not.toBeChecked()
+  })
+
+  it('disables Print Token and displays Cancelled notice when issued arrival is cancelled live', async () => {
+    let cancelled = false
+    const mockFetch = vi.fn().mockImplementation((url: string, init?: RequestInit) => {
+      const method = init?.method ?? 'GET'
+      if (url.includes('/api/system/heartbeat')) return Promise.resolve(jsonResponse(200, { ok: true }))
+      if (method === 'POST' && url.includes('/api/opd-arrivals')) {
+        return Promise.resolve(jsonResponse(201, sitaArrival))
+      }
+      if (url.includes('/api/opd-arrivals')) {
+        const list = cancelled ? [{ ...sitaArrival, status: 'CANCELLED' as const, version_id: 2 }] : [sitaArrival]
+        return Promise.resolve(jsonResponse(200, { total: list.length, arrivals: list }))
+      }
+      if (url.includes('/api/auth/me')) return Promise.resolve(jsonResponse(200, mockMe))
+      if (url.includes('/api/departments/1/doctors')) return Promise.resolve(jsonResponse(200, mockDoctors))
+      if (url.includes('/api/departments')) return Promise.resolve(jsonResponse(200, mockDepartments))
+      if (url.includes('/api/patients/check-duplicate'))
+        return Promise.resolve(jsonResponse(200, { has_duplicate: false, matching_patient: null }))
+      if (url.includes('/api/appointments')) return Promise.resolve(jsonResponse(200, { appointments: [], total: 0 }))
+      return Promise.reject(new Error(`Unhandled URL: ${url}`))
+    })
+    vi.stubGlobal('fetch', mockFetch)
+    const user = renderDesk()
+
+    await fillNewPatient(user)
+    await chooseDoctor(user)
+    await user.click(submitButton())
+    await screen.findByRole('heading', { name: 'Token Generated' })
+    expect(screen.getByRole('button', { name: /Print Token/i })).toBeEnabled()
+
+    // Simulate live cancellation picked up on refresh
+    cancelled = true
+    await user.click(screen.getByRole('button', { name: 'Refresh appointments' }))
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /Print Token/i })).toBeDisabled()
+    })
+    expect(screen.getByText(/This token has been cancelled/i)).toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: /Complete Registration & Check In/i })).not.toBeInTheDocument()
+  })
+
+  it('shows backend error message directly on 409 duplicate_opd_arrival and shows same-day active token notice', async () => {
+    installApi({
+      today: [checkedIn],
+      write: () =>
+        jsonResponse(409, {
+          code: 'duplicate_opd_arrival',
+          message: 'This mobile number already has a pending arrival in this doctor’s queue today.',
+        }),
+    })
+    const user = renderDesk()
+
+    await fillNewPatient(user)
+    await chooseDoctor(user)
+    await user.click(submitButton())
+
+    const alert = await screen.findByRole('alert')
+    expect(alert).toHaveTextContent('already has a pending arrival')
+    expect(screen.queryByRole('button', { name: /Check in their booking instead/i })).not.toBeInTheDocument()
+
+    // Selecting an existing patient who already has an active token today shows an informational notice
+    await selectExistingPatient(user)
+    expect(await screen.findByText(/Already checked in today/i)).toBeInTheDocument()
+  })
+
+  it('clears preset URL query params when clicking Clear form and ignores invalid params', async () => {
+    installApi({ today: [rameshBooking] })
+    const user = renderDesk('/reception/tokens?patient_id=101&appointment_id=501')
+
+    expect(await screen.findByText(/Booked appointment with/)).toBeInTheDocument()
+    expect(screen.getByTestId('router-search')).toHaveTextContent('?patient_id=101&appointment_id=501')
+    await user.click(screen.getByRole('button', { name: 'Clear form' }))
+    expect(screen.queryByText(/Booked appointment with/)).not.toBeInTheDocument()
+    expect(screen.queryByText('KH-2026-0001')).not.toBeInTheDocument()
+    expect(screen.getByTestId('router-search')).toHaveTextContent('')
+
+    // Invalid params (0, negative, non-numeric) do not load a patient or booking
+    cleanup()
+    const { mockFetch } = installApi({ today: [rameshBooking] })
+    renderDesk('/reception/tokens?patient_id=0&appointment_id=abc')
+    expect(screen.getByRole('button', { name: /New patient/i })).toHaveAttribute('aria-pressed', 'true')
+    expect(mockFetch).not.toHaveBeenCalledWith(expect.stringContaining('/api/patients/0'), expect.anything())
+  })
+
+  it('enforces canCreateArrival for new patients and canCheckIn for existing patients', async () => {
+    // Only visit:write (canCheckIn=true, canCreateArrival=false)
+    installApi({
+      me: { ...mockMe, permissions: ['patient:read', 'appointment:read', 'visit:read', 'visit:write'] },
+    })
+    const user = renderDesk()
+
+    await fillNewPatient(user)
+    await chooseDoctor(user)
+    expect(submitButton()).toBeDisabled()
+
+    await selectExistingPatient(user)
+    await chooseDoctor(user)
+    await user.click(
+      within(screen.getByRole('group', { name: 'Consultation type' })).getByRole('button', { name: 'New consultation' }),
+    )
+    expect(submitButton()).toBeEnabled()
+
+    // Now test only patient:create + appointment:write (canCreateArrival=true, canCheckIn=false)
+    cleanup()
+    installApi({
+      me: { ...mockMe, permissions: ['patient:read', 'patient:create', 'appointment:read', 'appointment:write'] },
+    })
+    const user2 = renderDesk()
+    await fillNewPatient(user2)
+    await chooseDoctor(user2)
+    expect(submitButton()).toBeEnabled()
+
+    await selectExistingPatient(user2)
+    await chooseDoctor(user2)
+    await user2.click(
+      within(screen.getByRole('group', { name: 'Consultation type' })).getByRole('button', { name: 'New consultation' }),
+    )
+    expect(submitButton()).toBeDisabled()
   })
 })

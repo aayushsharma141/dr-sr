@@ -5,6 +5,12 @@ import { Modal } from '../components/Modal'
 import { PriorityBadge } from '../components/checkin/PriorityBadge'
 import { TodayAppointmentsPanel } from '../components/checkin/TodayAppointmentsPanel'
 import {
+  AppointmentStatusBadge,
+  parsePositiveIntParam,
+  useDebouncedValue,
+  useIstToday,
+} from '../components/reception/AppointmentStatusBadge'
+import {
   useAppointment,
   useAppointments,
   useCheckDuplicate,
@@ -24,9 +30,10 @@ import type {
   OpdArrival,
   PatientOut,
   PriorityLevel,
+  ReferralSource,
   VisitKind,
 } from '../api/types'
-import { formatPaise, formatToken, istToday } from '../format'
+import { formatPaise, formatToken } from '../format'
 import {
   IconAlertTriangle,
   IconCalendar,
@@ -43,6 +50,15 @@ type PatientMode = 'new' | 'existing'
 const LABEL = 'mb-1 block text-xs font-semibold text-slate-700'
 const INPUT =
   'min-h-10 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm font-medium text-slate-900 shadow-2xs placeholder:text-slate-400 focus:border-[#8E1C3D] focus:outline-none focus:ring-2 focus:ring-[#8E1C3D]/15 disabled:bg-slate-100'
+
+const REFERRAL_OPTIONS: { value: ReferralSource; label: string; shortLabel: string; nameLabel: string }[] = [
+  { value: 'SELF', label: 'Self (came on their own)', shortLabel: 'Self', nameLabel: '' },
+  { value: 'DOCTOR', label: 'Doctor referral', shortLabel: 'Doctor referral', nameLabel: "Referring doctor's name" },
+  { value: 'PERSONAL', label: 'Patient / personal reference', shortLabel: 'Personal reference', nameLabel: "Referring person's name" },
+  { value: 'ORGANIZATION', label: 'Hospital / organisation', shortLabel: 'Organisation', nameLabel: 'Hospital or organisation name' },
+  { value: 'OTHER', label: 'Other / unknown', shortLabel: 'Other', nameLabel: 'Details (optional)' },
+]
+const REFERRAL_NEEDS_NAME: ReferralSource[] = ['DOCTOR', 'PERSONAL', 'ORGANIZATION']
 
 function sexLabel(gender: string): string {
   return gender === 'M' ? 'Male' : gender === 'F' ? 'Female' : 'Other'
@@ -111,7 +127,9 @@ export function TokenGenerationPage() {
   const permissions = me?.permissions ?? []
   const canCheckIn = permissions.includes('visit:write')
   const canManageBookings = permissions.includes('appointment:write')
-  const today = istToday()
+  const canCreateArrival =
+    permissions.includes('patient:create') && permissions.includes('appointment:write')
+  const today = useIstToday()
   const navigate = useNavigate()
 
   // --- Patient ---------------------------------------------------------------------------
@@ -130,6 +148,9 @@ export function TokenGenerationPage() {
 
   // --- Visit -----------------------------------------------------------------------------
   const [doctorKey, setDoctorKey] = useState('')
+  const [referralSource, setReferralSource] = useState<ReferralSource>('SELF')
+  const [referrerName, setReferrerName] = useState('')
+  const [referralOpen, setReferralOpen] = useState(false)
   const [priority, setPriority] = useState<PriorityLevel>('NORMAL')
   const [priorityReason, setPriorityReason] = useState('')
   const [remarks, setRemarks] = useState('')
@@ -146,8 +167,8 @@ export function TokenGenerationPage() {
   // booking already chosen (?patient_id=&appointment_id=).
   const [searchParams, setSearchParams] = useSearchParams()
   const [presetApplied, setPresetApplied] = useState(false)
-  const presetPatientId = Number(searchParams.get('patient_id')) || null
-  const presetBookingId = Number(searchParams.get('appointment_id')) || 0
+  const presetPatientId = parsePositiveIntParam(searchParams.get('patient_id'))
+  const presetBookingId = parsePositiveIntParam(searchParams.get('appointment_id')) ?? 0
   const { data: presetPatient } = usePatient(presetApplied ? null : presetPatientId)
   const { data: presetBooking, isPending: presetBookingPending } = useAppointment(
     presetApplied ? 0 : presetBookingId,
@@ -156,7 +177,11 @@ export function TokenGenerationPage() {
     setPresetApplied(true)
     setMode('existing')
     setSelectedPatient(presetPatient)
-    if (presetBooking && presetBooking.patient_id === presetPatient.id && isBookable(presetBooking)) {
+    if (
+      presetBooking &&
+      presetBooking.patient_id === presetPatient.id &&
+      isBookable(presetBooking, today)
+    ) {
       setBooking(presetBooking)
       setPriority(presetBooking.priority_level ?? 'NORMAL')
       setPriorityReason(presetBooking.priority_reason ?? '')
@@ -165,27 +190,19 @@ export function TokenGenerationPage() {
 
   // --- Data ------------------------------------------------------------------------------
   const { options: doctorOptions, isPending: doctorsPending } = useConsultingDoctors()
-  const { data: searchResults, isPending: searching } = usePatients(searchQuery, 8, 0)
+  const debouncedQuery = useDebouncedValue(searchQuery, 200)
+  const { data: searchResults, isPending: searching } = usePatients(debouncedQuery, 8, 0, {
+    enabled: mode === 'existing' && debouncedQuery.trim().length >= 2,
+  })
   const duplicateCheck = useCheckDuplicate(fullName, mobile, mode === 'new' && !issued)
   const duplicateMatch = duplicateCheck.data?.has_duplicate ? duplicateCheck.data.matching_patient : null
-  const { data: patientBookingsData } = useAppointments(
-    { appointment_date: today, patient_id: selectedPatient?.id },
-    { enabled: mode === 'existing' && selectedPatient != null },
-  )
-  const patientBookings = useMemo(
-    () =>
-      (patientBookingsData?.appointments ?? []).filter(
-        (a) => a.patient_id === selectedPatient?.id && isBookable(a),
-      ),
-    [patientBookingsData, selectedPatient],
-  )
 
   const walkIn = useWalkIn()
   const checkIn = useCheckIn()
   const createArrival = useCreateOpdArrival()
   const busy = walkIn.isPending || checkIn.isPending || createArrival.isPending
 
-  // Today's appointments and pending arrivals to compute next available token for the chosen doctor
+  // Today's appointments and pending arrivals: single source for next token, bookings, active tokens & live issued reconciliation
   const { data: allAppointmentsData } = useAppointments({ appointment_date: today })
   const allTodayAppointments = useMemo(
     () => allAppointmentsData?.appointments ?? [],
@@ -196,6 +213,55 @@ export function TokenGenerationPage() {
     () => arrivalData?.arrivals ?? [],
     [arrivalData],
   )
+
+  const patientBookings = useMemo(
+    () =>
+      selectedPatient == null
+        ? []
+        : allTodayAppointments.filter(
+            (a) => a.patient_id === selectedPatient.id && isBookable(a, today),
+          ),
+    [allTodayAppointments, selectedPatient, today],
+  )
+
+  const patientActiveTokens = useMemo(
+    () =>
+      selectedPatient == null
+        ? []
+        : allTodayAppointments.filter(
+            (a) =>
+              a.patient_id === selectedPatient.id &&
+              a.appointment_date === today &&
+              a.status !== 'CANCELLED' &&
+              a.status !== 'RESCHEDULED' &&
+              a.consultation_status !== 'CANCELLED' &&
+              !isBookable(a, today) &&
+              (a.consultation_status != null || a.token_number != null),
+          ),
+    [allTodayAppointments, selectedPatient, today],
+  )
+
+  const { liveIssued, issuedCancelled } = useMemo(() => {
+    if (!issued) return { liveIssued: null, issuedCancelled: false }
+    if (issued.kind === 'arrival') {
+      const candidate = pendingArrivals.find((a) => a.id === issued.arrival.id)
+      const live =
+        candidate && candidate.version_id >= issued.arrival.version_id ? candidate : issued.arrival
+      return {
+        liveIssued: { ...issued, arrival: live },
+        issuedCancelled: live.status === 'CANCELLED',
+      }
+    }
+    const candidate = allTodayAppointments.find((a) => a.id === issued.appointment.id)
+    const live =
+      candidate && candidate.version_id >= issued.appointment.version_id
+        ? candidate
+        : issued.appointment
+    return {
+      liveIssued: { ...issued, appointment: live },
+      issuedCancelled: live.status === 'CANCELLED' || live.consultation_status === 'CANCELLED',
+    }
+  }, [issued, pendingArrivals, allTodayAppointments])
 
   // The doctor comes from the booking when one is being checked in, else from the list.
   const chosenOption = useMemo(() => {
@@ -236,6 +302,9 @@ export function TokenGenerationPage() {
   // --- Actions ---------------------------------------------------------------------------
   const resetVisit = () => {
     setDoctorKey('')
+    setReferralSource('SELF')
+    setReferrerName('')
+    setReferralOpen(false)
     setPriority('NORMAL')
     setPriorityReason('')
     setRemarks('')
@@ -297,6 +366,7 @@ export function TokenGenerationPage() {
 
   // Everything the desk must have before the token can be issued; shown as the reason the
   // button is disabled, so reception is never left guessing.
+  const canSubmit = mode === 'new' ? canCreateArrival : canCheckIn
   const missing: string[] = []
   if (mode === 'new') {
     if (fullName.trim().length < 2) missing.push('patient name')
@@ -305,14 +375,17 @@ export function TokenGenerationPage() {
     if (duplicateMatch && !notDuplicate) missing.push('confirmation that this is a different patient')
   } else {
     if (!selectedPatient) missing.push('patient')
-    if (booking && !visitKind) missing.push('consultation type')
+    if (!visitKind) missing.push('consultation type')
+    if (REFERRAL_NEEDS_NAME.includes(referralSource) && referrerName.trim().length < 2) {
+      missing.push('referrer name')
+    }
   }
   if (!chosenOption) missing.push('consulting doctor')
   if (priority !== 'NORMAL' && priorityReason.trim().length < 3) missing.push('priority reason')
 
   const details = (): CheckInDetails => ({
-    referral_source: 'SELF',
-    referrer_name: null,
+    referral_source: referralSource,
+    referrer_name: referralSource === 'SELF' ? null : referrerName.trim() || null,
     priority_level: priority,
     priority_reason: priority === 'NORMAL' ? null : priorityReason.trim(),
     visit_kind: mode === 'new' ? 'NEW' : (visitKind ?? 'NEW'),
@@ -323,6 +396,7 @@ export function TokenGenerationPage() {
     setErrorMsg(null)
     setNotice(null)
     setDuplicateBooking(false)
+    if (!canSubmit) return
     if (missing.length > 0 || !chosenOption) {
       setErrorMsg(`Still needed: ${missing.join(', ')}.`)
       return
@@ -385,7 +459,11 @@ export function TokenGenerationPage() {
         return
       }
     } catch (err: unknown) {
-      if (err instanceof ApiError && err.code === 'duplicate_appointment') {
+      const matchingBooking =
+        mode === 'existing'
+          ? patientBookings.find((b) => b.doctor_id === chosenOption.doctor.id) ?? patientBookings[0] ?? null
+          : null
+      if (err instanceof ApiError && err.code === 'duplicate_appointment' && matchingBooking) {
         setDuplicateBooking(true)
         setErrorMsg('This patient already has a booking with this doctor today. Check that booking in instead.')
       } else if (err instanceof Error && err.message) {
@@ -404,11 +482,16 @@ export function TokenGenerationPage() {
       searchQuery ||
       booking ||
       doctorKey ||
+      referralSource !== 'SELF' ||
+      referrerName ||
       priority !== 'NORMAL' ||
       priorityReason ||
       remarks,
   )
   const submitLabel = mode === 'new' ? 'Generate Token' : 'Check in & Generate Token'
+  const showRemarks = mode === 'existing' && !booking
+  const selectedReferralMeta =
+    REFERRAL_OPTIONS.find((o) => o.value === referralSource) ?? REFERRAL_OPTIONS[0]
 
   return (
     <AppShell name={me?.full_name || 'Staff'} role={me?.role || 'RECEPTION'}>
@@ -441,7 +524,12 @@ export function TokenGenerationPage() {
             {duplicateBooking && patientBookings.length > 0 && (
               <button
                 type="button"
-                onClick={() => takeBooking(patientBookings[0])}
+                onClick={() =>
+                  takeBooking(
+                    patientBookings.find((b) => b.doctor_id === chosenOption?.doctor.id) ??
+                      patientBookings[0],
+                  )
+                }
                 className="inline-flex min-h-9 items-center rounded-lg border border-red-300 bg-white px-3 text-xs font-bold text-red-900 hover:bg-red-100"
               >
                 Check in their booking instead
@@ -544,11 +632,17 @@ export function TokenGenerationPage() {
                   {mode === 'new' ? (
                     <NewPatientFields
                       fullName={fullName}
-                      setFullName={setFullName}
+                      setFullName={(v) => {
+                        setFullName(v)
+                        setNotDuplicate(false)
+                      }}
                       ageYears={ageYears}
                       setAgeYears={setAgeYears}
                       mobile={mobile}
-                      setMobile={setMobile}
+                      setMobile={(v) => {
+                        setMobile(v)
+                        setNotDuplicate(false)
+                      }}
                       duplicate={duplicateMatch ?? null}
                       notDuplicate={notDuplicate}
                       setNotDuplicate={setNotDuplicate}
@@ -568,9 +662,27 @@ export function TokenGenerationPage() {
                       query={searchQuery}
                       setQuery={setSearchQuery}
                       results={searchResults}
-                      searching={searching}
+                      searching={searching || searchQuery !== debouncedQuery}
                       onPick={choosePatient}
                     />
+                  )}
+
+                  {mode === 'existing' && selectedPatient && patientActiveTokens.length > 0 && (
+                    <div
+                      role="status"
+                      className="space-y-1 rounded-xl border border-sky-200 bg-sky-50 px-3 py-2 text-xs text-sky-950"
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="font-bold">Already checked in today</span>
+                        <AppointmentStatusBadge status="CHECKED_IN" />
+                      </div>
+                      {patientActiveTokens.map((a) => (
+                        <p key={a.id} className="text-sky-900">
+                          {a.token_number != null ? `Token #${a.token_number} · ` : ''}
+                          {a.doctor_name_en}
+                        </p>
+                      ))}
+                    </div>
                   )}
 
                   {mode === 'existing' && selectedPatient && (
@@ -673,9 +785,9 @@ export function TokenGenerationPage() {
                   )}
                 </div>
 
-                {/* 3. Priority & Remarks */}
+                {/* 3. Priority, Remarks & Referral */}
                 <div className="space-y-2.5">
-                  <div className={booking ? undefined : 'grid grid-cols-1 gap-2.5 sm:grid-cols-[0.85fr_1.15fr]'}>
+                  <div className={showRemarks ? 'grid grid-cols-1 gap-2.5 sm:grid-cols-[0.85fr_1.15fr]' : undefined}>
                     <div>
                       <label htmlFor="checkin-priority" className={LABEL}>
                         Priority *
@@ -695,7 +807,7 @@ export function TokenGenerationPage() {
                         <option value="EMERGENCY">Emergency</option>
                       </select>
                     </div>
-                    {!booking && (
+                    {showRemarks && (
                       <div>
                         <label htmlFor="checkin-remarks" className={LABEL}>
                           Remarks (optional)
@@ -725,6 +837,75 @@ export function TokenGenerationPage() {
                       />
                     </div>
                   )}
+
+                  {mode === 'existing' && (
+                    <div className="space-y-2 rounded-xl border border-slate-200 bg-slate-50/70 px-3 py-2">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-xs font-semibold text-slate-700">
+                          Referred by:{' '}
+                          <span className="text-slate-900">
+                            {selectedReferralMeta.shortLabel}
+                            {referralSource !== 'SELF' && referrerName.trim()
+                              ? ` (${referrerName.trim()})`
+                              : ''}
+                          </span>
+                        </span>
+                        <button
+                          type="button"
+                          aria-expanded={referralOpen}
+                          onClick={() => setReferralOpen((open) => !open)}
+                          className="text-xs font-semibold text-[#8E1C3D] hover:underline"
+                        >
+                          {referralOpen ? 'Hide' : 'Change'}
+                        </button>
+                      </div>
+                      {referralOpen && (
+                        <div className="space-y-2 pt-1">
+                          <div>
+                            <label htmlFor="checkin-referral-source" className={LABEL}>
+                              Referred by *
+                            </label>
+                            <select
+                              id="checkin-referral-source"
+                              value={referralSource}
+                              onChange={(e) => {
+                                const next = e.target.value as ReferralSource
+                                setReferralSource(next)
+                                if (next === 'SELF') setReferrerName('')
+                              }}
+                              className={INPUT}
+                            >
+                              {REFERRAL_OPTIONS.map((o) => (
+                                <option key={o.value} value={o.value}>
+                                  {o.label}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                          {referralSource !== 'SELF' && (
+                            <div>
+                              <label htmlFor="checkin-referrer-name" className={LABEL}>
+                                {selectedReferralMeta.nameLabel || 'Referrer name'}
+                                {REFERRAL_NEEDS_NAME.includes(referralSource) ? ' *' : ''}
+                              </label>
+                              <input
+                                id="checkin-referrer-name"
+                                value={referrerName}
+                                onChange={(e) => setReferrerName(e.target.value)}
+                                maxLength={120}
+                                placeholder={
+                                  REFERRAL_NEEDS_NAME.includes(referralSource)
+                                    ? 'Enter name (min 2 characters)'
+                                    : 'Optional details'
+                                }
+                                className={INPUT}
+                              />
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
 
                 {/* Compact inline Next-Token preview */}
@@ -749,7 +930,7 @@ export function TokenGenerationPage() {
                   )}
                   <button
                     type="submit"
-                    disabled={busy || missing.length > 0 || !canCheckIn}
+                    disabled={busy || missing.length > 0 || !canSubmit}
                     className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-[#8E1C3D] px-5 text-sm font-bold text-white shadow-xs hover:bg-[#5D0B26] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#8E1C3D] disabled:opacity-50"
                   >
                     <IconTicket aria-hidden="true" className="h-4 w-4" />
@@ -757,13 +938,15 @@ export function TokenGenerationPage() {
                   </button>
                 </div>
               </form>
-            ) : (
+            ) : liveIssued ? (
               <StepTwoIssued
-                issued={issued}
+                issued={liveIssued}
+                canCreateArrival={canCreateArrival}
+                isCancelled={issuedCancelled}
                 onPrint={() => setPrintOpen(true)}
                 onNext={resetAll}
               />
-            )}
+            ) : null}
           </section>
 
           {/* RIGHT: today's appointments */}
@@ -772,7 +955,7 @@ export function TokenGenerationPage() {
               activeBookingId={booking?.id ?? null}
               canCheckIn={canCheckIn}
               canManage={canManageBookings}
-              canRegister={canCheckIn}
+              canRegister={canCreateArrival}
               onCheckIn={takeBooking}
               onRegisterArrival={(arrival) => {
                 navigate(`/reception/patients/new?arrival_id=${arrival.id}&doctor_id=${arrival.doctor_id}`)
@@ -789,9 +972,10 @@ export function TokenGenerationPage() {
         </div>
       </div>
 
-      {issued && (
+      {liveIssued && (
         <TokenSlipModal
-          issued={issued}
+          issued={liveIssued}
+          isCancelled={issuedCancelled}
           open={printOpen}
           onClose={() => setPrintOpen(false)}
         />
@@ -800,11 +984,15 @@ export function TokenGenerationPage() {
   )
 }
 
-/** A booking that can still be checked in today (a late arrival marked not arrived too). */
-function isBookable(a: Appointment): boolean {
+/** A booking that can still be checked in today (including late NO_SHOW, TO_ARRIVE, and REGISTERED without consultation). */
+function isBookable(a: Appointment, today: string): boolean {
   return (
-    a.appointment_date === istToday() &&
-    (a.status === 'BOOKED' || a.status === 'NO_SHOW')
+    a.appointment_date === today &&
+    a.consultation_status == null &&
+    (a.status === 'BOOKED' ||
+      a.status === 'NO_SHOW' ||
+      a.status === 'TO_ARRIVE' ||
+      a.status === 'REGISTERED')
   )
 }
 
@@ -1034,10 +1222,14 @@ function SelectedPatientCard({ patient, onChange }: { patient: PatientOut; onCha
 
 function StepTwoIssued({
   issued,
+  canCreateArrival,
+  isCancelled,
   onPrint,
   onNext,
 }: {
   issued: Issued
+  canCreateArrival: boolean
+  isCancelled: boolean
   onPrint: () => void
   onNext: () => void
 }) {
@@ -1052,17 +1244,29 @@ function StepTwoIssued({
   return (
     <div role="status" className="space-y-3.5">
       <div className="flex items-center justify-between gap-2">
-        {isArrival ? (
-          <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-300 bg-amber-50 px-3 py-1 text-xs font-bold text-amber-900">
-            To arrive · Pending full registration
-          </span>
+        {isCancelled ? (
+          <AppointmentStatusBadge status="CANCELLED" />
+        ) : isArrival ? (
+          <AppointmentStatusBadge
+            status="TO_ARRIVE"
+            label="To arrive · Pending full registration"
+          />
         ) : (
-          <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-300 bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-900">
-            <IconCheck aria-hidden="true" className="h-3.5 w-3.5 text-emerald-700" />
-            Checked In · Waiting for doctor
-          </span>
+          <AppointmentStatusBadge
+            status="CHECKED_IN"
+            label="Checked In · Waiting for doctor"
+          />
         )}
       </div>
+
+      {isCancelled && (
+        <div
+          role="alert"
+          className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs font-semibold text-red-800"
+        >
+          This token has been cancelled and cannot be printed.
+        </div>
+      )}
 
       <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-4 text-center">
         <span className="block text-xs font-semibold uppercase tracking-wide text-slate-600">
@@ -1119,17 +1323,20 @@ function StepTwoIssued({
       <div className="space-y-2 border-t border-slate-100 pt-3">
         {isArrival ? (
           <>
-            <Link
-              to={`/reception/patients/new?arrival_id=${issued.arrival.id}&doctor_id=${issued.arrival.doctor_id}`}
-              className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-[#8E1C3D] px-4 text-sm font-bold text-white shadow-xs hover:bg-[#5D0B26] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#8E1C3D]"
-            >
-              Complete Registration &amp; Check In →
-            </Link>
+            {canCreateArrival && !isCancelled && (
+              <Link
+                to={`/reception/patients/new?arrival_id=${issued.arrival.id}&doctor_id=${issued.arrival.doctor_id}`}
+                className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-[#8E1C3D] px-4 text-sm font-bold text-white shadow-xs hover:bg-[#5D0B26] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#8E1C3D]"
+              >
+                Complete Registration &amp; Check In →
+              </Link>
+            )}
             <div className="grid grid-cols-2 gap-2">
               <button
                 type="button"
+                disabled={isCancelled}
                 onClick={onPrint}
-                className="inline-flex min-h-10 items-center justify-center gap-1.5 rounded-xl border border-slate-300 bg-white px-3 text-xs font-bold text-slate-800 hover:bg-slate-50"
+                className="inline-flex min-h-10 items-center justify-center gap-1.5 rounded-xl border border-slate-300 bg-white px-3 text-xs font-bold text-slate-800 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 <IconPrinter aria-hidden="true" className="h-4 w-4" />
                 Print Token
@@ -1155,8 +1362,9 @@ function StepTwoIssued({
             <div className="grid grid-cols-2 gap-2">
               <button
                 type="button"
+                disabled={isCancelled}
                 onClick={onPrint}
-                className="inline-flex min-h-10 items-center justify-center gap-1.5 rounded-xl border border-slate-300 bg-white px-3 text-xs font-bold text-slate-800 hover:bg-slate-50"
+                className="inline-flex min-h-10 items-center justify-center gap-1.5 rounded-xl border border-slate-300 bg-white px-3 text-xs font-bold text-slate-800 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 <IconPrinter aria-hidden="true" className="h-4 w-4" />
                 Print Token
@@ -1177,10 +1385,12 @@ function StepTwoIssued({
 
 function TokenSlipModal({
   issued,
+  isCancelled,
   open,
   onClose,
 }: {
   issued: Issued
+  isCancelled: boolean
   open: boolean
   onClose: () => void
 }) {
@@ -1205,6 +1415,14 @@ function TokenSlipModal({
       className="max-w-sm"
     >
       <div className="space-y-4">
+        {isCancelled && (
+          <div
+            role="alert"
+            className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs font-semibold text-red-800 print:hidden"
+          >
+            This token has been cancelled and cannot be printed.
+          </div>
+        )}
         <div className="space-y-3 rounded-xl border border-slate-200 bg-white p-4 text-slate-900 print:mx-auto print:max-w-sm print:border print:border-slate-300 print:p-6">
           <div className="border-b border-dashed border-slate-300 pb-3 text-center">
             <p className="text-sm font-bold uppercase tracking-wide text-[#5D0B26]">
@@ -1223,9 +1441,21 @@ function TokenSlipModal({
             >
               {tokenText}
             </div>
-            <p className="mt-1 text-xs font-semibold text-slate-700">
-              {isArrival ? 'To arrive · Pending full registration' : 'Checked In · Waiting for doctor'}
-            </p>
+            <div className="mt-1 flex justify-center">
+              {isCancelled ? (
+                <AppointmentStatusBadge status="CANCELLED" />
+              ) : isArrival ? (
+                <AppointmentStatusBadge
+                  status="TO_ARRIVE"
+                  label="To arrive · Pending full registration"
+                />
+              ) : (
+                <AppointmentStatusBadge
+                  status="CHECKED_IN"
+                  label="Checked In · Waiting for doctor"
+                />
+              )}
+            </div>
           </div>
 
           <dl className="space-y-1.5 border-t border-dashed border-slate-300 pt-3 text-xs">
@@ -1286,8 +1516,9 @@ function TokenSlipModal({
           <button
             type="button"
             data-autofocus
+            disabled={isCancelled}
             onClick={() => window.print()}
-            className="inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-xl bg-[#8E1C3D] px-4 text-sm font-bold text-white shadow-xs hover:bg-[#5D0B26]"
+            className="inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-xl bg-[#8E1C3D] px-4 text-sm font-bold text-white shadow-xs hover:bg-[#5D0B26] disabled:cursor-not-allowed disabled:opacity-50"
           >
             <IconPrinter aria-hidden="true" className="h-4 w-4" />
             Print Slip
