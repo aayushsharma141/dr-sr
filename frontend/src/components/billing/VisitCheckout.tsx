@@ -1,7 +1,10 @@
 import { useState, type FormEvent } from 'react'
+import { Link } from 'react-router'
 import type { PreviousDueOut } from '../../api/bill'
 import {
+  useAppointments,
   useCloseVisit,
+  usePendingDues,
   useRecordPayment,
   useVisit,
   useVisitDues,
@@ -13,9 +16,11 @@ import type {
   VisitConsultation,
   VisitDetail,
   VisitDueOut,
+  VisitSummary,
 } from '../../api/types'
-import { formatIst, formatPaise, formatToken, paiseToRupees, rupeesToPaise } from '../../format'
-import { IconCheck, IconPrinter, IconRupee, IconUser } from '../icons'
+import { formatIst, formatPaise, formatToken, istToday, paiseToRupees, rupeesToPaise } from '../../format'
+import { IconArrowLeft, IconCheck, IconPrinter, IconRupee, IconUser } from '../icons'
+import { InlineAlert } from '../InlineAlert'
 import { PAYMENT_RECORDED_EVENT } from '../ReceiptHost'
 import { BillPanel } from './BillPanel'
 
@@ -43,7 +48,7 @@ function MethodPicker({
 }) {
   return (
     <div>
-      <span className="mb-1.5 block text-xs font-bold uppercase tracking-wider text-slate-700">
+      <span className="mb-1.5 block text-xs font-bold text-slate-700">
         Payment Mode *
       </span>
       <div className="grid grid-cols-3 gap-2">
@@ -148,7 +153,7 @@ function PaymentForm({
           )}
 
           <div>
-            <label htmlFor="visit-payment-amount" className="mb-1 block text-xs font-bold uppercase tracking-wider text-slate-700">
+            <label htmlFor="visit-payment-amount" className="mb-1 block text-xs font-bold text-slate-700">
               Amount (₹) *
             </label>
             <input
@@ -169,7 +174,7 @@ function PaymentForm({
           <MethodPicker value={method} onChange={setMethod} />
 
           <div>
-            <label htmlFor="visit-payment-remarks" className="mb-1 block text-xs font-bold uppercase tracking-wider text-slate-700">
+            <label htmlFor="visit-payment-remarks" className="mb-1 block text-xs font-bold text-slate-700">
               Remarks (optional)
             </label>
             <input
@@ -235,7 +240,7 @@ function CloseForm({
 
   return (
     <section className="space-y-3 rounded-2xl border border-slate-200 bg-white p-5 shadow-xs">
-      <h3 className="text-sm font-bold text-slate-900">Patient Out</h3>
+      <h3 className="text-sm font-bold text-slate-900">Close Visit / Patient Out</h3>
       {error && (
         <div role="alert" className="rounded-xl border border-red-300 bg-red-50 p-3 text-xs font-semibold text-red-900">
           {error}
@@ -245,7 +250,7 @@ function CloseForm({
         {owes && (
           <div>
             <div className="mb-1 flex items-center justify-between">
-              <label htmlFor="visit-close-reason" className="block text-xs font-bold uppercase tracking-wider text-amber-900">
+              <label htmlFor="visit-close-reason" className="block text-xs font-bold text-amber-900">
                 Reason for closing with {formatPaise(visit.outstanding_paise)} unpaid *
               </label>
               <span className="text-xs text-slate-500">
@@ -394,6 +399,72 @@ function VisitDetailPanel({
   )
 }
 
+function VisitQueueCard({
+  visit,
+  selected,
+  onSelect,
+}: {
+  visit: VisitSummary
+  selected: boolean
+  onSelect: () => void
+}) {
+  const tokens =
+    visit.token_numbers && visit.token_numbers.length > 0
+      ? visit.token_numbers.map((t) => formatToken(t)).join(', ')
+      : formatToken(null)
+
+  return (
+    <button
+      type="button"
+      aria-pressed={selected}
+      onClick={onSelect}
+      className={`w-full cursor-pointer rounded-xl border p-3 text-left text-xs transition-colors ${
+        selected
+          ? 'border-emerald-700 bg-emerald-50'
+          : 'border-slate-200 bg-white hover:bg-slate-50'
+      }`}
+    >
+      <div className="font-bold text-slate-900">{visit.patient_name}</div>
+      <div className="font-mono text-slate-600">
+        {visit.patient_urn} &bull; Token {tokens}
+      </div>
+      <div className="text-slate-600">{visit.doctors.join(', ')}</div>
+      {visit.last_completed_at && (
+        <div className="text-xs text-slate-500">
+          Completed {formatIst(visit.last_completed_at)}
+        </div>
+      )}
+      <div
+        className={`mt-1 font-mono font-bold ${
+          visit.outstanding_paise > 0 ? 'text-red-700' : 'text-emerald-800'
+        }`}
+      >
+        {visit.outstanding_paise > 0 ? `${formatPaise(visit.outstanding_paise)} due` : 'Paid in full'}
+      </div>
+    </button>
+  )
+}
+
+function DirectPaymentButton({
+  onClick,
+  fullWidth = false,
+}: {
+  onClick: () => void
+  fullWidth?: boolean
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`inline-flex min-h-9 cursor-pointer items-center justify-center rounded-lg border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-50 ${
+        fullWidth ? 'w-full' : ''
+      }`}
+    >
+      Direct payment (no visit)
+    </button>
+  )
+}
+
 export interface VisitCheckoutProps {
   /** payment:create (Reception). */
   canCollect: boolean
@@ -402,86 +473,278 @@ export interface VisitCheckoutProps {
   /** Visit opened from a dashboard link, if any. */
   initialVisitId: number | null
   onReprint: (paymentId: number) => void
+  /** Opens standalone non-visit billing mode when reception has payment:create. */
+  onDirectPayment?: () => void
+  /** True while an ?appointment_id= deep link is still resolving its visit_id. */
+  resolvingInitialVisit?: boolean
 }
 
-/** Checkout at the desk: visits waiting for payment, their charges, payments and Patient Out. */
-export function VisitCheckout({ canCollect, canClose, initialVisitId, onReprint }: VisitCheckoutProps) {
-  // undefined = nothing picked yet, so the dashboard's visit is shown; null = cleared after a close.
+/** Checkout at the desk: adaptive 3-state queue, charges, payments and Patient Out. */
+export function VisitCheckout({
+  canCollect,
+  canClose,
+  initialVisitId,
+  onReprint,
+  onDirectPayment,
+  resolvingInitialVisit = false,
+}: VisitCheckoutProps) {
+  // undefined = nothing picked yet, so the dashboard's visit is shown; null = cleared after a close or back.
   const [picked, setPicked] = useState<number | null | undefined>(undefined)
   const [notice, setNotice] = useState<string | null>(null)
-  const selectedId = picked === undefined ? initialVisitId : picked
+  const rawSelectedId = picked === undefined ? initialVisitId : picked
+  const validSelectedId =
+    typeof rawSelectedId === 'number' && Number.isFinite(rawSelectedId) && rawSelectedId > 0
+      ? rawSelectedId
+      : null
 
-  const { data: ready, isPending: readyPending } = useVisits({ readyForCheckout: true })
-  const { data: visit, isPending: visitPending } = useVisit(selectedId)
+  const {
+    data: ready,
+    isPending: readyPending,
+    isError: readyError,
+    error: readyErr,
+  } = useVisits({ readyForCheckout: true })
+  const { data: visit, isPending: visitPending } = useVisit(validSelectedId)
 
+  const readyVisits = ready?.visits ?? []
+  const isEmptyState =
+    !resolvingInitialVisit &&
+    !readyPending &&
+    !readyError &&
+    readyVisits.length === 0 &&
+    validSelectedId == null
+
+  const today = istToday()
+  const {
+    data: todayApptsData,
+    isPending: apptsPending,
+    isError: apptsError,
+  } = useAppointments(
+    { appointment_date: today },
+    { enabled: isEmptyState, refetchInterval: false },
+  )
+  const completedTodayCount =
+    apptsPending || apptsError || !todayApptsData
+      ? '—'
+      : todayApptsData.appointments.filter(
+          (a) =>
+            a.status !== 'CANCELLED' &&
+            a.consultation_status !== 'CANCELLED' &&
+            (a.status === 'DONE' || a.status === 'COMPLETED' || a.consultation_status === 'COMPLETED'),
+        ).length
+
+  const {
+    data: pendingDues,
+    isPending: pendingDuesPending,
+    isError: pendingDuesError,
+  } = usePendingDues()
+  const {
+    data: visitDues,
+    isPending: visitDuesPending,
+    isError: visitDuesError,
+  } = useVisitDues()
+  const duesPending = pendingDuesPending || visitDuesPending
+  const duesError = pendingDuesError || visitDuesError
+  const pendingDuesCount = (pendingDues?.length ?? 0) + (visitDues?.length ?? 0)
+  const pendingDuesTotalPaise = Math.max(
+    0,
+    (pendingDues ?? []).reduce((acc, d) => acc + d.balance_paise, 0) +
+      (visitDues ?? []).reduce((acc, d) => acc + d.balance_paise, 0),
+  )
+
+  const showDirectPayment = canCollect && Boolean(onDirectPayment)
+  const noticeBanner = notice ? (
+    <div
+      role="status"
+      className="rounded-xl border border-emerald-300 bg-emerald-50 p-3 text-xs font-semibold text-emerald-900"
+    >
+      {notice}
+    </div>
+  ) : null
+
+  // Loading state: compact single-column card while resolving deep link or initial queue
+  if ((resolvingInitialVisit || readyPending) && validSelectedId == null) {
+    return (
+      <section className="max-w-2xl space-y-3 rounded-2xl border border-slate-200 bg-white p-6 shadow-xs">
+        {noticeBanner}
+        <p className="py-4 text-center text-xs text-slate-600">Loading visits...</p>
+      </section>
+    )
+  }
+
+  // Queue fetch error state: never misreport a network/server error as an empty queue
+  if (readyError && validSelectedId == null) {
+    return (
+      <section className="max-w-2xl space-y-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-xs">
+        {noticeBanner}
+        <InlineAlert tone="error">
+          {errorText(readyErr, 'Could not load visits awaiting checkout. Try refreshing.')}
+        </InlineAlert>
+        {showDirectPayment && onDirectPayment && (
+          <div>
+            <DirectPaymentButton onClick={onDirectPayment} />
+          </div>
+        )}
+      </section>
+    )
+  }
+
+  // State 1 — Empty: compact summary card with daily completed count, pending dues, and quick actions
+  if (isEmptyState) {
+    return (
+      <section
+        data-testid="checkout-empty-state"
+        className="max-w-2xl space-y-5 rounded-2xl border border-slate-200 bg-white p-6 shadow-xs"
+      >
+        {noticeBanner}
+        <div>
+          <h2 className="text-base font-bold text-slate-900">No visits awaiting checkout</h2>
+          <p className="mt-1 text-xs text-slate-600">
+            Patients appear here when their doctor completes a consultation.
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-4">
+            <div className="text-xs font-semibold text-slate-600">Completed consultations today</div>
+            <div className="mt-1 font-mono text-xl font-black text-slate-900">
+              {completedTodayCount}
+            </div>
+          </div>
+
+          <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-4">
+            <div className="text-xs font-semibold text-slate-600">Pending dues</div>
+            <div className="mt-1 font-mono text-xl font-black text-slate-900">
+              {duesPending || duesError ? '—' : pendingDuesCount}
+            </div>
+            {!duesPending && !duesError && (
+              <div
+                className={`mt-0.5 font-mono text-xs font-semibold ${
+                  pendingDuesTotalPaise > 0 ? 'text-amber-800' : 'text-slate-600'
+                }`}
+              >
+                {formatPaise(pendingDuesTotalPaise)} outstanding
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-3 pt-1">
+          <Link
+            to="/reception/billing?tab=dues"
+            className="inline-flex min-h-9 items-center justify-center rounded-lg bg-[#124832] px-4 text-xs font-bold text-white shadow-xs transition-colors hover:bg-[#0D3822]"
+          >
+            View Pending Dues →
+          </Link>
+          {showDirectPayment && onDirectPayment && (
+            <DirectPaymentButton onClick={onDirectPayment} />
+          )}
+        </div>
+      </section>
+    )
+  }
+
+  // State 2 — Visits Ready, None Selected: focused single-column queue card
+  if (readyVisits.length > 0 && validSelectedId == null) {
+    return (
+      <section
+        data-testid="checkout-queue-unselected"
+        className="max-w-3xl space-y-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-xs"
+      >
+        {noticeBanner}
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h2 className="text-sm font-bold text-slate-900">
+              Ready for checkout ({readyVisits.length})
+            </h2>
+            <p className="mt-0.5 text-xs text-slate-600">
+              Select a patient to review charges, collect payment, and close the visit.
+            </p>
+          </div>
+          {showDirectPayment && onDirectPayment && (
+            <DirectPaymentButton onClick={onDirectPayment} />
+          )}
+        </div>
+
+        <ul className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
+          {readyVisits.map((v) => (
+            <li key={v.id}>
+              <VisitQueueCard
+                visit={v}
+                selected={false}
+                onSelect={() => {
+                  setNotice(null)
+                  setPicked(v.id)
+                }}
+              />
+            </li>
+          ))}
+        </ul>
+      </section>
+    )
+  }
+
+  // State 3 — Visit Selected: expanded 2-column checkout workspace
   return (
-    <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-12">
+    <div
+      data-testid="checkout-split-workspace"
+      className="grid grid-cols-1 items-start gap-5 lg:grid-cols-12"
+    >
       <section className="space-y-3 rounded-2xl border border-slate-200 bg-white p-5 shadow-xs lg:col-span-4">
         <div>
           <h2 className="text-sm font-bold text-slate-900">Ready for checkout</h2>
-          <p className="text-xs text-slate-500">The doctor has completed the consultation. Collect, then close the visit.</p>
+          <p className="text-xs text-slate-500">
+            The doctor has completed the consultation. Collect, then close the visit.
+          </p>
         </div>
         {readyPending ? (
           <p className="p-4 text-center text-xs text-slate-500">Loading visits...</p>
-        ) : !ready || ready.visits.length === 0 ? (
+        ) : readyError ? (
+          <InlineAlert tone="error" className="text-xs">
+            {errorText(readyErr, 'Could not load visits awaiting checkout.')}
+          </InlineAlert>
+        ) : readyVisits.length === 0 ? (
           <p className="rounded-xl border border-dashed border-slate-200 p-4 text-center text-xs text-slate-600">
-            Nothing to check out. Patients appear here when their doctor completes the consultation.
+            No other visits awaiting checkout.
           </p>
         ) : (
           <ul className="space-y-2">
-            {ready.visits.map((v) => {
-              const tokens =
-                v.token_numbers && v.token_numbers.length > 0
-                  ? v.token_numbers.map((t) => formatToken(t)).join(', ')
-                  : formatToken(null)
-
-              return (
-                <li key={v.id}>
-                  <button
-                    type="button"
-                    aria-pressed={v.id === selectedId}
-                    onClick={() => {
-                      setNotice(null)
-                      setPicked(v.id)
-                    }}
-                    className={`w-full cursor-pointer rounded-xl border p-3 text-left text-xs transition-colors ${
-                      v.id === selectedId
-                        ? 'border-emerald-700 bg-emerald-50'
-                        : 'border-slate-200 bg-white hover:bg-slate-50'
-                    }`}
-                  >
-                    <div className="font-bold text-slate-900">{v.patient_name}</div>
-                    <div className="font-mono text-slate-600">
-                      {v.patient_urn} &bull; Token {tokens}
-                    </div>
-                    <div className="text-slate-600">{v.doctors.join(', ')}</div>
-                    {v.last_completed_at && (
-                      <div className="text-xs text-slate-500">
-                        Completed {formatIst(v.last_completed_at)}
-                      </div>
-                    )}
-                    <div className="mt-1 font-mono font-bold text-red-700">
-                      {v.outstanding_paise > 0 ? `${formatPaise(v.outstanding_paise)} due` : 'Paid in full'}
-                    </div>
-                  </button>
-                </li>
-              )
-            })}
+            {readyVisits.map((v) => (
+              <li key={v.id}>
+                <VisitQueueCard
+                  visit={v}
+                  selected={v.id === validSelectedId}
+                  onSelect={() => {
+                    setNotice(null)
+                    setPicked(v.id)
+                  }}
+                />
+              </li>
+            ))}
           </ul>
+        )}
+        {showDirectPayment && onDirectPayment && (
+          <div className="border-t border-slate-100 pt-3">
+            <DirectPaymentButton onClick={onDirectPayment} fullWidth />
+          </div>
         )}
       </section>
 
       <section className="space-y-5 rounded-2xl border border-slate-200 bg-white p-5 shadow-xs lg:col-span-8">
-        {notice && (
-          <div role="status" className="rounded-xl border border-emerald-300 bg-emerald-50 p-3 text-xs font-semibold text-emerald-900">
-            {notice}
-          </div>
-        )}
-        {selectedId == null ? (
-          <p className="p-8 text-center text-xs text-slate-500">
-            Select a visit to see its charges, take payment, or close it.
-          </p>
-        ) : visitPending ? (
+        {noticeBanner}
+        <div>
+          <button
+            type="button"
+            onClick={() => {
+              setNotice(null)
+              setPicked(null)
+            }}
+            className="inline-flex min-h-8 cursor-pointer items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-50"
+          >
+            <IconArrowLeft className="h-3.5 w-3.5 text-slate-600" />
+            Back to queue
+          </button>
+        </div>
+        {visitPending ? (
           <p className="p-8 text-center text-xs text-slate-500">Loading visit...</p>
         ) : !visit ? (
           <p className="p-8 text-center text-xs text-red-700">This visit could not be loaded.</p>
@@ -524,7 +787,7 @@ export function VisitDuesSection({ canCollect }: { canCollect: boolean }) {
           </p>
         </div>
         <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-2">
-          <span className="block text-xs font-bold uppercase tracking-wider text-amber-800">Total outstanding</span>
+          <span className="block text-xs font-bold text-amber-800">Total outstanding</span>
           <span className="font-mono text-base font-black text-amber-950">{formatPaise(total)}</span>
         </div>
       </div>
@@ -553,7 +816,7 @@ export function VisitDuesSection({ canCollect }: { canCollect: boolean }) {
       ) : (
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs">
-            <thead className="border-b border-slate-200 bg-slate-50 font-bold uppercase tracking-wider text-slate-600">
+            <thead className="border-b border-slate-200 bg-slate-50 font-bold text-slate-600">
               <tr>
                 <th className="px-3 py-2">Patient</th>
                 <th className="px-3 py-2">Visit</th>
@@ -659,7 +922,7 @@ function DueCollectForm({
       )}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div>
-          <label htmlFor="due-collect-amount" className="mb-1 block text-xs font-bold uppercase tracking-wider text-slate-700">
+          <label htmlFor="due-collect-amount" className="mb-1 block text-xs font-bold text-slate-700">
             Amount (₹) *
           </label>
           <input
