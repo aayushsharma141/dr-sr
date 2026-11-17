@@ -211,6 +211,14 @@ def book_appointment(
     The booking has no token: it is issued at check-in (RF-12, owner decision 7), so queue
     order follows arrival.
     """
+    if principal.role == Role.DOCTOR and (
+        principal.doctor_id is None or payload.doctor_id != principal.doctor_id
+    ):
+        raise ApiError(
+            status_code=403,
+            code="scope_forbidden",
+            message="Doctors can only book appointments for themselves.",
+        )
     issue_tok = bool(payload.issue_token)
     appt = booking_service.create_booking(
         session,
@@ -822,11 +830,17 @@ def get_doctor_queue(
         )
         if a.consultation_status == ConsultationStatus.IN_CONSULTATION.value:
             in_consultation.append(item)
-        elif a.consultation_status == ConsultationStatus.WAITING.value:
+        elif (
+            a.consultation_status == ConsultationStatus.WAITING.value
+            or a.status in (AppointmentStatus.ARRIVED.value, AppointmentStatus.CHECKED_IN.value, AppointmentStatus.WAITING.value)
+        ):
             waiting.append(item)
-        elif a.status == AppointmentStatus.BOOKED.value:
+        elif a.status in (AppointmentStatus.BOOKED.value, AppointmentStatus.TO_ARRIVE.value, AppointmentStatus.REGISTERED.value):
             booked.append(item)
-        else:
+        elif (
+            a.status in (AppointmentStatus.DONE.value, AppointmentStatus.COMPLETED.value)
+            or a.consultation_status == ConsultationStatus.COMPLETED.value
+        ):
             completed.append(item)
 
     # Suggested order (OD-22-07): EMERGENCY by classification time, then PRIORITY, then NORMAL,

@@ -108,6 +108,16 @@ def check_duplicate_patient(
         Patient.is_active.is_(True),
     )
     match = session.scalar(stmt)
+    if not match and len(clean_phone) >= 10:
+        match = session.scalar(
+            select(Patient)
+            .where(
+                Patient.mobile.like(f"%{clean_phone[-10:]}"),
+                Patient.is_active.is_(True),
+            )
+            .order_by(Patient.id.asc())
+            .limit(1)
+        )
     if match:
         return DuplicateCheckResponse(
             has_duplicate=True,

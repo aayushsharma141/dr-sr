@@ -189,3 +189,22 @@ def test_duplicate_patient_detection(
     assert res["has_duplicate"] is True
     assert res["matching_patient"]["full_name"] == "Kavita Singh"
     assert res["matching_patient"]["mobile"] == "9934112233"
+
+    # 4. Shortened/variant name with same 10-digit mobile falls back to mobile match
+    check3 = rec_c.get(
+        "/api/patients/check-duplicate",
+        params={"name": "Kavita", "mobile": "+91-9934112233"},
+    )
+    assert check3.status_code == 200
+    res3 = check3.json()
+    assert res3["has_duplicate"] is True
+    assert res3["matching_patient"]["full_name"] == "Kavita Singh"
+    assert res3["matching_patient"]["mobile"] == "9934112233"
+
+    # 5. Short (<10 digit) mobile with a different name does not falsely match
+    check4 = rec_c.get(
+        "/api/patients/check-duplicate",
+        params={"name": "Different Person", "mobile": "12233"},
+    )
+    assert check4.status_code == 200
+    assert check4.json()["has_duplicate"] is False

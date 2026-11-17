@@ -554,6 +554,91 @@ def _cancel_prescription_payload(_target: Any = None) -> dict[str, Any]:
     }
 
 
+def _merge_patients_payload(target: Any = None) -> dict[str, Any]:
+    master_id = getattr(target, "master_id", 1)
+    secondary_id = getattr(target, "secondary_id", 2)
+    return {
+        "master_patient_id": master_id,
+        "secondary_patient_id": secondary_id,
+        "reason": "Administrative duplicate merge matrix test",
+    }
+
+
+def _unmerge_patient_payload(_target: Any = None) -> dict[str, Any]:
+    return {"reason": "Administrative unmerge matrix test"}
+
+
+def _bulk_archive_payload(target: Any = None) -> dict[str, Any]:
+    pid = getattr(target, "id", 1)
+    return {
+        "patient_ids": [pid],
+        "reason": "Administrative bulk archive matrix test",
+    }
+
+
+def _unarchive_patient_payload(_target: Any = None) -> dict[str, Any]:
+    return {"reason": "Administrative unarchive matrix test"}
+
+
+def _heartbeat_payload(_target: Any = None) -> dict[str, Any]:
+    return {
+        "hostname": "reception-pc-1",
+        "terminal_name": "Reception Desk 1",
+        "app_version": "3.0.0",
+    }
+
+
+def _create_opd_arrival_payload(target: Any = None) -> dict[str, Any]:
+    doc_id = getattr(target, "doctor_id", 1)
+    dept_id = getattr(target, "department_id", 1)
+    mob_suffix = f"{uuid.uuid4().int % 100000000:08d}"
+    return {
+        "full_name": f"New OPD Arrival {mob_suffix[:4]}",
+        "age_years": 28,
+        "mobile": f"98{mob_suffix}",
+        "doctor_id": doc_id,
+        "department_id": dept_id,
+        "priority_level": "NORMAL",
+    }
+
+
+def _patch_opd_arrival_priority_payload(target: Any = None) -> dict[str, Any]:
+    ver = getattr(target, "version_id", 1)
+    return {
+        "version_id": ver,
+        "priority_level": "PRIORITY",
+        "reason": "Emergency escalation matrix test",
+    }
+
+
+def _cancel_opd_arrival_payload(target: Any = None) -> dict[str, Any]:
+    ver = getattr(target, "version_id", 1)
+    return {
+        "version_id": ver,
+        "reason": "Patient left desk matrix test",
+    }
+
+
+def _register_opd_arrival_payload(target: Any = None) -> dict[str, Any]:
+    ver = getattr(target, "version_id", 1)
+    name = getattr(target, "full_name", "Registered OPD Patient")
+    age = getattr(target, "age_years", 28)
+    mobile = getattr(target, "mobile", "9876543210")
+    return {
+        "version_id": ver,
+        "patient": {
+            "full_name": name,
+            "guardian_name": "Guardian S/o",
+            "gender": "M",
+            "age_years": age,
+            "mobile": mobile,
+            "address": "Hospital Road, Ara",
+            "district": "Bhojpur",
+            "state": "Bihar",
+        },
+    }
+
+
 MATRIX: list[MatrixRow] = [
     # Admin Panel (Module 02, 06, 09, 10, 12)
     # Departments (All Specialties)
@@ -1168,7 +1253,7 @@ MATRIX: list[MatrixRow] = [
             "admin": 403,
             "reception": 201,
             "doctor_a": 201,
-            "doctor_b": 201,
+            "doctor_b": 403,
         },
     ),
     MatrixRow(
@@ -2428,6 +2513,189 @@ MATRIX: list[MatrixRow] = [
     MatrixRow(
         method="GET",
         path="/api/reports/referrals?date_from=2026-11-01&date_to=2026-11-30",
+        body_factory=None,
+        expected={
+            "anonymous": 401,
+            "admin": 200,
+            "reception": 403,
+            "doctor_a": 403,
+            "doctor_b": 403,
+        },
+    ),
+    # Phase 23: Advanced Patient Operations (Merge & Archive)
+    MatrixRow(
+        method="GET",
+        path="/api/admin/patients/duplicates",
+        body_factory=None,
+        expected={
+            "anonymous": 401,
+            "admin": 200,
+            "reception": 403,
+            "doctor_a": 403,
+            "doctor_b": 403,
+        },
+    ),
+    MatrixRow(
+        method="POST",
+        path="/api/admin/patients/merge",
+        body_factory=_merge_patients_payload,
+        expected={
+            "anonymous": 401,
+            "admin": 200,
+            "reception": 403,
+            "doctor_a": 403,
+            "doctor_b": 403,
+        },
+    ),
+    MatrixRow(
+        method="POST",
+        path="/api/admin/patients/{id}/unmerge",
+        body_factory=_unmerge_patient_payload,
+        expected={
+            "anonymous": 401,
+            "admin": 200,
+            "reception": 403,
+            "doctor_a": 403,
+            "doctor_b": 403,
+        },
+    ),
+    MatrixRow(
+        method="GET",
+        path="/api/admin/patients/archival-candidates",
+        body_factory=None,
+        expected={
+            "anonymous": 401,
+            "admin": 200,
+            "reception": 403,
+            "doctor_a": 403,
+            "doctor_b": 403,
+        },
+    ),
+    MatrixRow(
+        method="POST",
+        path="/api/admin/patients/bulk-archive",
+        body_factory=_bulk_archive_payload,
+        expected={
+            "anonymous": 401,
+            "admin": 200,
+            "reception": 403,
+            "doctor_a": 403,
+            "doctor_b": 403,
+        },
+    ),
+    MatrixRow(
+        method="POST",
+        path="/api/admin/patients/{id}/unarchive",
+        body_factory=_unarchive_patient_payload,
+        expected={
+            "anonymous": 401,
+            "admin": 200,
+            "reception": 403,
+            "doctor_a": 403,
+            "doctor_b": 403,
+        },
+    ),
+    # Phase 22: Pending OPD Arrivals
+    MatrixRow(
+        method="GET",
+        path="/api/opd-arrivals",
+        body_factory=None,
+        expected={
+            "anonymous": 401,
+            "admin": 200,
+            "reception": 200,
+            "doctor_a": 200,
+            "doctor_b": 200,
+        },
+    ),
+    MatrixRow(
+        method="GET",
+        path="/api/opd-arrivals/{arrival_id}",
+        body_factory=None,
+        expected={
+            "anonymous": 401,
+            "admin": 200,
+            "reception": 200,
+            "doctor_a": 200,
+            "doctor_b": 200,
+        },
+    ),
+    MatrixRow(
+        method="PATCH",
+        path="/api/opd-arrivals/{arrival_id}/priority",
+        body_factory=_patch_opd_arrival_priority_payload,
+        expected={
+            "anonymous": 401,
+            "admin": 403,
+            "reception": 200,
+            "doctor_a": 200,
+            "doctor_b": 404,
+        },
+    ),
+    MatrixRow(
+        method="POST",
+        path="/api/opd-arrivals/{arrival_id}/cancel",
+        body_factory=_cancel_opd_arrival_payload,
+        expected={
+            "anonymous": 401,
+            "admin": 403,
+            "reception": 200,
+            "doctor_a": 200,
+            "doctor_b": 404,
+        },
+    ),
+    MatrixRow(
+        method="POST",
+        path="/api/opd-arrivals",
+        body_factory=_create_opd_arrival_payload,
+        expected={
+            "anonymous": 401,
+            "admin": 403,
+            "reception": 201,
+            "doctor_a": 403,
+            "doctor_b": 403,
+        },
+    ),
+    MatrixRow(
+        method="POST",
+        path="/api/opd-arrivals/{arrival_id}/register",
+        body_factory=_register_opd_arrival_payload,
+        expected={
+            "anonymous": 401,
+            "admin": 403,
+            "reception": 201,
+            "doctor_a": 403,
+            "doctor_b": 403,
+        },
+    ),
+    # Phase 23: Workstation Heartbeat & Connectivity Monitoring
+    MatrixRow(
+        method="POST",
+        path="/api/system/heartbeat",
+        body_factory=_heartbeat_payload,
+        expected={
+            "anonymous": 401,
+            "admin": 200,
+            "reception": 200,
+            "doctor_a": 200,
+            "doctor_b": 200,
+        },
+    ),
+    MatrixRow(
+        method="GET",
+        path="/api/system/workstations",
+        body_factory=None,
+        expected={
+            "anonymous": 401,
+            "admin": 200,
+            "reception": 403,
+            "doctor_a": 403,
+            "doctor_b": 403,
+        },
+    ),
+    MatrixRow(
+        method="GET",
+        path="/api/admin/workstations",
         body_factory=None,
         expected={
             "anonymous": 401,

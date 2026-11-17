@@ -10,7 +10,7 @@ from datetime import date, datetime, time, timedelta
 
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel, ConfigDict
-from sqlalchemy import func, select
+from sqlalchemy import case, func, or_, select
 from sqlalchemy.orm import Session
 
 from kalyan_api import clock
@@ -23,11 +23,13 @@ from kalyan_api.models import (
     Appointment,
     AppointmentStatus,
     AuditLog,
+    ConsultationStatus,
     Department,
     Doctor,
     Patient,
     Payment,
     PaymentMethod,
+    PriorityLevel,
     User,
 )
 from kalyan_api.routers.system import measure_volume
@@ -235,14 +237,31 @@ def _ist_day_bounds(day: date) -> tuple[datetime, datetime]:
 
 
 def _appointments_today(session: Session, today: date) -> dict[str, int]:
-    counts: dict[str, int] = {s.value: 0 for s in AppointmentStatus}
+    canonical_statuses = (
+        AppointmentStatus.BOOKED.value,
+        AppointmentStatus.ARRIVED.value,
+        AppointmentStatus.IN_CONSULTATION.value,
+        AppointmentStatus.DONE.value,
+        AppointmentStatus.CANCELLED.value,
+        AppointmentStatus.NO_SHOW.value,
+        AppointmentStatus.RESCHEDULED.value,
+    )
+    counts: dict[str, int] = {s: 0 for s in canonical_statuses}
     rows = session.execute(
         select(Appointment.status, func.count(Appointment.id))
         .where(Appointment.appointment_date == today)
         .group_by(Appointment.status)
     ).all()
     for status_value, cnt in rows:
-        counts[str(status_value)] = int(cnt)
+        val = str(status_value)
+        if val in ("CHECKED_IN", "WAITING"):
+            counts[AppointmentStatus.ARRIVED.value] += int(cnt)
+        elif val == "COMPLETED":
+            counts[AppointmentStatus.DONE.value] += int(cnt)
+        elif val in ("TO_ARRIVE", "REGISTERED"):
+            counts[AppointmentStatus.BOOKED.value] += int(cnt)
+        elif val in counts:
+            counts[val] += int(cnt)
     return counts
 
 
@@ -261,6 +280,19 @@ def _doctors_today(session: Session, today: date) -> list[DoctorTodayOut]:
     for doctor_id, status_value, cnt in rows:
         per_doctor.setdefault(int(doctor_id), {})[str(status_value)] = int(cnt)
 
+    priority_rank = case(
+        (Appointment.priority_level == PriorityLevel.EMERGENCY.value, 0),
+        (Appointment.priority_level == PriorityLevel.PRIORITY.value, 1),
+        else_=2,
+    )
+    emergency_order_at = case(
+        (
+            Appointment.priority_level == PriorityLevel.EMERGENCY.value,
+            func.coalesce(Appointment.priority_updated_at, Appointment.status_updated_at),
+        ),
+        else_=None,
+    )
+
     result: list[DoctorTodayOut] = []
     for doctor_id, name_en, qualification in doctors:
         status_counts = per_doctor.get(int(doctor_id), {})
@@ -269,11 +301,24 @@ def _doctors_today(session: Session, today: date) -> list[DoctorTodayOut]:
             .where(
                 Appointment.doctor_id == doctor_id,
                 Appointment.appointment_date == today,
+                Appointment.token_number.is_not(None),
                 Appointment.status.in_(
-                    [AppointmentStatus.ARRIVED.value, AppointmentStatus.CHECKED_IN.value]
+                    [
+                        AppointmentStatus.ARRIVED.value,
+                        AppointmentStatus.CHECKED_IN.value,
+                        AppointmentStatus.WAITING.value,
+                    ]
+                ),
+                or_(
+                    Appointment.consultation_status == ConsultationStatus.WAITING.value,
+                    Appointment.consultation_status.is_(None),
                 ),
             )
-            .order_by(Appointment.token_number.asc())
+            .order_by(
+                priority_rank.asc(),
+                emergency_order_at.asc().nulls_last(),
+                Appointment.token_number.asc(),
+            )
             .limit(1)
         )
         result.append(
@@ -282,12 +327,17 @@ def _doctors_today(session: Session, today: date) -> list[DoctorTodayOut]:
                 name=name_en,
                 appointments_today=sum(status_counts.values()),
                 waiting=status_counts.get(AppointmentStatus.BOOKED.value, 0)
+                + status_counts.get(AppointmentStatus.TO_ARRIVE.value, 0)
+                + status_counts.get(AppointmentStatus.REGISTERED.value, 0)
                 + status_counts.get(AppointmentStatus.ARRIVED.value, 0)
-                + status_counts.get(AppointmentStatus.CHECKED_IN.value, 0),
+                + status_counts.get(AppointmentStatus.CHECKED_IN.value, 0)
+                + status_counts.get(AppointmentStatus.WAITING.value, 0),
                 arrived_waiting=status_counts.get(AppointmentStatus.ARRIVED.value, 0)
-                + status_counts.get(AppointmentStatus.CHECKED_IN.value, 0),
+                + status_counts.get(AppointmentStatus.CHECKED_IN.value, 0)
+                + status_counts.get(AppointmentStatus.WAITING.value, 0),
                 in_consultation=status_counts.get(AppointmentStatus.IN_CONSULTATION.value, 0),
-                done=status_counts.get(AppointmentStatus.DONE.value, 0),
+                done=status_counts.get(AppointmentStatus.DONE.value, 0)
+                + status_counts.get(AppointmentStatus.COMPLETED.value, 0),
                 department=qualification or "Physiotherapy",
                 next_token=next_tok,
             )
@@ -759,7 +809,11 @@ def _reception_alerts(session: Session, today: date, now_utc: datetime) -> list[
             select(func.count(Appointment.id)).where(
                 Appointment.appointment_date == today,
                 Appointment.status.in_(
-                    [AppointmentStatus.ARRIVED.value, AppointmentStatus.CHECKED_IN.value]
+                    [
+                        AppointmentStatus.ARRIVED.value,
+                        AppointmentStatus.CHECKED_IN.value,
+                        AppointmentStatus.WAITING.value,
+                    ]
                 ),
                 Appointment.status_updated_at <= thirty_mins_ago,
             )
@@ -779,7 +833,13 @@ def _reception_alerts(session: Session, today: date, now_utc: datetime) -> list[
         session.scalar(
             select(func.count(Appointment.id)).where(
                 Appointment.appointment_date == today,
-                Appointment.status == AppointmentStatus.BOOKED.value,
+                Appointment.status.in_(
+                    [
+                        AppointmentStatus.BOOKED.value,
+                        AppointmentStatus.TO_ARRIVE.value,
+                        AppointmentStatus.REGISTERED.value,
+                    ]
+                ),
             )
         )
         or 0
@@ -796,16 +856,20 @@ def _reception_alerts(session: Session, today: date, now_utc: datetime) -> list[
             )
         )
 
-    pending_dues = [
+    pending_package_dues = [
         due for due in billing_service.compute_pending_dues(session) if due.balance_paise > 0
     ]
-    if len(pending_dues) > 0:
+    pending_visit_dues = [
+        due for due in billing_service.compute_visit_dues(session) if due.balance_paise > 0
+    ]
+    pending_dues_count = len(pending_package_dues) + len(pending_visit_dues)
+    if pending_dues_count > 0:
         alerts.append(
             OverviewAlertOut(
                 code="pending_dues",
                 severity="warning",
                 message=(
-                    f"{len(pending_dues)} visit(s) have outstanding balances requiring payment "
+                    f"{pending_dues_count} visit(s) have outstanding balances requiring payment "
                     "follow-up."
                 ),
             )
@@ -841,7 +905,13 @@ def get_reception_overview(
     )
 
     outstanding_dues_paise = sum(
-        due.balance_paise for due in billing_service.compute_pending_dues(session)
+        due.balance_paise
+        for due in billing_service.compute_pending_dues(session)
+        if due.balance_paise > 0
+    ) + sum(
+        due.balance_paise
+        for due in billing_service.compute_visit_dues(session)
+        if due.balance_paise > 0
     )
 
     return ReceptionOverviewResponse(
