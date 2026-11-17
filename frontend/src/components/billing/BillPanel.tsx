@@ -90,14 +90,24 @@ export function BillPanel({
     (sum, section) =>
       sum +
       section.lines.reduce((lineSum, line) => {
-        if (
-          line.status !== 'ACTIVE' ||
-          !line.counts_toward_total ||
-          !line.history?.some((h) => h.kind === 'DISCOUNT' || h.kind === 'WAIVER')
-        ) {
+        if (line.status !== 'ACTIVE' || !line.counts_toward_total || !line.history?.length) {
           return lineSum
         }
-        return lineSum + Math.max(0, (line.original_amount_paise ?? line.amount_paise) - line.amount_paise)
+        const orderedHistory = [...line.history].sort((a, b) => {
+          const ta = Date.parse(a.created_at)
+          const tb = Date.parse(b.created_at)
+          if (Number.isFinite(ta) && Number.isFinite(tb) && ta !== tb) return ta - tb
+          return a.id - b.id
+        })
+        let lineDiscount = 0
+        for (const h of orderedHistory) {
+          if (h.kind === 'DISCOUNT' || h.kind === 'WAIVER') {
+            lineDiscount += Math.max(0, h.old_amount_paise - h.new_amount_paise)
+          } else if (h.kind === 'CORRECTION' && h.new_amount_paise > h.old_amount_paise) {
+            lineDiscount = Math.max(0, lineDiscount - (h.new_amount_paise - h.old_amount_paise))
+          }
+        }
+        return lineSum + lineDiscount
       }, 0),
     0,
   )

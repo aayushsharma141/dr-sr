@@ -1,10 +1,12 @@
-import React, { useState, useEffect, useMemo } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router'
 import { AppShell } from '../components/AppShell'
+import { InlineAlert } from '../components/InlineAlert'
 import { ReceiptDialog } from '../components/ReceiptDialog'
 import { PaymentModal } from '../components/PaymentModal'
 import { ReceptionDeskTabs } from '../components/billing/ReceptionDeskTabs'
 import { VisitCheckout, VisitDuesSection } from '../components/billing/VisitCheckout'
+import { parsePositiveIntParam, useDebouncedValue } from '../components/reception/AppointmentStatusBadge'
 import {
   useAppointment,
   useDoctors,
@@ -107,7 +109,7 @@ function ReceiptTable({
 
 export function ReceptionBillingPage() {
   const { data: me } = useMe()
-  const [searchParams] = useSearchParams()
+  const [searchParams, setSearchParams] = useSearchParams()
 
   const permissions = me?.permissions ?? []
   // Reception checks visits out and collects fees; Admin only oversees (full ledger, reversals).
@@ -130,22 +132,49 @@ export function ReceptionBillingPage() {
     setReprintId(null)
   }
 
+  const clearCheckoutParams = useCallback(() => {
+    setSearchParams(
+      (prev) => {
+        if (!prev.has('visit_id') && !prev.has('appointment_id') && !prev.has('patient_id')) {
+          return prev
+        }
+        const next = new URLSearchParams(prev)
+        next.delete('visit_id')
+        next.delete('appointment_id')
+        next.delete('patient_id')
+        return next
+      },
+      { replace: true },
+    )
+  }, [setSearchParams])
+
   // --- CHECKOUT: visit (default) or other payment with no visit ---
   const [checkoutMode, setCheckoutMode] = useState<CheckoutMode>('visit')
-  const visitIdParam = searchParams.get('visit_id')
-  const appointmentIdParam = searchParams.get('appointment_id')
-  const patientIdParam = searchParams.get('patient_id')
-  const linkedAppointmentId = appointmentIdParam ? Number(appointmentIdParam) : 0
-  const hasValidAppointmentId = Number.isFinite(linkedAppointmentId) && linkedAppointmentId > 0
-  const { data: linkedAppointment, isPending: linkedAppointmentPending } = useAppointment(
-    hasValidAppointmentId ? linkedAppointmentId : 0,
-  )
-  const initialVisitId = visitIdParam
-    ? Number(visitIdParam)
-    : (linkedAppointment?.visit_id ?? null)
+  const visitIdParam = parsePositiveIntParam(searchParams.get('visit_id'))
+  const linkedAppointmentId = parsePositiveIntParam(searchParams.get('appointment_id'))
+  const patientIdParam = parsePositiveIntParam(searchParams.get('patient_id'))
+  const {
+    data: linkedAppointment,
+    isPending: linkedAppointmentPending,
+    isError: linkedAppointmentError,
+    error: linkedAppointmentErr,
+  } = useAppointment(linkedAppointmentId ?? 0)
+  const initialVisitId = visitIdParam ?? linkedAppointment?.visit_id ?? null
+  const initialVisitError =
+    visitIdParam == null && linkedAppointmentId != null
+      ? linkedAppointmentError
+        ? linkedAppointmentErr instanceof Error
+          ? linkedAppointmentErr.message
+          : 'Could not load the linked appointment for checkout.'
+        : !linkedAppointmentPending && linkedAppointment && !linkedAppointment.visit_id
+          ? 'This appointment does not have an open visit ready for checkout yet.'
+          : null
+      : null
 
   // --- OTHER PAYMENT STATE (no visit: a plan, a fee or a custom charge) ---
   const [searchQuery, setSearchQuery] = useState('')
+  const debouncedSearch = useDebouncedValue(searchQuery, 200)
+  const isSearchDebouncing = searchQuery.trim() !== debouncedSearch.trim()
   const [selectedPatient, setSelectedPatient] = useState<PatientOut | null>(null)
   // 'opd_consultation' charges the chosen doctor's fee, 'fee:<id>' an admin fee schedule entry,
   // 'custom' whatever reception types. No amount is ever assumed (a guessed fee gets charged).
@@ -157,19 +186,31 @@ export function ReceptionBillingPage() {
 
   const [recordedPayment, setRecordedPayment] = useState<PaymentOut | null>(null)
   const [formError, setFormError] = useState<string | null>(null)
+  const submittingDirectPaymentRef = useRef(false)
 
-  // Queries
-  const { data: searchResults, isPending: isSearching } = usePatients(searchQuery, 8, 0)
-  const { data: preloadedPatient } = usePatient(patientIdParam ? Number(patientIdParam) : 0)
-  const { data: doctors } = useDoctors(false)
-  const { data: fees } = useFees(true)
+  // Queries — gated so mount never fires unused searches or dropdown fetches
+  const standalonePatientId =
+    visitIdParam == null && linkedAppointmentId == null ? patientIdParam : null
+  const { data: searchResults, isPending: isSearching } = usePatients(debouncedSearch.trim(), 8, 0, {
+    enabled: checkoutMode === 'other' && debouncedSearch.trim().length >= 2,
+  })
+  const { data: preloadedPatient } = usePatient(standalonePatientId)
+  const { data: doctors } = useDoctors(false, { enabled: checkoutMode === 'other' })
+  const { data: fees } = useFees(true, { enabled: checkoutMode === 'other' })
 
-  // Auto-select patient if provided via URL
+  // Apply standalone ?patient_id= at most once so Change / Checkout Next Patient never snaps back
+  const appliedPatientIdRef = useRef<number | null>(null)
   useEffect(() => {
-    if (preloadedPatient && !selectedPatient) {
+    if (
+      standalonePatientId != null &&
+      preloadedPatient &&
+      preloadedPatient.id === standalonePatientId &&
+      appliedPatientIdRef.current !== standalonePatientId
+    ) {
+      appliedPatientIdRef.current = standalonePatientId
       setSelectedPatient(preloadedPatient)
     }
-  }, [preloadedPatient, selectedPatient])
+  }, [standalonePatientId, preloadedPatient])
 
   // Update amount when service type changes
   const handleServiceChange = (val: ServiceType) => {
@@ -206,6 +247,7 @@ export function ReceptionBillingPage() {
 
   const handleCollectPayment = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (submittingDirectPaymentRef.current || recordPaymentMutation.isPending) return
     setFormError(null)
 
     if (!selectedPatient) {
@@ -223,6 +265,7 @@ export function ReceptionBillingPage() {
       return
     }
 
+    submittingDirectPaymentRef.current = true
     try {
       const res = await recordPaymentMutation.mutateAsync({
         patient_id: selectedPatient.id,
@@ -240,18 +283,22 @@ export function ReceptionBillingPage() {
       } else {
         setFormError('Failed to record payment and issue receipt.')
       }
+    } finally {
+      submittingDirectPaymentRef.current = false
     }
   }
 
   const handleResetCheckout = () => {
     setSelectedPatient(null)
     setSearchQuery('')
+    setSelectedDoctorId('')
     setAmountRupees('')
     setServiceType('opd_consultation')
     setPaymentMethod('CASH')
     setNotes('')
     setRecordedPayment(null)
     setFormError(null)
+    clearCheckoutParams()
   }
 
   // --- TODAY'S RECEIPTS (reception) / RECEIPTS LEDGER (admin only) ---
@@ -259,10 +306,18 @@ export function ReceptionBillingPage() {
   const [ledgerSearch, setLedgerSearch] = useState('')
   const [ledgerStatus, setLedgerStatus] = useState<'all' | 'active' | 'reversed'>('all')
 
-  const { data: todayReceipts, isPending: todayPending } = useReceiptsToday(
-    canCheckout && activeTab === 'ledger',
-  )
-  const { data: ledgerPayments, isLoading: ledgerLoading } = useLedger(
+  const {
+    data: todayReceipts,
+    isPending: todayPending,
+    isError: todayError,
+    error: todayErr,
+  } = useReceiptsToday(canCheckout && activeTab === 'ledger')
+  const {
+    data: ledgerPayments,
+    isLoading: ledgerLoading,
+    isError: ledgerError,
+    error: ledgerErr,
+  } = useLedger(
     { q: ledgerSearch, status: ledgerStatus },
     { enabled: hasFullLedger && activeTab === 'ledger' },
   )
@@ -285,7 +340,12 @@ export function ReceptionBillingPage() {
   )
 
   // --- PENDING DUES STATE (packages) ---
-  const { data: pendingDues, isLoading: duesLoading } = usePendingDues()
+  const {
+    data: pendingDues,
+    isLoading: duesLoading,
+    isError: duesError,
+    error: duesErr,
+  } = usePendingDues({ enabled: activeTab === 'dues' })
   const [duesSearch, setDuesSearch] = useState('')
   const [dueToCollect, setDueToCollect] = useState<PendingDueOut | null>(null)
 
@@ -327,7 +387,11 @@ export function ReceptionBillingPage() {
                 canCollect={canCollect}
                 canClose={canCheckout}
                 initialVisitId={initialVisitId}
-                resolvingInitialVisit={hasValidAppointmentId && linkedAppointmentPending}
+                resolvingInitialVisit={
+                  visitIdParam == null && linkedAppointmentId != null && linkedAppointmentPending
+                }
+                initialVisitError={initialVisitError}
+                onClearInitialVisit={clearCheckoutParams}
                 onReprint={(id) => setReprintId(id)}
                 onDirectPayment={canCollect ? () => setCheckoutMode('other') : undefined}
               />
@@ -355,8 +419,8 @@ export function ReceptionBillingPage() {
                   </button>
                 </div>
 
-                {/* Success Card when payment is recorded */}
-                {recordedPayment && (
+                {/* Success Card replaces the payment form so a stray click/Enter cannot double-charge */}
+                {recordedPayment ? (
                   <div
                     role="status"
                     className="space-y-4 rounded-2xl border border-emerald-300 bg-emerald-50/90 p-6 text-emerald-950 shadow-sm"
@@ -408,19 +472,19 @@ export function ReceptionBillingPage() {
                       </button>
                     </div>
                   </div>
-                )}
+                ) : (
+                  <>
+                    {formError && (
+                      <div
+                        role="alert"
+                        className="rounded-xl border border-red-300 bg-red-50 p-4 text-sm font-semibold text-red-900 shadow-xs"
+                      >
+                        {formError}
+                      </div>
+                    )}
 
-                {formError && (
-                  <div
-                    role="alert"
-                    className="rounded-xl border border-red-300 bg-red-50 p-4 text-sm font-semibold text-red-900 shadow-xs"
-                  >
-                    {formError}
-                  </div>
-                )}
-
-                {/* Main Checkout Form Grid */}
-                <form onSubmit={handleCollectPayment} className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+                    {/* Main Checkout Form Grid */}
+                    <form onSubmit={handleCollectPayment} className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
                   {/* LEFT COLUMN: Patient Selection & Charges (7 cols) */}
                   <div className="space-y-5 lg:col-span-7 xl:col-span-8">
                     {/* Patient Search & Profile Card */}
@@ -457,7 +521,7 @@ export function ReceptionBillingPage() {
                       {/* Autocomplete Results */}
                       {searchQuery.trim().length >= 2 && (
                         <div className="max-h-48 overflow-y-auto rounded-xl border border-slate-200 bg-white shadow-lg divide-y divide-slate-100">
-                          {isSearching ? (
+                          {isSearchDebouncing || isSearching ? (
                             <div className="p-3 text-center text-xs text-slate-500">Searching patients...</div>
                           ) : searchResults && searchResults.length > 0 ? (
                             searchResults.map((patient: PatientOut) => (
@@ -502,7 +566,10 @@ export function ReceptionBillingPage() {
                             </div>
                             <button
                               type="button"
-                              onClick={() => setSelectedPatient(null)}
+                              onClick={() => {
+                                setSelectedPatient(null)
+                                clearCheckoutParams()
+                              }}
                               className="text-xs font-semibold text-slate-500 hover:text-red-700 cursor-pointer"
                             >
                               Change
@@ -678,6 +745,8 @@ export function ReceptionBillingPage() {
                     </section>
                   </div>
                 </form>
+                  </>
+                )}
               </div>
             )}
           </div>
@@ -696,7 +765,9 @@ export function ReceptionBillingPage() {
               <div className="flex flex-wrap items-center gap-3">
                 <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2">
                   <span className="block text-xs font-bold text-emerald-800">Collected today</span>
-                  <span className="font-mono text-base font-black text-emerald-950">{formatPaise(todayCollectedPaise)}</span>
+                  <span className="font-mono text-base font-black text-emerald-950">
+                    {todayError ? '—' : formatPaise(todayCollectedPaise)}
+                  </span>
                 </div>
                 <input
                   type="text"
@@ -711,6 +782,10 @@ export function ReceptionBillingPage() {
 
             {todayPending ? (
               <div className="p-8 text-center text-xs text-slate-500">Loading today&apos;s receipts...</div>
+            ) : todayError ? (
+              <InlineAlert tone="error">
+                {todayErr instanceof Error ? todayErr.message : "Could not load today's receipts."}
+              </InlineAlert>
             ) : filteredToday.length === 0 ? (
               <div className="p-8 text-center text-xs text-slate-500">No receipts issued today match this filter.</div>
             ) : (
@@ -754,6 +829,10 @@ export function ReceptionBillingPage() {
 
             {ledgerLoading ? (
               <div className="p-8 text-center text-xs text-slate-500">Loading ledger receipts...</div>
+            ) : ledgerError ? (
+              <InlineAlert tone="error">
+                {ledgerErr instanceof Error ? ledgerErr.message : 'Could not load receipts ledger.'}
+              </InlineAlert>
             ) : !ledgerPayments || ledgerPayments.length === 0 ? (
               <div className="p-8 text-center text-xs text-slate-500">No payment receipts found matching filter.</div>
             ) : (
@@ -778,13 +857,13 @@ export function ReceptionBillingPage() {
                   </p>
                 </div>
 
-                <div className="flex items-center gap-4">
+                <div className="flex flex-wrap items-center gap-4">
                   <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-2">
                     <span className="text-xs font-bold text-amber-800 block">
                       Total Outstanding
                     </span>
                     <span className="font-mono text-base font-black text-amber-950">
-                      {formatPaise(totalOutstandingPaise)}
+                      {duesError ? '—' : formatPaise(totalOutstandingPaise)}
                     </span>
                   </div>
                   <input
@@ -800,6 +879,10 @@ export function ReceptionBillingPage() {
 
               {duesLoading ? (
                 <div className="p-8 text-center text-xs text-slate-500">Loading pending dues...</div>
+              ) : duesError ? (
+                <InlineAlert tone="error">
+                  {duesErr instanceof Error ? duesErr.message : 'Could not load pending package dues.'}
+                </InlineAlert>
               ) : filteredDues.length === 0 ? (
                 <div className="p-8 text-center text-xs text-slate-500">No active packages with pending dues found.</div>
               ) : (

@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { cleanup, render, screen, waitFor, within } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -845,5 +845,331 @@ describe('ReceptionBillingPage Desk', () => {
     expect(directPayBtn).toBeEnabled()
     await user.click(directPayBtn)
     expect(screen.getByRole('heading', { name: /Direct Payment \(No Visit\)/i })).toBeInTheDocument()
+  })
+
+  it('resolves Waiting Room ?appointment_id=9&patient_id=77 deep link, clears URL on Back to queue, and never pre-selects patient in Direct Payment', async () => {
+    let resolveAppt!: (val: Reply) => void
+    const apptPromise = new Promise<Reply>((res) => {
+      resolveAppt = res
+    })
+
+    const mockFetch = vi.fn().mockImplementation((url: string, init?: RequestInit) => {
+      const method = (init?.method ?? 'GET').toUpperCase()
+      const path = new URL(url, 'http://localhost').pathname
+      if (method === 'GET' && path === '/api/appointments/9') {
+        return apptPromise.then((reply) => ({
+          ok: (reply.status ?? 200) < 400,
+          status: reply.status ?? 200,
+          headers: new Headers({ 'content-type': 'application/json' }),
+          text: () => Promise.resolve(JSON.stringify(reply.body)),
+        }))
+      }
+      const routes: Record<string, Route> = {
+        '/api/auth/me': () => ({ body: mockMe }),
+        '/api/fees': () => ({ body: [] }),
+        '/api/doctors': () => ({ body: mockDoctors }),
+        '/api/patients/77': () => ({ body: { ...mockPatient, id: 77, full_name: 'Deep Link Patient', urn: 'KH-2026-0077' } }),
+        '/api/visits': () => ({ body: { total: 1, visits: [readySummary] } }),
+        '/api/visits/7': () => ({ body: openDetail }),
+        '/api/visits/7/bill': () => ({ body: openBill }),
+        '/api/billing/visit-dues': () => ({ body: [] }),
+        '/api/billing/receipts/today': () => ({ body: [] }),
+        '/api/billing/pending-dues': () => ({ body: [] }),
+      }
+      const key = Object.keys(routes).find((k) => {
+        const [m, p] = k.includes(' ') ? k.split(' ') : ['GET', k]
+        return m === method && p === path
+      })
+      if (!key) return Promise.reject(new Error(`Unhandled ${method} ${path}`))
+      const reply = routes[key](init)
+      return Promise.resolve({
+        ok: (reply.status ?? 200) < 400,
+        status: reply.status ?? 200,
+        headers: new Headers({ 'content-type': 'application/json' }),
+        text: () => Promise.resolve(JSON.stringify(reply.body)),
+      })
+    })
+
+    const user = userEvent.setup()
+    renderPage(mockFetch, queryClient, '/reception/billing?appointment_id=9&patient_id=77')
+
+    // While appointment is pending, shows loading state
+    expect(await screen.findByText(/Loading visits\.\.\./i)).toBeInTheDocument()
+
+    // Resolve linked appointment to visit_id 7
+    resolveAppt({
+      body: {
+        id: 9,
+        visit_id: 7,
+        patient_id: 77,
+        doctor_id: 1,
+        status: 'DONE',
+      },
+    })
+
+    // Transitions directly into split workspace for visit 7
+    const splitWorkspace = await screen.findByTestId('checkout-split-workspace')
+    expect(splitWorkspace).toBeInTheDocument()
+
+    // Back to queue clears URL params and returns to unselected queue
+    await user.click(within(splitWorkspace).getByRole('button', { name: /Back to queue/i }))
+    const unselectedQueue = await screen.findByTestId('checkout-queue-unselected')
+    expect(unselectedQueue).toBeInTheDocument()
+
+    // Switching to Direct Payment must NOT pre-select patient_id=77
+    await user.click(within(unselectedQueue).getByRole('button', { name: /Direct payment \(no visit\)/i }))
+    expect(screen.getByRole('heading', { name: /Direct Payment \(No Visit\)/i })).toBeInTheDocument()
+    expect(screen.queryByText('Deep Link Patient')).not.toBeInTheDocument()
+    expect(screen.getByText(/Search above to select a patient/i)).toBeInTheDocument()
+
+    // Going back to Visit Checkout must NOT reopen visit 7
+    await user.click(screen.getByRole('button', { name: /Back to Visit Checkout/i }))
+    expect(await screen.findByTestId('checkout-queue-unselected')).toBeInTheDocument()
+    expect(screen.queryByTestId('checkout-split-workspace')).not.toBeInTheDocument()
+  })
+
+  it('pre-selects standalone ?patient_id=77 once and does not snap back after Change or Checkout Next Patient', async () => {
+    const patient77: PatientOut = {
+      ...mockPatient,
+      id: 77,
+      urn: 'KH-2026-0077',
+      full_name: 'Meera Devi',
+    }
+    const mockFetch = mockApi({
+      '/api/auth/me': () => ({ body: mockMe }),
+      '/api/fees': () => ({ body: [] }),
+      '/api/doctors': () => ({ body: mockDoctors }),
+      '/api/patients/77': () => ({ body: patient77 }),
+      '/api/visits': () => ({ body: { total: 0, visits: [] } }),
+      '/api/appointments': () => ({ body: { total: 0, appointments: [] } }),
+      '/api/billing/visit-dues': () => ({ body: [] }),
+      '/api/billing/receipts/today': () => ({ body: [] }),
+      '/api/billing/pending-dues': () => ({ body: [] }),
+      'POST /api/payments': () => ({
+        status: 201,
+        body: { ...mockRecordedPayment, patient_id: 77, patient_name: 'Meera Devi', patient_urn: 'KH-2026-0077' },
+      }),
+    })
+
+    const user = userEvent.setup()
+    const { unmount } = renderPage(mockFetch, queryClient, '/reception/billing?patient_id=77')
+
+    const emptyState = await screen.findByTestId('checkout-empty-state')
+    await user.click(within(emptyState).getByRole('button', { name: /Direct payment \(no visit\)/i }))
+
+    // Patient 77 is pre-selected
+    expect(await screen.findByText('Meera Devi')).toBeInTheDocument()
+
+    // Clicking Change clears patient and does NOT snap back
+    await user.click(screen.getByRole('button', { name: /^Change$/i }))
+    await waitFor(() => {
+      expect(screen.queryByText('Meera Devi')).not.toBeInTheDocument()
+    })
+    expect(screen.getByText(/Search above to select a patient/i)).toBeInTheDocument()
+    unmount()
+
+    // Now verify Checkout Next Patient also does not snap back
+    const qc2 = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 }, mutations: { retry: false } } })
+    renderPage(mockFetch, qc2, '/reception/billing?patient_id=77')
+    const empty2 = await screen.findByTestId('checkout-empty-state')
+    await user.click(within(empty2).getByRole('button', { name: /Direct payment \(no visit\)/i }))
+    expect(await screen.findByText('Meera Devi')).toBeInTheDocument()
+
+    await waitFor(() => {
+      expect(screen.getByLabelText(/Consulting Doctor/i).querySelectorAll('option').length).toBeGreaterThan(1)
+    })
+    await user.selectOptions(screen.getByLabelText(/Consulting Doctor/i), String(mockDoctors[0].id))
+    await user.click(screen.getByRole('button', { name: /Collect ₹400.00 & Issue Receipt/i }))
+
+    expect(await screen.findByText(/Payment Recorded & Receipt Issued!/i)).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: /Checkout Next Patient/i }))
+    await waitFor(() => {
+      expect(screen.queryByText('Meera Devi')).not.toBeInTheDocument()
+    })
+    expect(screen.getByText(/Search above to select a patient/i)).toBeInTheDocument()
+  })
+
+  it('hides the Direct Payment form after recording and guards against double-submit while in flight', async () => {
+    let postCount = 0
+    let resolvePayment!: (val: Reply) => void
+    const paymentPromise = new Promise<Reply>((res) => {
+      resolvePayment = res
+    })
+
+    const mockFetch = vi.fn().mockImplementation((url: string, init?: RequestInit) => {
+      const method = (init?.method ?? 'GET').toUpperCase()
+      const path = new URL(url, 'http://localhost').pathname
+      if (method === 'POST' && path === '/api/payments') {
+        postCount++
+        return paymentPromise.then((reply) => ({
+          ok: true,
+          status: reply.status ?? 201,
+          headers: new Headers({ 'content-type': 'application/json' }),
+          text: () => Promise.resolve(JSON.stringify(reply.body)),
+        }))
+      }
+      const routes: Record<string, Route> = {
+        '/api/auth/me': () => ({ body: mockMe }),
+        '/api/fees': () => ({ body: [] }),
+        '/api/doctors': () => ({ body: mockDoctors }),
+        '/api/patients/101': () => ({ body: mockPatient }),
+        '/api/visits': () => ({ body: { total: 0, visits: [] } }),
+        '/api/appointments': () => ({ body: { total: 0, appointments: [] } }),
+        '/api/billing/visit-dues': () => ({ body: [] }),
+        '/api/billing/receipts/today': () => ({ body: [] }),
+        '/api/billing/pending-dues': () => ({ body: [] }),
+      }
+      const key = Object.keys(routes).find((k) => {
+        const [m, p] = k.includes(' ') ? k.split(' ') : ['GET', k]
+        return m === method && p === path
+      })
+      if (!key) return Promise.reject(new Error(`Unhandled ${method} ${path}`))
+      const reply = routes[key](init)
+      return Promise.resolve({
+        ok: (reply.status ?? 200) < 400,
+        status: reply.status ?? 200,
+        headers: new Headers({ 'content-type': 'application/json' }),
+        text: () => Promise.resolve(JSON.stringify(reply.body)),
+      })
+    })
+
+    const user = userEvent.setup()
+    renderPage(mockFetch, queryClient, '/reception/billing?patient_id=101')
+
+    const emptyState = await screen.findByTestId('checkout-empty-state')
+    await user.click(within(emptyState).getByRole('button', { name: /Direct payment \(no visit\)/i }))
+    expect(await screen.findByText('Aarav Kumar')).toBeInTheDocument()
+
+    await waitFor(() => {
+      expect(screen.getByLabelText(/Consulting Doctor/i).querySelectorAll('option').length).toBeGreaterThan(1)
+    })
+    await user.selectOptions(screen.getByLabelText(/Consulting Doctor/i), String(mockDoctors[0].id))
+
+    const collectBtn = screen.getByRole('button', { name: /Collect ₹400.00 & Issue Receipt/i })
+    const form = collectBtn.closest('form')!
+    // Trigger rapid double-submit synchronously before React re-renders
+    fireEvent.submit(form)
+    fireEvent.submit(form)
+
+    await waitFor(() => {
+      expect(postCount).toBe(1)
+    })
+
+    resolvePayment({ status: 201, body: mockRecordedPayment })
+
+    // Success card replaces the payment form so a stray click cannot double-charge
+    expect(await screen.findByText(/Payment Recorded & Receipt Issued!/i)).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Collect ₹400.00 & Issue Receipt/i })).not.toBeInTheDocument()
+    expect(screen.queryByLabelText(/Payable Amount/i)).not.toBeInTheDocument()
+    expect(postCount).toBe(1)
+  })
+
+  it('hides Direct payment (no visit) when reception lacks payment:create (canCollect=false)', async () => {
+    const meNoCollect: Me = {
+      ...mockMe,
+      permissions: ['payment:read', 'patients:read', 'appointment:read', 'visit:read', 'visit:write'],
+    }
+    const mockFetch = mockApi({
+      '/api/auth/me': () => ({ body: meNoCollect }),
+      '/api/visits': () => ({ body: { total: 0, visits: [] } }),
+      '/api/appointments': () => ({ body: { total: 0, appointments: [] } }),
+      '/api/billing/visit-dues': () => ({ body: [] }),
+      '/api/billing/pending-dues': () => ({ body: [] }),
+    })
+
+    renderPage(mockFetch, queryClient)
+
+    const emptyState = await screen.findByTestId('checkout-empty-state')
+    expect(within(emptyState).queryByRole('button', { name: /Direct payment \(no visit\)/i })).not.toBeInTheDocument()
+  })
+
+  it('renders error alerts instead of ₹0.00 on Pending Dues and Today Receipts tabs when API calls fail', async () => {
+    const mockFetch = mockApi({
+      '/api/auth/me': () => ({ body: mockMe }),
+      '/api/visits': () => ({ body: { total: 0, visits: [] } }),
+      '/api/billing/visit-dues': () => ({
+        status: 500,
+        body: { code: 'internal_error', message: 'Visit dues database unavailable' },
+      }),
+      '/api/billing/pending-dues': () => ({
+        status: 500,
+        body: { code: 'internal_error', message: 'Package dues service unavailable' },
+      }),
+      '/api/billing/receipts/today': () => ({
+        status: 500,
+        body: { code: 'internal_error', message: 'Receipts query failed' },
+      }),
+    })
+
+    renderPage(mockFetch, queryClient, '/reception/billing?tab=dues')
+
+    await waitFor(() => {
+      const alerts = screen.getAllByRole('alert')
+      expect(alerts.some((a) => a.textContent?.includes('Visit dues database unavailable'))).toBe(true)
+      expect(alerts.some((a) => a.textContent?.includes('Package dues service unavailable'))).toBe(true)
+    })
+    expect(screen.queryByText('No closed visit has a balance.')).not.toBeInTheDocument()
+    expect(screen.queryByText('No active packages with pending dues found.')).not.toBeInTheDocument()
+    expect(screen.queryByText('₹0.00')).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /^Retry$/i })).toBeInTheDocument()
+
+    // Check Today's Receipts error alert (no ₹0.00)
+    cleanup()
+    const qc2 = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 }, mutations: { retry: false } } })
+    renderPage(mockFetch, qc2, '/reception/billing?tab=ledger')
+
+    const ledgerAlert = await screen.findByRole('alert')
+    expect(ledgerAlert).toHaveTextContent('Receipts query failed')
+    expect(screen.queryByText(/No receipts issued today/i)).not.toBeInTheDocument()
+    expect(screen.queryByText('₹0.00')).not.toBeInTheDocument()
+
+    // Check Admin Ledger error alert
+    cleanup()
+    const adminMockFetch = mockApi({
+      '/api/auth/me': () => ({ body: mockAdmin }),
+      '/api/billing/ledger': () => ({
+        status: 500,
+        body: { code: 'internal_error', message: 'Ledger service unavailable' },
+      }),
+    })
+    const qc3 = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 }, mutations: { retry: false } } })
+    renderPage(adminMockFetch, qc3, '/reception/billing?tab=ledger')
+
+    const adminAlert = await screen.findByRole('alert')
+    expect(adminAlert).toHaveTextContent('Ledger service unavailable')
+    expect(screen.queryByText(/No payment receipts found/i)).not.toBeInTheDocument()
+  })
+
+  it('shows initialVisitError alert when ?appointment_id= has no visit_id', async () => {
+    const mockFetch = mockApi({
+      '/api/auth/me': () => ({ body: mockMe }),
+      '/api/appointments/15': () => ({
+        body: { id: 15, visit_id: null, patient_id: 101, doctor_id: 1, status: 'BOOKED' },
+      }),
+      '/api/visits': () => ({ body: { total: 0, visits: [] } }),
+      '/api/appointments': () => ({ body: { total: 0, appointments: [] } }),
+      '/api/billing/visit-dues': () => ({ body: [] }),
+      '/api/billing/pending-dues': () => ({ body: [] }),
+    })
+
+    renderPage(mockFetch, queryClient, '/reception/billing?appointment_id=15')
+
+    const alert = await screen.findByRole('alert')
+    expect(alert).toHaveTextContent(/does not have an open visit ready for checkout/i)
+  })
+
+  it('hides Daily Collection Report tab in ADMIN oversight view', async () => {
+    const mockFetch = mockApi({
+      '/api/auth/me': () => ({ body: mockAdmin }),
+      '/api/billing/ledger': () => ({ body: [mockRecordedPayment] }),
+      '/api/billing/pending-dues': () => ({ body: [] }),
+      '/api/billing/visit-dues': () => ({ body: [] }),
+    })
+
+    renderPage(mockFetch, queryClient)
+
+    const nav = await screen.findByRole('navigation', { name: /Reception Desk Financial Tabs/i })
+    expect(within(nav).getByRole('link', { name: /Receipts Ledger/i })).toBeInTheDocument()
+    expect(within(nav).queryByRole('link', { name: /Daily Collection Report/i })).not.toBeInTheDocument()
   })
 })

@@ -550,4 +550,280 @@ describe('BillPanel (Task 1 & Task 3)', () => {
     expect(within(strip).queryByText('included')).not.toBeInTheDocument()
     expect(screen.queryByText('Discounts applied (included above)')).not.toBeInTheDocument()
   })
+
+  it('computes ₹100.00 discount after an upward CORRECTION (500 → 600) followed by DISCOUNT (600 → 500)', () => {
+    const bill: VisitBillOut = {
+      ...baseBill,
+      sections: [
+        {
+          category: 'CONSULTATION',
+          subtotal_paise: 50000,
+          lines: [
+            {
+              ...baseBill.sections[0].lines[0],
+              rate_paise: 50000,
+              amount_paise: 50000,
+              original_amount_paise: 50000,
+              history: [
+                {
+                  id: 31,
+                  bill_item_id: 1,
+                  kind: 'CORRECTION',
+                  old_amount_paise: 50000,
+                  new_amount_paise: 60000,
+                  reason: 'Specialist fee rate correction',
+                  actor_user_id: 1,
+                  actor_username: 'admin',
+                  created_at: '2026-11-16T09:10:00Z',
+                },
+                {
+                  id: 32,
+                  bill_item_id: 1,
+                  kind: 'DISCOUNT',
+                  old_amount_paise: 60000,
+                  new_amount_paise: 50000,
+                  reason: 'Senior citizen discount',
+                  actor_user_id: 1,
+                  actor_username: 'admin',
+                  created_at: '2026-11-16T09:20:00Z',
+                },
+              ],
+            },
+          ],
+        },
+        ...baseBill.sections.slice(1),
+      ],
+      bill_total_paise: 60000,
+      paid_paise: 0,
+      due_paise: 60000,
+    }
+
+    renderWithClient(<BillPanel visitId={10} initialBill={bill} />)
+
+    const strip = screen.getByTestId('checkout-summary-strip')
+    expect(within(strip).getByText('Discounts')).toBeInTheDocument()
+    expect(within(strip).getByText('₹100.00')).toBeInTheDocument()
+    expect(within(strip).getByText('included')).toBeInTheDocument()
+    const discountRow = screen.getByText('Discounts applied (included above)')
+    expect(discountRow.parentElement).toHaveTextContent('₹100.00')
+  })
+
+  it('computes ₹50.00 discount after a downward CORRECTION (500 → 400) followed by DISCOUNT (400 → 350)', () => {
+    const bill: VisitBillOut = {
+      ...baseBill,
+      sections: [
+        {
+          category: 'CONSULTATION',
+          subtotal_paise: 35000,
+          lines: [
+            {
+              ...baseBill.sections[0].lines[0],
+              rate_paise: 35000,
+              amount_paise: 35000,
+              original_amount_paise: 50000,
+              history: [
+                {
+                  id: 41,
+                  bill_item_id: 1,
+                  kind: 'CORRECTION',
+                  old_amount_paise: 50000,
+                  new_amount_paise: 40000,
+                  reason: 'Follow-up tariff correction',
+                  actor_user_id: 1,
+                  actor_username: 'admin',
+                  created_at: '2026-11-16T09:10:00Z',
+                },
+                {
+                  id: 42,
+                  bill_item_id: 1,
+                  kind: 'DISCOUNT',
+                  old_amount_paise: 40000,
+                  new_amount_paise: 35000,
+                  reason: 'Staff courtesy discount',
+                  actor_user_id: 1,
+                  actor_username: 'admin',
+                  created_at: '2026-11-16T09:20:00Z',
+                },
+              ],
+            },
+          ],
+        },
+        ...baseBill.sections.slice(1),
+      ],
+      bill_total_paise: 45000,
+      paid_paise: 0,
+      due_paise: 45000,
+    }
+
+    renderWithClient(<BillPanel visitId={10} initialBill={bill} />)
+
+    const strip = screen.getByTestId('checkout-summary-strip')
+    expect(within(strip).getByText('₹50.00')).toBeInTheDocument()
+    expect(within(strip).queryByText('₹150.00')).not.toBeInTheDocument()
+    expect(within(strip).getByText('included')).toBeInTheDocument()
+    const discountRow = screen.getByText('Discounts applied (included above)')
+    expect(discountRow.parentElement).toHaveTextContent('₹50.00')
+  })
+
+  it('clears discount to ₹0.00 when DISCOUNT (500 → 400) is undone by upward CORRECTION (400 → 500)', () => {
+    const bill: VisitBillOut = {
+      ...baseBill,
+      sections: [
+        {
+          category: 'CONSULTATION',
+          subtotal_paise: 50000,
+          lines: [
+            {
+              ...baseBill.sections[0].lines[0],
+              rate_paise: 50000,
+              amount_paise: 50000,
+              original_amount_paise: 50000,
+              history: [
+                {
+                  id: 51,
+                  bill_item_id: 1,
+                  kind: 'DISCOUNT',
+                  old_amount_paise: 50000,
+                  new_amount_paise: 40000,
+                  reason: 'Entered discount on wrong patient',
+                  actor_user_id: 1,
+                  actor_username: 'admin',
+                  created_at: '2026-11-16T09:10:00Z',
+                },
+                {
+                  id: 52,
+                  bill_item_id: 1,
+                  kind: 'CORRECTION',
+                  old_amount_paise: 40000,
+                  new_amount_paise: 50000,
+                  reason: 'Reverted mistaken discount',
+                  actor_user_id: 1,
+                  actor_username: 'admin',
+                  created_at: '2026-11-16T09:15:00Z',
+                },
+              ],
+            },
+          ],
+        },
+        ...baseBill.sections.slice(1),
+      ],
+      bill_total_paise: 60000,
+      paid_paise: 10000,
+      due_paise: 50000,
+    }
+
+    renderWithClient(<BillPanel visitId={10} initialBill={bill} />)
+
+    const strip = screen.getByTestId('checkout-summary-strip')
+    expect(within(strip).getByText('Discounts')).toBeInTheDocument()
+    expect(within(strip).getByText('₹0.00')).toBeInTheDocument()
+    expect(within(strip).queryByText('included')).not.toBeInTheDocument()
+    expect(screen.queryByText('Discounts applied (included above)')).not.toBeInTheDocument()
+  })
+
+  it('excludes counts_toward_total: false lines from Discounts and sums across multiple active counted lines', () => {
+    const bill: VisitBillOut = {
+      ...baseBill,
+      sections: [
+        {
+          category: 'CONSULTATION',
+          subtotal_paise: 40000,
+          lines: [
+            {
+              ...baseBill.sections[0].lines[0],
+              rate_paise: 40000,
+              amount_paise: 40000,
+              original_amount_paise: 50000,
+              history: [
+                {
+                  id: 61,
+                  bill_item_id: 1,
+                  kind: 'DISCOUNT',
+                  old_amount_paise: 50000,
+                  new_amount_paise: 40000,
+                  reason: 'Consultation discount',
+                  actor_user_id: 1,
+                  actor_username: 'admin',
+                  created_at: '2026-11-16T09:10:00Z',
+                },
+              ],
+            },
+          ],
+        },
+        {
+          category: 'PROCEDURE',
+          subtotal_paise: 0,
+          lines: [
+            {
+              id: 3,
+              visit_id: 10,
+              category: 'PROCEDURE',
+              source: 'DOCTOR',
+              description: 'Package-covered session',
+              quantity: 1,
+              rate_paise: 0,
+              amount_paise: 0,
+              original_amount_paise: 20000,
+              status: 'ACTIVE',
+              counts_toward_total: false,
+              created_by_user_id: 5,
+              created_by_username: 'dr_madan',
+              created_at: '2026-11-16T09:20:00Z',
+              history: [
+                {
+                  id: 62,
+                  bill_item_id: 3,
+                  kind: 'WAIVER',
+                  old_amount_paise: 20000,
+                  new_amount_paise: 0,
+                  reason: 'Excluded from total',
+                  actor_user_id: 1,
+                  actor_username: 'admin',
+                  created_at: '2026-11-16T09:25:00Z',
+                },
+              ],
+            },
+          ],
+        },
+        baseBill.sections[2],
+        {
+          category: 'MEDICINE',
+          subtotal_paise: 5000,
+          lines: [
+            {
+              ...baseBill.sections[3].lines[0],
+              amount_paise: 5000,
+              original_amount_paise: 10000,
+              history: [
+                {
+                  id: 63,
+                  bill_item_id: 2,
+                  kind: 'DISCOUNT',
+                  old_amount_paise: 10000,
+                  new_amount_paise: 5000,
+                  reason: 'Medicine discount',
+                  actor_user_id: 1,
+                  actor_username: 'admin',
+                  created_at: '2026-11-16T09:35:00Z',
+                },
+              ],
+            },
+          ],
+        },
+        baseBill.sections[4],
+      ],
+      bill_total_paise: 45000,
+      paid_paise: 0,
+      due_paise: 45000,
+    }
+
+    renderWithClient(<BillPanel visitId={10} initialBill={bill} />)
+
+    const strip = screen.getByTestId('checkout-summary-strip')
+    // 100.00 (consultation) + 50.00 (medicine) = 150.00; 200.00 waiver on counts_toward_total: false excluded
+    expect(within(strip).getByText('₹150.00')).toBeInTheDocument()
+    expect(within(strip).getByText('included')).toBeInTheDocument()
+    const discountRow = screen.getByText('Discounts applied (included above)')
+    expect(discountRow.parentElement).toHaveTextContent('₹150.00')
+  })
 })

@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react'
+import { useRef, useState, type FormEvent } from 'react'
 import { Link } from 'react-router'
 import type { PreviousDueOut } from '../../api/bill'
 import {
@@ -100,10 +100,12 @@ function PaymentForm({
   const [method, setMethod] = useState<PaymentMethod>('CASH')
   const [remarks, setRemarks] = useState('')
   const [error, setError] = useState<string | null>(null)
+  const submittingRef = useRef(false)
   const recordPayment = useRecordPayment()
 
   const submit = async (e: FormEvent) => {
     e.preventDefault()
+    if (submittingRef.current || recordPayment.isPending) return
     setError(null)
     const paise = rupeesToPaise(amount)
     if (paise === null) {
@@ -114,6 +116,7 @@ function PaymentForm({
       setError(`Only ${formatPaise(visit.outstanding_paise)} is due on this visit.`)
       return
     }
+    submittingRef.current = true
     try {
       const payment = await recordPayment.mutateAsync({
         patient_id: visit.patient_id,
@@ -128,6 +131,8 @@ function PaymentForm({
       announcePayment(payment)
     } catch (err) {
       setError(errorText(err, 'Failed to record the payment.'))
+    } finally {
+      submittingRef.current = false
     }
   }
 
@@ -477,6 +482,10 @@ export interface VisitCheckoutProps {
   onDirectPayment?: () => void
   /** True while an ?appointment_id= deep link is still resolving its visit_id. */
   resolvingInitialVisit?: boolean
+  /** Clears URL deep-link params when returning to queue or closing a visit. */
+  onClearInitialVisit?: () => void
+  /** Error message when an ?appointment_id= deep link fails or has no open visit. */
+  initialVisitError?: string | null
 }
 
 /** Checkout at the desk: adaptive 3-state queue, charges, payments and Patient Out. */
@@ -487,13 +496,15 @@ export function VisitCheckout({
   onReprint,
   onDirectPayment,
   resolvingInitialVisit = false,
+  onClearInitialVisit,
+  initialVisitError = null,
 }: VisitCheckoutProps) {
   // undefined = nothing picked yet, so the dashboard's visit is shown; null = cleared after a close or back.
   const [picked, setPicked] = useState<number | null | undefined>(undefined)
   const [notice, setNotice] = useState<string | null>(null)
   const rawSelectedId = picked === undefined ? initialVisitId : picked
   const validSelectedId =
-    typeof rawSelectedId === 'number' && Number.isFinite(rawSelectedId) && rawSelectedId > 0
+    typeof rawSelectedId === 'number' && Number.isInteger(rawSelectedId) && rawSelectedId > 0
       ? rawSelectedId
       : null
 
@@ -502,8 +513,10 @@ export function VisitCheckout({
     isPending: readyPending,
     isError: readyError,
     error: readyErr,
-  } = useVisits({ readyForCheckout: true })
-  const { data: visit, isPending: visitPending } = useVisit(validSelectedId)
+  } = useVisits({ readyForCheckout: true }, { refetchInterval: 10_000 })
+  const { data: visit, isPending: visitPending } = useVisit(validSelectedId, {
+    refetchInterval: (q) => (!q.state.data || q.state.data.status === 'OPEN' ? 10_000 : false),
+  })
 
   const readyVisits = ready?.visits ?? []
   const isEmptyState =
@@ -536,12 +549,12 @@ export function VisitCheckout({
     data: pendingDues,
     isPending: pendingDuesPending,
     isError: pendingDuesError,
-  } = usePendingDues()
+  } = usePendingDues({ enabled: isEmptyState })
   const {
     data: visitDues,
     isPending: visitDuesPending,
     isError: visitDuesError,
-  } = useVisitDues()
+  } = useVisitDues({ enabled: isEmptyState })
   const duesPending = pendingDuesPending || visitDuesPending
   const duesError = pendingDuesError || visitDuesError
   const pendingDuesCount = (pendingDues?.length ?? 0) + (visitDues?.length ?? 0)
@@ -560,12 +573,17 @@ export function VisitCheckout({
       {notice}
     </div>
   ) : null
+  const initialErrorBanner =
+    initialVisitError && validSelectedId == null ? (
+      <InlineAlert tone="error">{initialVisitError}</InlineAlert>
+    ) : null
 
   // Loading state: compact single-column card while resolving deep link or initial queue
   if ((resolvingInitialVisit || readyPending) && validSelectedId == null) {
     return (
       <section className="max-w-2xl space-y-3 rounded-2xl border border-slate-200 bg-white p-6 shadow-xs">
         {noticeBanner}
+        {initialErrorBanner}
         <p className="py-4 text-center text-xs text-slate-600">Loading visits...</p>
       </section>
     )
@@ -576,6 +594,7 @@ export function VisitCheckout({
     return (
       <section className="max-w-2xl space-y-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-xs">
         {noticeBanner}
+        {initialErrorBanner}
         <InlineAlert tone="error">
           {errorText(readyErr, 'Could not load visits awaiting checkout. Try refreshing.')}
         </InlineAlert>
@@ -596,6 +615,7 @@ export function VisitCheckout({
         className="max-w-2xl space-y-5 rounded-2xl border border-slate-200 bg-white p-6 shadow-xs"
       >
         {noticeBanner}
+        {initialErrorBanner}
         <div>
           <h2 className="text-base font-bold text-slate-900">No visits awaiting checkout</h2>
           <p className="mt-1 text-xs text-slate-600">
@@ -651,6 +671,7 @@ export function VisitCheckout({
         className="max-w-3xl space-y-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-xs"
       >
         {noticeBanner}
+        {initialErrorBanner}
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <h2 className="text-sm font-bold text-slate-900">
@@ -737,6 +758,7 @@ export function VisitCheckout({
             onClick={() => {
               setNotice(null)
               setPicked(null)
+              onClearInitialVisit?.()
             }}
             className="inline-flex min-h-8 cursor-pointer items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-50"
           >
@@ -762,6 +784,7 @@ export function VisitCheckout({
                   : `${closed.patient_name}'s visit is closed.`,
               )
               setPicked(null)
+              onClearInitialVisit?.()
             }}
           />
         )}
@@ -772,7 +795,7 @@ export function VisitCheckout({
 
 /** Fees still owed on visits closed with a balance. Collected at the desk like any other payment. */
 export function VisitDuesSection({ canCollect }: { canCollect: boolean }) {
-  const { data: dues, isPending } = useVisitDues()
+  const { data: dues, isPending, isError, error, refetch } = useVisitDues()
   const [collecting, setCollecting] = useState<VisitDueOut | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
   const total = (dues ?? []).reduce((acc, d) => acc + d.balance_paise, 0)
@@ -788,7 +811,9 @@ export function VisitDuesSection({ canCollect }: { canCollect: boolean }) {
         </div>
         <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-2">
           <span className="block text-xs font-bold text-amber-800">Total outstanding</span>
-          <span className="font-mono text-base font-black text-amber-950">{formatPaise(total)}</span>
+          <span className="font-mono text-base font-black text-amber-950">
+            {isError ? '—' : formatPaise(total)}
+          </span>
         </div>
       </div>
 
@@ -811,6 +836,19 @@ export function VisitDuesSection({ canCollect }: { canCollect: boolean }) {
 
       {isPending ? (
         <p className="p-6 text-center text-xs text-slate-500">Loading visit balances...</p>
+      ) : isError ? (
+        <div className="space-y-3">
+          <InlineAlert tone="error">
+            {errorText(error, 'Could not load visit balances. Please try again.')}
+          </InlineAlert>
+          <button
+            type="button"
+            onClick={() => refetch()}
+            className="inline-flex min-h-9 cursor-pointer items-center rounded-lg border border-slate-300 bg-white px-3.5 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+          >
+            Retry
+          </button>
+        </div>
       ) : !dues || dues.length === 0 ? (
         <p className="p-6 text-center text-xs text-slate-500">No closed visit has a balance.</p>
       ) : (
@@ -875,11 +913,13 @@ function DueCollectForm({
   const [amountOverride, setAmountOverride] = useState<string | null>(null)
   const [method, setMethod] = useState<PaymentMethod>('CASH')
   const [error, setError] = useState<string | null>(null)
+  const submittingRef = useRef(false)
   const recordPayment = useRecordPayment()
   const amount = amountOverride ?? paiseToRupees(due.balance_paise)
 
   const submit = async (e: FormEvent) => {
     e.preventDefault()
+    if (submittingRef.current || recordPayment.isPending) return
     setError(null)
     const paise = rupeesToPaise(amount)
     if (paise === null) {
@@ -890,6 +930,7 @@ function DueCollectForm({
       setError(`Only ${formatPaise(due.balance_paise)} is owed on this visit.`)
       return
     }
+    submittingRef.current = true
     try {
       const payment = await recordPayment.mutateAsync({
         patient_id: due.patient_id,
@@ -902,6 +943,8 @@ function DueCollectForm({
       onCollected(payment)
     } catch (err) {
       setError(errorText(err, 'Failed to record the payment.'))
+    } finally {
+      submittingRef.current = false
     }
   }
 
