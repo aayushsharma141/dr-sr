@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useMemo } from 'react'
-import { Link, useSearchParams } from 'react-router'
+import { useSearchParams } from 'react-router'
 import { AppShell } from '../components/AppShell'
 import { ReceiptDialog } from '../components/ReceiptDialog'
 import { PaymentModal } from '../components/PaymentModal'
+import { ReceptionDeskTabs } from '../components/billing/ReceptionDeskTabs'
 import { VisitCheckout, VisitDuesSection } from '../components/billing/VisitCheckout'
 import {
   useAppointment,
@@ -21,15 +22,13 @@ import type { PatientOut, PaymentOut, PaymentMethod, PendingDueOut } from '../ap
 import { PAYMENT_RECORDED_EVENT } from '../components/ReceiptHost'
 import { formatIst, formatPaise, paiseToRupees, rupeesToPaise } from '../format'
 import {
+  IconArrowLeft,
   IconCheck,
-  IconClock,
   IconDeviceFloppy,
   IconPrinter,
-  IconReceipt,
   IconRupee,
   IconSearch,
   IconStethoscope,
-  IconTicket,
   IconUser,
   IconX,
 } from '../components/icons'
@@ -49,7 +48,7 @@ function ReceiptTable({
   return (
     <div className="overflow-x-auto">
       <table className="w-full text-left text-xs">
-        <thead className="bg-slate-50 text-slate-600 font-bold border-b border-slate-200 uppercase tracking-wider">
+        <thead className="bg-slate-50 text-slate-600 font-semibold border-b border-slate-200">
           <tr>
             <th className="py-3 px-3">Receipt #</th>
             <th className="py-3 px-3">Date &amp; Time (IST)</th>
@@ -108,7 +107,7 @@ function ReceiptTable({
 
 export function ReceptionBillingPage() {
   const { data: me } = useMe()
-  const [searchParams, setSearchParams] = useSearchParams()
+  const [searchParams] = useSearchParams()
 
   const permissions = me?.permissions ?? []
   // Reception checks visits out and collects fees; Admin only oversees (full ledger, reversals).
@@ -120,10 +119,6 @@ export function ReceptionBillingPage() {
   const requestedTab = searchParams.get('tab')
   let activeTab: TabKey = requestedTab === 'dues' || requestedTab === 'ledger' ? requestedTab : 'checkout'
   if (me && activeTab === 'checkout' && !canCheckout) activeTab = 'ledger'
-
-  const handleTabChange = (tab: TabKey) => {
-    setSearchParams(tab === 'checkout' ? {} : { tab })
-  }
 
   // Shared receipt printing: list rows carry the receipt, visit payments are fetched by id.
   const [reprintPayment, setReprintPayment] = useState<PaymentOut | null>(null)
@@ -140,7 +135,11 @@ export function ReceptionBillingPage() {
   const visitIdParam = searchParams.get('visit_id')
   const appointmentIdParam = searchParams.get('appointment_id')
   const patientIdParam = searchParams.get('patient_id')
-  const { data: linkedAppointment } = useAppointment(appointmentIdParam ? Number(appointmentIdParam) : 0)
+  const linkedAppointmentId = appointmentIdParam ? Number(appointmentIdParam) : 0
+  const hasValidAppointmentId = Number.isFinite(linkedAppointmentId) && linkedAppointmentId > 0
+  const { data: linkedAppointment, isPending: linkedAppointmentPending } = useAppointment(
+    hasValidAppointmentId ? linkedAppointmentId : 0,
+  )
   const initialVisitId = visitIdParam
     ? Number(visitIdParam)
     : (linkedAppointment?.visit_id ?? null)
@@ -308,123 +307,54 @@ export function ReceptionBillingPage() {
 
   return (
     <AppShell name={me?.full_name || 'Reception Staff'} role={me?.role || 'RECEPTION'}>
-      <div className="w-full space-y-5">
-        {/* Top Header */}
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between border-b border-slate-200/80 pb-4">
-          <div className="flex items-center gap-3">
-            <div className="flex h-11 w-11 items-center justify-center rounded-xl border border-emerald-200 bg-emerald-50 text-emerald-800 shadow-xs shrink-0">
-              <IconReceipt className="h-6 w-6" />
-            </div>
-            <div>
-              <h1 className="text-xl font-bold tracking-tight text-slate-900">
-                Billing &amp; Checkout
-              </h1>
-              <p className="text-xs text-slate-500">
-                {canCheckout
-                  ? 'Collect fees at checkout, issue receipts, and close visits.'
-                  : 'Oversight of receipts, the full ledger, and visit balances.'}
-              </p>
-            </div>
-          </div>
+      <div className="w-full space-y-4">
+        <h1 className="sr-only">Billing &amp; Checkout</h1>
 
-          {canCheckout && (
-            <div className="flex items-center gap-2.5">
-              <Link
-                to="/reception/appointments"
-                className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 shadow-2xs"
-              >
-                <IconTicket className="h-4 w-4 text-emerald-800" />
-                Appointments
-              </Link>
-              <Link
-                to="/reception/tokens"
-                className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 shadow-2xs"
-              >
-                <IconUser className="h-4 w-4 text-slate-500" />
-                Check-in &amp; Token
-              </Link>
-            </div>
-          )}
-        </div>
-
-        {/* Tab Navigation Bar */}
-        <div className="flex border-b border-slate-200 bg-white px-4 pt-2 rounded-xl shadow-2xs">
-          {canCheckout && (
-            <button
-              type="button"
-              onClick={() => handleTabChange('checkout')}
-              className={`flex items-center gap-2 border-b-2 px-5 py-3 text-sm font-bold transition-all ${activeTab === 'checkout'
-                ? 'border-emerald-800 text-emerald-900'
-                : 'border-transparent text-slate-500 hover:text-slate-800'
-                }`}
-            >
-              <IconRupee className="h-4 w-4" />
-              Checkout
-            </button>
-          )}
-          <button
-            type="button"
-            onClick={() => handleTabChange('ledger')}
-            className={`flex items-center gap-2 border-b-2 px-5 py-3 text-sm font-bold transition-all ${activeTab === 'ledger'
-              ? 'border-emerald-800 text-emerald-900'
-              : 'border-transparent text-slate-500 hover:text-slate-800'
-              }`}
-          >
-            <IconReceipt className="h-4 w-4" />
-            {canCheckout ? "Today's Receipts" : 'Receipts Ledger'}
-          </button>
-          <button
-            type="button"
-            onClick={() => handleTabChange('dues')}
-            className={`flex items-center gap-2 border-b-2 px-5 py-3 text-sm font-bold transition-all ${activeTab === 'dues'
-              ? 'border-emerald-800 text-emerald-900'
-              : 'border-transparent text-slate-500 hover:text-slate-800'
-              }`}
-          >
-            <IconClock className="h-4 w-4" />
-            Pending Dues
-          </button>
-        </div>
+        <ReceptionDeskTabs
+          activeTab={activeTab === 'dues' ? 'dues' : activeTab === 'ledger' ? 'ledger' : 'billing'}
+          isAdmin={!canCheckout}
+        />
 
         {!me && <div className="p-8 text-center text-xs text-slate-500">Loading billing desk...</div>}
 
         {/* ======================================================== */}
-        {/* TAB 1: CHECKOUT (visit) / OTHER PAYMENT                  */}
+        {/* CHECKOUT (visit) / DIRECT PAYMENT (no visit)             */}
         {/* ======================================================== */}
         {me && activeTab === 'checkout' && canCheckout && (
-          <div className="space-y-5">
-            <div className="inline-flex rounded-xl border border-slate-200 bg-white p-1 shadow-2xs">
-              <button
-                type="button"
-                aria-pressed={checkoutMode === 'visit'}
-                onClick={() => setCheckoutMode('visit')}
-                className={`inline-flex min-h-9 cursor-pointer items-center gap-1.5 rounded-lg px-3.5 text-xs font-bold ${checkoutMode === 'visit' ? 'bg-[#124832] text-white' : 'text-slate-700 hover:bg-slate-50'}`}
-              >
-                <IconStethoscope className="h-4 w-4" />
-                Visit payment
-              </button>
-              <button
-                type="button"
-                aria-pressed={checkoutMode === 'other'}
-                onClick={() => setCheckoutMode('other')}
-                className={`inline-flex min-h-9 cursor-pointer items-center gap-1.5 rounded-lg px-3.5 text-xs font-bold ${checkoutMode === 'other' ? 'bg-[#124832] text-white' : 'text-slate-700 hover:bg-slate-50'}`}
-              >
-                <IconRupee className="h-4 w-4" />
-                Other payment (no visit)
-              </button>
-            </div>
-
+          <div className="space-y-4">
             {checkoutMode === 'visit' && (
               <VisitCheckout
                 canCollect={canCollect}
                 canClose={canCheckout}
                 initialVisitId={initialVisitId}
+                resolvingInitialVisit={hasValidAppointmentId && linkedAppointmentPending}
                 onReprint={(id) => setReprintId(id)}
+                onDirectPayment={canCollect ? () => setCheckoutMode('other') : undefined}
               />
             )}
 
             {checkoutMode === 'other' && (
               <div className="space-y-5">
+                <div className="flex items-center justify-between border-b border-slate-200 pb-3">
+                  <div>
+                    <h2 className="text-base font-bold text-slate-900">Direct Payment (No Visit)</h2>
+                    <p className="text-xs text-slate-500">
+                      Charge fee schedule item, plan or custom payment without a consultation visit.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCheckoutMode('visit')
+                      handleResetCheckout()
+                    }}
+                    className="inline-flex min-h-9 cursor-pointer items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3.5 text-xs font-bold text-slate-700 shadow-2xs hover:bg-slate-50 transition-colors"
+                  >
+                    <IconArrowLeft className="h-4 w-4 text-slate-600" />
+                    Back to Visit Checkout
+                  </button>
+                </div>
+
                 {/* Success Card when payment is recorded */}
                 {recordedPayment && (
                   <div
@@ -448,13 +378,13 @@ export function ReceptionBillingPage() {
                       </div>
 
                       <div className="rounded-xl border border-emerald-300 bg-white px-5 py-3 text-center shadow-xs">
-                        <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                        <span className="text-xs font-bold text-slate-500">
                           Amount Collected
                         </span>
                         <div className="font-mono text-2xl font-black text-emerald-800">
                           {formatPaise(recordedPayment.amount_paise)}
                         </div>
-                        <span className="text-xs font-bold text-slate-600 uppercase">
+                        <span className="text-xs font-bold text-slate-600">
                           {recordedPayment.payment_method}
                         </span>
                       </div>
@@ -604,7 +534,7 @@ export function ReceptionBillingPage() {
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         {/* Service Type */}
                         <div>
-                          <label htmlFor="billing-service-type" className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
+                          <label htmlFor="billing-service-type" className="block text-xs font-bold text-slate-700 mb-1">
                             Service Type *
                           </label>
                           <select
@@ -625,7 +555,7 @@ export function ReceptionBillingPage() {
 
                         {/* Consulting Doctor */}
                         <div>
-                          <label htmlFor="billing-doctor" className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
+                          <label htmlFor="billing-doctor" className="block text-xs font-bold text-slate-700 mb-1">
                             Consulting Doctor (Optional)
                           </label>
                           <select
@@ -645,7 +575,7 @@ export function ReceptionBillingPage() {
 
                         {/* Amount in Rupees */}
                         <div className="sm:col-span-2">
-                          <label htmlFor="billing-amount" className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
+                          <label htmlFor="billing-amount" className="block text-xs font-bold text-slate-700 mb-1">
                             Payable Amount (₹ INR) *
                           </label>
                           <div className="relative max-w-xs">
@@ -685,7 +615,7 @@ export function ReceptionBillingPage() {
 
                       {/* Payment Mode Selector */}
                       <div>
-                        <span className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1.5">
+                        <span className="block text-xs font-bold text-slate-700 mb-1.5">
                           Payment Mode *
                         </span>
                         <div className="grid grid-cols-3 gap-2">
@@ -707,7 +637,7 @@ export function ReceptionBillingPage() {
 
                       {/* Notes / Reference */}
                       <div>
-                        <label htmlFor="billing-notes" className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
+                        <label htmlFor="billing-notes" className="block text-xs font-bold text-slate-700 mb-1">
                           Transaction Remarks (Optional)
                         </label>
                         <textarea
@@ -761,11 +691,11 @@ export function ReceptionBillingPage() {
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 pb-4">
               <div>
                 <h2 className="text-base font-bold text-slate-900">Today&apos;s Receipts</h2>
-                <p className="text-xs text-slate-500">Receipts issued today (IST). Earlier days are with Admin.</p>
+                <p className="text-xs text-slate-500">Today&apos;s receipts (IST). Earlier days in Admin.</p>
               </div>
               <div className="flex flex-wrap items-center gap-3">
                 <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2">
-                  <span className="block text-xs font-bold uppercase tracking-wider text-emerald-800">Collected today</span>
+                  <span className="block text-xs font-bold text-emerald-800">Collected today</span>
                   <span className="font-mono text-base font-black text-emerald-950">{formatPaise(todayCollectedPaise)}</span>
                 </div>
                 <input
@@ -850,7 +780,7 @@ export function ReceptionBillingPage() {
 
                 <div className="flex items-center gap-4">
                   <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-2">
-                    <span className="text-xs font-bold uppercase tracking-wider text-amber-800 block">
+                    <span className="text-xs font-bold text-amber-800 block">
                       Total Outstanding
                     </span>
                     <span className="font-mono text-base font-black text-amber-950">
@@ -875,7 +805,7 @@ export function ReceptionBillingPage() {
               ) : (
                 <div className="overflow-x-auto">
                   <table className="w-full text-left text-xs">
-                    <thead className="bg-slate-50 text-slate-600 font-bold border-b border-slate-200 uppercase tracking-wider">
+                    <thead className="bg-slate-50 text-slate-600 font-semibold border-b border-slate-200">
                       <tr>
                         <th className="py-3 px-3">Patient</th>
                         <th className="py-3 px-3">Package Details</th>
