@@ -185,10 +185,7 @@ describe('AppointmentsReception', () => {
       expect(within(main).getByRole('heading', { level: 1, name: 'Appointments' })).toBeInTheDocument()
       expect(within(main).queryByRole('tablist')).not.toBeInTheDocument()
       expect(within(main).getByRole('button', { name: /book appointment/i })).toBeInTheDocument()
-      expect(within(main).getByRole('link', { name: /check-in & token/i })).toHaveAttribute(
-        'href',
-        '/reception/tokens',
-      )
+      expect(within(main).queryByRole('link', { name: /check-in & token/i })).not.toBeInTheDocument()
       expect(within(main).queryByRole('link', { name: /new patient/i })).not.toBeInTheDocument()
 
       // Compact 5-column layout without Token column, mobile number, or Hindi doctor name
@@ -273,13 +270,18 @@ describe('AppointmentsReception', () => {
       expect(screen.queryByText('Waiting')).not.toBeInTheDocument()
       expect(screen.queryByText(/billing →/i)).not.toBeInTheDocument()
 
-      // Toolbar lifecycle counts
+      // Toolbar lifecycle counts (including No-show so visible stage counts sum to Active (11))
       const hasCount = (text: string) =>
         screen.getByText((_, el) => el?.tagName === 'SPAN' && el.textContent === text)
       expect(hasCount('3 Booked')).toBeInTheDocument()
       expect(hasCount('1 Arrived')).toBeInTheDocument()
       expect(hasCount('4 Checked In')).toBeInTheDocument()
       expect(hasCount('2 Completed')).toBeInTheDocument()
+      expect(hasCount('1 No-show')).toBeInTheDocument()
+
+      const filters = within(screen.getByRole('group', { name: 'Filter appointments' }))
+      expect(filters.getByRole('button', { name: 'Active (11)' })).toBeInTheDocument()
+      expect(3 + 1 + 4 + 2 + 1).toBe(11)
     })
   })
 
@@ -496,6 +498,42 @@ describe('AppointmentsReception', () => {
       expect(screen.getByRole('alert')).toHaveTextContent(/modified by another user/i)
       expect(screen.getByRole('button', { name: 'Reload latest' })).toBeInTheDocument()
     })
+
+    it('defaults RescheduleModal date and min to tomorrow for today NO_SHOW and TO_ARRIVE bookings', async () => {
+      renderAppointments({
+        appointments: [
+          makeAppointment({ id: 48, patient_name: 'Today NoShow', status: 'NO_SHOW', appointment_date: today }),
+          makeAppointment({ id: 49, patient_name: 'Today ToArrive', status: 'TO_ARRIVE', appointment_date: today }),
+          makeAppointment({ id: 490, patient_name: 'Today Booked', status: 'BOOKED', appointment_date: today }),
+        ],
+      })
+
+      await screen.findByText('Today Booked')
+      const table = screen.getByRole('table')
+      const user = userEvent.setup()
+
+      // Today's NO_SHOW requires tomorrow
+      await user.click(within(within(table).getByText('Today NoShow').closest('tr')!).getByRole('button', { name: 'Reschedule' }))
+      let dialog = await screen.findByRole('dialog')
+      expect(within(dialog).getByLabelText('New date *')).toHaveValue(tomorrow)
+      expect(within(dialog).getByLabelText('New date *')).toHaveAttribute('min', tomorrow)
+      await user.click(within(dialog).getByRole('button', { name: 'Keep current date' }))
+      await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+
+      // Today's TO_ARRIVE requires tomorrow
+      await user.click(within(within(table).getByText('Today ToArrive').closest('tr')!).getByRole('button', { name: 'Reschedule' }))
+      dialog = await screen.findByRole('dialog')
+      expect(within(dialog).getByLabelText('New date *')).toHaveValue(tomorrow)
+      expect(within(dialog).getByLabelText('New date *')).toHaveAttribute('min', tomorrow)
+      await user.click(within(dialog).getByRole('button', { name: 'Keep current date' }))
+      await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+
+      // Today's BOOKED still allows today (time-only reschedule)
+      await user.click(within(within(table).getByText('Today Booked').closest('tr')!).getByRole('button', { name: 'Reschedule' }))
+      dialog = await screen.findByRole('dialog')
+      expect(within(dialog).getByLabelText('New date *')).toHaveValue(today)
+      expect(within(dialog).getByLabelText('New date *')).toHaveAttribute('min', today)
+    })
   })
 
   describe('Check in, No-Show & Cancel transitions and guards', () => {
@@ -617,11 +655,11 @@ describe('AppointmentsReception', () => {
       await user.click(filters.getByRole('button', { name: 'All (12)' }))
 
       const table = screen.getByRole('table')
-      for (const name of ['C Booked', 'C ToArrive', 'C Registered', 'C Arrived', 'C CheckedIn', 'C Waiting']) {
+      for (const name of ['C Booked', 'C ToArrive', 'C Registered', 'C CheckedIn', 'C Waiting']) {
         const row = within(table).getByText(name).closest('tr')!
         expect(within(row).getByRole('button', { name: 'Cancel' })).toBeInTheDocument()
       }
-      for (const name of ['C NoShow', 'C InConsult', 'C Done', 'C Completed', 'C Cancelled', 'C Rescheduled']) {
+      for (const name of ['C Arrived', 'C NoShow', 'C InConsult', 'C Done', 'C Completed', 'C Cancelled', 'C Rescheduled']) {
         const row = within(table).getByText(name).closest('tr')!
         expect(within(row).queryByRole('button', { name: 'Cancel' })).not.toBeInTheDocument()
       }
@@ -713,6 +751,84 @@ describe('AppointmentsReception', () => {
       })
       expect(screen.getByRole('alert')).toHaveTextContent(/modified by another user/i)
       expect(screen.getByRole('button', { name: 'Reload latest' })).toBeInTheDocument()
+    })
+
+    it('disables No-Show button while update is pending and prevents duplicate PATCH calls', async () => {
+      let patchCalls = 0
+      let resolvePatch!: (value: ReturnType<typeof jsonResponse>) => void
+
+      const mockFetch = vi.fn().mockImplementation((url: string, init?: RequestInit) => {
+        if (url.includes('/api/appointments/74/status') && init?.method === 'PATCH') {
+          patchCalls += 1
+          return new Promise((resolve) => {
+            resolvePatch = resolve
+          })
+        }
+        if (url.includes('/api/auth/me')) return Promise.resolve(jsonResponse(mockMe))
+        if (url.includes('/api/doctors')) return Promise.resolve(jsonResponse(mockDoctors))
+        if (url.includes('/api/departments')) return Promise.resolve(jsonResponse(mockDepartments))
+        if (url.includes('/api/appointments')) {
+          return Promise.resolve(
+            jsonResponse({ total: 1, appointments: [makeAppointment({ id: 74, status: 'BOOKED' })] }),
+          )
+        }
+        return Promise.reject(new Error(`Unhandled: ${url}`))
+      })
+      vi.stubGlobal('fetch', mockFetch)
+
+      const queryClient = new QueryClient({
+        defaultOptions: { queries: { retry: false, gcTime: 0 } },
+      })
+      render(
+        <QueryClientProvider client={queryClient}>
+          <MemoryRouter initialEntries={['/reception/appointments']}>
+            <AppointmentsReception />
+          </MemoryRouter>
+        </QueryClientProvider>,
+      )
+
+      await screen.findByText('Aarav Kumar')
+      const noShowBtn = screen.getByRole('button', { name: 'No-Show' })
+      expect(noShowBtn).not.toBeDisabled()
+
+      const user = userEvent.setup()
+      await user.click(noShowBtn)
+      await waitFor(() => {
+        expect(noShowBtn).toBeDisabled()
+      })
+      expect(patchCalls).toBe(1)
+
+      resolvePatch(jsonResponse(makeAppointment({ id: 74, status: 'NO_SHOW', version_id: 2 })))
+      await waitFor(() => {
+        expect(noShowBtn).not.toBeDisabled()
+      })
+    })
+
+    it('enforces a minimum of 3 characters in CancelModal before enabling submission', async () => {
+      renderAppointments({
+        appointments: [makeAppointment({ id: 75, status: 'BOOKED' })],
+      })
+
+      await screen.findByText('Aarav Kumar')
+      const user = userEvent.setup()
+      await user.click(screen.getByRole('button', { name: 'Cancel' }))
+
+      const dialog = await screen.findByRole('dialog')
+      const textarea = within(dialog).getByLabelText('Cancellation reason *')
+      const confirmBtn = within(dialog).getByRole('button', { name: 'Confirm Cancellation' })
+
+      expect(confirmBtn).toBeDisabled()
+
+      await user.type(textarea, 'ab')
+      expect(confirmBtn).toBeDisabled()
+
+      await user.clear(textarea)
+      await user.type(textarea, '  a ')
+      expect(confirmBtn).toBeDisabled()
+
+      await user.clear(textarea)
+      await user.type(textarea, 'Ill')
+      expect(confirmBtn).not.toBeDisabled()
     })
   })
 
@@ -824,6 +940,40 @@ describe('AppointmentsReception', () => {
 
       const checkedInRow = within(table).getByText('Doc Waiting Status').closest('tr')!
       expect(within(checkedInRow).queryByRole('button', { name: 'Cancel' })).not.toBeInTheDocument()
+
+      // Security #1: DOCTOR must NOT see Book Appointment in header
+      expect(screen.queryByRole('button', { name: /book appointment/i })).not.toBeInTheDocument()
+    })
+
+    it('hides Book Appointment in empty state for DOCTOR and lets DOCTOR switch to All doctors without snapping back', async () => {
+      const { mockFetch } = renderAppointments({
+        me: doctorMe,
+        appointments: [],
+        initialEntries: ['/reception/appointments?tab=today'],
+      })
+
+      await screen.findByText('No active appointments for this date and doctor.')
+
+      // Neither header nor empty state shows Book Appointment for DOCTOR
+      expect(screen.queryByRole('button', { name: /book appointment/i })).not.toBeInTheDocument()
+
+      const doctorSelect = screen.getByLabelText('Doctor') as HTMLSelectElement
+      await waitFor(() => {
+        expect(doctorSelect.value).toBe('1')
+      })
+
+      const user = userEvent.setup()
+      await user.selectOptions(doctorSelect, '')
+      expect(doctorSelect.value).toBe('')
+
+      // Wait a tick to ensure the one-shot pre-filter ref does not snap back to doctor 1
+      await waitFor(() => {
+        expect(doctorSelect.value).toBe('')
+        expect(mockFetch).toHaveBeenCalledWith(
+          expect.stringMatching(/\/api\/appointments\?appointment_date=\d{4}-\d{2}-\d{2}$/),
+          expect.anything(),
+        )
+      })
     })
   })
 })

@@ -1,7 +1,8 @@
-import { render, screen } from '@testing-library/react'
+import { cleanup, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import '../../test/dialog-shim'
+import { ApiError } from '../../api/client'
 import { AppointmentBookingModal } from '../AppointmentBookingModal'
 import { SessionAddendumModal } from '../SessionAddendumModal'
 import { SessionLoggerModal } from '../SessionLoggerModal'
@@ -9,14 +10,24 @@ import type { PatientOut, TreatmentPlanOut, TreatmentSessionOut } from '../../ap
 
 const patient = { id: 7, full_name: 'Aarav Kumar', urn: 'KH-2026-0007', mobile: '9876543210', age_years: 30 } as PatientOut
 
+const { usePatientsSpy, bookMutateAsync, departmentsState, departmentDoctorsState } = vi.hoisted(() => ({
+  usePatientsSpy: vi.fn(),
+  bookMutateAsync: vi.fn(),
+  departmentsState: { data: [] as { id: number; name_en: string; name_hi?: string | null }[] },
+  departmentDoctorsState: { data: [] as { id: number; name_en: string; name_hi?: string | null; qualification?: string | null }[] },
+}))
+
 vi.mock('../../api/queries', () => ({
   useLogTreatmentSession: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useAddSessionAddendum: () => ({ mutateAsync: vi.fn(), isPending: false }),
-  useBookAppointment: () => ({ mutateAsync: vi.fn(), isPending: false }),
+  useBookAppointment: () => ({ mutateAsync: bookMutateAsync, isPending: false }),
   useUpdateAppointmentStatus: () => ({ mutateAsync: vi.fn(), isPending: false }),
-  useDepartments: () => ({ data: [] }),
-  useDepartmentDoctors: () => ({ data: [] }),
-  usePatients: () => ({ data: [patient], isPending: false }),
+  useDepartments: () => ({ data: departmentsState.data }),
+  useDepartmentDoctors: () => ({ data: departmentDoctorsState.data }),
+  usePatients: (...args: unknown[]) => {
+    usePatientsSpy(...args)
+    return { data: [patient], isPending: false }
+  },
 }))
 
 const plan = {
@@ -36,7 +47,12 @@ const session = {
 } as TreatmentSessionOut
 
 afterEach(() => {
+  cleanup()
   vi.useRealTimers()
+  usePatientsSpy.mockClear()
+  bookMutateAsync.mockReset()
+  departmentsState.data = []
+  departmentDoctorsState.data = []
 })
 
 describe('session dialogs', () => {
@@ -89,5 +105,52 @@ describe('appointment booking dialog', () => {
     await user.keyboard('{Enter}')
 
     expect(screen.getByRole('button', { name: 'Change' })).toBeInTheDocument()
+  })
+
+  it('debounces patient search and gates usePatients on >= 2 chars and no initialPatient', async () => {
+    const user = userEvent.setup()
+    const { unmount } = render(<AppointmentBookingModal isOpen onClose={vi.fn()} />)
+
+    // Initially disabled with empty search query
+    expect(usePatientsSpy).toHaveBeenLastCalledWith('', 5, 0, { enabled: false })
+
+    // Typing 1 character stays disabled
+    await user.type(screen.getByRole('textbox', { name: 'Patient' }), 'A')
+    expect(usePatientsSpy).toHaveBeenLastCalledWith('', 5, 0, { enabled: false })
+
+    // Typing >= 2 characters enables search after debounce
+    await user.type(screen.getByRole('textbox', { name: 'Patient' }), 'arav')
+    await waitFor(() => {
+      expect(usePatientsSpy).toHaveBeenLastCalledWith('Aarav', 5, 0, { enabled: true })
+    })
+
+    // When initialPatient is provided on open, search stays disabled
+    unmount()
+    usePatientsSpy.mockClear()
+    render(<AppointmentBookingModal isOpen initialPatient={patient} onClose={vi.fn()} />)
+    expect(usePatientsSpy).toHaveBeenLastCalledWith('', 5, 0, { enabled: false })
+  })
+
+  it('shows a clear conflict message without override-reason jargon on 409 duplicate_appointment', async () => {
+    departmentsState.data = [{ id: 1, name_en: 'Physiotherapy', name_hi: null }]
+    departmentDoctorsState.data = [{ id: 2, name_en: 'Dr. Sharma', name_hi: null, qualification: 'PT' }]
+    bookMutateAsync.mockRejectedValueOnce(
+      new ApiError(
+        409,
+        'duplicate_appointment',
+        'Patient already has an active appointment with this doctor on this date. An override reason of at least 5 characters is required.',
+      ),
+    )
+
+    const user = userEvent.setup()
+    render(<AppointmentBookingModal isOpen initialPatient={patient} onClose={vi.fn()} />)
+
+    await user.selectOptions(screen.getByLabelText('Department / Specialty'), '1')
+    await user.selectOptions(screen.getByLabelText('Consulting Doctor'), '2')
+    await user.click(screen.getByRole('button', { name: 'Confirm Booking' }))
+
+    const alert = await screen.findByRole('alert')
+    expect(alert).toHaveTextContent(/already has an active appointment/i)
+    expect(alert.textContent).not.toMatch(/override reason/i)
   })
 })

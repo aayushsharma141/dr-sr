@@ -1,8 +1,9 @@
 import { useState } from 'react'
 import { Modal } from './Modal'
+import { useDebouncedValue, useIstToday } from './reception/AppointmentStatusBadge'
+import { ApiError } from '../api/client'
 import { useDepartments, useDepartmentDoctors, usePatients, useBookAppointment } from '../api/queries'
 import type { PatientOut, DepartmentDoctorOut } from '../api/types'
-import { istToday } from '../format'
 
 interface AppointmentBookingModalProps {
   isOpen: boolean
@@ -19,25 +20,33 @@ export function AppointmentBookingModal({
   initialDate,
   onSuccess,
 }: AppointmentBookingModalProps) {
+  const today = useIstToday()
   const [patientSearch, setPatientSearch] = useState('')
   const [selectedPatient, setSelectedPatient] = useState<PatientOut | null>(
     initialPatient || null,
   )
   const [selectedDepartmentId, setSelectedDepartmentId] = useState<number | ''>('')
   const [selectedDoctorId, setSelectedDoctorId] = useState<number | ''>('')
-  const [appointmentDate, setAppointmentDate] = useState(() => {
-    const today = istToday()
-    return initialDate && initialDate >= today ? initialDate : today
-  })
+  const [appointmentDate, setAppointmentDate] = useState(() =>
+    initialDate && initialDate >= today ? initialDate : today,
+  )
   const [expectedTime, setExpectedTime] = useState('')
   const [notes, setNotes] = useState('')
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
   // The token is issued at check-in, so a booking is confirmed without one.
   const [isBooked, setIsBooked] = useState(false)
 
+  const debouncedQuery = useDebouncedValue(patientSearch, 200)
+  const searchEnabled = isOpen && !selectedPatient && debouncedQuery.trim().length >= 2
+
   const { data: departments } = useDepartments()
   const { data: doctors } = useDepartmentDoctors(selectedDepartmentId || null)
-  const { data: searchResults, isPending: isSearching } = usePatients(patientSearch, 5, 0)
+  const { data: searchResults, isPending: isSearching } = usePatients(
+    debouncedQuery,
+    5,
+    0,
+    { enabled: searchEnabled },
+  )
   const bookMutation = useBookAppointment()
 
   if (!isOpen) return null
@@ -77,7 +86,11 @@ export function AppointmentBookingModal({
       setIsBooked(true)
       if (onSuccess) onSuccess()
     } catch (err: unknown) {
-      if (err instanceof Error) {
+      if (err instanceof ApiError && err.status === 409 && err.code === 'duplicate_appointment') {
+        setErrorMsg(
+          'This patient already has an active appointment with this doctor on this date. Please reschedule or cancel the existing booking instead.',
+        )
+      } else if (err instanceof Error) {
         setErrorMsg(err.message)
       } else {
         setErrorMsg('Failed to book appointment.')
@@ -166,7 +179,7 @@ export function AppointmentBookingModal({
                     placeholder="Search patient by URN, mobile or name..."
                     className="w-full p-2 border border-neutral-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-red-800"
                   />
-                  {isSearching && <p className="text-xs text-neutral-500">Searching patients...</p>}
+                  {searchEnabled && isSearching && <p className="text-xs text-neutral-500">Searching patients...</p>}
                   {searchResults && searchResults.length > 0 && (
                     <div className="max-h-40 overflow-y-auto border border-neutral-200 rounded divide-y divide-neutral-100 bg-white">
                       {searchResults.slice(0, 5).map((p: PatientOut) => (
@@ -244,7 +257,7 @@ export function AppointmentBookingModal({
               <input
                 id="date-input"
                 type="date"
-                min={istToday()}
+                min={today}
                 value={appointmentDate}
                 onChange={(e) => setAppointmentDate(e.target.value)}
                 required

@@ -1,4 +1,4 @@
-import { useState, useEffect, type FormEvent } from 'react'
+import { useState, useEffect, useRef, type FormEvent } from 'react'
 import { Link, useSearchParams } from 'react-router'
 import { AppShell } from '../components/AppShell'
 import { TableSkeleton } from '../components/AdminSkeleton'
@@ -6,6 +6,7 @@ import { AppointmentBookingModal } from '../components/AppointmentBookingModal'
 import { ConflictBanner } from '../components/ConflictBanner'
 import { InlineAlert } from '../components/InlineAlert'
 import { Modal } from '../components/Modal'
+import { AppointmentStatusBadge, useIstToday } from '../components/reception/AppointmentStatusBadge'
 import {
   useAppointments,
   useDoctors,
@@ -17,7 +18,7 @@ import {
 import type { Appointment, AppointmentStatus, DoctorOut } from '../api/types'
 import { istToday } from '../format'
 import { isVersionConflict } from '../api/client'
-import { IconPlus, IconTicket } from '../components/icons'
+import { IconPlus } from '../components/icons'
 
 type FollowUpWindow = 'all' | 'today' | 'week' | 'overdue'
 type StatusView = 'active' | 'cancelled' | 'all'
@@ -54,54 +55,28 @@ function lifecycleStatus(appt: Appointment): LifecycleStatus {
   return 'BOOKED'
 }
 
-const LIFECYCLE_LABEL: Record<LifecycleStatus, string> = {
-  BOOKED: 'Booked',
-  ARRIVED: 'Arrived',
-  CHECKED_IN: 'Checked In',
-  COMPLETED: 'Completed',
-  NO_SHOW: 'No-show',
-  CANCELLED: 'Cancelled',
-  RESCHEDULED: 'Rescheduled',
-}
-
-const LIFECYCLE_CLASS: Record<LifecycleStatus, string> = {
-  BOOKED: 'bg-blue-50 text-blue-800 ring-blue-200',
-  ARRIVED: 'bg-amber-50 text-amber-800 ring-amber-200',
-  CHECKED_IN: 'bg-teal-50 text-teal-800 ring-teal-200',
-  COMPLETED: 'bg-emerald-50 text-emerald-800 ring-emerald-200',
-  NO_SHOW: 'bg-slate-100 text-slate-700 ring-slate-200',
-  CANCELLED: 'bg-slate-100 text-slate-700 ring-slate-200',
-  RESCHEDULED: 'bg-slate-100 text-slate-700 ring-slate-200',
-}
-
 const SECONDARY_BUTTON =
   'min-h-9 rounded-lg border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50'
 
-function localDateValue(date: Date) {
-  const year = date.getFullYear()
-  const month = String(date.getMonth() + 1).padStart(2, '0')
-  const day = String(date.getDate()).padStart(2, '0')
-  return `${year}-${month}-${day}`
+function shiftIsoDate(isoDate: string, days: number): string {
+  const d = new Date(`${isoDate}T00:00:00Z`)
+  if (Number.isNaN(d.getTime())) return isoDate
+  d.setUTCDate(d.getUTCDate() + days)
+  return d.toISOString().slice(0, 10)
 }
 
 function FollowUpVisits() {
   const [selectedWindow, setSelectedWindow] = useState<FollowUpWindow>('all')
   const [recallNotifiedId, setRecallNotifiedId] = useState<number | null>(null)
-  const today = localDateValue(new Date())
-  const weekEnd = new Date()
-  weekEnd.setDate(weekEnd.getDate() + 6)
+  const today = istToday()
 
   const dateRange =
     selectedWindow === 'today'
       ? { date_from: today, date_to: today }
       : selectedWindow === 'week'
-        ? { date_from: today, date_to: localDateValue(weekEnd) }
+        ? { date_from: today, date_to: shiftIsoDate(today, 6) }
         : selectedWindow === 'overdue'
-          ? (() => {
-            const yesterday = new Date()
-            yesterday.setDate(yesterday.getDate() - 1)
-            return { date_to: localDateValue(yesterday) }
-          })()
+          ? { date_to: shiftIsoDate(today, -1) }
           : undefined
 
   const { data, isPending, isError, error, refetch } = usePrescriptionFollowUps(dateRange)
@@ -278,6 +253,7 @@ function RowActions({
   today,
   isReception,
   canManageAppointments,
+  busy,
   onReschedule,
   onMarkNoShow,
   onCancel,
@@ -286,6 +262,7 @@ function RowActions({
   today: string
   isReception: boolean
   canManageAppointments: boolean
+  busy: boolean
   onReschedule: () => void
   onMarkNoShow: () => void
   onCancel: () => void
@@ -312,7 +289,7 @@ function RowActions({
       (appt.status === 'BOOKED' || appt.status === 'TO_ARRIVE' || appt.status === 'REGISTERED')) ||
     (isReception &&
       (appt.status === 'ARRIVED' || appt.status === 'CHECKED_IN' || appt.status === 'WAITING') &&
-      (appt.consultation_status == null || appt.consultation_status === 'WAITING'))
+      appt.consultation_status === 'WAITING')
 
   if (!canCheckIn && !canReschedule && !canMarkNoShow && !canCancel) {
     return <span className="text-xs text-slate-500">—</span>
@@ -327,7 +304,7 @@ function RowActions({
         </button>
       )}
       {canMarkNoShow && (
-        <button type="button" onClick={onMarkNoShow} className={SECONDARY_BUTTON}>
+        <button type="button" disabled={busy} onClick={onMarkNoShow} className={SECONDARY_BUTTON}>
           No-Show
         </button>
       )}
@@ -349,9 +326,11 @@ function RescheduleModal({
   onClose: () => void
   onConflict: () => void
 }) {
-  const today = istToday()
+  const today = useIstToday()
+  const requiresTomorrowMin = appt.status !== 'BOOKED' && appt.appointment_date === today
+  const minDate = requiresTomorrowMin ? shiftIsoDate(today, 1) : today
   const [date, setDate] = useState(() =>
-    appt.appointment_date >= today ? appt.appointment_date : today,
+    appt.appointment_date >= minDate ? appt.appointment_date : minDate,
   )
   const [time, setTime] = useState(() => appt.expected_time?.slice(0, 5) ?? '')
   const [reason, setReason] = useState('')
@@ -414,7 +393,7 @@ function RescheduleModal({
             id="reschedule-date"
             data-autofocus
             type="date"
-            min={today}
+            min={minDate}
             value={date}
             onChange={(e) => setDate(e.target.value)}
             required
@@ -489,7 +468,9 @@ export function AppointmentsReception() {
       : isDoctor
         ? 'Bookings by date and doctor. Your live queue for today is on My Queue.'
         : 'Manage bookings by date and doctor: book, reschedule, or cancel appointments. Live queue is managed in Waiting Room.'
-  const [selectedDate, setSelectedDate] = useState(istToday)
+  const today = useIstToday()
+  const prevTodayRef = useRef(today)
+  const [selectedDate, setSelectedDate] = useState(today)
   const [selectedDoctorId, setSelectedDoctorId] = useState<number | undefined>(undefined)
   const [statusView, setStatusView] = useState<StatusView>('active')
   const [bookingOpen, setBookingOpen] = useState(false)
@@ -499,17 +480,29 @@ export function AppointmentsReception() {
   const [conflictError, setConflictError] = useState<string | null>(null)
   const [actionError, setActionError] = useState<string | null>(null)
 
-  // Pre-filter to logged-in doctor if role is DOCTOR and not explicitly modified
+  // Roll selectedDate across IST midnight only if the user stayed on the previous today
   useEffect(() => {
-    if (isDoctor && me?.doctor_id && selectedDoctorId === undefined) {
+    if (prevTodayRef.current !== today) {
+      const previousToday = prevTodayRef.current
+      prevTodayRef.current = today
+      setSelectedDate((current) => (current === previousToday ? today : current))
+    }
+  }, [today])
+
+  // Pre-filter to logged-in doctor once so DOCTOR users can switch to "All doctors" without snapping back
+  const appliedDoctorDefaultRef = useRef<boolean>(false)
+  useEffect(() => {
+    if (!appliedDoctorDefaultRef.current && isDoctor && me?.doctor_id) {
+      appliedDoctorDefaultRef.current = true
       setSelectedDoctorId(me.doctor_id)
     }
-  }, [isDoctor, me?.doctor_id, selectedDoctorId])
+  }, [isDoctor, me?.doctor_id])
 
   // Cancel dialog state
   const [cancellingAppt, setCancellingAppt] = useState<Appointment | null>(null)
   const [cancelReason, setCancelReason] = useState('')
   const [cancelError, setCancelError] = useState<string | null>(null)
+  const statusUpdateInFlightRef = useRef(false)
 
   const closeCancel = () => {
     setCancellingAppt(null)
@@ -524,19 +517,19 @@ export function AppointmentsReception() {
     isError,
     error,
     refetch,
-  } = useAppointments({
-    appointment_date: selectedDate,
-    doctor_id: selectedDoctorId,
-  })
+  } = useAppointments(
+    {
+      appointment_date: selectedDate,
+      doctor_id: selectedDoctorId,
+    },
+    { enabled: activeTab === 'today' },
+  )
 
   const updateStatusMutation = useUpdateAppointmentStatus()
 
   const handleDateShift = (days: number) => {
-    const base = selectedDate || istToday()
-    const d = new Date(`${base}T00:00:00Z`)
-    if (Number.isNaN(d.getTime())) return
-    d.setUTCDate(d.getUTCDate() + days)
-    setSelectedDate(d.toISOString().slice(0, 10))
+    const base = selectedDate || today
+    setSelectedDate(shiftIsoDate(base, days))
   }
 
   const handleUpdateStatus = async (
@@ -544,6 +537,8 @@ export function AppointmentsReception() {
     newStatus: AppointmentStatus,
     reason?: string,
   ) => {
+    if (statusUpdateInFlightRef.current || updateStatusMutation.isPending) return
+    statusUpdateInFlightRef.current = true
     const inCancelModal = newStatus === 'CANCELLED'
     setConflictError(null)
     setActionError(null)
@@ -569,10 +564,11 @@ export function AppointmentsReception() {
       } else {
         setActionError(err instanceof Error ? err.message : 'Failed to update status.')
       }
+    } finally {
+      statusUpdateInFlightRef.current = false
     }
   }
 
-  const today = istToday()
   const appointments = appointmentsData?.appointments || []
   const activeAppointments = appointments.filter(
     (a) => a.status !== 'CANCELLED' && a.status !== 'RESCHEDULED',
@@ -603,7 +599,7 @@ export function AppointmentsReception() {
             <h1 className="text-xl font-bold tracking-tight text-slate-900">{pageTitle}</h1>
             <p className="mt-0.5 text-sm text-slate-600">{pageDescription}</p>
           </div>
-          {canManageAppointments ? (
+          {isReception && canManageAppointments ? (
             <div className="flex flex-wrap gap-2">
               <button
                 type="button"
@@ -613,19 +609,10 @@ export function AppointmentsReception() {
                 <IconPlus className="h-4 w-4" />
                 Book Appointment
               </button>
-              {isReception && (
-                <Link
-                  to="/reception/tokens"
-                  className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-700 shadow-2xs hover:bg-slate-50"
-                >
-                  <IconTicket className="h-4 w-4 text-emerald-800" />
-                  Check-in &amp; Token
-                </Link>
-              )}
             </div>
-          ) : (
+          ) : !canManageAppointments ? (
             <span className="rounded-lg bg-slate-100 px-3 py-2 text-xs font-semibold text-slate-600">Read-only schedule</span>
-          )}
+          ) : null}
         </div>
 
         {/* Tabs only when there is a choice: reception has a single view here. */}
@@ -747,7 +734,7 @@ export function AppointmentsReception() {
             <div className="flex flex-wrap items-end gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-xs">
               <div>
                 <label htmlFor="queue-date" className="mb-1 block text-xs font-semibold text-slate-600">Date</label>
-                <div className="flex items-center gap-1.5">
+                <div className="flex flex-wrap items-center gap-1.5">
                   <button type="button" onClick={() => handleDateShift(-1)} className={SECONDARY_BUTTON} aria-label="Previous day">&larr;</button>
                   <input
                     id="queue-date"
@@ -757,7 +744,7 @@ export function AppointmentsReception() {
                     className="min-h-9 rounded-lg border border-slate-300 px-2 text-sm text-slate-900 focus:outline-none focus:ring-1 focus:ring-[#8E1C3D]"
                   />
                   <button type="button" onClick={() => handleDateShift(1)} className={SECONDARY_BUTTON} aria-label="Next day">&rarr;</button>
-                  <button type="button" onClick={() => setSelectedDate(istToday())} className={SECONDARY_BUTTON}>Today</button>
+                  <button type="button" onClick={() => setSelectedDate(today)} className={SECONDARY_BUTTON}>Today</button>
                 </div>
               </div>
               <div>
@@ -781,6 +768,7 @@ export function AppointmentsReception() {
                 <span><strong>{activeCount('ARRIVED')}</strong> Arrived</span>
                 <span><strong>{activeCount('CHECKED_IN')}</strong> Checked In</span>
                 <span><strong>{activeCount('COMPLETED')}</strong> Completed</span>
+                <span><strong>{activeCount('NO_SHOW')}</strong> No-show</span>
               </div>
             </div>
 
@@ -824,7 +812,7 @@ export function AppointmentsReception() {
               ) : visibleAppointments.length === 0 ? (
                 <div className="space-y-4 p-12 text-center">
                   <p className="text-sm font-medium text-slate-600">{emptyMessage}</p>
-                  {canManageAppointments && statusView !== 'cancelled' && (
+                  {isReception && canManageAppointments && statusView !== 'cancelled' && (
                     <button
                       type="button"
                       onClick={() => setBookingOpen(true)}
@@ -868,9 +856,10 @@ export function AppointmentsReception() {
                               )}
                             </td>
                             <td className="block md:table-cell md:px-4 md:py-3">
-                              <span className={`inline-flex min-h-7 items-center rounded-full px-2.5 text-xs font-semibold ring-1 ring-inset ${LIFECYCLE_CLASS[stage]}`}>
-                                {LIFECYCLE_LABEL[stage]}
-                              </span>
+                              <AppointmentStatusBadge
+                                status={stage === 'ARRIVED' ? 'TO_ARRIVE' : stage}
+                                label={stage === 'ARRIVED' ? 'Arrived' : undefined}
+                              />
                               {appt.status === 'CANCELLED' && appt.cancellation_reason && (
                                 <span className="mt-1 block max-w-xs truncate text-xs text-slate-500">{appt.cancellation_reason}</span>
                               )}
@@ -882,6 +871,7 @@ export function AppointmentsReception() {
                                   today={today}
                                   isReception={isReception}
                                   canManageAppointments={canManageAppointments}
+                                  busy={updateStatusMutation.isPending}
                                   onReschedule={() => setReschedulingAppt(appt)}
                                   onMarkNoShow={() => handleUpdateStatus(appt, 'NO_SHOW')}
                                   onCancel={() => {
@@ -927,9 +917,12 @@ export function AppointmentsReception() {
                 <form
                   onSubmit={(e) => {
                     e.preventDefault()
-                    if (cancelReason.trim()) {
-                      void handleUpdateStatus(cancellingAppt, 'CANCELLED', cancelReason.trim())
+                    const trimmed = cancelReason.trim()
+                    if (trimmed.length < 3) {
+                      setCancelError('Please enter at least 3 characters for the cancellation reason.')
+                      return
                     }
+                    void handleUpdateStatus(cancellingAppt, 'CANCELLED', trimmed)
                   }}
                   className="space-y-4"
                 >
@@ -953,6 +946,7 @@ export function AppointmentsReception() {
                       onChange={(e) => setCancelReason(e.target.value)}
                       placeholder="Reason for cancellation (e.g. Patient called to reschedule)..."
                       rows={3}
+                      minLength={3}
                       required
                       className="w-full rounded border border-neutral-300 p-2 text-sm focus:outline-none focus:ring-1 focus:ring-red-800"
                     />
@@ -968,7 +962,7 @@ export function AppointmentsReception() {
                     </button>
                     <button
                       type="submit"
-                      disabled={!cancelReason.trim() || updateStatusMutation.isPending}
+                      disabled={cancelReason.trim().length < 3 || updateStatusMutation.isPending}
                       className="rounded bg-red-700 px-3 py-1.5 text-sm font-medium text-white hover:bg-red-800 disabled:opacity-50"
                     >
                       Confirm Cancellation
@@ -993,7 +987,7 @@ export function AppointmentsReception() {
           )
         )}
 
-        {bookingOpen && (
+        {bookingOpen && isReception && canManageAppointments && (
           <AppointmentBookingModal
             isOpen
             initialDate={selectedDate}
