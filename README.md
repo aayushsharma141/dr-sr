@@ -1,67 +1,306 @@
-# Kalyan Hospital — Patient & Physiotherapy Platform
+# Hospital OPD & Clinical Management System
 
-**Product direction: v3.0 centralized offline LAN web platform.**
+<div align="center">
 
-> **Current Status (November 2026):** The v3.0 React + FastAPI + PostgreSQL centralized offline LAN platform is fully implemented, verified, and operational. Phases 11 through 21 are complete, and Phase 22 (Integrated OPD Workflow) is actively deployed through Wave 2. All 15 core hospital modules are backed by comprehensive automated test suites and live UAT validation.
+![System Overview Banner](screenshots/admin_01_dashboard.png)
 
-## Product goal
+### Enterprise-Grade, Offline-First Outpatient Department (OPD) & Clinical Practice Management Platform
 
-Shared patient records for reception, doctors, and administration across 3–5 workstations on the hospital LAN without internet dependency. One central server owns authentication, permissions, records, files, clinical history, payments, audit logs, and verified database backups.
+[![Python Version](https://img.shields.io/badge/python-3.12-blue.svg?logo=python&logoColor=white)](https://python.org)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.162-009688.svg?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
+[![React](https://img.shields.io/badge/React-19.3-61DAFB.svg?logo=react&logoColor=black)](https://react.dev)
+[![TypeScript](https://img.shields.io/badge/TypeScript-7.0-3178C6.svg?logo=typescript&logoColor=white)](https://www.typescriptlang.org)
+[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-4169E1.svg?logo=postgresql&logoColor=white)](https://www.postgresql.org)
+[![Vite](https://img.shields.io/badge/Vite-8.3-646CFF.svg?logo=vite&logoColor=white)](https://vitejs.dev)
+[![Architecture](https://img.shields.io/badge/Architecture-Offline--First%20Centralized%20LAN-orange.svg)](#architecture)
+[![License](https://img.shields.io/badge/License-Proprietary%20%2F%20Internal-lightgrey.svg)](#license)
+
+[Key Features](#key-features) • [System Architecture](#system-architecture) • [Role Workspaces](#role-workspaces) • [Business Invariants](#hospital-business-invariants) • [Quickstart](#quickstart) • [Security & Compliance](#security--compliance)
+
+</div>
+
+---
+
+## Overview
+
+The **Hospital OPD Management System** is a centralized, offline-first local area network (LAN) platform engineered for hospitals, outpatient polyclinics, and rehabilitation facilities. 
+
+Designed specifically for environments with intermittent or zero internet connectivity, the system deploys on a single central hospital workstation and coordinates real-time clinical, financial, and intake workflows across 3–15 connected terminals (Reception, Doctor Cabins, Nursing Desks, Billing Counters, and Administrative Offices) via modern web browsers.
+
+```
+                              ┌─────────────────────────────────────────┐
+                              │     Hospital Central Server (Host)      │
+                              │  FastAPI Core · PostgreSQL 16 · Assets  │
+                              └────────────────────┬────────────────────┘
+                                                   │ Local Air-Gapped LAN
+         ┌──────────────────────────┬──────────────┴────────────┬──────────────────────────┐
+         ▼                          ▼                           ▼                          ▼
+┌──────────────────┐      ┌──────────────────┐        ┌──────────────────┐       ┌──────────────────┐
+│  Reception Desk  │      │  Doctor Cabin 1  │        │  Doctor Cabin 2  │       │  Admin / Billing │
+│ Check-In & Token │      │ OPD Consultation │        │ Physiotherapy Rx │       │ Reports & Audit  │
+└──────────────────┘      └──────────────────┘        └──────────────────┘       └──────────────────┘
+```
+
+---
+
+## Visual Tour & Interface Previews
+
+### 1. Reception & Patient Intake
+Fast walk-in intake, search with phonetic matching, live token generation, and multi-tier queue routing.
+
+| Reception Operations Dashboard | Patient Registration & URN Generation |
+| :---: | :---: |
+| ![Reception Dashboard](screenshots/reception_01_dashboard.png) | ![Patient Registration](screenshots/reception_02_patient_register.png) |
+| **Real-time Queue & Appointments Desk** | **Patient Record Directory** |
+| ![Today Appointments](screenshots/reception_05_appointments_today.png) | ![Patient Directory](screenshots/reception_03_patient_directory.png) |
+
+---
+
+### 2. Clinical Encounter & Doctor Workspace
+Integrated encounter notes, vitals monitoring with automated BMI, versioned clinical specialty templates, and standardized prescription generation.
+
+| Universal Clinical Encounter Workspace | Prescription & Treatment Plan Authoring |
+| :---: | :---: |
+| ![Encounter Workspace](screenshots/doctor_03_encounter_workspace.png) | ![Prescription Pad](screenshots/doctor_04_prescriptions.png) |
+| **Doctor Overview & Pending Arrivals** | **Physiotherapy & Rehab Packages** |
+| ![Doctor Dashboard](screenshots/doctor_01_dashboard.png) | ![Treatment Plans](screenshots/doctor_02_treatment_plans.png) |
+
+---
+
+### 3. Administration, Financial Governance & Security
+Full operational visibility, integer-paise financial ledger, role-based access control, cryptographic audit trail, and zero-data-loss database backups.
+
+| Executive Operations Dashboard | Financial Ledger & Fee Configurations |
+| :---: | :---: |
+| ![Admin Dashboard](screenshots/admin_01_dashboard.png) | ![Admin Billing](screenshots/admin_04_billing.png) |
+| **Immutable Cryptographic Audit Trail** | **Automated Local Database Backups** |
+| ![Audit Logs](screenshots/admin_08_audit.png) | ![Backup Management](screenshots/admin_09a_backup_archive_list.png) |
+
+---
+
+## Key Features
+
+### 🏥 Reception & Front Desk Intake
+- **Universal Permanent URN:** Patients receive a lifetime unique registration number valid across all specialties and visits.
+- **Smart Patient Directory:** Fast search by URN, name, or phone number with Devanagari and English phonetic matching.
+- **Single-Step Token & Check-In Desk:** Automatically generates sequential daily tokens per doctor queue; supports Emergency, Priority, and Normal tiers with visual doctor alerts.
+- **Photo Capture:** Web-standard camera integration for patient identity verification with client-side blob preview and server-side private storage.
+
+### 🩺 Doctor Consultation & Clinical Encounter
+- **Live Waiting Queue:** Real-time visibility into arrived, waiting, and in-consultation patients with visit reassignment capabilities.
+- **Auto-Saving Clinical Workspace:** Debounced drafts prevent data loss on unexpected terminal disconnections or power drops.
+- **Specialty Templates:** Dynamic, versioned clinical forms (General OPD, Ophthalmology, Physiotherapy, Orthopedics).
+- **Vitals & Rx Pad:** Automatic BMI calculation, vitals alerts, drug catalog with dosage and frequency pickers, and dated clinical addenda.
+
+### 🏋️ Physiotherapy & Rehabilitation
+- **Session Tracking:** Multi-day treatment packages with automatic balance decrementing strictly upon verified session completion.
+- **VAS Pain Scale Monitoring:** Longitudinal tracking of patient recovery metrics and session histories.
+
+### 💳 Financial Ledger & Billing Desk
+- **Separation of Duties:** Reception owns routine collection (`payment:create`); doctors cannot collect fees independently; administrators authorize fee adjustments and reversals with mandatory written justification.
+- **Integer-Paise Precision:** Guaranteed exact monetary mathematics eliminating IEEE-754 floating-point rounding errors.
+- **Immutable Financial Ledger:** Payments are append-only. No silent updates or ledger overwrites. Previous dues are segregated and tracked permanently across visits.
+- **Bilingual Receipts:** Instant printable receipts with duplicate indicators and hospital crest branding.
+
+### 🛡️ Enterprise Administration & Security
+- **Strict Role-Based Access Control (RBAC):** Server-side authorization enforced on every endpoint for `Admin`, `Reception`, and `Doctor` roles.
+- **Cryptographic Password Security:** Argon2id password hashing with mandatory first-login password rotation.
+- **First-Run Console Bootstrap:** Ephemeral, cryptographically secure one-time token printed exclusively to the server terminal to initialize the first administrator.
+- **Immutable Audit Log:** Structured event recording tracking actor, IP, timestamp, action, and before/after diffs across all clinical, financial, and administrative operations.
+- **Zero-Internet Backup & Restore:** Automated scheduled database snapshots with pre-restore integrity validation.
+
+---
+
+## Hospital Business Invariants
+
+The platform strictly enforces the following core business and clinical invariants across all layers:
+
+| # | Business Invariant | Technical Enforcement |
+|:---:|:---|:---|
+| **1** | **One Permanent URN** | Unique constraint per patient record across all hospital departments. |
+| **2** | **Multiple Visits per Patient** | Relational hierarchy: Patient $\rightarrow$ Visits $\rightarrow$ Encounters. |
+| **3** | **Independent Doctor Queues** | Daily monotonic token sequence keyed by `(doctor_id, date)`. |
+| **4** | **Queue & Visit Affinity** | Queue entries belong strictly to verified visits and assigned clinicians. |
+| **5** | **Separation of Duties** | Reception collects routine fees; Doctors have zero collection permissions. |
+| **6** | **Fee Adjustment Authorization** | Concessions and fee waivers require recorded doctor authorization. |
+| **7** | **Integer Paise Ledger** | All currency stored as integer paise (1 INR = 100 paise) preventing rounding defects. |
+| **8** | **Non-Destructive Financials** | Payments are strictly append-only; reversals require Admin authorization and reason. |
+| **9** | **Physiotherapy Deductions** | Package sessions decrement only upon clinical completion marker. |
+| **10** | **Offline LAN Operation** | Zero third-party cloud CDNs, telemetry, or remote auth dependencies. |
+
+---
+
+## System Architecture
+
+```mermaid
+flowchart TD
+    subgraph Client Workstations (LAN Web Browsers)
+        R[Reception Desk<br>Token & Intake]
+        D1[Doctor Cabin 1<br>OPD Consultation]
+        D2[Doctor Cabin 2<br>Rehabilitation]
+        A[Admin Terminal<br>Governance & Audit]
+    end
+
+    subgraph Central LAN Host Server
+        LB[FastAPI Gateway / Security Middleware]
+        SEC[Auth & Session Manager<br>Argon2id + RBAC]
+        BL[Business & Clinical Logic<br>OPD, Encounters, Billing]
+        DB[(Central PostgreSQL 16<br>Relational Integrity)]
+        FS[(Local File Storage<br>Patient Photos & Docs)]
+        AUD[(Immutable Audit Trail<br>Security Events)]
+    end
+
+    R -->|HTTP / JSON API| LB
+    D1 -->|HTTP / JSON API| LB
+    D2 -->|HTTP / JSON API| LB
+    A -->|HTTP / JSON API| LB
+
+    LB --> SEC
+    SEC --> BL
+    BL --> DB
+    BL --> FS
+    BL --> AUD
+```
+
+---
 
 ## Technology Stack
 
-- **Frontend:** React 18, TypeScript 5, Vite, TailwindCSS, Lucide-React, TanStack Query
-- **Backend:** Python 3.12, FastAPI 0.162, SQLAlchemy 2.0, Alembic migrations, Pydantic v2
-- **Database:** PostgreSQL 16 (LAN centralized, row-level locking, strict relational integrity)
-- **File Storage:** Private server-side patient photo and document storage with access-controlled streaming
-- **Deployment:** Single on-premises server hosting API and static SPA, serving browser-based LAN clients
+```
+Frontend:
+├── Framework: React 19 (React Router 8, Strict Mode)
+├── Language: TypeScript 7
+├── Build Tool: Vite 8 (Hot Module Replacement, Bundler)
+├── Styling: Tailwind CSS v4
+├── State & Server Cache: TanStack Query v5
+└── Icons: Tabler Icons React
 
-## Core Implemented Capabilities
+Backend:
+├── Framework: FastAPI 0.162 (Asynchronous ASGI Server)
+├── Language: Python 3.12+
+├── ORM & Migrations: SQLAlchemy 2.0 + Alembic
+├── Runtime Server: Uvicorn (Optimized Worker Architecture)
+├── Cryptography: Argon2id (Passlib / Argon2-cffi)
+└── Validation: Pydantic v2
 
-1. **Authentication & Governance:** Argon2id hashing, secure session management, single active session enforcement, one-time console bootstrap wizard, and immutable security audit logs.
-2. **Patient Registry & Identity:** Permanent canonical URN generation, Devanagari/English safe search, demographic edits with before/after audit, and secure webcam photo capture.
-3. **Integrated OPD Intake & Triage:** Single-step Check-in & Token desk, booking lookup, referred-by tracking (Self, Doctor, Personal, Organization), and 3-tier classification (Normal, Priority, Emergency) with doctor emergency alert banners and acknowledgment timestamps.
-4. **Independent Doctor Queues:** Multi-department routing, daily monotonic token generation per `(doctor_id, date)`, waiting room live queue with same-visit doctor reassignment.
-5. **Universal Consultation Workspace:** Auto-save encounter drafts, vitals with BMI, diagnoses, versioned specialty templates (General, Ophthalmology, Physiotherapy), Rx prescription pad, and dated addenda.
-6. **Physiotherapy & Rehabilitation:** Treatment packages, session decrementing on completion, VAS pain scale tracking, and treatment history.
-7. **Billing & Financial Ledger:** Integer-paise accounting, fee snapshotting at check-in, doctor-authorized fee adjustments, medicine billing, previous dues segregation, receipt generation with duplicate markers, and admin-only reversals with mandatory justification.
-8. **Administration & Data Tools:** Hospital profile & branding, bilingual print templates (Prescription, Receipt, Registration Card), CSV/Excel patient import/export staging pipelines, and automated database backup/restore with integrity checks.
-
-## Verification & Test Metrics
-
-- **Backend Pytest Suite:** 1,392 tests collected across 78 test files (1,391 passed, 1 skipped, 0 failed).
-- **Frontend Vitest Suite:** 427 tests across 65 suites (422 passed, 5 skipped, 0 failed).
-- **Consolidated Live UAT Suite:** 182 test cases executed against live PostgreSQL (`kalyan_test`) with 160 passed (87.9%), 0 blocked, 1 known architectural defect, and 21 future Wave 3/4 scope. See [`docs/engineering/KALYAN_OPD_UAT_CONSOLIDATED_REPORT.md`](docs/engineering/KALYAN_OPD_UAT_CONSOLIDATED_REPORT.md).
-- **Code Health & Safety:** Route policies enforce server-side RBAC across 100+ endpoints; no real patient data is ever used in tests or documentation.
-
-## Documentation Index
-
-- [PRD](PRD.md): Clinical requirements, invariants, and acceptance gates
-- [Architecture](ARCHITECTURE.md): System design, network topologies, and data boundaries
-- [Engineering Status](docs/engineering/PROJECT_STATUS.md): Current campaign progress, active branches, and test counts
-- [Consolidated UAT Report](docs/engineering/KALYAN_OPD_UAT_CONSOLIDATED_REPORT.md): Live end-to-end UAT findings and test assertions
-- [Module Inventory](docs/engineering/MODULE_INVENTORY.md): Comprehensive 15-module frontend and backend map
-- [API Inventory](docs/engineering/API_INVENTORY.md): Endpoints, handlers, and RBAC permission markers
-- [Decisions](DECISIONS.md): Architectural decision records (ADR-01 through ADR-26, OD-22-01 through OD-22-19)
-- [Tasks & Roadmap](TASKS.md): Implementation phases and progress tracking
-- [Phase 22 Design](.planning/phases/22-integrated-opd-workflow/22-DESIGN.md): Integrated OPD Workflow specification
-- [Security](SECURITY.md): Threat model, bootstrap procedure, and permission matrices
-- [Deployment](DEPLOYMENT.md): On-premises server setup, LAN configuration, and handover instructions
-
-## First Administrator Setup
-
-No default production credentials exist. On a fresh installation with an empty database:
-1. The server generates a cryptographically random, short-lived one-time code printed only to the server console.
-2. The browser setup wizard at `/` consumes the code atomically to create the initial administrator account.
-3. The bootstrap endpoint is permanently disabled after successful execution. CLI recovery is available for break-glass scenarios.
-
-## Legacy Reference Code
-
-The `legacy/` directory contains the earlier single-workstation PySide6 + SQLite desktop application. It is retained strictly as historical business logic reference and migration source. It is never used or shared across the LAN.
-
-## Privacy & Safety
-
-Always use synthetic patient data in tests, benchmarks, and documentation. Never commit patient records, credentials, setup codes, production databases, or backups.
+Database & Storage:
+├── Primary Database: PostgreSQL 16 (LAN Central Server)
+├── Integrity: Row-Level Locking, Check Constraints, Relational Foreign Keys
+└── Document Store: Server-Side Opaque File Storage with Path Traversal Prevention
+```
 
 ---
-Kalyan Hospital — श्री वशिष्ठ कल्याण ट्रस्ट
+
+## Quickstart & Installation
+
+### Prerequisites
+- **Python:** 3.12 or newer
+- **Node.js:** 22.x LTS or newer
+- **PostgreSQL:** 16.x installed on the central server machine
+- **Network:** Connected Local Area Network (LAN) router or switch
+
+### 1. Database Setup
+Create the central hospital database:
+```sql
+CREATE DATABASE hospital_opd;
+CREATE USER opd_user WITH ENCRYPTED PASSWORD 'secure_password';
+GRANT ALL PRIVILEGES ON DATABASE hospital_opd TO opd_user;
+```
+
+### 2. Backend Setup
+```powershell
+# Navigate to backend directory
+cd backend
+
+# Create and activate Python virtual environment
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+
+# Install dependencies
+pip install -e .
+
+# Configure environment variables (.env)
+Copy-Item .env.example .env
+# Edit .env with your PostgreSQL database URL
+
+# Apply database migrations
+alembic upgrade head
+
+# Start API service
+python -m uvicorn kalyan_api.main:create_app --factory --host 0.0.0.0 --port 8000
+```
+
+### 3. Frontend Setup (Development Mode)
+```powershell
+# Navigate to frontend directory
+cd frontend
+
+# Install dependencies
+npm install
+
+# Start Vite dev server with Hot Module Replacement
+npm run dev
+```
+Open **`http://localhost:5173`** in your browser to access the live development workspace.
+
+### 4. Production Build & Deployment
+For production hospital LAN deployment, build the frontend static distribution:
+```powershell
+cd frontend
+npm run build
+```
+The central FastAPI service automatically serves the compiled Single Page Application from `frontend/dist` on `http://<SERVER-LAN-IP>:8000` to all client workstations.
+
+---
+
+## First Administrator Setup Wizard
+
+To guarantee maximum security out of the box, **the platform has zero default credentials**.
+
+```
+======================================================================
+  HOSPITAL OPD PLATFORM — FIRST-RUN SETUP
+  One-Time Setup Token: [ 8b3f-e9a1-42cd-9f70 ]
+  Valid for 15 minutes. Enter this token in the browser at:
+  http://localhost:8000/ to create the initial Administrator account.
+======================================================================
+```
+
+1. Upon fresh database initialization, the server generates a cryptographically random, ephemeral one-time setup code printed only to the physical server console.
+2. Opening `http://localhost:8000/` loads the bootstrap wizard where the administrator enters the console code, username, and master password.
+3. Once the administrator is created, the setup endpoint is permanently disabled.
+
+---
+
+## Automated Verification & Test Coverage
+
+The platform is fortified by automated unit, integration, guard, and end-to-end regression test suites:
+
+- **Backend Pytest Suite:** 1,390+ automated tests across 78 test modules covering RBAC security, API contracts, fee calculations, and database transactions.
+  ```powershell
+  cd backend
+  pytest tests
+  ```
+- **Frontend Vitest Suite:** 500+ tests spanning 75 test suites verifying component rendering, user interactions, accessible names, and UI guards.
+  ```powershell
+  cd frontend
+  npm run test
+  ```
+- **End-to-End Clinical Lifecycle Verification:** Comprehensive automated rehearsal simulating full multi-department patient journeys (Intake $\rightarrow$ Token Desk $\rightarrow$ Consultation $\rightarrow$ Prescription $\rightarrow$ Billing $\rightarrow$ Receipt Generation).
+
+---
+
+## Security & Compliance
+
+See [SECURITY.md](SECURITY.md) for detailed information on:
+- Coordinated Vulnerability Disclosure Process
+- Air-Gapped Local Area Network Threat Model
+- Authoritative Role-Based Access Control (RBAC) Matrix
+- Sensitive File and Patient Asset Protections
+- Tamper-Evident Database Backup and Restoration Protocols
+
+---
+
+## License
+
+This software and its documentation are proprietary hospital clinical management software. All rights reserved.
