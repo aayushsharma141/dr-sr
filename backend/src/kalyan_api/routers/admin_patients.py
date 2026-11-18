@@ -44,6 +44,10 @@ DEMOGRAPHIC_FIELDS = (
 )
 
 
+def _escape_like(term: str) -> str:
+    return term.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+
+
 @router.get(
     "/search",
     dependencies=[Depends(require(Permission.PATIENT_CORRECT))],
@@ -56,15 +60,16 @@ def search_patients_for_correction(
 ) -> list[PatientOut]:
     """Server-side patient search matching URN, legacy URN, full name, or mobile for correction."""
     q_clean = q.strip()
+    q_escaped = _escape_like(q_clean)
     digits = "".join(c for c in q_clean if c.isdigit())
 
     conditions = [
-        Patient.urn.ilike(f"%{q_clean}%"),
-        Patient.full_name.ilike(f"%{q_clean}%"),
-        Patient.legacy_urn.ilike(f"%{q_clean}%"),
+        Patient.urn.ilike(f"%{q_escaped}%"),
+        Patient.full_name.ilike(f"%{q_escaped}%"),
+        Patient.legacy_urn.ilike(f"%{q_escaped}%"),
     ]
     if digits and len(digits) >= 3:
-        conditions.append(Patient.mobile.like(f"%{digits}%"))
+        conditions.append(Patient.mobile.like(f"%{_escape_like(digits)}%"))
 
     stmt = (
         select(Patient)

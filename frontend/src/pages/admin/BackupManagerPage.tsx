@@ -5,7 +5,7 @@ import { AdminPageHeader } from '../../components/admin/AdminPageHeader'
 import { TableSkeleton } from '../../components/AdminSkeleton'
 import { Modal } from '../../components/Modal'
 import { toast } from '../../components/ToastHost'
-import { useBackups, useCreateBackup, useRestoreBackup, useMe } from '../../api/queries'
+import { useBackups, useCreateBackup, useRestoreBackup, useMe, useBackupSettings } from '../../api/queries'
 import type { BackupArchiveInfo } from '../../api/types'
 import { PatientExportDialog } from '../../components/admin/PatientExportDialog'
 import { ImportWizard } from '../../components/admin/ImportWizard'
@@ -48,6 +48,7 @@ function kindLabel(kind: ArchiveKind): string {
 
 export function BackupManagerPage() {
   const { data: me } = useMe()
+  const { data: backupSettings } = useBackupSettings()
   const [searchParams, setSearchParams] = useSearchParams()
   const [showImportModal, setShowImportModal] = useState(() => searchParams.get('action') === 'import')
   const [importBusy, setImportBusy] = useState(false)
@@ -231,8 +232,14 @@ export function BackupManagerPage() {
           </div>
           <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
             <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Automation status</p>
-            <p className="mt-2 text-lg font-bold text-slate-900">Not reported</p>
-            <p className="mt-1 text-xs text-slate-500">Schedule details are not available from the current server API</p>
+            <p className="mt-2 text-lg font-bold text-slate-900">
+              {backupSettings ? (backupSettings.schedule_enabled ? 'Active' : 'Disabled') : 'Loading…'}
+            </p>
+            <p className="mt-1 text-xs text-slate-500">
+              {backupSettings?.schedule_enabled
+                ? `Automated backups scheduled: ${backupSettings.frequency} at ${backupSettings.run_at}`
+                : 'Automated backups are currently disabled'}
+            </p>
           </div>
         </section>
 
@@ -309,11 +316,11 @@ export function BackupManagerPage() {
                   type="text"
                   maxLength={50}
                   value={label}
-                  onChange={(event) => setLabel(event.target.value)}
-                  placeholder="For example: before software update"
+                  onChange={(event) => setLabel(event.target.value.replace(/[^A-Za-z0-9_-]/g, '_'))}
+                  placeholder="e.g. before_update"
                   className="min-h-11 w-full rounded-lg border border-slate-300 px-3 text-sm focus:border-[#8E1C3D] focus:outline-none focus:ring-2 focus:ring-[#8E1C3D]/15"
                 />
-                <p className="mt-1 text-xs text-slate-500">Use a short description that helps staff identify this copy later.</p>
+                <p className="mt-1 text-xs text-slate-500">Letters, numbers, underscores, and hyphens only (no spaces).</p>
               </div>
               <button type="submit" disabled={createBackup.isPending} className="min-h-11 rounded-lg bg-[#5D0B26] px-5 text-sm font-semibold text-white hover:bg-[#4A081E] disabled:cursor-not-allowed disabled:opacity-50">
                 {createBackup.isPending ? 'Creating backup…' : 'Start backup'}
@@ -324,20 +331,36 @@ export function BackupManagerPage() {
 
         <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
           <div className="flex flex-wrap gap-2 border-b border-slate-200 bg-slate-50 p-2" role="tablist" aria-label="Backup management views">
-            <button type="button" role="tab" aria-selected={activeTab === 'archives'} onClick={() => setActiveTab('archives')} className={`min-h-10 rounded-lg px-4 text-sm font-semibold ${activeTab === 'archives' ? 'bg-white text-[#5D0B26] shadow-sm ring-1 ring-slate-200' : 'text-slate-600 hover:bg-white/70'}`}>
+            <button
+              id="tab-archives"
+              type="button"
+              role="tab"
+              aria-selected={activeTab === 'archives'}
+              aria-controls="panel-archives"
+              onClick={() => setActiveTab('archives')}
+              className={`min-h-10 rounded-lg px-4 text-sm font-semibold ${activeTab === 'archives' ? 'bg-white text-[#5D0B26] shadow-sm ring-1 ring-slate-200' : 'text-slate-600 hover:bg-white/70'}`}
+            >
               Backups <span className="ml-1 text-xs text-slate-500">({archives.length})</span>
             </button>
-            <button type="button" role="tab" aria-selected={activeTab === 'schedule'} onClick={() => setActiveTab('schedule')} className={`min-h-10 rounded-lg px-4 text-sm font-semibold ${activeTab === 'schedule' ? 'bg-white text-[#5D0B26] shadow-sm ring-1 ring-slate-200' : 'text-slate-600 hover:bg-white/70'}`}>
+            <button
+              id="tab-schedule"
+              type="button"
+              role="tab"
+              aria-selected={activeTab === 'schedule'}
+              aria-controls="panel-schedule"
+              onClick={() => setActiveTab('schedule')}
+              className={`min-h-10 rounded-lg px-4 text-sm font-semibold ${activeTab === 'schedule' ? 'bg-white text-[#5D0B26] shadow-sm ring-1 ring-slate-200' : 'text-slate-600 hover:bg-white/70'}`}
+            >
               Schedule & automation
             </button>
           </div>
 
           {activeTab === 'schedule' ? (
-            <div className="p-5 sm:p-7">
+            <div id="panel-schedule" role="tabpanel" aria-labelledby="tab-schedule" className="p-5 sm:p-7">
               <BackupSchedulePanel />
             </div>
           ) : (
-            <>
+            <div id="panel-archives" role="tabpanel" aria-labelledby="tab-archives">
               <div className="border-b border-slate-200 p-4">
                 <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
                   <div>
@@ -445,7 +468,7 @@ export function BackupManagerPage() {
                   </div>
                 </>
               )}
-            </>
+            </div>
           )}
         </section>
 

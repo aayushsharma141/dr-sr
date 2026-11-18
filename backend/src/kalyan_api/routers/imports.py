@@ -1,6 +1,7 @@
 """Patient import staging and execution endpoints (D-20-08 to D-20-14)."""
 
 import json
+from pathlib import Path
 from typing import Any
 
 from fastapi import APIRouter, Depends, File, Form, Request, Response, UploadFile
@@ -38,6 +39,27 @@ from kalyan_api.services.import_service import (
 router = APIRouter(prefix="/admin/imports", tags=["admin-imports"])
 
 
+MAX_IMPORT_BYTES = 50 * 1024 * 1024
+ALLOWED_IMPORT_EXTENSIONS = {".csv", ".xlsx", ".xls"}
+
+
+def _check_upload_file(file: UploadFile) -> None:
+    filename = file.filename or ""
+    ext = Path(filename).suffix.lower()
+    if ext not in ALLOWED_IMPORT_EXTENSIONS:
+        raise ApiError(
+            status_code=422,
+            code="invalid_file_extension",
+            message=f"File extension '{ext}' is not supported. Allowed: {', '.join(sorted(ALLOWED_IMPORT_EXTENSIONS))}",
+        )
+    if file.size and file.size > MAX_IMPORT_BYTES:
+        raise ApiError(
+            status_code=422,
+            code="file_too_large",
+            message="File exceeds maximum allowed size of 50MB",
+        )
+
+
 @router.post(
     "/inspect",
     dependencies=[Depends(require(Permission.PATIENT_IMPORT))],
@@ -47,7 +69,10 @@ async def inspect_import_file(
     file: UploadFile = File(...),
 ) -> InspectFileResponse:
     """Analyze uploaded spreadsheet file structure, detect encoding, and preview headers."""
+    _check_upload_file(file)
     file_bytes = await file.read()
+    if len(file_bytes) > MAX_IMPORT_BYTES:
+        raise ApiError(status_code=422, code="file_too_large", message="File exceeds maximum allowed size of 50MB")
     try:
         result = import_service.inspect_file(file_bytes, file.filename or "unknown.csv")
     except ImportServiceError as exc:
@@ -69,6 +94,7 @@ async def stage_import_batch(
     column_mapping: str = Form(...),
 ) -> BatchSummaryResponse:
     """Stage raw spreadsheet rows into staging table and record PATIENT_IMPORT_STAGED."""
+    _check_upload_file(file)
     try:
         mapping_dict = json.loads(column_mapping)
         if not isinstance(mapping_dict, dict):
@@ -79,6 +105,8 @@ async def stage_import_batch(
         ) from exc
 
     file_bytes = await file.read()
+    if len(file_bytes) > MAX_IMPORT_BYTES:
+        raise ApiError(status_code=422, code="file_too_large", message="File exceeds maximum allowed size of 50MB")
     try:
         batch = import_service.stage_batch(
             session=session,

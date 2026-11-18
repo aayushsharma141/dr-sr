@@ -642,6 +642,7 @@ export function useUpdateClinicSettings() {
       }),
     onSuccess: (data) => {
       qc.setQueryData(['clinic-settings'], data)
+      qc.invalidateQueries({ queryKey: ['clinic-settings'] })
       invalidateAdminSummaries(qc)
     },
   })
@@ -1983,7 +1984,10 @@ export function useReversePayment() {
       queryClient.invalidateQueries({ queryKey: ['timeline'] })
       queryClient.invalidateQueries({ queryKey: ['visits'] })
       queryClient.invalidateQueries({ queryKey: ['visit-bill'] })
-      queryClient.invalidateQueries({ queryKey: ['overview', 'reception'] })
+      queryClient.invalidateQueries({ queryKey: ['receipts'] })
+      queryClient.invalidateQueries({ queryKey: ['pending-dues'] })
+      queryClient.invalidateQueries({ queryKey: ['overview'] })
+      invalidateAdminSummaries(queryClient)
     },
   })
 }
@@ -1998,17 +2002,20 @@ export function usePatientTimeline(patientId: number | null | undefined) {
 }
 
 // Phase 16: Audit Viewer, Backup/Restore & Integrity Queries & Mutations
-export function useAuditLogs(params?: {
-  actor_username?: string
-  action?: string
-  entity_type?: string
-  entity_id?: string
-  outcome?: string
-  date_from?: string
-  date_to?: string
-  page?: number
-  page_size?: number
-}) {
+export function useAuditLogs(
+  params?: {
+    actor_username?: string
+    action?: string
+    entity_type?: string
+    entity_id?: string
+    outcome?: string
+    date_from?: string
+    date_to?: string
+    page?: number
+    page_size?: number
+  },
+  options?: { enabled?: boolean }
+) {
   const searchParams = new URLSearchParams()
   if (params?.actor_username) searchParams.set('actor_username', params.actor_username)
   if (params?.action) searchParams.set('action', params.action)
@@ -2026,6 +2033,7 @@ export function useAuditLogs(params?: {
   return useQuery({
     queryKey: ['audit-logs', params],
     queryFn: () => apiFetch<AuditLogListResponse>(endpoint),
+    enabled: options?.enabled ?? true,
   })
 }
 
@@ -2056,6 +2064,7 @@ export function useCreateBackup() {
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['operations', 'backups'] })
+      queryClient.invalidateQueries({ queryKey: ['backups'] })
       invalidateAdminSummaries(queryClient)
     },
     onError: () => {
@@ -2256,6 +2265,9 @@ export function useUploadAsset() {
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin', 'assets'] })
+      queryClient.invalidateQueries({ queryKey: ['assets'] })
+      queryClient.invalidateQueries({ queryKey: ['branding'] })
+      queryClient.invalidateQueries({ queryKey: ['clinic-settings'] })
     },
   })
 }
@@ -2269,6 +2281,9 @@ export function useDeactivateAsset() {
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin', 'assets'] })
+      queryClient.invalidateQueries({ queryKey: ['assets'] })
+      queryClient.invalidateQueries({ queryKey: ['branding'] })
+      queryClient.invalidateQueries({ queryKey: ['clinic-settings'] })
     },
   })
 }
@@ -2306,6 +2321,7 @@ export function useUpdatePrintTemplate() {
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['admin', 'templates'] })
       queryClient.invalidateQueries({ queryKey: ['admin', 'templates', variables.docType] })
+      queryClient.invalidateQueries({ queryKey: ['print-templates'] })
     },
   })
 }
@@ -2329,6 +2345,8 @@ export function useCorrectPatientDemographics() {
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['admin', 'patients', 'search'] })
       queryClient.invalidateQueries({ queryKey: ['patient', data.id] })
+      queryClient.invalidateQueries({ queryKey: ['patients'] })
+      queryClient.invalidateQueries({ queryKey: ['patient-summary', data.id] })
     },
   })
 }

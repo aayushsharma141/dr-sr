@@ -130,7 +130,8 @@ export function PatientExportDialog({ open, onClose, onExportSuccess }: PatientE
   const hasClinicalFields = selectedFields.some((f) => CLINICAL_FIELD_KEYS.has(f))
   const isReasonValid = reason.trim().length >= 5
   const hasFields = selectedFields.length > 0
-  const canExport = hasFields && isReasonValid && !isExporting
+  const dateRangeInverted = !!(startDate && endDate && startDate > endDate)
+  const canExport = hasFields && isReasonValid && !dateRangeInverted && !isExporting
 
   const toggleField = (fieldKey: string) => {
     setSelectedFields((prev) =>
@@ -299,6 +300,11 @@ export function PatientExportDialog({ open, onClose, onExportSuccess }: PatientE
                 onChange={(e) => setEndDate(e.target.value)}
                 className="mt-1 block h-11 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-xs focus:border-[#8E1C3D] focus:ring-1 focus:ring-[#8E1C3D]"
               />
+              {dateRangeInverted && (
+                <p className="mt-1 text-xs font-medium text-red-600">
+                  End date cannot be earlier than start date.
+                </p>
+              )}
             </div>
 
             <div>

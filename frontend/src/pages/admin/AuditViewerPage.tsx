@@ -198,7 +198,7 @@ export function AuditViewerPage() {
     date_to: dateTo ? istDayEnd(dateTo) : undefined,
     page,
     page_size: PAGE_SIZE,
-  })
+  }, { enabled: !rangeInverted })
 
   const update = (setter: (v: string) => void) => (v: string) => {
     setter(v)

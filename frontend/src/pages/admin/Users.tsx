@@ -20,6 +20,7 @@ import { TableSkeleton } from '../../components/AdminSkeleton'
 import { Modal } from '../../components/Modal'
 import { ConflictBanner } from '../../components/ConflictBanner'
 import { InlineAlert } from '../../components/InlineAlert'
+import { toast } from '../../components/ToastHost'
 import {
   ADMIN_REASON_MAX_LENGTH,
   type BulkDeleteUsersOut,
@@ -275,11 +276,10 @@ function LoginHistoryDialog({ user, onClose }: { user: UserOut; onClose: () => v
               </tr>
             </thead>
             <tbody className="divide-y divide-neutral-200">
-              {data.map((entry, index) => {
+              {data.map((entry) => {
                 const details = historyDetails(entry, user.username)
-                const rowDelay = index * 50
                 return (
-                  <tr key={entry.id} className="align-top transition-colors" style={{ transitionDelay: `${rowDelay}ms` }}>
+                  <tr key={entry.id} className="align-top transition-colors">
                     <td className="px-3 py-2 whitespace-nowrap">{formatDateTime(entry.occurred_at)}</td>
                     <td className="px-3 py-2">{HISTORY_ACTION_LABEL[entry.action] ?? entry.action}</td>
                     <td className="px-3 py-2">
@@ -462,7 +462,6 @@ export function Users() {
   const now = useNow(30000)
 
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
-  const [successNotice, setSuccessNotice] = useState<string | null>(null)
   const [selectedIds, setSelectedIds] = useState<Set<number>>(() => new Set())
   // Snapshot of the accounts the dialog was opened for, so the result view survives the list refresh.
   const [bulkUsers, setBulkUsers] = useState<UserOut[] | null>(null)
@@ -568,10 +567,10 @@ export function Users() {
 
     try {
       const created: UserCreatedOut = await createMutation.mutateAsync({
-        username: newUsername,
-        full_name: newFullName,
+        username: newUsername.trim(),
+        full_name: newFullName.trim(),
         role: newRole,
-        doctor_name_en: newRole === 'DOCTOR' ? newDoctorName : null,
+        doctor_name_en: newRole === 'DOCTOR' ? (newDoctorName.trim() || null) : null,
       })
       setCreateOpen(false)
       setTempPasswordNotice({
@@ -589,12 +588,12 @@ export function Users() {
     setEditError(null)
     setIsConflict(false)
 
-    const payload: UserUpdate = { full_name: editFullName, version_id: editVersionId }
+    const payload: UserUpdate = { full_name: editFullName.trim(), version_id: editVersionId }
     if (editRole !== editUser.role) payload.role = editRole
 
     try {
       await updateMutation.mutateAsync({ id: editUser.id, payload })
-      setSuccessNotice(`Account updated: ${editUser.username}`)
+      toast.success(`Account updated: ${editUser.username}`)
       setEditUser(null)
       refetchUsers()
     } catch (err: unknown) {
@@ -634,28 +633,27 @@ export function Users() {
     try {
       if (type === 'deactivate') {
         await deactivateMutation.mutateAsync({ id: user.id, payload })
-        setSuccessNotice(`Account deactivated: ${user.username}`)
+        toast.success(`Account deactivated: ${user.username}`)
       } else if (type === 'reactivate') {
         await reactivateMutation.mutateAsync({ id: user.id, payload })
-        setSuccessNotice(`Account reactivated: ${user.username}`)
+        toast.success(`Account reactivated: ${user.username}`)
       } else if (type === 'reset-password') {
         const res = await resetPasswordMutation.mutateAsync({ id: user.id, payload })
-        setSuccessNotice(null)
         setTempPasswordNotice({ username: user.username, password: res.temporary_password })
       } else if (type === 'unlock') {
         await unlockMutation.mutateAsync({ id: user.id, payload })
-        setSuccessNotice(`Account unlocked: ${user.username}`)
+        toast.success(`Account unlocked: ${user.username}`)
       } else if (type === 'delete') {
         await deleteMutation.mutateAsync({
           id: user.id,
           payload: { ...payload, super_admin_password: superAdminPassword },
         })
-        setSuccessNotice(`Account deleted: ${user.username}`)
+        toast.success(`Account deleted: ${user.username}`)
       } else {
         const res = await revokeSessionsMutation.mutateAsync({ id: user.id, payload: { reason } })
         const count = res.revoked_count
         const sessions = count === 1 ? '1 session' : `${count} sessions`
-        setSuccessNotice(
+        toast.success(
           `Signed out ${sessions} for ${user.username}.${res.kept_current_session ? ' Your current session was kept.' : ''}`,
         )
       }
@@ -697,7 +695,7 @@ export function Users() {
   const handleBulkFinished = (out: BulkDeleteUsersOut) => {
     setBulkUsers(null)
     setSelectedIds(new Set())
-    setSuccessNotice(
+    toast.success(
       `Deleted ${out.deleted_count} ${out.deleted_count === 1 ? 'account' : 'accounts'}${
         out.skipped_count > 0 ? `, skipped ${out.skipped_count}` : ''
       }.`,
@@ -717,12 +715,6 @@ export function Users() {
             </button>
           }
         />
-
-        {successNotice && (
-          <InlineAlert tone="success" onDismiss={() => setSuccessNotice(null)}>
-            {successNotice}
-          </InlineAlert>
-        )}
 
         {isPending && <TableSkeleton label="Loading user accounts..." rows={5} columns={6} />}
 
@@ -1024,7 +1016,7 @@ export function Users() {
               )}
 
               <div className="flex items-center justify-end gap-3 pt-2">
-                <button type="button" onClick={() => setCreateOpen(false)} className={BTN_SECONDARY}>
+                <button type="button" onClick={() => setCreateOpen(false)} disabled={createMutation.isPending} className={BTN_SECONDARY}>
                   Cancel
                 </button>
                 <button type="submit" disabled={createMutation.isPending} className={BTN_PRIMARY}>
@@ -1089,7 +1081,7 @@ export function Users() {
               </div>
 
               <div className="flex items-center justify-end gap-3 pt-2">
-                <button type="button" onClick={() => setEditUser(null)} className={BTN_SECONDARY}>
+                <button type="button" onClick={() => setEditUser(null)} disabled={updateMutation.isPending} className={BTN_SECONDARY}>
                   Cancel
                 </button>
                 <button type="submit" disabled={updateMutation.isPending || isReloading} className={BTN_PRIMARY}>

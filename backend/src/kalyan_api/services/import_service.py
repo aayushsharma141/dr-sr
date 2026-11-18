@@ -632,27 +632,6 @@ def resolve_duplicate(
     return row
 
 
-def bulk_resolve_duplicates(
-    session: Session,
-    batch_id: str,
-    resolution: str = "SKIP",
-) -> int:
-    """Bulk update all duplicate rows in a batch to resolution (default 'SKIP')."""
-    if resolution not in ("SKIP", "IMPORT_AS_NEW"):
-        raise ValueError("Resolution must be 'SKIP' or 'IMPORT_AS_NEW'")
-
-    rows = session.scalars(
-        select(PatientImportRow).where(
-            PatientImportRow.batch_id == batch_id,
-            PatientImportRow.validation_status == "DUPLICATE",
-        )
-    ).all()
-    for r in rows:
-        r.duplicate_resolution = resolution
-    session.flush()
-    return len(rows)
-
-
 def commit_batch(
     session: Session,
     user_id: int,

@@ -4,6 +4,7 @@ import re
 
 from fastapi import APIRouter, Depends, Request
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from kalyan_api import clock
@@ -43,10 +44,14 @@ def _unique_code(session: Session, name_en: str) -> str:
     response_model=list[DepartmentOut],
     dependencies=[Depends(require(Permission.DOCTOR_READ))],
 )
-def list_departments(session: SessionDep) -> list[DepartmentOut]:
-    rows = session.scalars(
-        select(Department).where(Department.is_active.is_(True)).order_by(Department.name_en)
-    ).all()
+def list_departments(
+    session: SessionDep,
+    include_inactive: bool = False,
+) -> list[DepartmentOut]:
+    stmt = select(Department).order_by(Department.name_en)
+    if not include_inactive:
+        stmt = stmt.where(Department.is_active.is_(True))
+    rows = session.scalars(stmt).all()
     return [DepartmentOut.model_validate(row) for row in rows]
 
 
@@ -69,7 +74,14 @@ def create_department(
         description=payload.description,
     )
     session.add(row)
-    session.flush()
+    try:
+        session.flush()
+    except IntegrityError as exc:
+        raise ApiError(
+            status_code=409,
+            code="department_conflict",
+            message=f"A department with name '{payload.name_en}' or code already exists.",
+        ) from exc
     audit_service.record(
         session,
         build_audit_context(request, principal),

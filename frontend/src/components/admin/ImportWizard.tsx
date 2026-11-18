@@ -316,11 +316,14 @@ export function ImportWizard({ onBusyChange }: ImportWizardProps = {}) {
       setCurrentStage('reconcile')
     } catch (err) {
       const apiErr = err instanceof ApiError ? err : null
+      const isBackupError = apiErr?.message?.toLowerCase().includes('backup') || (apiErr?.status === 500 && String((apiErr?.body as any)?.detail || '').toLowerCase().includes('backup'))
       setErrorMessage({
-        title: 'Import commit aborted because pre-import safety backup failed.',
+        title: isBackupError
+          ? 'Import commit aborted because pre-import safety backup failed.'
+          : 'Import commit failed.',
         body:
           apiErr?.message ||
-          'The automated database backup encountered a disk or permission error. Check server storage space in System Health, verify backup configuration, and retry "Commit Import Batch".',
+          'The import commit encountered an unexpected error. Please verify server logs and retry.',
       })
     } finally {
       setIsCommitting(false)
@@ -748,10 +751,11 @@ export function ImportWizard({ onBusyChange }: ImportWizardProps = {}) {
             </button>
             <button
               type="button"
+              disabled={isLoading}
               onClick={handleSaveResolutionsAndPreview}
-              className="min-h-[44px] cursor-pointer rounded-lg bg-[#8E1C3D] px-6 py-2 text-sm font-semibold text-white shadow-xs hover:bg-[#721630]"
+              className="min-h-[44px] cursor-pointer rounded-lg bg-[#8E1C3D] px-6 py-2 text-sm font-semibold text-white shadow-xs hover:bg-[#721630] disabled:cursor-not-allowed disabled:opacity-50"
             >
-              Resolve Duplicate Records
+              {isLoading ? 'Resolving...' : 'Resolve Duplicate Records'}
             </button>
           </div>
         </div>

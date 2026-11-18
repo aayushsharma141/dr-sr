@@ -588,18 +588,24 @@ def create_backup(
         manifest_path = payload_dir / "manifest.json"
         manifest_path.write_text(json.dumps(manifest.to_dict(), indent=2), encoding="utf-8")
 
-        # 5. Create .tar.gz bundle
-        with tarfile.open(final_archive_path, "w:gz") as tar:
-            # Add manifest
-            tar.add(manifest_path, arcname="manifest.json")
-            # Add db.sql
-            tar.add(db_dump_file, arcname="db.sql")
-            # Add photos dir
-            tar.add(photos_target_dir, arcname="photos")
-            # Add assets dir
-            tar.add(assets_target_dir, arcname="assets")
-            # Add documents dir
-            tar.add(documents_target_dir, arcname="documents")
+        # 5. Create .tar.gz bundle atomically via .part file
+        part_path = final_archive_path.with_name(f"{final_archive_path.name}.part")
+        try:
+            with tarfile.open(part_path, "w:gz") as tar:
+                # Add manifest
+                tar.add(manifest_path, arcname="manifest.json")
+                # Add db.sql
+                tar.add(db_dump_file, arcname="db.sql")
+                # Add photos dir
+                tar.add(photos_target_dir, arcname="photos")
+                # Add assets dir
+                tar.add(assets_target_dir, arcname="assets")
+                # Add documents dir
+                tar.add(documents_target_dir, arcname="documents")
+            part_path.replace(final_archive_path)
+        finally:
+            if part_path.exists():
+                part_path.unlink(missing_ok=True)
 
     return final_archive_path
 

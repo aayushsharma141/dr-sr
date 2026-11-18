@@ -2,6 +2,7 @@
 
 from fastapi import APIRouter, Depends, Query, Request
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 
 from kalyan_api.core.errors import ApiError, require_version
 from kalyan_api.core.permissions import Permission, Role
@@ -89,7 +90,14 @@ def create_doctor(
         default_fee_paise=payload.default_fee_paise,
     )
     session.add(doc)
-    session.flush()
+    try:
+        session.flush()
+    except IntegrityError as exc:
+        raise ApiError(
+            status_code=409,
+            code="doctor_conflict",
+            message=f"A doctor with registration '{payload.registration_number}' or cabin code already exists.",
+        ) from exc
 
     ctx = build_audit_context(request, principal)
     audit_service.record(

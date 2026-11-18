@@ -13,6 +13,7 @@ import { apiFetch } from '../../api/client'
 import type { PatientOut } from '../../api/types'
 import { IconAlertTriangle, IconCheck, IconServer } from '../../components/icons'
 import { toast } from '../../components/ToastHost'
+import { formatPaise } from '../../format'
 
 export function BulkArchivePage() {
   const { data: me } = useMe()
@@ -21,7 +22,15 @@ export function BulkArchivePage() {
   // Candidate Filter State
   const [inactivityYears, setInactivityYears] = useState<number>(3)
   const [district, setDistrict] = useState<string>('')
+  const [debouncedDistrict, setDebouncedDistrict] = useState<string>('')
   const [zeroVisitsOnly, setZeroVisitsOnly] = useState<boolean>(false)
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedDistrict(district)
+    }, 300)
+    return () => clearTimeout(timer)
+  }, [district])
 
   // Candidate Data State
   const [candidates, setCandidates] = useState<ArchivalCandidateItem[]>([])
@@ -38,6 +47,8 @@ export function BulkArchivePage() {
   const [archivedPatients, setArchivedPatients] = useState<PatientOut[]>([])
   const [loadingArchived, setLoadingArchived] = useState<boolean>(false)
   const [isUnarchiving, setIsUnarchiving] = useState<number | null>(null)
+  const [unarchiveTarget, setUnarchiveTarget] = useState<PatientOut | null>(null)
+  const [unarchiveReason, setUnarchiveReason] = useState<string>('')
 
   const fetchCandidates = useCallback(async () => {
     try {
@@ -46,7 +57,7 @@ export function BulkArchivePage() {
       setSelectedIds(new Set())
       const data = await getArchivalCandidates({
         inactivity_years: inactivityYears,
-        district: district.trim() || undefined,
+        district: debouncedDistrict.trim() || undefined,
         zero_visits_only: zeroVisitsOnly,
         limit: 100,
       })
@@ -56,7 +67,7 @@ export function BulkArchivePage() {
     } finally {
       setLoading(false)
     }
-  }, [inactivityYears, district, zeroVisitsOnly])
+  }, [inactivityYears, debouncedDistrict, zeroVisitsOnly])
 
   const fetchArchivedPatients = useCallback(async () => {
     try {
@@ -126,11 +137,18 @@ export function BulkArchivePage() {
     }
   }
 
-  const handleRestorePatient = async (patient: PatientOut) => {
+  const handleOpenRestoreModal = (patient: PatientOut) => {
+    setUnarchiveTarget(patient)
+    setUnarchiveReason('Administrative reactivation of patient record')
+  }
+
+  const handleExecuteRestore = async () => {
+    if (!unarchiveTarget) return
     try {
-      setIsUnarchiving(patient.id)
-      await unarchivePatient(patient.id, 'Administrative restore requested from UI')
-      toast.success(`Restored patient record ${patient.urn} to active status.`)
+      setIsUnarchiving(unarchiveTarget.id)
+      await unarchivePatient(unarchiveTarget.id, unarchiveReason.trim())
+      toast.success(`Restored patient record ${unarchiveTarget.urn} to active status.`)
+      setUnarchiveTarget(null)
       await fetchArchivedPatients()
     } catch (err: any) {
       toast.error(err?.message || 'Failed to unarchive patient')
@@ -317,7 +335,7 @@ export function BulkArchivePage() {
                           <td className="px-4 py-3">
                             {c.total_dues_paise > 0 ? (
                               <span className="font-semibold text-red-700">
-                                ₹{(c.total_dues_paise / 100).toFixed(2)}
+                                {formatPaise(c.total_dues_paise)}
                               </span>
                             ) : (
                               <span className="text-emerald-700">₹0.00</span>
@@ -392,7 +410,7 @@ export function BulkArchivePage() {
                       <td className="px-4 py-3 text-right">
                         <button
                           type="button"
-                          onClick={() => handleRestorePatient(p)}
+                          onClick={() => handleOpenRestoreModal(p)}
                           disabled={isUnarchiving === p.id}
                           className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-2xs hover:bg-slate-50 disabled:opacity-50"
                         >
@@ -454,6 +472,55 @@ export function BulkArchivePage() {
               className="min-h-11 rounded-lg bg-red-700 px-4 py-2 text-xs font-semibold text-white hover:bg-red-800 disabled:opacity-50"
             >
               {isArchiving ? 'Archiving...' : `Archive ${selectedIds.size} Files`}
+            </button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Restore Confirmation Modal */}
+      <Modal
+        open={!!unarchiveTarget}
+        onClose={() => { if (!isUnarchiving) setUnarchiveTarget(null) }}
+        title="Confirm Record Reactivation"
+        busy={isUnarchiving !== null}
+        className="max-w-md"
+      >
+        <div className="space-y-4">
+          <p className="text-xs text-slate-600">
+            You are about to restore archived patient record <strong className="text-slate-900">{unarchiveTarget?.urn}</strong> ({unarchiveTarget?.full_name}). The record will become active and available for search, check-in, and appointments.
+          </p>
+
+          <div>
+            <label htmlFor="unarchive-reason" className="block text-xs font-semibold text-slate-700">
+              Reactivation Justification *
+            </label>
+            <textarea
+              id="unarchive-reason"
+              rows={3}
+              value={unarchiveReason}
+              onChange={(e) => setUnarchiveReason(e.target.value)}
+              placeholder="e.g. Patient returned for follow-up treatment"
+              className="mt-1 w-full rounded-lg border border-slate-300 p-2 text-xs text-slate-900 focus:border-brand-700 focus-visible:outline-2 focus-visible:outline-brand-700"
+            />
+          </div>
+
+          <div className="flex justify-end gap-2 border-t border-slate-200 pt-4">
+            <button
+              type="button"
+              data-autofocus
+              disabled={isUnarchiving !== null}
+              onClick={() => setUnarchiveTarget(null)}
+              className="min-h-11 rounded-lg border border-slate-300 px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              disabled={isUnarchiving !== null || unarchiveReason.trim().length < 3}
+              onClick={handleExecuteRestore}
+              className="min-h-11 rounded-lg bg-emerald-700 px-4 py-2 text-xs font-semibold text-white hover:bg-emerald-800 disabled:opacity-50"
+            >
+              {isUnarchiving !== null ? 'Restoring...' : 'Confirm Reactivation'}
             </button>
           </div>
         </div>

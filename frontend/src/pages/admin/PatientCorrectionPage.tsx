@@ -10,6 +10,7 @@ import { ConflictBanner } from '../../components/ConflictBanner'
 import { DemographicCorrectionModal } from '../../components/admin/DemographicCorrectionModal'
 import { AdminPageHeader } from '../../components/admin/AdminPageHeader'
 import { AppShell } from '../../components/AppShell'
+import { toast } from '../../components/ToastHost'
 
 export function PatientCorrectionPage() {
   const { data: me } = useMe()
@@ -22,7 +23,7 @@ export function PatientCorrectionPage() {
   const [guardianName, setGuardianName] = useState('')
   const [gender, setGender] = useState<'M' | 'F' | 'O'>('M')
   const [dob, setDob] = useState('')
-  const [ageYears, setAgeYears] = useState<number>(0)
+  const [ageYears, setAgeYears] = useState<number | ''>(0)
   const [mobile, setMobile] = useState('')
   const [address, setAddress] = useState('')
   const [district, setDistrict] = useState('Bhojpur')
@@ -32,8 +33,6 @@ export function PatientCorrectionPage() {
   // UI state
   const [conflictError, setConflictError] = useState<string | null>(null)
   const [isReloading, setIsReloading] = useState(false)
-  const [successMessage, setSuccessMessage] = useState<string | null>(null)
-  const [generalError, setGeneralError] = useState<string | null>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
 
   const {
@@ -58,8 +57,6 @@ export function PatientCorrectionPage() {
       setState(selectedPatient.state || 'Bihar')
       setEmergencyContact(selectedPatient.emergency_contact || '')
       setConflictError(null)
-      setSuccessMessage(null)
-      setGeneralError(null)
     }
   }, [selectedPatient])
 
@@ -78,7 +75,7 @@ export function PatientCorrectionPage() {
       setSelectedPatient(latest)
       setConflictError(null)
     } catch {
-      setGeneralError('Failed to reload latest patient record.')
+      toast.error('Failed to reload latest patient record.')
     } finally {
       setIsReloading(false)
     }
@@ -99,14 +96,11 @@ export function PatientCorrectionPage() {
 
   const handleOpenReview = (e: React.FormEvent) => {
     e.preventDefault()
-    setGeneralError(null)
-    setSuccessMessage(null)
     setIsModalOpen(true)
   }
 
   const handleApplyCorrection = async (reason: string) => {
     if (!selectedPatient) return
-    setGeneralError(null)
     setConflictError(null)
 
     const payload: AdminPatientDemographicCorrection = {
@@ -122,15 +116,15 @@ export function PatientCorrectionPage() {
       })
       setSelectedPatient(updated)
       setIsModalOpen(false)
-      setSuccessMessage('Patient demographic record updated and permanently audited successfully.')
+      toast.success('Patient demographic record updated and permanently audited successfully.')
     } catch (err: unknown) {
       setIsModalOpen(false)
       if (err instanceof ApiError && err.status === 409) {
         setConflictError('Patient demographics were updated in another session.')
       } else if (err instanceof ApiError && err.message) {
-        setGeneralError(err.message)
+        toast.error(err.message)
       } else {
-        setGeneralError('An unexpected error occurred while applying demographic correction.')
+        toast.error('An unexpected error occurred while applying demographic correction.')
       }
     }
   }
@@ -278,38 +272,6 @@ export function PatientCorrectionPage() {
             />
           )}
 
-          {successMessage && (
-            <div
-              role="alert"
-              className="rounded-md border border-emerald-300 bg-emerald-50 p-4 text-xs font-semibold text-emerald-950 flex items-center justify-between"
-            >
-              <span>{successMessage}</span>
-              <button
-                type="button"
-                onClick={() => setSuccessMessage(null)}
-                className="text-emerald-800 hover:text-emerald-950 font-bold px-2 py-1"
-              >
-                ✕
-              </button>
-            </div>
-          )}
-
-          {generalError && (
-            <div
-              role="alert"
-              className="rounded-md border border-red-300 bg-red-50 p-4 text-xs font-semibold text-red-950 flex items-center justify-between"
-            >
-              <span>{generalError}</span>
-              <button
-                type="button"
-                onClick={() => setGeneralError(null)}
-                className="text-red-800 hover:text-red-950 font-bold px-2 py-1"
-              >
-                ✕
-              </button>
-            </div>
-          )}
-
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
             {/* Left Column: Editable Form Fields */}
             <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-xs space-y-4">
@@ -418,7 +380,7 @@ export function PatientCorrectionPage() {
                       min={0}
                       max={150}
                       value={ageYears}
-                      onChange={(e) => setAgeYears(Number(e.target.value))}
+                      onChange={(e) => setAgeYears(e.target.value === '' ? '' : Number(e.target.value))}
                       className="mt-1 w-full min-h-11 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-xs focus-visible:outline-2 focus-visible:outline-[#8E1C3D]"
                     />
                   </div>

@@ -246,15 +246,3 @@ def list_admin_workstations_endpoint(
 ) -> list[WorkstationOut]:
     """Retrieve list of hospital LAN workstations and current live connectivity status."""
     return workstation_service.list_workstations(session)
-
-
-@router.get(
-    "/workstations",
-    dependencies=[Depends(require(Permission.WORKSTATION_READ))],
-    response_model=list[WorkstationOut],
-)
-def list_system_workstations_endpoint(
-    session: SessionDep,
-) -> list[WorkstationOut]:
-    """Retrieve list of hospital LAN workstations and current live connectivity status."""
-    return workstation_service.list_workstations(session)

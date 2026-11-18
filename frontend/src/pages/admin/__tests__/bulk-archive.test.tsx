@@ -176,6 +176,9 @@ describe('BulkArchivePage', () => {
     const restoreBtn = screen.getByRole('button', { name: /restore record/i })
     await user.click(restoreBtn)
 
+    const confirmRestoreBtn = await screen.findByRole('button', { name: /confirm reactivation/i })
+    await user.click(confirmRestoreBtn)
+
     await waitFor(() => {
       expect(adminDataOps.unarchivePatient).toHaveBeenCalledWith(10, expect.any(String))
     })

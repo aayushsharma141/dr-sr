@@ -37,8 +37,6 @@ ALLOWED_OVERRIDE_FIELDS = frozenset(
         "blood_group",
         "pin_code",
         "guardian_relationship",
-        "medical_history_notes",
-        "allergies",
         "notes",
     }
 )
@@ -107,6 +105,28 @@ def find_duplicate_candidates(session: Session, limit: int = 50) -> list[Duplica
         .order_by(Patient.mobile, Patient.created_at.asc(), Patient.id.asc())
     )
     patients = session.execute(stmt).scalars().all()
+    if not patients:
+        return []
+
+    candidate_pids = [p.id for p in patients]
+
+    # Pre-fetch open visits and visit counts in 2 batch queries instead of 4 queries per pair
+    open_rows = session.execute(
+        select(Visit.patient_id, Visit.id, Visit.visit_date).where(
+            Visit.patient_id.in_(candidate_pids),
+            Visit.status == VisitStatus.OPEN.value,
+        )
+    ).all()
+    open_by_patient: dict[int, str] = {
+        pid: f"Open visit #{vid} ({vdate})" for pid, vid, vdate in open_rows
+    }
+
+    count_rows = session.execute(
+        select(Visit.patient_id, func.count(Visit.id))
+        .where(Visit.patient_id.in_(candidate_pids))
+        .group_by(Visit.patient_id)
+    ).all()
+    visits_by_patient: dict[int, int] = {pid: cnt for pid, cnt in count_rows}
 
     # Group by mobile
     by_mobile: dict[str, list[Patient]] = {}
@@ -127,13 +147,13 @@ def find_duplicate_candidates(session: Session, limit: int = 50) -> list[Duplica
                 else "Exact mobile match with similar name"
             )
 
-            p_has_open, p_open_desc = check_open_visit(session, primary.id)
-            c_has_open, c_open_desc = check_open_visit(session, candidate.id)
-            has_open = p_has_open or c_has_open
+            p_open_desc = open_by_patient.get(primary.id)
+            c_open_desc = open_by_patient.get(candidate.id)
+            has_open = bool(p_open_desc or c_open_desc)
             open_desc = p_open_desc or c_open_desc
 
-            p_visits = get_patient_visit_count(session, primary.id)
-            c_visits = get_patient_visit_count(session, candidate.id)
+            p_visits = visits_by_patient.get(primary.id, 0)
+            c_visits = visits_by_patient.get(candidate.id, 0)
 
             pairs.append(
                 DuplicateCandidatePair(

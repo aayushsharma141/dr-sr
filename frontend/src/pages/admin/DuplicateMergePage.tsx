@@ -28,7 +28,6 @@ const COMPARABLE_FIELDS: Array<{ key: string; label: string }> = [
   { key: 'mobile', label: 'Mobile' },
   { key: 'address', label: 'Address' },
   { key: 'district', label: 'District' },
-  { key: 'allergies', label: 'Allergies' },
 ]
 
 export function DuplicateMergePage() {
@@ -46,6 +45,8 @@ export function DuplicateMergePage() {
   // Undo / Recent merges state
   const [recentMerges, setRecentMerges] = useState<MergedHistoryItem[]>([])
   const [isUnmerging, setIsUnmerging] = useState<number | null>(null)
+  const [unmergeTarget, setUnmergeTarget] = useState<MergedHistoryItem | null>(null)
+  const [unmergeReason, setUnmergeReason] = useState<string>('')
 
   const fetchCandidates = useCallback(async () => {
     try {
@@ -127,12 +128,19 @@ export function DuplicateMergePage() {
     }
   }
 
-  const handleUndoMerge = async (item: MergedHistoryItem) => {
+  const handleOpenUnmergeModal = (item: MergedHistoryItem) => {
+    setUnmergeTarget(item)
+    setUnmergeReason('Administrative undo of accidental patient merge')
+  }
+
+  const handleExecuteUnmerge = async () => {
+    if (!unmergeTarget) return
     try {
-      setIsUnmerging(item.secondaryId)
-      await unmergePatient(item.secondaryId, 'Administrative undo requested from UI')
-      setRecentMerges((prev) => prev.filter((m) => m.secondaryId !== item.secondaryId))
-      toast.success(`Reactivated patient record ${item.secondaryUrn}.`)
+      setIsUnmerging(unmergeTarget.secondaryId)
+      await unmergePatient(unmergeTarget.secondaryId, unmergeReason.trim())
+      setRecentMerges((prev) => prev.filter((m) => m.secondaryId !== unmergeTarget.secondaryId))
+      toast.success(`Reactivated patient record ${unmergeTarget.secondaryUrn}.`)
+      setUnmergeTarget(null)
       await fetchCandidates()
     } catch (err: any) {
       toast.error(err?.message || 'Failed to unmerge patient record')
@@ -187,7 +195,7 @@ export function DuplicateMergePage() {
                 </div>
                 <button
                   type="button"
-                  onClick={() => handleUndoMerge(item)}
+                  onClick={() => handleOpenUnmergeModal(item)}
                   disabled={isUnmerging === item.secondaryId}
                   className="rounded-md border border-slate-300 bg-white px-2.5 py-1 text-xs font-medium text-slate-700 shadow-2xs hover:bg-slate-50 disabled:opacity-50"
                 >
@@ -388,6 +396,55 @@ export function DuplicateMergePage() {
             </div>
           </div>
         )}
+      </Modal>
+
+      {/* Undo Merge Confirmation Modal */}
+      <Modal
+        open={unmergeTarget !== null}
+        onClose={() => { if (!isUnmerging) setUnmergeTarget(null) }}
+        title="Confirm Undo Patient Merge"
+        busy={isUnmerging !== null}
+        className="max-w-md"
+      >
+        <div className="space-y-4">
+          <p className="text-xs text-slate-600">
+            You are about to unmerge and reactivate secondary patient record <strong className="text-slate-900">{unmergeTarget?.secondaryUrn}</strong> (merged into {unmergeTarget?.masterUrn}). The secondary file will be restored as an independent active record.
+          </p>
+
+          <div>
+            <label htmlFor="unmerge-reason" className="block text-xs font-semibold text-slate-700">
+              Unmerge Justification / Reason *
+            </label>
+            <textarea
+              id="unmerge-reason"
+              rows={3}
+              value={unmergeReason}
+              onChange={(e) => setUnmergeReason(e.target.value)}
+              placeholder="Reason for undoing the patient merge..."
+              className="mt-1 w-full rounded-lg border border-slate-300 p-2 text-xs text-slate-900 focus:border-brand-700 focus-visible:outline-2 focus-visible:outline-brand-700"
+            />
+          </div>
+
+          <div className="flex justify-end gap-2 border-t border-slate-200 pt-4">
+            <button
+              type="button"
+              data-autofocus
+              disabled={isUnmerging !== null}
+              onClick={() => setUnmergeTarget(null)}
+              className="min-h-11 rounded-lg border border-slate-300 px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              disabled={isUnmerging !== null || unmergeReason.trim().length < 3}
+              onClick={handleExecuteUnmerge}
+              className="min-h-11 rounded-lg bg-red-700 px-4 py-2 text-xs font-semibold text-white hover:bg-red-800 disabled:opacity-50"
+            >
+              {isUnmerging !== null ? 'Restoring...' : 'Confirm Unmerge'}
+            </button>
+          </div>
+        </div>
       </Modal>
     </div>
     </AppShell>

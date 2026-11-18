@@ -278,9 +278,24 @@ function runResult(
 }
 
 function RecentRuns() {
-  const { data } = useIntegrityHistory(10)
+  const { data, isPending } = useIntegrityHistory(10)
   const runs = data?.runs ?? []
-  if (runs.length === 0) return null
+  if (isPending) {
+    return (
+      <section aria-label="Recent runs" className="rounded-xl border border-slate-200 bg-white p-5 shadow-2xs">
+        <h2 className="text-base font-bold text-slate-900">Recent runs</h2>
+        <p className="mt-2 text-xs text-slate-500">Loading diagnostic execution history…</p>
+      </section>
+    )
+  }
+  if (runs.length === 0) {
+    return (
+      <section aria-label="Recent runs" className="rounded-xl border border-slate-200 bg-white p-5 shadow-2xs">
+        <h2 className="text-base font-bold text-slate-900">Recent runs</h2>
+        <p className="mt-2 text-xs text-slate-500">No previous integrity audit runs recorded in the database. Run your first diagnostic scan using "Run Diagnostic Checks" above.</p>
+      </section>
+    )
+  }
   return (
     <section aria-label="Recent runs" aria-labelledby="recent-runs" className="rounded-xl border border-slate-200 bg-white p-5 shadow-2xs">
       <div className="flex items-center justify-between pb-3 border-b border-slate-100">
@@ -301,8 +316,8 @@ function RecentRuns() {
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
-            {runs.map((run, index) => (
-              <tr key={run.id} className="hover:bg-slate-50/50 transition-colors" style={{ transitionDelay: `${index * 50}ms` }}>
+            {runs.map((run) => (
+              <tr key={run.id} className="hover:bg-slate-50/50 transition-colors">
                 <td className="py-2.5 pr-4 font-medium text-slate-800">{formatIst(run.generated_at)}</td>
                 <td className="py-2.5 pr-4 font-semibold text-slate-700">{run.run_by_username ?? 'System'}</td>
                 <td className={`py-2.5 ${run.failed_checks ? 'font-bold text-red-700' : 'font-medium text-slate-700'}`}>
@@ -336,7 +351,7 @@ export function IntegrityDashboard() {
 
   return (
     <AppShell name={me?.full_name ?? 'Admin'} role={me?.role ?? 'ADMIN'}>
-      <main className="mx-auto w-full max-w-[1600px] space-y-5 px-1 pb-8">
+      <div className="mx-auto w-full max-w-[1600px] space-y-5 px-1 pb-8">
         {/* Header */}
         <header className="flex flex-col justify-between gap-4 rounded-xl border border-slate-200 bg-white p-5 shadow-xs sm:flex-row sm:items-center">
           <AdminPageHeader
@@ -435,9 +450,11 @@ export function IntegrityDashboard() {
                 <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">Identified Findings</p>
                 <div className="mt-2 flex items-baseline gap-3">
                   <span className="text-2xl font-extrabold text-slate-900">{groups.length}</span>
-                  <div className="flex items-center gap-1.5 text-xs font-semibold">
+                  <div className="flex flex-wrap items-center gap-1.5 text-xs font-semibold">
                     {counts.ERROR > 0 && <span className="text-red-700 font-bold">{counts.ERROR} problem{counts.ERROR > 1 ? 's' : ''}</span>}
-                    {counts.ERROR > 0 && counts.CLEANUP > 0 && <span className="text-slate-500">·</span>}
+                    {counts.ERROR > 0 && counts.WARNING > 0 && <span className="text-slate-500">·</span>}
+                    {counts.WARNING > 0 && <span className="text-amber-700 font-bold">{counts.WARNING} warning{counts.WARNING > 1 ? 's' : ''}</span>}
+                    {((counts.ERROR > 0 || counts.WARNING > 0) && counts.CLEANUP > 0) && <span className="text-slate-500">·</span>}
                     {counts.CLEANUP > 0 && <span className="text-slate-600">{counts.CLEANUP} clean-up</span>}
                     {groups.length === 0 && <span className="text-emerald-700">Zero discrepancies detected</span>}
                   </div>
@@ -613,7 +630,7 @@ export function IntegrityDashboard() {
             {(activeTab === 'all' || activeTab === 'history') && <RecentRuns />}
           </>
         )}
-      </main>
+      </div>
     </AppShell>
   )
 }

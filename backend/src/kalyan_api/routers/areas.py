@@ -8,7 +8,7 @@ Protected by granular DASHBOARD_* permissions:
 
 from datetime import date, datetime, time, timedelta
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 from pydantic import BaseModel, ConfigDict
 from sqlalchemy import case, func, or_, select
 from sqlalchemy.orm import Session
@@ -29,8 +29,13 @@ from kalyan_api.models import (
     Patient,
     Payment,
     PaymentMethod,
+    PendingOpdArrival,
     PriorityLevel,
+    Refund,
     User,
+    Visit,
+    VisitStatus,
+    doctor_departments,
 )
 from kalyan_api.routers.system import measure_volume
 from kalyan_api.services import billing_service
@@ -64,7 +69,8 @@ class DoctorTodayOut(BaseModel):
     in_consultation: int
     done: int
     arrived_waiting: int = 0
-    department: str = "Physiotherapy"
+    pending_arrivals: int = 0
+    department: str = "OPD"
     next_token: int | None = None
 
 
@@ -280,6 +286,28 @@ def _doctors_today(session: Session, today: date) -> list[DoctorTodayOut]:
     for doctor_id, status_value, cnt in rows:
         per_doctor.setdefault(int(doctor_id), {})[str(status_value)] = int(cnt)
 
+    pending_arrival_rows = session.execute(
+        select(PendingOpdArrival.doctor_id, func.count(PendingOpdArrival.id))
+        .where(
+            PendingOpdArrival.appointment_date == today,
+            PendingOpdArrival.status == "TO_ARRIVE",
+        )
+        .group_by(PendingOpdArrival.doctor_id)
+    ).all()
+    pending_arrivals_by_doctor: dict[int, int] = {
+        int(doc_id): int(cnt) for doc_id, cnt in pending_arrival_rows
+    }
+
+    dept_rows = session.execute(
+        select(doctor_departments.c.doctor_id, Department.name_en)
+        .join(Department, Department.id == doctor_departments.c.department_id)
+        .where(Department.is_active.is_(True))
+        .order_by(Department.name_en.asc(), Department.id.asc())
+    ).all()
+    primary_department: dict[int, str] = {}
+    for doc_id, dept_name in dept_rows:
+        primary_department.setdefault(int(doc_id), dept_name)
+
     priority_rank = case(
         (Appointment.priority_level == PriorityLevel.EMERGENCY.value, 0),
         (Appointment.priority_level == PriorityLevel.PRIORITY.value, 1),
@@ -293,34 +321,40 @@ def _doctors_today(session: Session, today: date) -> list[DoctorTodayOut]:
         else_=None,
     )
 
+    active_tokens_stmt = (
+        select(Appointment.doctor_id, Appointment.token_number)
+        .where(
+            Appointment.doctor_id.in_([int(d[0]) for d in doctors]),
+            Appointment.appointment_date == today,
+            Appointment.token_number.is_not(None),
+            Appointment.status.in_(
+                [
+                    AppointmentStatus.ARRIVED.value,
+                    AppointmentStatus.CHECKED_IN.value,
+                    AppointmentStatus.WAITING.value,
+                ]
+            ),
+            or_(
+                Appointment.consultation_status == ConsultationStatus.WAITING.value,
+                Appointment.consultation_status.is_(None),
+            ),
+        )
+        .order_by(
+            Appointment.doctor_id,
+            priority_rank.asc(),
+            emergency_order_at.asc().nulls_last(),
+            Appointment.token_number.asc(),
+        )
+    )
+    next_tok_by_doc: dict[int, int] = {}
+    for doc_id, tok in session.execute(active_tokens_stmt).all():
+        if doc_id not in next_tok_by_doc:
+            next_tok_by_doc[doc_id] = tok
+
     result: list[DoctorTodayOut] = []
     for doctor_id, name_en, qualification in doctors:
         status_counts = per_doctor.get(int(doctor_id), {})
-        next_tok = session.scalar(
-            select(Appointment.token_number)
-            .where(
-                Appointment.doctor_id == doctor_id,
-                Appointment.appointment_date == today,
-                Appointment.token_number.is_not(None),
-                Appointment.status.in_(
-                    [
-                        AppointmentStatus.ARRIVED.value,
-                        AppointmentStatus.CHECKED_IN.value,
-                        AppointmentStatus.WAITING.value,
-                    ]
-                ),
-                or_(
-                    Appointment.consultation_status == ConsultationStatus.WAITING.value,
-                    Appointment.consultation_status.is_(None),
-                ),
-            )
-            .order_by(
-                priority_rank.asc(),
-                emergency_order_at.asc().nulls_last(),
-                Appointment.token_number.asc(),
-            )
-            .limit(1)
-        )
+        next_tok = next_tok_by_doc.get(int(doctor_id))
         result.append(
             DoctorTodayOut(
                 doctor_id=int(doctor_id),
@@ -335,10 +369,13 @@ def _doctors_today(session: Session, today: date) -> list[DoctorTodayOut]:
                 arrived_waiting=status_counts.get(AppointmentStatus.ARRIVED.value, 0)
                 + status_counts.get(AppointmentStatus.CHECKED_IN.value, 0)
                 + status_counts.get(AppointmentStatus.WAITING.value, 0),
+                pending_arrivals=pending_arrivals_by_doctor.get(int(doctor_id), 0),
                 in_consultation=status_counts.get(AppointmentStatus.IN_CONSULTATION.value, 0),
                 done=status_counts.get(AppointmentStatus.DONE.value, 0)
                 + status_counts.get(AppointmentStatus.COMPLETED.value, 0),
-                department=qualification or "Physiotherapy",
+                department=primary_department.get(int(doctor_id))
+                or (qualification or "").strip()
+                or "OPD",
                 next_token=next_tok,
             )
         )
@@ -492,6 +529,7 @@ class DoctorOverviewResponse(BaseModel):
     dependencies=[Depends(require(Permission.DASHBOARD_ADMIN))],
 )
 def get_admin_overview(
+    request: Request,
     session: SessionDep,
     principal: Principal = Depends(current_principal),
 ) -> AdminOverviewResponse:
@@ -531,10 +569,18 @@ def get_admin_overview(
         or 0
     )
 
-    # Reuse the pending-dues ledger computation (BIL-03) instead of duplicating the math.
-    outstanding_dues_paise = sum(
+    # Treatment package pending dues + closed-visit outstanding dues (BIL-03)
+    package_dues = sum(
         due.balance_paise for due in billing_service.compute_pending_dues(session)
     )
+    closed_visit_ids = session.scalars(
+        select(Visit.id).where(Visit.status == VisitStatus.CLOSED.value)
+    ).all()
+    visit_dues = 0
+    if closed_visit_ids:
+        totals = billing_service.visit_totals(session, closed_visit_ids)
+        visit_dues = sum(max(0, vt.bill_total_paise - vt.paid_paise) for vt in totals.values())
+    outstanding_dues_paise = package_dues + visit_dues
 
     locked_accounts: int = (
         session.scalar(
@@ -661,37 +707,57 @@ def get_management_overview(
     next_start = _month_start(today.year, today.month + 1)
     bounds = [_ist_midnight(d) for d in starts] + [_ist_midnight(next_start)]
 
-    def collected(start: datetime, end: datetime) -> int:
-        return int(
-            session.scalar(
-                select(func.coalesce(func.sum(Payment.amount_paise), 0)).where(
-                    Payment.is_reversed.is_(False),
-                    Payment.created_at >= start,
-                    Payment.created_at < end,
-                )
-            )
-            or 0
+    # Preload payment, refund, and registration timestamps across 6-month window in 3 queries
+    pay_rows = session.execute(
+        select(Payment.created_at, Payment.amount_paise).where(
+            Payment.is_reversed.is_(False),
+            Payment.created_at >= bounds[0],
+            Payment.created_at < bounds[6],
         )
-
-    def registered(start: datetime, end: datetime) -> int:
-        return int(
-            session.scalar(
-                select(func.count(Patient.id)).where(
-                    Patient.created_at >= start, Patient.created_at < end
-                )
-            )
-            or 0
+    ).all()
+    ref_rows = session.execute(
+        select(Refund.created_at, Refund.amount_paise).where(
+            Refund.created_at >= bounds[0],
+            Refund.created_at < bounds[6],
         )
+    ).all()
+    pat_rows = session.scalars(
+        select(Patient.created_at).where(
+            Patient.created_at >= bounds[0],
+            Patient.created_at < bounds[6],
+        )
+    ).all()
 
-    trend_paise = [collected(bounds[i], bounds[i + 1]) for i in range(6)]
-    trend_patients = [registered(bounds[i], bounds[i + 1]) for i in range(6)]
+    trend_paise = [0] * 6
+    for created_at, amt in pay_rows:
+        if created_at:
+            for i in range(6):
+                if bounds[i] <= created_at < bounds[i + 1]:
+                    trend_paise[i] += int(amt or 0)
+                    break
+    for created_at, amt in ref_rows:
+        if created_at:
+            for i in range(6):
+                if bounds[i] <= created_at < bounds[i + 1]:
+                    trend_paise[i] = max(0, trend_paise[i] - int(amt or 0))
+                    break
+
+    trend_patients = [0] * 6
+    for created_at in pat_rows:
+        if created_at:
+            for i in range(6):
+                if bounds[i] <= created_at < bounds[i + 1]:
+                    trend_patients[i] += 1
+                    break
+
     cur_start, cur_end = bounds[5], bounds[6]
 
     reversed_row = session.execute(
         select(func.count(Payment.id), func.coalesce(func.sum(Payment.amount_paise), 0)).where(
             Payment.is_reversed.is_(True),
-            Payment.created_at >= cur_start,
-            Payment.created_at < cur_end,
+            Payment.reversed_at.is_not(None),
+            Payment.reversed_at >= cur_start,
+            Payment.reversed_at < cur_end,
         )
     ).one()
 

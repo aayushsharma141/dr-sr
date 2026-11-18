@@ -12,6 +12,10 @@ from kalyan_api.db.session import SessionDep
 from kalyan_api.models import REFERRAL_SOURCES_NEEDING_NAME, Visit, VisitStatus
 from kalyan_api.schemas.reports import ReferralReportOut, ReferralReportRow
 
+def _escape_like(term: str) -> str:
+    return term.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+
+
 router = APIRouter(prefix="/reports", tags=["reports"])
 
 
@@ -69,7 +73,7 @@ def get_referral_report(
         r_clean = referrer.strip()
         stmt = stmt.where(
             Visit.referrer_name.is_not(None),
-            Visit.referrer_name.ilike(f"%{r_clean}%"),
+            Visit.referrer_name.ilike(f"%{_escape_like(r_clean)}%"),
         )
 
     # Order by visit_count desc, then source asc, then referrer_name asc

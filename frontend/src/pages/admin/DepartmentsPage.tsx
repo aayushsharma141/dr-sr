@@ -64,7 +64,7 @@ export function DepartmentsPage() {
     } catch (e) { toast.error(e instanceof Error ? e.message : 'Save failed.') }
   }
 
-  return <AppShell name={me?.full_name ?? 'Admin'} role={me?.role ?? 'ADMIN'}><main className="mx-auto max-w-4xl space-y-6 p-4 sm:p-6">
+  return <AppShell name={me?.full_name ?? 'Admin'} role={me?.role ?? 'ADMIN'}><div className="mx-auto max-w-4xl space-y-6 p-4 sm:p-6">
     <AdminPageHeader eyebrow="Administration" title="Departments" description="Configure reception departments and doctor memberships." />
     <section className="space-y-3 rounded-lg border bg-white p-4">
       <h2 className="font-semibold">Create department</h2>
@@ -107,5 +107,5 @@ export function DepartmentsPage() {
       {doctorId !== null && !assignmentsReady && (assignmentsFailed ? <p role="alert" className="text-sm text-red-900">Could not load this doctor's departments.</p> : <p role="status" className="text-sm text-neutral-600">Loading departments…</p>)}
       {doctorId !== null && <form onSubmit={saveAssignments} className="space-y-3"><fieldset disabled={!assignmentsReady} className="space-y-2"><legend className="text-sm font-medium">Departments</legend>{choices.map((d) => <label key={d.id} className="flex min-h-9 cursor-pointer items-center gap-2 rounded px-1 text-sm transition-colors hover:bg-neutral-50"><input type="checkbox" checked={ids.includes(d.id)} onChange={(e) => setIds((old) => e.target.checked ? [...old, d.id] : old.filter((id) => id !== d.id))} />{d.name_en}{d.name_hi ? ` / ${d.name_hi}` : ''}{d.is_active ? '' : ' (Inactive)'}</label>)}</fieldset><button disabled={assign.isPending || !assignmentsReady || !choices.length} className="min-h-11 cursor-pointer rounded bg-red-900 px-4 py-2 text-sm text-white transition-colors hover:bg-red-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-900 disabled:cursor-not-allowed disabled:opacity-50">{assign.isPending ? 'Saving…' : 'Save assignments'}</button></form>}
     </section>
-  </main></AppShell>
+  </div></AppShell>
 }

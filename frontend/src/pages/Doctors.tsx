@@ -15,6 +15,7 @@ import { ConflictBanner } from '../components/ConflictBanner'
 import { InlineAlert } from '../components/InlineAlert'
 import { Modal } from '../components/Modal'
 import { toast } from '../components/ToastHost'
+import { formatPaise } from '../format'
 import type { DoctorOut, DoctorCreate, DoctorUpdate, FeeOut } from '../api/types'
 
 interface DoctorForm {
@@ -85,7 +86,7 @@ function rupeesToPaise(value: string): number | null {
 }
 
 function formatRupees(paise: number): string {
-  return `₹${(paise / 100).toFixed(2)}`
+  return formatPaise(paise)
 }
 
 /** Readable messages from an error, including the per-field messages of a 422 validation_error. */

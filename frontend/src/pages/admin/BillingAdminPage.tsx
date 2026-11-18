@@ -6,6 +6,8 @@ import { AdminPageHeader } from '../../components/admin/AdminPageHeader'
 import { TableSkeleton } from '../../components/AdminSkeleton'
 import { InlineAlert } from '../../components/InlineAlert'
 import { PaymentReversalModal } from '../../components/PaymentReversalModal'
+import { toast } from '../../components/ToastHost'
+import { formatPaise } from '../../format'
 
 // Admin module 06. Shows how billing works today and gives administrators the reversal screen.
 // Payment methods, receipt format and reversal authority are not editable: they await the client.
@@ -26,12 +28,6 @@ const HEAD = 'px-3 py-2 text-left text-sm font-semibold text-slate-700'
 const CELL = 'px-3 py-2 text-sm text-slate-800'
 const INPUT =
   'mt-1 w-full rounded border border-slate-300 bg-white px-3 py-2 min-h-11 text-sm text-slate-900 focus-visible:outline-2 focus-visible:outline-[#8E1C3D]'
-
-/** Integer-paise formatting: no floating-point division of money (BIL-02). */
-function formatPaise(paise: number): string {
-  const rupees = Math.floor(paise / 100).toLocaleString('en-IN')
-  return `₹${rupees}.${String(paise % 100).padStart(2, '0')}`
-}
 
 function formatIst(value: string): string {
   return new Date(value).toLocaleString('en-IN', {
@@ -124,7 +120,6 @@ function LedgerSection() {
   const [search, setSearch] = useState('')
   const [filter, setFilter] = useState<LedgerFilter>({ q: '', status: 'all' })
   const [reversing, setReversing] = useState<PaymentOut | null>(null)
-  const [notice, setNotice] = useState<string | null>(null)
   const { data, isPending, isError, error } = useLedger(filter)
 
   const handleSearch = (e: FormEvent) => {
@@ -140,11 +135,6 @@ function LedgerSection() {
       <p className="mt-1 text-sm text-slate-700">
         A reversal keeps the original receipt, records the reason and returns the amount to the patient's dues.
       </p>
-      {notice && (
-        <InlineAlert tone="success" className="mt-3" onDismiss={() => setNotice(null)}>
-          {notice}
-        </InlineAlert>
-      )}
       <form onSubmit={handleSearch} className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-[1fr_14rem_auto] md:items-end">
         <div>
           <label htmlFor="ledger-search" className="text-sm font-semibold text-slate-800">
@@ -202,7 +192,7 @@ function LedgerSection() {
         isOpen={reversing !== null}
         payment={reversing}
         onClose={() => setReversing(null)}
-        onSuccess={(p) => setNotice(`Receipt ${p.receipt_number} was reversed.`)}
+        onSuccess={(p) => toast.success(`Receipt ${p.receipt_number} was reversed.`)}
       />
     </section>
   )

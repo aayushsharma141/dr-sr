@@ -2,7 +2,7 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { MemoryRouter } from 'react-router'
-import { PatientImportPage } from '../admin/PatientImportPage'
+import { ImportWizard } from '../../components/admin/ImportWizard'
 import { apiFetch, ApiError } from '../../api/client'
 
 vi.mock('../../api/queries', () => ({
@@ -66,9 +66,8 @@ describe('PatientImportPage and 8-Stage Import Wizard', () => {
   })
 
   it('renders 8-stage stepper and initial upload stage', () => {
-    renderWithProviders(<PatientImportPage />)
+    renderWithProviders(<ImportWizard />)
 
-    expect(screen.getByRole('heading', { name: 'Import Patients' })).toBeInTheDocument()
     expect(screen.getByLabelText('Import Progress')).toBeInTheDocument()
 
     // 8 stages in stepper
@@ -111,7 +110,7 @@ describe('PatientImportPage and 8-Stage Import Wizard', () => {
 
     vi.mocked(apiFetch).mockResolvedValueOnce(mockInspectResponse)
 
-    renderWithProviders(<PatientImportPage />)
+    renderWithProviders(<ImportWizard />)
 
     const file = new File(['Name,Guardian\nArun,Vinod'], 'patients.csv', { type: 'text/csv' })
     const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement
@@ -217,7 +216,7 @@ describe('PatientImportPage and 8-Stage Import Wizard', () => {
       .mockResolvedValueOnce(mockValidateSummary) // validate
       .mockResolvedValueOnce(mockDuplicates) // duplicates fetch
 
-    renderWithProviders(<PatientImportPage />)
+    renderWithProviders(<ImportWizard />)
 
     // Stage 1 -> Stage 2
     const file = new File(['content'], 'patients.csv', { type: 'text/csv' })
@@ -322,7 +321,7 @@ describe('PatientImportPage and 8-Stage Import Wizard', () => {
       .mockResolvedValueOnce(mockValidateSummary)
       .mockResolvedValueOnce(mockCommitResult)
 
-    renderWithProviders(<PatientImportPage />)
+    renderWithProviders(<ImportWizard />)
 
     const file = new File(['content'], 'patients.csv', { type: 'text/csv' })
     const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement
@@ -408,7 +407,7 @@ describe('PatientImportPage and 8-Stage Import Wizard', () => {
         new ApiError(500, 'precommit_backup_failed', 'Import commit aborted because pre-import safety backup failed: disk error')
       )
 
-    renderWithProviders(<PatientImportPage />)
+    renderWithProviders(<ImportWizard />)
 
     const file = new File(['content'], 'patients.csv', { type: 'text/csv' })
     const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement

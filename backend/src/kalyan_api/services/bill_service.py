@@ -11,9 +11,9 @@ Rules, all enforced here and at the endpoint (AGENTS.md: the backend authorises 
 """
 
 from datetime import UTC
-from decimal import Decimal, ROUND_HALF_UP
+from decimal import ROUND_HALF_UP, Decimal
 
-from sqlalchemy import func, select
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from kalyan_api.clock import IST, ist_today, utcnow
@@ -29,7 +29,6 @@ from kalyan_api.models import (
     BillItemStatus,
     ClinicalEncounter,
     ConsultationStatus,
-    Payment,
     Prescription,
     PrescriptionItem,
     PrescriptionStatus,
@@ -38,6 +37,7 @@ from kalyan_api.models import (
     VisitStatus,
 )
 from kalyan_api.schemas.bill import BillLineCreate, DoctorLineCreate
+from kalyan_api.services import ledger_service
 from kalyan_api.services.billing_service import counts_toward_total, visit_totals
 
 
@@ -142,7 +142,8 @@ def adjust_consultation_fee(
 
     v_totals = visit_totals(session, [appt.visit_id])[appt.visit_id]
     delta = new_amount_paise - old_amount
-    new_visit_total = v_totals.bill_total_paise + delta
+    line_counted = counts_toward_total(line, appt.consultation_status)
+    new_visit_total = v_totals.bill_total_paise + (delta if line_counted else 0)
     if new_visit_total < v_totals.paid_paise:
         raise ApiError(
             status_code=422,
@@ -167,6 +168,12 @@ def adjust_consultation_fee(
     line.rate_paise = new_amount_paise
     line.amount_paise = new_amount_paise
     session.flush()
+    ledger_service.record_charge_adjustment(
+        session,
+        line,
+        history,
+        actor_user_id=principal.user_id,
+    )
     return line, history
 
 
@@ -209,7 +216,10 @@ def add_reception_line(
             raise ApiError(
                 status_code=422,
                 code="prescription_item_not_on_visit",
-                message="The prescribed medicine was not found on an authorised prescription for this visit.",
+                message=(
+                    "The prescribed medicine was not found on an authorised "
+                    "prescription for this visit."
+                ),
             )
 
     amount = line_amount_paise(payload.quantity, payload.rate_paise)
@@ -232,6 +242,8 @@ def add_reception_line(
     )
     session.add(item)
     session.flush()
+    if item.amount_paise > 0:
+        ledger_service.record_charge(session, item, actor_user_id=principal.user_id)
     return item
 
 
@@ -266,7 +278,10 @@ def void_line(
         raise ApiError(
             status_code=422,
             code="consultation_line_not_voidable",
-            message="Consultation lines cannot be voided here. Adjust the consultation fee instead.",
+            message=(
+                "Consultation lines cannot be voided here. "
+                "Adjust the consultation fee instead."
+            ),
         )
 
     if line.status != BillItemStatus.ACTIVE.value:
@@ -279,7 +294,9 @@ def void_line(
     user_id = getattr(principal, "user_id", getattr(principal, "id", None))
 
     if own_same_day_only:
-        created_dt = line.created_at if line.created_at.tzinfo else line.created_at.replace(tzinfo=UTC)
+        created_dt = (
+            line.created_at if line.created_at.tzinfo else line.created_at.replace(tzinfo=UTC)
+        )
         created_ist_date = created_dt.astimezone(IST).date()
         if (
             line.source != BillItemSource.RECEPTION.value
@@ -311,7 +328,10 @@ def void_line(
         raise ApiError(
             status_code=422,
             code="void_below_paid",
-            message="Voiding this line would bring the visit total below what has already been paid.",
+            message=(
+                "Voiding this line would bring the visit total below "
+                "what has already been paid."
+            ),
             details={"visit_paid_paise": v_totals.paid_paise, "paid_paise": v_totals.paid_paise},
         )
 
@@ -335,6 +355,12 @@ def void_line(
     line.voided_by_user_id = user_id
     line.voided_at = now
     session.flush()
+    ledger_service.record_charge_void(
+        session,
+        line,
+        adjustment=history,
+        actor_user_id=user_id,
+    )
 
     return line, history
 
@@ -353,15 +379,17 @@ def correct_line(
 
     The caller locks the visit first, then the line with_for_update().
     - own_same_day_only: True for reception (bill:write), requiring own same-day line;
-      False for admin (bill:adjust), allowing correction of any non-consultation line on an open visit.
+      False for admin (bill:adjust), allowing correction of any non-consultation line on
+      an open visit.
     - Consultation lines are refused (422 consultation_line_not_correctable).
     - Package lines are refused (422 package_line_not_correctable).
     - Non-active lines are refused (409 line_not_active).
     - Closed visits are locked (422 visit_closed).
     - Refused if correction brings visit total below paid (422 correction_below_paid).
-    - Must specify at least one of quantity or rate_paise, and new values must differ from old (422 no_change).
-    - Writes BillItemAdjustment(kind=CORRECTION) and updates line quantity, rate_paise, amount_paise.
-      original_amount_paise is preserved.
+    - Must specify at least one of quantity or rate_paise, and new values must differ from
+      old (422 no_change).
+    - Writes BillItemAdjustment(kind=CORRECTION) and updates line quantity, rate_paise,
+      and amount_paise. original_amount_paise is preserved.
     """
     reason_text = (reason or "").strip()
     if len(reason_text) < 3 or len(reason_text) > 500:
@@ -375,7 +403,10 @@ def correct_line(
         raise ApiError(
             status_code=422,
             code="consultation_line_not_correctable",
-            message="Consultation lines cannot be corrected here. Adjust the consultation fee instead.",
+            message=(
+                "Consultation lines cannot be corrected here. "
+                "Adjust the consultation fee instead."
+            ),
         )
 
     if line.category == BillItemCategory.PACKAGE.value:
@@ -395,7 +426,9 @@ def correct_line(
     user_id = getattr(principal, "user_id", getattr(principal, "id", None))
 
     if own_same_day_only:
-        created_dt = line.created_at if line.created_at.tzinfo else line.created_at.replace(tzinfo=UTC)
+        created_dt = (
+            line.created_at if line.created_at.tzinfo else line.created_at.replace(tzinfo=UTC)
+        )
         created_ist_date = created_dt.astimezone(IST).date()
         if (
             line.source != BillItemSource.RECEPTION.value
@@ -444,12 +477,21 @@ def correct_line(
 
     v_totals = visit_totals(session, [line.visit_id])[line.visit_id]
     delta = new_amount_paise - old_amount_paise
-    new_visit_total = v_totals.bill_total_paise + delta
+    c_status = None
+    if line.appointment_id:
+        appt = session.get(Appointment, line.appointment_id)
+        if appt:
+            c_status = appt.consultation_status
+    line_counted = counts_toward_total(line, c_status)
+    new_visit_total = v_totals.bill_total_paise + (delta if line_counted else 0)
     if new_visit_total < v_totals.paid_paise:
         raise ApiError(
             status_code=422,
             code="correction_below_paid",
-            message="Correcting this line would bring the visit total below what has already been paid.",
+            message=(
+                "Correcting this line would bring the visit total below "
+                "what has already been paid."
+            ),
             details={"visit_paid_paise": v_totals.paid_paise, "paid_paise": v_totals.paid_paise},
         )
 
@@ -471,6 +513,12 @@ def correct_line(
     line.rate_paise = new_rate_paise
     line.amount_paise = new_amount_paise
     session.flush()
+    ledger_service.record_charge_adjustment(
+        session,
+        line,
+        history,
+        actor_user_id=user_id,
+    )
 
     return line, history
 
@@ -481,7 +529,7 @@ def add_doctor_line(
     principal: Principal,
     payload: DoctorLineCreate,
 ) -> BillItem:
-    """Doctor adds a procedure or package reference line to own consultation (design §6, OD-22-14, OD-C).
+    """Doctor adds a procedure or package line to own consultation (design §6, OD-22-14, OD-C).
 
     The caller locks the visit first (billing_service.lock_visit), then locks the appointment
     (booking_service.lock_appointment).
@@ -566,6 +614,8 @@ def add_doctor_line(
 
     session.add(item)
     session.flush()
+    if item.amount_paise > 0:
+        ledger_service.record_charge(session, item, actor_user_id=user_id)
     return item
 
 

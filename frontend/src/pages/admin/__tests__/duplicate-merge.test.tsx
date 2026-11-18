@@ -93,7 +93,7 @@ describe('DuplicateMergePage', () => {
     await user.click(screen.getByRole('button', { name: /compare & merge/i }))
 
     expect(screen.getByText(/compare & merge patient records/i)).toBeInTheDocument()
-    expect(screen.getByText('Penicillin')).toBeInTheDocument()
+    expect(screen.getByText('Station Road, Ara')).toBeInTheDocument()
   })
 
   it('disables merge button and shows warning if candidate has open visit', async () => {
@@ -140,6 +140,9 @@ describe('DuplicateMergePage', () => {
     expect(await screen.findByText(/recent merges in this session/i)).toBeInTheDocument()
     const undoBtn = screen.getByRole('button', { name: /undo merge/i })
     await user.click(undoBtn)
+
+    const confirmUndoBtn = await screen.findByRole('button', { name: /confirm unmerge/i })
+    await user.click(confirmUndoBtn)
 
     await waitFor(() => {
       expect(adminDataOps.unmergePatient).toHaveBeenCalledWith(2, expect.any(String))
