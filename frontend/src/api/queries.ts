@@ -24,6 +24,9 @@ import type {
   PaymentOut,
   PaymentReversalCreate,
   PendingDueOut,
+  PatientLedgerResponse,
+  RefundCreateRequest,
+  RefundOut,
   TimelineItemOut,
   AddendumCreate,
   AddendumRead,
@@ -31,6 +34,7 @@ import type {
   AppointmentCreate,
   OpdArrival,
   OpdArrivalCreate,
+  OpdArrivalList,
   OpdArrivalRegister,
   OpdArrivalPriorityUpdate,
   AppointmentListResponse,
@@ -44,10 +48,19 @@ import type {
   AcknowledgeAlertRequest,
   RescheduleRequest,
   EncounterCreate,
+  EncounterDiagnosisCreate,
+  EncounterDiagnosisOut,
+  EncounterDiagnosisUpdate,
   EncounterRead,
   EncounterSummary,
   EncounterUpdate,
+  InvestigationOrderCreate,
+  InvestigationOrderOut,
+  InvestigationResultCreate,
+  InvestigationResultOut,
+  InvestigationStatusUpdate,
   UnfinishedEncounter,
+  PrescriptionAmendRequest,
   PrescriptionCreate,
   PrescriptionOut,
   PrescriptionSummary,
@@ -57,8 +70,11 @@ import type {
   ClinicalTemplateRead,
   TemplateResponseInput,
   TemplateResponseRead,
+  FollowUpBookRequest,
+  FollowUpCloseRequest,
   FollowUpRecommendationCreate,
   DoctorFollowUpResponse,
+  ReceptionFollowUpResponse,
   TreatmentPlanCreate,
   TreatmentPlanOut,
   TreatmentPlanUpdate,
@@ -66,13 +82,30 @@ import type {
   TreatmentSessionAddendumOut,
   TreatmentSessionCreate,
   TreatmentSessionOut,
+  QuickPhraseCreate,
+  QuickPhraseListResponse,
+  QuickPhraseOut,
+  QuickPhraseSection,
+  QuickPhraseUpdate,
 } from './types'
 import type {
   AdminPatientDemographicCorrection,
   DuplicateCheckResponse,
+  PatientAllergyCreate,
+  PatientAllergyOut,
+  PatientAllergyUpdate,
+  PatientConditionCreate,
+  PatientConditionOut,
+  PatientConditionUpdate,
   PatientCreate,
+  PatientDirectoryFilters,
+  PatientDocumentOut,
+  PatientDocumentUploadInput,
   PatientOut,
+  PatientSummaryOut,
   PatientUpdate,
+  PatientVisitHistoryResponse,
+  VisitWorkspaceOut,
 } from './types'
 import type {
   ClinicSettingsOut,
@@ -216,12 +249,16 @@ export function useSetupStatus() {
   })
 }
 
-export function useOverview<T extends AreaOverview = AreaOverview>(area: string, options?: { refetchInterval?: number | false }) {
+export function useOverview<T extends AreaOverview = AreaOverview>(
+  area: string,
+  options?: { enabled?: boolean; refetchInterval?: number | false },
+) {
   return useQuery({
     queryKey: ['overview', area],
-    queryFn: async (): Promise<T> => {
-      return await apiFetch<T>(`/${area}/overview`)
+    queryFn: async ({ signal }): Promise<T> => {
+      return await apiFetch<T>(`/${area}/overview`, { signal })
     },
+    enabled: options?.enabled ?? true,
     retry: false,
     refetchInterval: options?.refetchInterval ?? false,
   })
@@ -610,10 +647,11 @@ export function useUpdateClinicSettings() {
   })
 }
 
-export function useDepartments() {
+export function useDepartments(options?: { enabled?: boolean }) {
   return useQuery({
     queryKey: ['departments'],
     queryFn: () => apiFetch<DepartmentOut[]>('/departments'),
+    enabled: options?.enabled ?? true,
   })
 }
 
@@ -801,35 +839,121 @@ export function useRegisterPatient() {
 export function useCheckDuplicate(name: string, mobile: string, enabled: boolean = true) {
   return useQuery({
     queryKey: ['check-duplicate', name, mobile],
-    queryFn: () =>
+    queryFn: ({ signal }) =>
       apiFetch<DuplicateCheckResponse>(
         `/patients/check-duplicate?name=${encodeURIComponent(name.trim())}&mobile=${encodeURIComponent(mobile.trim())}`,
+        { signal },
       ),
     enabled: enabled && name.trim().length >= 2 && mobile.trim().length >= 10,
     staleTime: 5000,
   })
 }
 
+function buildPatientDirectorySearchParams(
+  q: string,
+  filters?: PatientDirectoryFilters,
+  pagination?: { limit: number; offset: number },
+): string {
+  const parts: string[] = [`q=${encodeURIComponent(q)}`]
+  if (filters?.status) parts.push(`status=${encodeURIComponent(filters.status)}`)
+  if (filters?.gender === 'M' || filters?.gender === 'F' || filters?.gender === 'O') {
+    parts.push(`gender=${encodeURIComponent(filters.gender)}`)
+  }
+  const district = filters?.district?.trim()
+  if (district) parts.push(`district=${encodeURIComponent(district)}`)
+  // Omit has_due_balance unless explicitly boolean so DOCTOR callers never trigger 403.
+  if (typeof filters?.has_due_balance === 'boolean') {
+    parts.push(`has_due_balance=${filters.has_due_balance ? 'true' : 'false'}`)
+  }
+  if (pagination) {
+    if (filters?.sort_by) parts.push(`sort_by=${encodeURIComponent(filters.sort_by)}`)
+    parts.push(`limit=${pagination.limit}`)
+    parts.push(`offset=${pagination.offset}`)
+  }
+  return `?${parts.join('&')}`
+}
+
+export interface UsePatientsOptions extends PatientDirectoryFilters {
+  enabled?: boolean
+  filters?: PatientDirectoryFilters
+}
+
 export function usePatients(
   q: string = '',
   limit: number = 20,
   offset: number = 0,
-  options?: { enabled?: boolean },
+  options?: UsePatientsOptions,
+  filters?: PatientDirectoryFilters,
 ) {
+  const resolvedFilters: PatientDirectoryFilters | undefined =
+    filters ??
+    options?.filters ??
+    (options &&
+    (options.status !== undefined ||
+      options.gender !== undefined ||
+      options.district !== undefined ||
+      options.has_due_balance !== undefined ||
+      options.sort_by !== undefined)
+      ? {
+          status: options.status,
+          gender: options.gender,
+          district: options.district,
+          has_due_balance: options.has_due_balance,
+          sort_by: options.sort_by,
+        }
+      : undefined)
+
   return useQuery({
-    queryKey: ['patients', { q, limit, offset }],
-    queryFn: () =>
+    queryKey: [
+      'patients',
+      {
+        q,
+        limit,
+        offset,
+        status: resolvedFilters?.status,
+        gender: resolvedFilters?.gender || undefined,
+        district: resolvedFilters?.district?.trim() || undefined,
+        has_due_balance:
+          typeof resolvedFilters?.has_due_balance === 'boolean'
+            ? resolvedFilters.has_due_balance
+            : undefined,
+        sort_by: resolvedFilters?.sort_by,
+      },
+    ],
+    queryFn: ({ signal }) =>
       apiFetch<PatientOut[]>(
-        `/patients?q=${encodeURIComponent(q)}&limit=${limit}&offset=${offset}`,
+        `/patients${buildPatientDirectorySearchParams(q, resolvedFilters, { limit, offset })}`,
+        { signal },
       ),
     enabled: options?.enabled ?? true,
   })
 }
 
-export function usePatientCount(q: string = '') {
+export function usePatientCount(
+  q: string = '',
+  filters?: PatientDirectoryFilters,
+  options?: { enabled?: boolean },
+) {
   return useQuery({
-    queryKey: ['patients', 'count', { q }],
-    queryFn: () => apiFetch<{ total: number }>(`/patients/count?q=${encodeURIComponent(q)}`),
+    queryKey: [
+      'patients',
+      'count',
+      {
+        q,
+        status: filters?.status,
+        gender: filters?.gender || undefined,
+        district: filters?.district?.trim() || undefined,
+        has_due_balance:
+          typeof filters?.has_due_balance === 'boolean'
+            ? filters.has_due_balance
+            : undefined,
+      },
+    ],
+    queryFn: () =>
+      apiFetch<{ total: number }>(
+        `/patients/count${buildPatientDirectorySearchParams(q, filters)}`,
+      ),
+    enabled: options?.enabled ?? true,
   })
 }
 
@@ -852,6 +976,7 @@ export function useUpdatePatient() {
     onSuccess: (data) => {
       qc.setQueryData(['patient', data.id], data)
       qc.invalidateQueries({ queryKey: ['patients'] })
+      qc.invalidateQueries({ queryKey: ['patient-summary', data.id] })
     },
   })
 }
@@ -874,6 +999,79 @@ export function useUploadPatientPhoto() {
   })
 }
 
+// ---------------------------------------------------------------------------
+// Milestone 1: Patient Workspace Summary, Visit History & Clinical Allergies
+// ---------------------------------------------------------------------------
+
+export function usePatientSummary(patientId: number | null) {
+  return useQuery({
+    queryKey: ['patient-summary', patientId],
+    queryFn: () => apiFetch<PatientSummaryOut>(`/api/patients/${patientId}/summary`),
+    enabled: patientId !== null && patientId > 0,
+  })
+}
+
+export function usePatientVisits(
+  patientId: number | null,
+  params?: { limit?: number; offset?: number },
+) {
+  const searchParams = new URLSearchParams()
+  if (params?.limit !== undefined) searchParams.set('limit', String(params.limit))
+  if (params?.offset !== undefined) searchParams.set('offset', String(params.offset))
+  const qs = searchParams.toString() ? `?${searchParams.toString()}` : ''
+
+  return useQuery({
+    queryKey: ['patient-visits', patientId, params],
+    queryFn: () =>
+      apiFetch<PatientVisitHistoryResponse>(`/api/patients/${patientId}/visits${qs}`),
+    enabled: patientId !== null && patientId > 0,
+  })
+}
+
+/**
+ * GET /api/patients/{patientId}/allergies (DOCTOR only, D-04).
+ * Defaults enabled=false so Reception/Admin callers never trigger 403s; pass enabled=isDoctor.
+ */
+export function usePatientAllergies(patientId: number | null, enabled: boolean = false) {
+  return useQuery({
+    queryKey: ['patient-allergies', patientId],
+    queryFn: () => apiFetch<PatientAllergyOut[]>(`/api/patients/${patientId}/allergies`),
+    enabled: enabled && patientId !== null && patientId > 0,
+  })
+}
+
+/** POST /api/patients/{patientId}/allergies (DOCTOR only, allergy:write). */
+export function useCreatePatientAllergy(patientId: number) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (body: PatientAllergyCreate) =>
+      apiFetch<PatientAllergyOut>(`/api/patients/${patientId}/allergies`, {
+        method: 'POST',
+        body,
+      }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['patient-summary', patientId] })
+      qc.invalidateQueries({ queryKey: ['patient-allergies', patientId] })
+    },
+  })
+}
+
+/** PATCH /api/patients/{patientId}/allergies/{allergyId} (DOCTOR only, allergy:write, optimistic version_id). */
+export function useUpdatePatientAllergy(patientId: number) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ allergyId, body }: { allergyId: number; body: PatientAllergyUpdate }) =>
+      apiFetch<PatientAllergyOut>(`/api/patients/${patientId}/allergies/${allergyId}`, {
+        method: 'PATCH',
+        body,
+      }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['patient-summary', patientId] })
+      qc.invalidateQueries({ queryKey: ['patient-allergies', patientId] })
+    },
+  })
+}
+
 
 // ==============================================================================
 export { useHealth, type HealthStatus } from './health'
@@ -881,13 +1079,20 @@ export { useHealth, type HealthStatus } from './health'
 // Appointments & Clinical Encounters (Phase 13)
 // ==============================================================================
 
+export interface UseAppointmentsParams {
+  appointment_date?: string
+  doctor_id?: number
+  patient_id?: number
+  status?: string
+  status_bucket?: string
+  limit?: number
+  offset?: number
+  sort_by?: 'token' | 'time'
+  search?: string
+}
+
 export function useAppointments(
-  params?: {
-    appointment_date?: string
-    doctor_id?: number
-    patient_id?: number
-    status?: string
-  },
+  params?: UseAppointmentsParams,
   options?: { enabled?: boolean; refetchInterval?: number | false },
 ) {
   const q = new URLSearchParams()
@@ -895,23 +1100,51 @@ export function useAppointments(
   if (params?.doctor_id) q.set('doctor_id', String(params.doctor_id))
   if (params?.patient_id) q.set('patient_id', String(params.patient_id))
   if (params?.status) q.set('status', params.status)
+  if (params?.status_bucket) q.set('status_bucket', params.status_bucket)
+  if (params?.limit !== undefined) q.set('limit', String(params.limit))
+  if (params?.offset !== undefined) q.set('offset', String(params.offset))
+  if (params?.sort_by) q.set('sort_by', params.sort_by)
+  const trimmedSearch = params?.search?.trim()
+  if (trimmedSearch) q.set('search', trimmedSearch)
   const qs = q.toString() ? `?${q.toString()}` : ''
 
   return useQuery({
     queryKey: ['appointments', params],
-    queryFn: () => apiFetch<AppointmentListResponse>(`/appointments${qs}`),
+    queryFn: ({ signal }) => apiFetch<AppointmentListResponse>(`/appointments${qs}`, { signal }),
     enabled: options?.enabled ?? true,
     // Reception and doctor screens share this list; poll so every workstation sees the same queue.
     refetchInterval: options?.refetchInterval ?? 10000,
   })
 }
 
-export function useOpdArrivals(arrivalDate: string) {
+export interface UseOpdArrivalsOptions {
+  enabled?: boolean
+  doctor_id?: number
+  limit?: number
+  offset?: number
+  refetchInterval?: number | false
+}
+
+export function useOpdArrivals(arrivalDate: string, options?: UseOpdArrivalsOptions) {
   const query = new URLSearchParams({ arrival_date: arrivalDate })
+  if (options?.doctor_id) query.set('doctor_id', String(options.doctor_id))
+  if (options?.limit !== undefined) query.set('limit', String(options.limit))
+  if (options?.offset !== undefined) query.set('offset', String(options.offset))
+  const filterKey =
+    options?.doctor_id !== undefined ||
+    options?.limit !== undefined ||
+    options?.offset !== undefined
+      ? {
+          doctor_id: options.doctor_id,
+          limit: options.limit,
+          offset: options.offset,
+        }
+      : undefined
   return useQuery({
-    queryKey: ['opd-arrivals', arrivalDate],
-    queryFn: () => apiFetch<{ total: number; arrivals: OpdArrival[] }>(`/opd-arrivals?${query}`),
-    refetchInterval: 10000,
+    queryKey: filterKey ? ['opd-arrivals', arrivalDate, filterKey] : ['opd-arrivals', arrivalDate],
+    queryFn: ({ signal }) => apiFetch<OpdArrivalList>(`/opd-arrivals?${query}`, { signal }),
+    enabled: options?.enabled ?? true,
+    refetchInterval: options?.refetchInterval ?? 10000,
   })
 }
 
@@ -926,7 +1159,8 @@ export function useOpdArrival(id: number) {
 export function useCreateOpdArrival() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (body: OpdArrivalCreate) => apiFetch<OpdArrival>('/opd-arrivals', { method: 'POST', body }),
+    mutationFn: ({ idempotencyKey, ...body }: OpdArrivalCreate & { idempotencyKey?: string }) =>
+      apiFetch<OpdArrival>('/opd-arrivals', { method: 'POST', body, idempotencyKey }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['opd-arrivals'] })
       qc.invalidateQueries({ queryKey: ['appointments'] })
@@ -941,12 +1175,17 @@ export function useRegisterOpdArrival() {
     mutationFn: ({ id, body }: { id: number; body: OpdArrivalRegister }) =>
       apiFetch<Appointment>(`/opd-arrivals/${id}/register`, { method: 'POST', body }),
     onSuccess: (appointment) => {
+      qc.setQueryData(['appointment', appointment.id], appointment)
       qc.invalidateQueries({ queryKey: ['opd-arrivals'] })
       qc.invalidateQueries({ queryKey: ['appointments'] })
       qc.invalidateQueries({ queryKey: ['doctor-queue'] })
+      qc.invalidateQueries({ queryKey: ['visits'] })
+      qc.invalidateQueries({ queryKey: ['visit-bill'] })
       qc.invalidateQueries({ queryKey: ['patients'] })
+      qc.invalidateQueries({ queryKey: ['patient-summary'] })
+      qc.invalidateQueries({ queryKey: ['patient-visits'] })
+      qc.invalidateQueries({ queryKey: ['timeline'] })
       qc.invalidateQueries({ queryKey: ['overview', 'reception'] })
-      qc.setQueryData(['appointment', appointment.id], appointment)
     },
   })
 }
@@ -992,10 +1231,11 @@ export function useAppointment(id: number) {
 export function useBookAppointment() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (body: AppointmentCreate) =>
+    mutationFn: ({ idempotencyKey, ...body }: AppointmentCreate & { idempotencyKey?: string }) =>
       apiFetch<Appointment>('/appointments', {
         method: 'POST',
         body,
+        idempotencyKey,
       }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['appointments'] })
@@ -1009,12 +1249,17 @@ export function useBookAppointment() {
 export function useWalkIn() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (body: WalkInCreate) =>
-      apiFetch<Appointment>('/appointments/walk-in', { method: 'POST', body }),
-    onSuccess: () => {
+    mutationFn: ({ idempotencyKey, ...body }: WalkInCreate & { idempotencyKey?: string }) =>
+      apiFetch<Appointment>('/appointments/walk-in', { method: 'POST', body, idempotencyKey }),
+    onSuccess: (data) => {
+      qc.setQueryData(['appointment', data.id], data)
       qc.invalidateQueries({ queryKey: ['appointments'] })
       qc.invalidateQueries({ queryKey: ['doctor-queue'] })
       qc.invalidateQueries({ queryKey: ['visits'] })
+      qc.invalidateQueries({ queryKey: ['visit-bill'] })
+      qc.invalidateQueries({ queryKey: ['patient-summary'] })
+      qc.invalidateQueries({ queryKey: ['patient-visits'] })
+      qc.invalidateQueries({ queryKey: ['timeline'] })
       qc.invalidateQueries({ queryKey: ['overview', 'reception'] })
     },
   })
@@ -1039,13 +1284,22 @@ export function useRescheduleAppointment() {
 export function useCheckInNewPatient() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (body: NewPatientCheckIn) =>
-      apiFetch<Appointment>('/appointments/walk-in/new-patient', { method: 'POST', body }),
-    onSuccess: () => {
+    mutationFn: ({ idempotencyKey, ...body }: NewPatientCheckIn & { idempotencyKey?: string }) =>
+      apiFetch<Appointment>('/appointments/walk-in/new-patient', {
+        method: 'POST',
+        body,
+        idempotencyKey,
+      }),
+    onSuccess: (data) => {
+      qc.setQueryData(['appointment', data.id], data)
       qc.invalidateQueries({ queryKey: ['appointments'] })
       qc.invalidateQueries({ queryKey: ['doctor-queue'] })
       qc.invalidateQueries({ queryKey: ['visits'] })
+      qc.invalidateQueries({ queryKey: ['visit-bill'] })
       qc.invalidateQueries({ queryKey: ['patients'] })
+      qc.invalidateQueries({ queryKey: ['patient-summary'] })
+      qc.invalidateQueries({ queryKey: ['patient-visits'] })
+      qc.invalidateQueries({ queryKey: ['timeline'] })
       qc.invalidateQueries({ queryKey: ['overview', 'reception'] })
     },
   })
@@ -1060,7 +1314,6 @@ export function useAcknowledgeAlert() {
     onSuccess: (data) => {
       qc.setQueryData(['appointment', data.id], data)
       qc.invalidateQueries({ queryKey: ['doctor-queue'] })
-      qc.invalidateQueries({ queryKey: ['doctor-alerts'] })
     },
   })
 }
@@ -1101,13 +1354,29 @@ export function useUpdatePriority() {
 export function useCheckIn() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: ({ id, body }: { id: number; body: CheckInRequest }) =>
-      apiFetch<Appointment>(`/appointments/${id}/check-in`, { method: 'POST', body }),
+    mutationFn: ({
+      id,
+      body,
+      idempotencyKey,
+    }: {
+      id: number
+      body: CheckInRequest
+      idempotencyKey?: string
+    }) =>
+      apiFetch<Appointment>(`/appointments/${id}/check-in`, {
+        method: 'POST',
+        body,
+        idempotencyKey,
+      }),
     onSuccess: (data) => {
       qc.setQueryData(['appointment', data.id], data)
       qc.invalidateQueries({ queryKey: ['appointments'] })
       qc.invalidateQueries({ queryKey: ['doctor-queue'] })
       qc.invalidateQueries({ queryKey: ['visits'] })
+      qc.invalidateQueries({ queryKey: ['visit-bill'] })
+      qc.invalidateQueries({ queryKey: ['patient-summary'] })
+      qc.invalidateQueries({ queryKey: ['patient-visits'] })
+      qc.invalidateQueries({ queryKey: ['timeline'] })
       qc.invalidateQueries({ queryKey: ['overview', 'reception'] })
     },
   })
@@ -1156,10 +1425,11 @@ export function useEncounter(id: number) {
   })
 }
 
-export function useUnfinishedEncounters() {
+export function useUnfinishedEncounters(enabled = true) {
   return useQuery({
     queryKey: ['unfinished-encounters'],
     queryFn: () => apiFetch<UnfinishedEncounter[]>('/encounters/unfinished'),
+    enabled,
   })
 }
 
@@ -1338,6 +1608,14 @@ export function useSaveEncounterTemplateResponse() {
   })
 }
 
+export function useEncounterPrescription(encounterId: number) {
+  return useQuery({
+    queryKey: ['encounter-prescription', encounterId],
+    queryFn: () => apiFetch<PrescriptionOut | null>(`/encounters/${encounterId}/prescription`),
+    enabled: encounterId > 0,
+  })
+}
+
 export function useAuthorisePrescription() {
   const qc = useQueryClient()
   return useMutation({
@@ -1411,6 +1689,58 @@ export function useCreateFollowUp() {
       }),
     onSuccess: (data, { encounterId }) => {
       qc.setQueryData(['encounter-follow-up', encounterId], data)
+      qc.invalidateQueries({ queryKey: ['reception-follow-ups'] })
+    },
+  })
+}
+
+export function useReceptionFollowUps(
+  params?: { status?: string; date_from?: string; date_to?: string; overdue?: boolean },
+  enabled = true,
+) {
+  const searchParams = new URLSearchParams()
+  if (params?.status) searchParams.set('status', params.status)
+  if (params?.date_from) searchParams.set('date_from', params.date_from)
+  if (params?.date_to) searchParams.set('date_to', params.date_to)
+  if (params?.overdue !== undefined) searchParams.set('overdue', String(params.overdue))
+  const query = searchParams.toString()
+
+  return useQuery({
+    queryKey: ['reception-follow-ups', params],
+    queryFn: () =>
+      apiFetch<ReceptionFollowUpResponse[]>(
+        `/reception/follow-ups${query ? `?${query}` : ''}`,
+      ),
+    enabled,
+  })
+}
+
+export function useBookFollowUp() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, body }: { id: number; body: FollowUpBookRequest }) =>
+      apiFetch<ReceptionFollowUpResponse>(`/follow-ups/${id}/book`, {
+        method: 'POST',
+        body,
+      }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['reception-follow-ups'] })
+      qc.invalidateQueries({ queryKey: ['appointments'] })
+      qc.invalidateQueries({ queryKey: ['doctor-queue'] })
+    },
+  })
+}
+
+export function useCloseFollowUp() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, body }: { id: number; body: FollowUpCloseRequest }) =>
+      apiFetch<ReceptionFollowUpResponse>(`/follow-ups/${id}/close`, {
+        method: 'POST',
+        body,
+      }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['reception-follow-ups'] })
     },
   })
 }
@@ -1463,9 +1793,29 @@ export function useCreatePrescription() {
         body,
       }),
     onSuccess: (data) => {
+      if (data.encounter_id) {
+        qc.setQueryData(['encounter-prescription', data.encounter_id], data)
+        qc.invalidateQueries({ queryKey: ['encounter-prescription', data.encounter_id] })
+      }
       qc.invalidateQueries({ queryKey: ['patient-prescriptions', data.patient_id] })
       qc.invalidateQueries({ queryKey: ['doctor-queue'] })
     },
+  })
+}
+
+export type TreatmentPlanRosterStatus = 'ACTIVE' | 'COMPLETED' | 'CANCELLED' | 'ALL'
+
+export function useTreatmentPlans(
+  status: TreatmentPlanRosterStatus = 'ACTIVE',
+  enabled = true,
+) {
+  return useQuery({
+    queryKey: ['treatment-plans', status],
+    queryFn: () =>
+      apiFetch<TreatmentPlanOut[]>(
+        `/treatment-plans?status=${encodeURIComponent(status)}`,
+      ),
+    enabled,
   })
 }
 
@@ -1494,7 +1844,9 @@ export function useCreateTreatmentPlan() {
         body,
       }),
     onSuccess: (data) => {
+      qc.setQueryData(['treatment-plan', data.id], data)
       qc.invalidateQueries({ queryKey: ['patient-treatment-plans', data.patient_id] })
+      qc.invalidateQueries({ queryKey: ['treatment-plans'] })
     },
   })
 }
@@ -1510,6 +1862,7 @@ export function useUpdateTreatmentPlan() {
     onSuccess: (data) => {
       qc.setQueryData(['treatment-plan', data.id], data)
       qc.invalidateQueries({ queryKey: ['patient-treatment-plans', data.patient_id] })
+      qc.invalidateQueries({ queryKey: ['treatment-plans'] })
     },
   })
 }
@@ -1534,6 +1887,7 @@ export function useLogTreatmentSession() {
       qc.invalidateQueries({ queryKey: ['treatment-sessions', data.treatment_plan_id] })
       qc.invalidateQueries({ queryKey: ['treatment-plan', data.treatment_plan_id] })
       qc.invalidateQueries({ queryKey: ['patient-treatment-plans', data.patient_id] })
+      qc.invalidateQueries({ queryKey: ['treatment-plans'] })
     },
   })
 }
@@ -1592,8 +1946,14 @@ export function useRecordPayment() {
       }),
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['payments'] })
+      queryClient.invalidateQueries({ queryKey: ['patient-payments', variables.patient_id] })
+      queryClient.invalidateQueries({ queryKey: ['patient-ledger', variables.patient_id] })
+      queryClient.invalidateQueries({ queryKey: ['patient-summary', variables.patient_id] })
+      queryClient.invalidateQueries({ queryKey: ['patient-visits', variables.patient_id] })
       queryClient.invalidateQueries({ queryKey: ['billing'] })
       queryClient.invalidateQueries({ queryKey: ['treatment-plans'] })
+      queryClient.invalidateQueries({ queryKey: ['treatment-plan'] })
+      queryClient.invalidateQueries({ queryKey: ['patient-treatment-plans'] })
       queryClient.invalidateQueries({ queryKey: ['timeline', variables.patient_id] })
       queryClient.invalidateQueries({ queryKey: ['visits'] })
       queryClient.invalidateQueries({ queryKey: ['visit-bill'] })
@@ -1610,10 +1970,16 @@ export function useReversePayment() {
         method: 'POST',
         body: payload,
       }),
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['payments'] })
+      queryClient.invalidateQueries({ queryKey: ['patient-payments', data.patient_id] })
+      queryClient.invalidateQueries({ queryKey: ['patient-ledger', data.patient_id] })
+      queryClient.invalidateQueries({ queryKey: ['patient-summary', data.patient_id] })
+      queryClient.invalidateQueries({ queryKey: ['patient-visits', data.patient_id] })
       queryClient.invalidateQueries({ queryKey: ['billing'] })
       queryClient.invalidateQueries({ queryKey: ['treatment-plans'] })
+      queryClient.invalidateQueries({ queryKey: ['treatment-plan'] })
+      queryClient.invalidateQueries({ queryKey: ['patient-treatment-plans'] })
       queryClient.invalidateQueries({ queryKey: ['timeline'] })
       queryClient.invalidateQueries({ queryKey: ['visits'] })
       queryClient.invalidateQueries({ queryKey: ['visit-bill'] })
@@ -1686,6 +2052,7 @@ export function useCreateBackup() {
       apiFetch<BackupArchiveInfo>('/api/operations/backups', {
         method: 'POST',
         body: payload,
+        timeoutMs: 300_000,
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['operations', 'backups'] })
@@ -1854,6 +2221,7 @@ export function useRestoreBackup() {
       apiFetch<RestoreResultOut>('/api/operations/restore', {
         method: 'POST',
         body: payload,
+        timeoutMs: 300_000,
       }),
     onSuccess: () => {
       queryClient.invalidateQueries()
@@ -1964,6 +2332,502 @@ export function useCorrectPatientDemographics() {
     },
   })
 }
+
+// ---------------------------------------------------------------------------
+// Milestone 2: Conditions, Encounter Diagnoses, Investigations & Rx Versioning
+// ---------------------------------------------------------------------------
+
+/**
+ * GET /api/patients/{patientId}/conditions (DOCTOR only, D-04).
+ * Defaults enabled=false so Reception/Admin callers never trigger 403s; pass enabled=isDoctor.
+ */
+export function usePatientConditions(patientId: number | null, enabled: boolean = false) {
+  return useQuery({
+    queryKey: ['patient-conditions', patientId],
+    queryFn: () => apiFetch<PatientConditionOut[]>(`/api/patients/${patientId}/conditions`),
+    enabled: enabled && patientId !== null && patientId > 0,
+  })
+}
+
+/** POST /api/patients/{patientId}/conditions (DOCTOR only). */
+export function useCreatePatientCondition(patientId: number) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (body: PatientConditionCreate) =>
+      apiFetch<PatientConditionOut>(`/api/patients/${patientId}/conditions`, {
+        method: 'POST',
+        body,
+      }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['patient-conditions', patientId] })
+      qc.invalidateQueries({ queryKey: ['patient-summary', patientId] })
+    },
+  })
+}
+
+/** PATCH /api/patients/{patientId}/conditions/{conditionId} (DOCTOR only, optimistic version_id). */
+export function useUpdatePatientCondition(patientId: number) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({
+      conditionId,
+      body,
+    }: {
+      conditionId: number
+      body: PatientConditionUpdate
+    }) =>
+      apiFetch<PatientConditionOut>(`/api/patients/${patientId}/conditions/${conditionId}`, {
+        method: 'PATCH',
+        body,
+      }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['patient-conditions', patientId] })
+      qc.invalidateQueries({ queryKey: ['patient-summary', patientId] })
+    },
+  })
+}
+
+/** GET /api/encounters/{encounterId}/diagnoses (DOCTOR only). */
+export function useEncounterDiagnoses(encounterId: number | null, enabled: boolean = true) {
+  return useQuery({
+    queryKey: ['encounter-diagnoses', encounterId],
+    queryFn: () => apiFetch<EncounterDiagnosisOut[]>(`/api/encounters/${encounterId}/diagnoses`),
+    enabled: enabled && encounterId !== null && encounterId > 0,
+  })
+}
+
+/** POST /api/encounters/{encounterId}/diagnoses (DOCTOR only; supports promote_to_condition). */
+export function useCreateEncounterDiagnosis(encounterId: number, patientId?: number) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (body: EncounterDiagnosisCreate) =>
+      apiFetch<EncounterDiagnosisOut>(`/api/encounters/${encounterId}/diagnoses`, {
+        method: 'POST',
+        body,
+      }),
+    onSuccess: (data) => {
+      qc.invalidateQueries({ queryKey: ['encounter-diagnoses', encounterId] })
+      const targetPatientId = patientId ?? data.patient_id
+      qc.invalidateQueries({ queryKey: ['patient-conditions', targetPatientId] })
+      qc.invalidateQueries({ queryKey: ['patient-summary', targetPatientId] })
+    },
+  })
+}
+
+/** PATCH /api/encounters/{encounterId}/diagnoses/{diagnosisId} (DOCTOR only, unfinalised only). */
+export function useUpdateEncounterDiagnosis(encounterId: number) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({
+      diagnosisId,
+      body,
+    }: {
+      diagnosisId: number
+      body: EncounterDiagnosisUpdate
+    }) =>
+      apiFetch<EncounterDiagnosisOut>(
+        `/api/encounters/${encounterId}/diagnoses/${diagnosisId}`,
+        {
+          method: 'PATCH',
+          body,
+        },
+      ),
+    onSuccess: (data) => {
+      qc.invalidateQueries({ queryKey: ['encounter-diagnoses', encounterId] })
+      qc.invalidateQueries({ queryKey: ['patient-summary', data.patient_id] })
+    },
+  })
+}
+
+/** DELETE /api/encounters/{encounterId}/diagnoses/{diagnosisId} (DOCTOR only, unfinalised only). */
+export function useDeleteEncounterDiagnosis(encounterId: number) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (diagnosisId: number) =>
+      apiFetch<void>(`/api/encounters/${encounterId}/diagnoses/${diagnosisId}`, {
+        method: 'DELETE',
+      }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['encounter-diagnoses', encounterId] })
+    },
+  })
+}
+
+/**
+ * GET /api/patients/{patientId}/investigations (DOCTOR only, D-04).
+ * Defaults enabled=false so Reception/Admin callers never trigger 403s; pass enabled=isDoctor.
+ */
+export function usePatientInvestigations(patientId: number | null, enabled: boolean = false) {
+  return useQuery({
+    queryKey: ['patient-investigations', patientId],
+    queryFn: () =>
+      apiFetch<InvestigationOrderOut[]>(`/api/patients/${patientId}/investigations`),
+    enabled: enabled && patientId !== null && patientId > 0,
+  })
+}
+
+/** GET /api/encounters/{encounterId}/investigations (DOCTOR only). */
+export function useEncounterInvestigations(encounterId: number | null, enabled: boolean = true) {
+  return useQuery({
+    queryKey: ['encounter-investigations', encounterId],
+    queryFn: () =>
+      apiFetch<InvestigationOrderOut[]>(`/api/encounters/${encounterId}/investigations`),
+    enabled: enabled && encounterId !== null && encounterId > 0,
+  })
+}
+
+/** POST /api/encounters/{encounterId}/investigations (DOCTOR only). */
+export function useCreateInvestigationOrder(encounterId: number, patientId?: number) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (body: InvestigationOrderCreate) =>
+      apiFetch<InvestigationOrderOut>(`/api/encounters/${encounterId}/investigations`, {
+        method: 'POST',
+        body,
+      }),
+    onSuccess: (data) => {
+      qc.invalidateQueries({ queryKey: ['encounter-investigations', encounterId] })
+      const targetPatientId = patientId ?? data.patient_id
+      qc.invalidateQueries({ queryKey: ['patient-investigations', targetPatientId] })
+      qc.invalidateQueries({ queryKey: ['patient-summary', targetPatientId] })
+    },
+  })
+}
+
+/** PATCH /api/investigations/{orderId}/status (DOCTOR only, optimistic version_id). */
+export function useUpdateInvestigationStatus(patientId?: number, encounterId?: number) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ orderId, body }: { orderId: number; body: InvestigationStatusUpdate }) =>
+      apiFetch<InvestigationOrderOut>(`/api/investigations/${orderId}/status`, {
+        method: 'PATCH',
+        body,
+      }),
+    onSuccess: (data) => {
+      const targetPatientId = patientId ?? data.patient_id
+      const targetEncounterId = encounterId ?? data.encounter_id
+      qc.invalidateQueries({ queryKey: ['patient-investigations', targetPatientId] })
+      qc.invalidateQueries({ queryKey: ['encounter-investigations', targetEncounterId] })
+    },
+  })
+}
+
+/** POST /api/investigations/{orderId}/results (DOCTOR only, append-only result). */
+export function useRecordInvestigationResult(patientId?: number, encounterId?: number) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ orderId, body }: { orderId: number; body: InvestigationResultCreate }) =>
+      apiFetch<InvestigationResultOut>(`/api/investigations/${orderId}/results`, {
+        method: 'POST',
+        body,
+      }),
+    onSuccess: (data) => {
+      const targetPatientId = patientId ?? data.patient_id
+      qc.invalidateQueries({ queryKey: ['patient-investigations', targetPatientId] })
+      if (encounterId !== undefined) {
+        qc.invalidateQueries({ queryKey: ['encounter-investigations', encounterId] })
+      } else {
+        qc.invalidateQueries({ queryKey: ['encounter-investigations'] })
+      }
+    },
+  })
+}
+
+/** POST /api/prescriptions/{prescriptionId}/amend (DOCTOR only, creates versioned revision). */
+export function useAmendPrescription(patientId?: number) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({
+      prescriptionId,
+      body,
+    }: {
+      prescriptionId: number
+      body: PrescriptionAmendRequest
+    }) =>
+      apiFetch<PrescriptionOut>(`/api/prescriptions/${prescriptionId}/amend`, {
+        method: 'POST',
+        body,
+      }),
+    onSuccess: (data, variables) => {
+      qc.setQueryData(['prescription', data.id], data)
+      qc.invalidateQueries({ queryKey: ['prescription', variables.prescriptionId] })
+      const targetPatientId = patientId ?? data.patient_id
+      qc.invalidateQueries({ queryKey: ['patient-prescriptions', targetPatientId] })
+      qc.invalidateQueries({ queryKey: ['patient-summary', targetPatientId] })
+      qc.invalidateQueries({ queryKey: ['timeline', targetPatientId] })
+      if (data.encounter_id) {
+        qc.invalidateQueries({ queryKey: ['encounter-prescription', data.encounter_id] })
+      }
+    },
+  })
+}
+
+// ---------------------------------------------------------------------------
+// Milestone 3: Append-Only Patient Financial Ledger & Admin Refunds
+// ---------------------------------------------------------------------------
+
+/** GET /api/patients/{patientId}/ledger (ADMIN + RECEPTION with payment:read). */
+export function usePatientLedger(
+  patientId: number | null,
+  params?: { limit?: number; offset?: number; order?: 'desc' | 'asc' },
+  enabled: boolean = true,
+) {
+  const searchParams = new URLSearchParams()
+  if (params?.limit !== undefined) searchParams.set('limit', String(params.limit))
+  if (params?.offset !== undefined) searchParams.set('offset', String(params.offset))
+  if (params?.order !== undefined) searchParams.set('order', params.order)
+  const qs = searchParams.toString() ? `?${searchParams.toString()}` : ''
+
+  return useQuery({
+    queryKey: ['patient-ledger', patientId, params],
+    queryFn: () =>
+      apiFetch<PatientLedgerResponse>(`/api/patients/${patientId}/ledger${qs}`),
+    enabled: enabled && patientId !== null && patientId > 0,
+  })
+}
+
+/** POST /api/payments/{paymentId}/refunds (ADMIN only, payment:refund, D-06). */
+export function useCreatePaymentRefund(patientId: number) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ paymentId, body }: { paymentId: number; body: RefundCreateRequest }) =>
+      apiFetch<RefundOut>(`/api/payments/${paymentId}/refunds`, {
+        method: 'POST',
+        body,
+      }),
+    onSuccess: (refund) => {
+      qc.invalidateQueries({ queryKey: ['patient-ledger', patientId] })
+      qc.invalidateQueries({ queryKey: ['patient-summary', patientId] })
+      qc.invalidateQueries({ queryKey: ['patient-payments', patientId] })
+      qc.invalidateQueries({ queryKey: ['payments'] })
+      qc.invalidateQueries({ queryKey: ['patient-visits', patientId] })
+      qc.invalidateQueries({ queryKey: ['visits'] })
+      qc.invalidateQueries({ queryKey: ['visit-bill'] })
+      if (refund.visit_id != null) {
+        qc.invalidateQueries({ queryKey: ['visit-bill', refund.visit_id] })
+      }
+      qc.invalidateQueries({ queryKey: ['billing'] })
+      qc.invalidateQueries({ queryKey: ['timeline', patientId] })
+      qc.invalidateQueries({ queryKey: ['overview'] })
+    },
+  })
+}
+
+// ---------------------------------------------------------------------------
+// Milestone 4: Patient Documents & Unified Visit Workspace
+// ---------------------------------------------------------------------------
+
+/** GET /api/patients/{patientId}/documents?include_archived=... (DOCUMENT_READ). */
+export function usePatientDocuments(
+  patientId: number | null,
+  includeArchived: boolean = false,
+  enabled: boolean = true,
+) {
+  return useQuery({
+    queryKey: ['patient-documents', patientId, { includeArchived }],
+    queryFn: () =>
+      apiFetch<PatientDocumentOut[]>(
+        `/api/patients/${patientId}/documents?include_archived=${includeArchived ? 'true' : 'false'}`,
+      ),
+    enabled: enabled && patientId !== null && patientId > 0,
+  })
+}
+
+/** POST /api/patients/{patientId}/documents (multipart FormData with CSRF via apiFetch). */
+export function useUploadPatientDocument(patientId: number) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (input: PatientDocumentUploadInput) => {
+      const formData = new FormData()
+      formData.append('file', input.file)
+      formData.append('title', input.title)
+      formData.append('category', input.category)
+      formData.append('is_clinical', String(Boolean(input.is_clinical)))
+      if (input.visit_id != null) {
+        formData.append('visit_id', String(input.visit_id))
+      }
+      if (input.encounter_id != null) {
+        formData.append('encounter_id', String(input.encounter_id))
+      }
+      if (input.notes != null && input.notes.trim() !== '') {
+        formData.append('notes', input.notes)
+      }
+      return apiFetch<PatientDocumentOut>(`/api/patients/${patientId}/documents`, {
+        method: 'POST',
+        body: formData,
+      })
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['patient-documents', patientId] })
+    },
+  })
+}
+
+/** POST /api/documents/{documentId}/archive (soft-archive; retains bytes on disk). */
+export function useArchivePatientDocument(patientId: number) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (documentId: number) =>
+      apiFetch<PatientDocumentOut>(`/api/documents/${documentId}/archive`, {
+        method: 'POST',
+      }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['patient-documents', patientId] })
+    },
+  })
+}
+
+function parseContentDispositionFilename(header: string | null, fallback: string): string {
+  if (!header) return fallback
+  const starMatch = /filename\*\s*=\s*(?:UTF-8'')?([^;\s]+)/i.exec(header)
+  if (starMatch?.[1]) {
+    try {
+      const decoded = decodeURIComponent(starMatch[1].replace(/^["']|["']$/g, ''))
+      if (decoded.trim()) return decoded.trim()
+    } catch {
+      // fall through to standard filename= parsing
+    }
+  }
+  const quotedMatch = /filename\s*=\s*"([^"]+)"/i.exec(header)
+  if (quotedMatch?.[1]?.trim()) return quotedMatch[1].trim()
+  const bareMatch = /filename\s*=\s*([^;\s]+)/i.exec(header)
+  if (bareMatch?.[1]?.trim()) return bareMatch[1].trim()
+  return fallback
+}
+
+/**
+ * Authenticated binary fetch for GET /api/documents/{documentId}/download.
+ * Returns an Object URL suitable for image modal preview or new-tab PDF open;
+ * callers must call URL.revokeObjectURL(url) on close/unmount.
+ */
+export async function downloadPatientDocumentBlob(
+  documentId: number,
+): Promise<{ blob: Blob; url: string; filename: string; contentType: string }> {
+  const res = await fetch(`/api/documents/${documentId}/download`, {
+    credentials: 'same-origin',
+  })
+
+  if (!res.ok) {
+    let errData: Record<string, unknown> = {}
+    try {
+      const text = await res.text()
+      if (text) {
+        const parsed: unknown = JSON.parse(text)
+        if (typeof parsed === 'object' && parsed !== null) {
+          errData = parsed as Record<string, unknown>
+        }
+      }
+    } catch {
+      errData = {}
+    }
+    const code = typeof errData.code === 'string' ? errData.code : 'error'
+    const message =
+      typeof errData.message === 'string'
+        ? errData.message
+        : res.statusText || 'Failed to download document'
+    throw new ApiError(res.status, code, message, errData)
+  }
+
+  const blob = await res.blob()
+  const contentType = res.headers.get('Content-Type') || blob.type || 'application/octet-stream'
+  const filename = parseContentDispositionFilename(
+    res.headers.get('Content-Disposition'),
+    `document-${documentId}`,
+  )
+  const url = URL.createObjectURL(blob)
+  return { blob, url, filename, contentType }
+}
+
+/** GET /api/patients/{patientId}/visits/{visitId}/workspace (role-redacted unified visit view). */
+export function useVisitWorkspace(
+  patientId: number | null,
+  visitId: number | null,
+  options?: { enabled?: boolean },
+) {
+  return useQuery({
+    queryKey: ['visit-workspace', patientId, visitId],
+    queryFn: () =>
+      apiFetch<VisitWorkspaceOut>(
+        `/api/patients/${patientId}/visits/${visitId}/workspace`,
+      ),
+    enabled:
+      (options?.enabled ?? true) &&
+      patientId !== null &&
+      patientId > 0 &&
+      visitId !== null &&
+      visitId > 0,
+  })
+}
+
+// ---------------------------------------------------------------------------
+// Phase 3: Persistent Clinical Quick Phrases (DOCTOR-scoped)
+// ---------------------------------------------------------------------------
+
+/** GET /api/quick-phrases?section=...&department_id=... (returns { defaults, personal }). */
+export function useQuickPhrases(
+  departmentId: number | null,
+  section: QuickPhraseSection = 'COMPLAINTS',
+  enabled: boolean = true,
+) {
+  const normalizedDeptId = departmentId != null && departmentId > 0 ? departmentId : null
+  return useQuery({
+    queryKey: ['quick-phrases', normalizedDeptId, section],
+    queryFn: () => {
+      const params = new URLSearchParams({ section })
+      if (normalizedDeptId !== null) {
+        params.set('department_id', String(normalizedDeptId))
+      }
+      return apiFetch<QuickPhraseListResponse>(`/quick-phrases?${params.toString()}`)
+    },
+    enabled,
+  })
+}
+
+/** POST /api/quick-phrases: create a doctor-owned personal quick phrase. */
+export function useCreateQuickPhrase() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (body: QuickPhraseCreate) =>
+      apiFetch<QuickPhraseOut>('/quick-phrases', {
+        method: 'POST',
+        body,
+      }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['quick-phrases'] })
+    },
+  })
+}
+
+/** PATCH /api/quick-phrases/{id}: update own personal quick phrase. */
+export function useUpdateQuickPhrase() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, body }: { id: number; body: QuickPhraseUpdate }) =>
+      apiFetch<QuickPhraseOut>(`/quick-phrases/${id}`, {
+        method: 'PATCH',
+        body,
+      }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['quick-phrases'] })
+    },
+  })
+}
+
+/** DELETE /api/quick-phrases/{id}: soft-delete own personal quick phrase. */
+export function useDeleteQuickPhrase() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (id: number) =>
+      apiFetch<void>(`/quick-phrases/${id}`, {
+        method: 'DELETE',
+      }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['quick-phrases'] })
+    },
+  })
+}
+
+
 
 
 

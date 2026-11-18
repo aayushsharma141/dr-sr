@@ -22,8 +22,12 @@ from kalyan_api import __version__ as PACKAGE_FALLBACK_VERSION
 from kalyan_api import clock
 from kalyan_api.config import Settings
 from kalyan_api.core.permissions import Permission
-from kalyan_api.core.policy import require
-from kalyan_api.core.principal import Principal, current_principal, get_current_settings
+from kalyan_api.core.policy import authenticated_only, require
+from kalyan_api.core.principal import (
+    Principal,
+    current_principal_allow_pending,
+    get_current_settings,
+)
 from kalyan_api.db.migrate import alembic_config
 from kalyan_api.db.session import SessionDep
 from kalyan_api.models import BackupRun, BackupSettings
@@ -219,13 +223,14 @@ def get_system_status(request: Request, session: SessionDep) -> SystemStatusOut:
 
 @router.post(
     "/heartbeat",
+    dependencies=[Depends(authenticated_only)],
     response_model=WorkstationOut,
 )
 def record_heartbeat_endpoint(
     request: Request,
     payload: WorkstationHeartbeatIn,
     session: SessionDep,
-    principal: Principal = Depends(current_principal),
+    principal: Principal = Depends(current_principal_allow_pending),
 ) -> WorkstationOut:
     """Ingest periodic heartbeat from hospital LAN workstation."""
     return workstation_service.record_heartbeat(session, principal, request, payload)

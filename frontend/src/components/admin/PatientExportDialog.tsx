@@ -1,5 +1,6 @@
-import { useState, type FormEvent } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
 import { getCsrfToken } from '../../api/client'
+import { useDepartments } from '../../api/queries'
 import type { PatientExportRequest } from '../../api/types'
 import { istToday } from '../../format'
 import { Modal } from '../Modal'
@@ -99,6 +100,7 @@ const CLINICAL_FIELD_KEYS = new Set([
 ])
 
 export function PatientExportDialog({ open, onClose, onExportSuccess }: PatientExportDialogProps) {
+  const { data: departments = [] } = useDepartments({ enabled: open })
   // Scope states
   const [startDate, setStartDate] = useState<string>('')
   const [endDate, setEndDate] = useState<string>('')
@@ -115,6 +117,15 @@ export function PatientExportDialog({ open, onClose, onExportSuccess }: PatientE
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [statusMessage, setStatusMessage] = useState<string | null>(null)
   const [reasonTouched, setReasonTouched] = useState<boolean>(false)
+
+  useEffect(() => {
+    if (!open) {
+      setReason('')
+      setReasonTouched(false)
+      setErrorMessage(null)
+      setStatusMessage(null)
+    }
+  }, [open])
 
   const hasClinicalFields = selectedFields.some((f) => CLINICAL_FIELD_KEYS.has(f))
   const isReasonValid = reason.trim().length >= 5
@@ -206,6 +217,8 @@ export function PatientExportDialog({ open, onClose, onExportSuccess }: PatientE
       anchor.remove()
       window.URL.revokeObjectURL(downloadUrl)
 
+      setReason('')
+      setReasonTouched(false)
       setStatusMessage(null)
       onExportSuccess?.(filename)
       onClose()
@@ -302,8 +315,11 @@ export function PatientExportDialog({ open, onClose, onExportSuccess }: PatientE
                 className="mt-1 block h-11 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-xs focus:border-[#8E1C3D] focus:ring-1 focus:ring-[#8E1C3D]"
               >
                 <option value="">All Departments</option>
-                <option value="1">Physiotherapy</option>
-                <option value="2">Ophthalmology</option>
+                {departments.map((dept) => (
+                  <option key={dept.id} value={String(dept.id)}>
+                    {dept.name_en}
+                  </option>
+                ))}
               </select>
             </div>
 

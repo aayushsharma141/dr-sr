@@ -60,6 +60,7 @@ from kalyan_api.services.backup_service import (
     InvalidBackupLabelError,
     InvalidDestinationDirError,
     create_backup,
+    read_manifest,
     resolve_archive_in_dir,
     restore_backup,
     validate_destination_dir,
@@ -397,8 +398,9 @@ def list_backups() -> BackupArchiveListResponse:
     for file_path in backup_dir.glob(ARCHIVE_GLOB):
         if file_path.is_file():
             stat = file_path.stat()
-            # Fast inspection of manifest
-            is_valid, _, manifest = verify_backup_bundle(file_path)
+            # Fast head-only manifest inspection (full hashing runs via POST /verify)
+            manifest = read_manifest(file_path)
+            is_valid = manifest is not None
             label = manifest.get("label") if manifest else None
 
             archives.append(

@@ -104,6 +104,11 @@ vi.mock('../../api/queries', () => ({
     mutateAsync: vi.fn(),
     isPending: false,
   }),
+  useDepartments: () => ({
+    data: [{ id: 1, name_en: 'Physiotherapy', name_hi: null, description: null, is_active: true, version_id: 1 }],
+    isPending: false,
+    isError: false,
+  }),
 }))
 
 describe('BackupManagerPage', () => {
@@ -160,8 +165,14 @@ describe('BackupManagerPage', () => {
     fireEvent.change(screen.getByLabelText('Reason for restoration *'), {
       target: { value: 'Approved recovery after a verified server incident' },
     })
+    // Regression M3: old mismatched phrase must NOT enable submission; backend requires exact 'RESTORE'.
     fireEvent.change(screen.getByLabelText('Type the confirmation phrase'), {
       target: { value: 'RESTORE-DATABASE-OVERWRITE' },
+    })
+    expect(screen.getByRole('button', { name: 'Confirm database restoration' })).toBeDisabled()
+
+    fireEvent.change(screen.getByLabelText('Type the confirmation phrase'), {
+      target: { value: 'RESTORE' },
     })
     expect(screen.getByRole('button', { name: 'Confirm database restoration' })).toBeEnabled()
   })
@@ -260,9 +271,13 @@ describe('BackupManagerPage failures are persistent inline alerts (UX-03)', () =
       target: { value: 'Approved recovery after a verified server incident' },
     })
     fireEvent.change(screen.getByLabelText('Type the confirmation phrase'), {
-      target: { value: 'RESTORE-DATABASE-OVERWRITE' },
+      target: { value: 'RESTORE' },
     })
     fireEvent.click(screen.getByRole('button', { name: 'Confirm database restoration' }))
+
+    expect(mocks.restoreMutate).toHaveBeenCalledWith(
+      expect.objectContaining({ confirmation_phrase: 'RESTORE' }),
+    )
 
     const alert = await screen.findByRole('alert')
     expect(alert).toHaveTextContent('Restore failed: checksum mismatch')

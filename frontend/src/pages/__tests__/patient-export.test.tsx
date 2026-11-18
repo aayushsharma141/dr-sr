@@ -8,6 +8,14 @@ import { PatientExportDialog } from '../../components/admin/PatientExportDialog'
 vi.mock('../../api/queries', () => ({
   useMe: () => ({ data: { full_name: 'System Administrator', role: 'ADMIN' }, isLoading: false }),
   useLogout: () => ({ mutateAsync: vi.fn(), isPending: false }),
+  useDepartments: () => ({
+    data: [
+      { id: 1, name_en: 'Physiotherapy', name_hi: null, description: null, is_active: true, version_id: 1 },
+      { id: 2, name_en: 'Ophthalmology', name_hi: null, description: null, is_active: true, version_id: 1 },
+    ],
+    isPending: false,
+    isError: false,
+  }),
 }))
 
 vi.mock('../../api/branding', () => ({

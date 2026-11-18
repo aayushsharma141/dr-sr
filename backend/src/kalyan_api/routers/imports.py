@@ -216,9 +216,20 @@ def resolve_duplicates(
             status_code=404, code="batch_not_found", message=f"Import batch {batch_id} not found"
         )
 
+    if batch.status == "COMMITTED":
+        raise ApiError(
+            status_code=409,
+            code="batch_already_committed",
+            message=f"Import batch {batch_id} has already been committed",
+        )
+
     for item in payload.resolutions:
         try:
             import_service.resolve_duplicate(session, batch_id, item.row_id, item.resolution)
+        except BatchStateError as exc:
+            raise ApiError(
+                status_code=409, code="batch_already_committed", message=str(exc)
+            ) from exc
         except ImportServiceError as exc:
             raise ApiError(status_code=400, code="resolution_failed", message=str(exc)) from exc
 
@@ -242,7 +253,12 @@ def commit_import_batch(
     except BatchNotFoundError as exc:
         raise ApiError(status_code=404, code="batch_not_found", message=str(exc)) from exc
     except BatchStateError as exc:
-        raise ApiError(status_code=409, code="batch_already_committed", message=str(exc)) from exc
+        code = (
+            "batch_already_committed"
+            if "already been committed" in str(exc)
+            else "batch_not_validated"
+        )
+        raise ApiError(status_code=409, code=code, message=str(exc)) from exc
     except PreCommitBackupFailedError as exc:
         # Pre-commit safety backup gate aborted commit (D-20-12)
         raise ApiError(

@@ -2,9 +2,11 @@
 
 from fastapi import Request
 from sqlalchemy import select
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import Session
 
 from kalyan_api.clock import utcnow
+from kalyan_api.core import net
 from kalyan_api.core.principal import Principal
 from kalyan_api.models import Workstation
 from kalyan_api.schemas.workstations import WorkstationHeartbeatIn, WorkstationOut
@@ -13,13 +15,9 @@ ONLINE_THRESHOLD_SECONDS = 60
 IDLE_THRESHOLD_SECONDS = 300
 
 
-def get_client_ip(request: Request) -> str | None:
-    """Extract client LAN IP address from request."""
-    if request.headers.get("x-forwarded-for"):
-        return request.headers["x-forwarded-for"].split(",")[0].strip()
-    if request.client:
-        return request.client.host
-    return None
+def get_client_ip(request: Request) -> str:
+    """Extract canonical LAN peer IP without trusting spoofable proxy headers."""
+    return net.client_ip(request)[:64]
 
 
 def record_heartbeat(
@@ -28,16 +26,25 @@ def record_heartbeat(
     request: Request,
     payload: WorkstationHeartbeatIn,
 ) -> WorkstationOut:
-    """Record periodic heartbeat from an active hospital terminal."""
+    """Record periodic heartbeat from an active hospital terminal via atomic upsert."""
     client_ip = get_client_ip(request)
     now = utcnow()
 
-    ws = session.scalar(
-        select(Workstation).where(Workstation.hostname == payload.hostname).with_for_update()
-    )
+    update_values: dict[str, object] = {
+        "ip_address": client_ip,
+        "last_seen_at": now,
+        "last_user_id": principal.user_id,
+        "last_username": principal.username,
+        "updated_at": now,
+    }
+    if payload.terminal_name:
+        update_values["terminal_name"] = payload.terminal_name
+    if payload.app_version:
+        update_values["app_version"] = payload.app_version
 
-    if not ws:
-        ws = Workstation(
+    stmt = (
+        pg_insert(Workstation)
+        .values(
             hostname=payload.hostname,
             ip_address=client_ip,
             terminal_name=payload.terminal_name,
@@ -46,17 +53,13 @@ def record_heartbeat(
             last_user_id=principal.user_id,
             last_username=principal.username,
         )
-        session.add(ws)
-    else:
-        ws.ip_address = client_ip
-        if payload.terminal_name:
-            ws.terminal_name = payload.terminal_name
-        if payload.app_version:
-            ws.app_version = payload.app_version
-        ws.last_seen_at = now
-        ws.last_user_id = principal.user_id
-        ws.last_username = principal.username
-
+        .on_conflict_do_update(
+            index_elements=[Workstation.hostname],
+            set_=update_values,
+        )
+        .returning(Workstation)
+    )
+    ws = session.scalars(stmt, execution_options={"populate_existing": True}).one()
     session.flush()
 
     out = WorkstationOut.model_validate(ws)

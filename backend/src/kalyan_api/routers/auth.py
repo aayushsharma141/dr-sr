@@ -15,6 +15,7 @@ from kalyan_api.core.principal import (
     build_audit_context,
     current_principal_allow_pending,
     get_current_settings,
+    get_effective_settings,
 )
 from kalyan_api.db.session import SessionDep
 from kalyan_api.models import AuthSession, User
@@ -39,7 +40,7 @@ def login(
     request: Request,
     body: LoginRequest,
     session: SessionDep,
-    settings: Settings = Depends(get_current_settings),
+    settings: Settings = Depends(get_effective_settings),
 ) -> Response:
     """Authenticate credentials, create server-side session, set cookie, and return MeResponse.
 
@@ -340,7 +341,7 @@ def change_password(
     body: ChangePasswordRequest,
     session: SessionDep,
     principal: Principal = Depends(current_principal_allow_pending),
-    settings: Settings = Depends(get_current_settings),
+    settings: Settings = Depends(get_effective_settings),
 ) -> Response:
     """Change user password, enforce NIST policy, revoke all sessions, and issue fresh session."""
     ctx = build_audit_context(request, principal)

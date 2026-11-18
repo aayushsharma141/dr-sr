@@ -1,9 +1,23 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import type { ReactNode } from 'react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import '../../../test/dialog-shim'
 import { BulkArchivePage } from '../BulkArchivePage'
 import * as adminDataOps from '../../../api/admin-data-ops'
 import * as clientModule from '../../../api/client'
+
+vi.mock('../../../components/AppShell', () => ({
+  AppShell: ({ name, role, children }: { name: string; role: string; children: ReactNode }) => (
+    <div data-testid="app-shell" data-name={name} data-role={role}>
+      {children}
+    </div>
+  ),
+}))
+
+vi.mock('../../../api/queries', () => ({
+  useMe: () => ({ data: { full_name: 'Admin User', role: 'ADMIN' } }),
+}))
 
 vi.mock('../../../api/admin-data-ops', () => ({
   getArchivalCandidates: vi.fn(),
@@ -156,6 +170,8 @@ describe('BulkArchivePage', () => {
     await user.click(tabBtn)
 
     expect(await screen.findByText('Prior test archive')).toBeInTheDocument()
+    // M8: must explicitly request status=archived (backend defaults to status=active)
+    expect(clientModule.apiFetch).toHaveBeenCalledWith('/patients?status=archived&limit=100')
 
     const restoreBtn = screen.getByRole('button', { name: /restore record/i })
     await user.click(restoreBtn)
@@ -163,5 +179,74 @@ describe('BulkArchivePage', () => {
     await waitFor(() => {
       expect(adminDataOps.unarchivePatient).toHaveBeenCalledWith(10, expect.any(String))
     })
+  })
+
+  it('wraps the page in AppShell with admin identity (M15)', async () => {
+    vi.mocked(adminDataOps.getArchivalCandidates).mockResolvedValue([])
+
+    render(<BulkArchivePage />)
+
+    await screen.findByText('Patient Record Archival')
+    const shell = screen.getByTestId('app-shell')
+    expect(shell).toHaveAttribute('data-role', 'ADMIN')
+    expect(shell).toHaveAttribute('data-name', 'Admin User')
+  })
+
+  it('shows a limit notice when 100 archived patients are returned (M8)', async () => {
+    vi.mocked(adminDataOps.getArchivalCandidates).mockResolvedValue([])
+    const hundredArchived = Array.from({ length: 100 }, (_, i) => ({
+      ...mockEligible.patient,
+      id: 1000 + i,
+      urn: `URN-ARC-${1000 + i}`,
+      is_archived: true,
+      archive_reason: 'Retention policy',
+    }))
+    vi.mocked(clientModule.apiFetch).mockResolvedValue(hundredArchived)
+
+    const user = userEvent.setup()
+    render(<BulkArchivePage />)
+
+    await user.click(screen.getByRole('button', { name: /archived patient files/i }))
+    expect(await screen.findByText(/showing first 100 archived/i)).toBeInTheDocument()
+  })
+
+  it('uses shared Modal dialog with Escape close, focus restore, and busy guard (M16-Phase23)', async () => {
+    vi.mocked(adminDataOps.getArchivalCandidates).mockResolvedValue([mockEligible])
+    let resolveArchive!: (value: adminDataOps.BulkArchiveResult) => void
+    vi.mocked(adminDataOps.bulkArchivePatients).mockImplementation(
+      () => new Promise((resolve) => { resolveArchive = resolve }),
+    )
+
+    const user = userEvent.setup()
+    render(<BulkArchivePage />)
+
+    await screen.findByText(/URN-ARC-010/)
+    await user.click(screen.getByTitle('Select all eligible'))
+
+    const trigger = screen.getByRole('button', { name: /archive selected \(1\)/i })
+    await user.click(trigger)
+
+    // Native <dialog> semantics and Escape dismissal + focus restore
+    expect(screen.getByRole('dialog')).toBeInTheDocument()
+    fireEvent.keyDown(document, { key: 'Escape' })
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+    await waitFor(() => expect(trigger).toHaveFocus())
+
+    // Reopen and verify busy state blocks Escape and disables Cancel
+    await user.click(trigger)
+    expect(screen.getByRole('dialog')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: /archive 1 files/i }))
+
+    expect(screen.getByRole('button', { name: /^cancel$/i })).toBeDisabled()
+    fireEvent.keyDown(document, { key: 'Escape' })
+    expect(screen.getByRole('dialog')).toBeInTheDocument()
+
+    resolveArchive({
+      archived_count: 1,
+      skipped_count: 0,
+      skipped_details: [],
+      message: 'Archived 1 patient',
+    })
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
   })
 })

@@ -1,9 +1,12 @@
 import { useState, useEffect, useCallback } from 'react'
 import { AdminPageHeader } from '../../components/admin/AdminPageHeader'
+import { AppShell } from '../../components/AppShell'
+import { useMe } from '../../api/queries'
 import { getWorkstations, type WorkstationOut } from '../../api/admin-data-ops'
 import { IconServer, IconAlertTriangle } from '../../components/icons'
 
 export function WorkstationMonitorPage() {
+  const { data: me } = useMe()
   const [workstations, setWorkstations] = useState<WorkstationOut[]>([])
   const [loading, setLoading] = useState<boolean>(true)
   const [error, setError] = useState<string | null>(null)
@@ -66,7 +69,8 @@ export function WorkstationMonitorPage() {
   }
 
   return (
-    <div className="mx-auto max-w-7xl space-y-6 px-4 py-6 sm:px-6">
+    <AppShell name={me?.full_name ?? 'Admin'} role={me?.role ?? 'ADMIN'}>
+    <div className="space-y-6">
       <AdminPageHeader
         title="LAN Workstations Monitor"
         description="Live telemetry and connectivity status of client terminals operating across Kalyan Hospital local area network."
@@ -180,5 +184,6 @@ export function WorkstationMonitorPage() {
         )}
       </div>
     </div>
+    </AppShell>
   )
 }

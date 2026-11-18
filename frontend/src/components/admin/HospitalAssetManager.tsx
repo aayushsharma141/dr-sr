@@ -3,6 +3,7 @@ import { useDeactivateAsset, useHospitalAssets, useUploadAsset } from '../../api
 import type { AssetType, HospitalAssetOut } from '../../api/types'
 import { InlineAlert } from '../InlineAlert'
 import { Modal } from '../Modal'
+import { toast } from '../ToastHost'
 
 const DATE_FORMATTER = new Intl.DateTimeFormat('en-IN', {
   dateStyle: 'medium',
@@ -79,17 +80,17 @@ export function HospitalAssetManager({ layout }: HospitalAssetManagerProps = {})
     setSelectedFile(file)
   }
 
-  const handleDragOver = (e: DragEvent<HTMLDivElement>) => {
+  const handleDragOver = (e: DragEvent<HTMLButtonElement>) => {
     e.preventDefault()
     setIsDragging(true)
   }
 
-  const handleDragLeave = (e: DragEvent<HTMLDivElement>) => {
+  const handleDragLeave = (e: DragEvent<HTMLButtonElement>) => {
     e.preventDefault()
     setIsDragging(false)
   }
 
-  const handleDrop = (e: DragEvent<HTMLDivElement>) => {
+  const handleDrop = (e: DragEvent<HTMLButtonElement>) => {
     e.preventDefault()
     setIsDragging(false)
     if (e.dataTransfer.files && e.dataTransfer.files[0]) {
@@ -119,6 +120,7 @@ export function HospitalAssetManager({ layout }: HospitalAssetManagerProps = {})
       setIsUploadOpen(false)
       setSelectedFile(null)
       if (fileInputRef.current) fileInputRef.current.value = ''
+      toast.success(`${formatAssetType(selectedType)} uploaded successfully.`)
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Asset upload failed.'
       setUploadError(msg)
@@ -135,10 +137,12 @@ export function HospitalAssetManager({ layout }: HospitalAssetManagerProps = {})
     if (!deactivatingAsset) return
     try {
       await deactivateMutation.mutateAsync(deactivatingAsset.id)
+      const label = deactivatingAsset.original_filename
       setDeactivatingAsset(null)
+      toast.success(`Deactivated asset "${label}".`)
     } catch (err: unknown) {
-      // Keep modal open to show failure if needed
-      console.error('Failed to deactivate asset', err)
+      setDeactivatingAsset(null)
+      toast.error(err instanceof Error ? err.message : 'Failed to deactivate asset.')
     }
   }
 
@@ -438,29 +442,19 @@ export function HospitalAssetManager({ layout }: HospitalAssetManagerProps = {})
             <label htmlFor="asset-file-input" className="block text-xs font-semibold uppercase text-slate-700">
               Asset File <span className="text-red-700">*</span>
             </label>
-            <div
+            <button
+              type="button"
               onDragOver={handleDragOver}
               onDragLeave={handleDragLeave}
               onDrop={handleDrop}
               onClick={() => fileInputRef.current?.click()}
-              className={`mt-1.5 flex flex-col items-center justify-center rounded-xl border-2 border-dashed p-6 text-center transition cursor-pointer ${
+              className={`mt-1.5 flex w-full flex-col items-center justify-center rounded-xl border-2 border-dashed p-6 text-center transition cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-700 ${
                 isDragging
                   ? 'border-brand-700 bg-brand-50'
                   : 'border-slate-300 bg-slate-50/50 hover:bg-slate-100/50'
               }`}
             >
-              <input
-                id="asset-file-input"
-                ref={fileInputRef}
-                type="file"
-                aria-label="Upload hospital asset file"
-                accept=".png,.jpg,.jpeg,.webp,.svg,.pdf"
-                onChange={handleFileInputChange}
-                className="hidden"
-                data-testid="asset-file-input"
-              />
-
-              <svg className="mb-2 h-8 w-8 text-slate-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <svg className="mb-2 h-8 w-8 text-slate-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
                 <path
                   strokeLinecap="round"
                   strokeLinejoin="round"
@@ -470,19 +464,29 @@ export function HospitalAssetManager({ layout }: HospitalAssetManagerProps = {})
               </svg>
 
               {selectedFile ? (
-                <div className="space-y-1">
-                  <p className="text-sm font-semibold text-slate-900">{selectedFile.name}</p>
-                  <p className="text-xs text-slate-500">{formatFileSize(selectedFile.size)}</p>
-                </div>
+                <span className="block space-y-1">
+                  <span className="block text-sm font-semibold text-slate-900">{selectedFile.name}</span>
+                  <span className="block text-xs text-slate-500">{formatFileSize(selectedFile.size)}</span>
+                </span>
               ) : (
-                <div className="space-y-1">
-                  <p className="text-sm font-medium text-slate-800">
+                <span className="block space-y-1">
+                  <span className="block text-sm font-medium text-slate-800">
                     <span className="font-semibold text-brand-700">Click to browse</span> or drag and drop
-                  </p>
-                  <p className="text-xs text-slate-500">PNG, JPEG, WebP, SVG, and PDF documents up to 10 MB</p>
-                </div>
+                  </span>
+                  <span className="block text-xs text-slate-500">PNG, JPEG, WebP, SVG, and PDF documents up to 10 MB</span>
+                </span>
               )}
-            </div>
+            </button>
+            <input
+              id="asset-file-input"
+              ref={fileInputRef}
+              type="file"
+              aria-label="Upload hospital asset file"
+              accept=".png,.jpg,.jpeg,.webp,.svg,.pdf"
+              onChange={handleFileInputChange}
+              className="hidden"
+              data-testid="asset-file-input"
+            />
           </div>
 
           {/* Dialog Action Buttons */}

@@ -4,13 +4,13 @@ from difflib import SequenceMatcher
 from typing import Any
 
 from fastapi import Request
-from sqlalchemy import func, or_, select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from kalyan_api.clock import utcnow
 from kalyan_api.core.errors import ApiError
 from kalyan_api.core.principal import Principal, build_audit_context
-from kalyan_api.models import Patient, Visit
+from kalyan_api.models import Patient, Visit, VisitStatus
 from kalyan_api.schemas.patients import (
     DuplicateCandidatePair,
     PatientMergeRequest,
@@ -32,6 +32,12 @@ ALLOWED_OVERRIDE_FIELDS = frozenset(
         "district",
         "state",
         "emergency_contact",
+        "alternate_mobile",
+        "email",
+        "blood_group",
+        "pin_code",
+        "guardian_relationship",
+        "medical_history_notes",
         "allergies",
         "notes",
     }
@@ -56,7 +62,7 @@ def check_open_visit(session: Session, patient_id: int) -> tuple[bool, str | Non
     """Check if a patient has an active unclosed visit (open visit guard)."""
     stmt = (
         select(Visit)
-        .where(Visit.patient_id == patient_id, Visit.closed_at.is_(None))
+        .where(Visit.patient_id == patient_id, Visit.status == VisitStatus.OPEN.value)
         .order_by(Visit.created_at.desc())
     )
     open_visit = session.execute(stmt).scalars().first()
@@ -108,15 +114,19 @@ def find_duplicate_candidates(session: Session, limit: int = 50) -> list[Duplica
         by_mobile.setdefault(p.mobile, []).append(p)
 
     pairs: list[DuplicateCandidatePair] = []
-    for mobile, group in by_mobile.items():
+    for _mobile, group in by_mobile.items():
         if len(group) < 2:
             continue
         # Compare first (oldest, master candidate) with subsequent records
         primary = group[0]
         for candidate in group[1:]:
             sim = compute_name_similarity(primary.full_name, candidate.full_name)
-            match_reason = "Exact mobile & name match" if sim >= 0.95 else "Exact mobile match with similar name"
-            
+            match_reason = (
+                "Exact mobile & name match"
+                if sim >= 0.95
+                else "Exact mobile match with similar name"
+            )
+
             p_has_open, p_open_desc = check_open_visit(session, primary.id)
             c_has_open, c_open_desc = check_open_visit(session, candidate.id)
             has_open = p_has_open or c_has_open
@@ -161,11 +171,19 @@ def merge_patients(
     first_id = min(payload.master_patient_id, payload.secondary_patient_id)
     second_id = max(payload.master_patient_id, payload.secondary_patient_id)
 
-    p1 = session.execute(select(Patient).where(Patient.id == first_id).with_for_update()).scalar_one_or_none()
-    p2 = session.execute(select(Patient).where(Patient.id == second_id).with_for_update()).scalar_one_or_none()
+    p1 = session.execute(
+        select(Patient).where(Patient.id == first_id).with_for_update()
+    ).scalar_one_or_none()
+    p2 = session.execute(
+        select(Patient).where(Patient.id == second_id).with_for_update()
+    ).scalar_one_or_none()
 
     if not p1 or not p2:
-        raise ApiError(status_code=404, code="patient_not_found", message="One or both patients not found.")
+        raise ApiError(
+            status_code=404,
+            code="patient_not_found",
+            message="One or both patients not found.",
+        )
 
     master = p1 if p1.id == payload.master_patient_id else p2
     secondary = p2 if p1.id == payload.master_patient_id else p1
@@ -174,14 +192,36 @@ def merge_patients(
         raise ApiError(
             status_code=400,
             code="master_inactive_or_merged",
-            message=f"Master patient #{master.id} ({master.urn}) is deactivated or already merged into #{master.merged_into_id}.",
+            message=(
+                f"Master patient #{master.id} ({master.urn}) is deactivated or "
+                f"already merged into #{master.merged_into_id}."
+            ),
         )
 
     if not secondary.is_active or secondary.merged_into_id is not None:
         raise ApiError(
             status_code=400,
             code="secondary_already_merged",
-            message=f"Secondary patient #{secondary.id} ({secondary.urn}) is already inactive or merged.",
+            message=(
+                f"Secondary patient #{secondary.id} ({secondary.urn}) is already "
+                "inactive or merged."
+            ),
+        )
+
+    # Consolidation queries are 1-hop; refuse merging a patient that already owns merged children
+    # so chained merges (A -> B -> C) can never orphan A's clinical or financial history.
+    has_merged_children = session.scalar(
+        select(Patient.id).where(Patient.merged_into_id == secondary.id).limit(1)
+    )
+    if has_merged_children is not None:
+        raise ApiError(
+            status_code=409,
+            code="secondary_has_merged_children",
+            message=(
+                f"Cannot merge patient #{secondary.id} ({secondary.urn}) as secondary because "
+                "other patient records are already merged into it. Merge into this record as "
+                "master instead, or unmerge its linked records first."
+            ),
         )
 
     # 2. Open visit safety guard (Fail-Closed)
@@ -190,7 +230,10 @@ def merge_patients(
         raise ApiError(
             status_code=400,
             code="open_visit_conflict",
-            message=f"Cannot merge patient files: Master patient #{master.id} has an open visit ({m_desc}). Please close or complete the visit first.",
+            message=(
+                f"Cannot merge patient files: Master patient #{master.id} has an open visit "
+                f"({m_desc}). Please close or complete the visit first."
+            ),
         )
 
     s_open, s_desc = check_open_visit(session, secondary.id)
@@ -198,14 +241,47 @@ def merge_patients(
         raise ApiError(
             status_code=400,
             code="open_visit_conflict",
-            message=f"Cannot merge patient files: Secondary patient #{secondary.id} has an open visit ({s_desc}). Please close or complete the visit first.",
+            message=(
+                f"Cannot merge patient files: Secondary patient #{secondary.id} has an open visit "
+                f"({s_desc}). Please close or complete the visit first."
+            ),
         )
 
     # 3. Apply optional demographic overrides to master record
+    before_demographics: dict[str, Any] = {}
     if payload.demographic_overrides:
-        for field, value in payload.demographic_overrides.items():
+        from pydantic import ValidationError
+
+        from kalyan_api.schemas.patients import PatientUpdate
+
+        for field in payload.demographic_overrides.keys():
+            if field not in ALLOWED_OVERRIDE_FIELDS:
+                raise ApiError(
+                    status_code=422,
+                    code="disallowed_override_field",
+                    message=f"Field '{field}' is not permitted for demographic override.",
+                )
+
+        try:
+            validated = PatientUpdate.model_validate(
+                {"version_id": master.version_id, **payload.demographic_overrides}
+            )
+        except ValidationError as err:
+            raise ApiError(
+                status_code=422,
+                code="invalid_override_data",
+                message=f"Invalid demographic overrides: {err}",
+            ) from err
+
+        for field, value in validated.model_dump(exclude_unset=True).items():
             if field in ALLOWED_OVERRIDE_FIELDS and value is not None:
+                orig_val = getattr(master, field)
+                before_demographics[field] = (
+                    orig_val.isoformat() if hasattr(orig_val, "isoformat") else orig_val
+                )
                 setattr(master, field, value)
+
+        master.version_id += 1
 
     # 4. Deactivate secondary patient and record alias pointer
     now = utcnow()
@@ -225,13 +301,18 @@ def merge_patients(
         action=AuditAction.PATIENT_MERGED,
         entity_type="PATIENT",
         entity_id=str(secondary.id),
-        before={"is_active": True, "merged_into_id": None},
+        before={
+            "is_active": True,
+            "merged_into_id": None,
+            "master_demographics": before_demographics,
+        },
         after={
             "is_active": False,
             "merged_into_id": master.id,
             "master_urn": master.urn,
             "secondary_urn": secondary.urn,
             "overrides": payload.demographic_overrides or {},
+            "master_version_id": master.version_id,
         },
         reason=payload.reason.strip(),
     )
@@ -256,7 +337,11 @@ def unmerge_patient(
     ).scalar_one_or_none()
 
     if not patient:
-        raise ApiError(status_code=404, code="patient_not_found", message=f"Patient #{patient_id} not found.")
+        raise ApiError(
+            status_code=404,
+            code="patient_not_found",
+            message=f"Patient #{patient_id} not found.",
+        )
 
     if patient.merged_into_id is None:
         raise ApiError(

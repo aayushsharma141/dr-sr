@@ -1,5 +1,8 @@
 import { useState, useEffect, useCallback } from 'react'
 import { AdminPageHeader } from '../../components/admin/AdminPageHeader'
+import { AppShell } from '../../components/AppShell'
+import { Modal } from '../../components/Modal'
+import { useMe } from '../../api/queries'
 import {
   getDuplicateCandidates,
   mergePatients,
@@ -8,6 +11,7 @@ import {
   type PatientMergeRequest,
 } from '../../api/admin-data-ops'
 import { IconAlertTriangle, IconCheck, IconUsers, IconHistory } from '../../components/icons'
+import { toast } from '../../components/ToastHost'
 
 interface MergedHistoryItem {
   secondaryId: number
@@ -28,10 +32,10 @@ const COMPARABLE_FIELDS: Array<{ key: string; label: string }> = [
 ]
 
 export function DuplicateMergePage() {
+  const { data: me } = useMe()
   const [candidates, setCandidates] = useState<DuplicateCandidatePair[]>([])
   const [loading, setLoading] = useState<boolean>(true)
   const [error, setError] = useState<string | null>(null)
-  const [success, setSuccess] = useState<string | null>(null)
 
   // Side-by-side Modal State
   const [selectedPair, setSelectedPair] = useState<DuplicateCandidatePair | null>(null)
@@ -88,13 +92,12 @@ export function DuplicateMergePage() {
   const handleExecuteMerge = async () => {
     if (!selectedPair) return
     if (!mergeReason.trim() || mergeReason.trim().length < 3) {
-      setError('A valid merge reason (minimum 3 characters) is required.')
+      toast.error('A valid merge reason (minimum 3 characters) is required.')
       return
     }
 
     try {
       setIsMerging(true)
-      setError(null)
       const payload: PatientMergeRequest = {
         master_patient_id: selectedPair.master.id,
         secondary_patient_id: selectedPair.duplicate.id,
@@ -114,11 +117,11 @@ export function DuplicateMergePage() {
         ...prev,
       ])
 
-      setSuccess(`Successfully merged ${selectedPair.duplicate.urn} into ${selectedPair.master.urn}.`)
+      toast.success(`Successfully merged ${selectedPair.duplicate.urn} into ${selectedPair.master.urn}.`)
       closeCompareModal()
       await fetchCandidates()
     } catch (err: any) {
-      setError(err?.message || 'Failed to complete patient merge')
+      toast.error(err?.message || 'Failed to complete patient merge')
     } finally {
       setIsMerging(false)
     }
@@ -127,20 +130,20 @@ export function DuplicateMergePage() {
   const handleUndoMerge = async (item: MergedHistoryItem) => {
     try {
       setIsUnmerging(item.secondaryId)
-      setError(null)
       await unmergePatient(item.secondaryId, 'Administrative undo requested from UI')
       setRecentMerges((prev) => prev.filter((m) => m.secondaryId !== item.secondaryId))
-      setSuccess(`Reactivated patient record ${item.secondaryUrn}.`)
+      toast.success(`Reactivated patient record ${item.secondaryUrn}.`)
       await fetchCandidates()
     } catch (err: any) {
-      setError(err?.message || 'Failed to unmerge patient record')
+      toast.error(err?.message || 'Failed to unmerge patient record')
     } finally {
       setIsUnmerging(null)
     }
   }
 
   return (
-    <div className="mx-auto max-w-7xl space-y-6 px-4 py-6 sm:px-6">
+    <AppShell name={me?.full_name ?? 'Admin'} role={me?.role ?? 'ADMIN'}>
+    <div className="space-y-6">
       <AdminPageHeader
         title="Duplicate Patient Resolution"
         description="Review suspected duplicate patient files, resolve demographic discrepancies, and merge records under an alias pointer without tampering with historical payments."
@@ -158,18 +161,11 @@ export function DuplicateMergePage() {
         }
       />
 
-      {/* Notifications */}
+      {/* Load Error Alert */}
       {error && (
         <div role="alert" className="flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800">
           <IconAlertTriangle className="h-5 w-5 shrink-0 text-red-600" />
           <span>{error}</span>
-        </div>
-      )}
-
-      {success && (
-        <div role="status" className="flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800">
-          <IconCheck className="h-5 w-5 shrink-0 text-emerald-700" />
-          <span>{success}</span>
         </div>
       )}
 
@@ -283,18 +279,24 @@ export function DuplicateMergePage() {
       </div>
 
       {/* Side-by-Side Comparison & Merge Modal */}
-      {selectedPair && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4 backdrop-blur-xs">
-          <div className="relative max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-2xl bg-white p-6 shadow-xl">
-            <h3 className="text-lg font-bold text-slate-900">Compare &amp; Merge Patient Records</h3>
-            <p className="mt-1 text-xs text-slate-600">
+      <Modal
+        open={selectedPair !== null}
+        onClose={() => { if (!isMerging) closeCompareModal() }}
+        variant="destructive"
+        title="Compare & Merge Patient Records"
+        busy={isMerging}
+        className="max-w-3xl"
+      >
+        {selectedPair && (
+          <div className="space-y-4">
+            <p className="text-xs text-slate-600">
               Merging will deactivate duplicate record <span className="font-semibold">{selectedPair.duplicate.urn}</span> and
               link it to master record <span className="font-semibold">{selectedPair.master.urn}</span>. Historical clinical
               records and payments remain fully preserved.
             </p>
 
             {selectedPair.has_open_visit && (
-              <div className="mt-4 flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 p-3 text-xs text-red-800">
+              <div className="flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 p-3 text-xs text-red-800">
                 <IconAlertTriangle className="h-4 w-4 shrink-0 text-red-600" />
                 <span>
                   <strong>Cannot Merge:</strong> Either the master or duplicate patient has an active open visit.
@@ -304,7 +306,7 @@ export function DuplicateMergePage() {
             )}
 
             {/* Side-by-side Demographic Comparison */}
-            <div className="mt-4 rounded-xl border border-slate-200">
+            <div className="rounded-xl border border-slate-200">
               <table className="w-full text-left text-xs">
                 <thead className="border-b border-slate-200 bg-slate-50 font-semibold text-slate-700">
                   <tr>
@@ -350,7 +352,7 @@ export function DuplicateMergePage() {
             </div>
 
             {/* Justification Reason */}
-            <div className="mt-4">
+            <div>
               <label htmlFor="merge-reason" className="block text-xs font-semibold text-slate-700">
                 Administrative Justification / Reason *
               </label>
@@ -360,16 +362,18 @@ export function DuplicateMergePage() {
                 value={mergeReason}
                 onChange={(e) => setMergeReason(e.target.value)}
                 placeholder="Reason for merging duplicate records..."
-                className="mt-1 w-full rounded-lg border border-slate-300 p-2 text-xs text-slate-900 focus:border-brand-700 focus:outline-none"
+                className="mt-1 w-full rounded-lg border border-slate-300 p-2 text-xs text-slate-900 focus:border-brand-700 focus-visible:outline-2 focus-visible:outline-brand-700"
               />
             </div>
 
             {/* Modal Actions */}
-            <div className="mt-5 flex justify-end gap-2 border-t border-slate-200 pt-4">
+            <div className="flex justify-end gap-2 border-t border-slate-200 pt-4">
               <button
                 type="button"
+                data-autofocus
+                disabled={isMerging}
                 onClick={closeCompareModal}
-                className="rounded-lg border border-slate-300 px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                className="min-h-11 rounded-lg border border-slate-300 px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
               >
                 Cancel
               </button>
@@ -377,14 +381,15 @@ export function DuplicateMergePage() {
                 type="button"
                 disabled={selectedPair.has_open_visit || isMerging || mergeReason.trim().length < 3}
                 onClick={handleExecuteMerge}
-                className="rounded-lg bg-brand-700 px-4 py-2 text-xs font-semibold text-white hover:bg-brand-800 disabled:opacity-50"
+                className="min-h-11 rounded-lg bg-brand-700 px-4 py-2 text-xs font-semibold text-white hover:bg-brand-800 disabled:opacity-50"
               >
                 {isMerging ? 'Merging...' : 'Confirm Alias Merge'}
               </button>
             </div>
           </div>
-        </div>
-      )}
+        )}
+      </Modal>
     </div>
+    </AppShell>
   )
 }

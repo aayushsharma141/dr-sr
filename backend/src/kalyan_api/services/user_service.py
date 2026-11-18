@@ -395,7 +395,11 @@ def _authorise_super_admin(
         return "throttled"
 
     super_admins = session.scalars(
-        select(User).where(User.is_super_admin.is_(True), User.is_active.is_(True))
+        select(User).where(
+            User.is_super_admin.is_(True),
+            User.is_active.is_(True),
+            User.must_change_password.is_(False),
+        )
     ).all()
     if not super_admins:
         raise ApiError(
@@ -601,6 +605,13 @@ def reset_password(
             status_code=409,
             code="self_action_forbidden",
             message="Administrators cannot reset their own password via admin API",
+        )
+
+    if user.is_super_admin:
+        raise ApiError(
+            status_code=409,
+            code="super_admin_protected",
+            message="Super admin passwords cannot be reset via admin API",
         )
 
     old_must_change = user.must_change_password

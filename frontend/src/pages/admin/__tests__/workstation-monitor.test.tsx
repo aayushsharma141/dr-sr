@@ -1,7 +1,20 @@
 import { render, screen } from '@testing-library/react'
+import type { ReactNode } from 'react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { WorkstationMonitorPage } from '../WorkstationMonitorPage'
 import * as adminDataOps from '../../../api/admin-data-ops'
+
+vi.mock('../../../components/AppShell', () => ({
+  AppShell: ({ name, role, children }: { name: string; role: string; children: ReactNode }) => (
+    <div data-testid="app-shell" data-name={name} data-role={role}>
+      {children}
+    </div>
+  ),
+}))
+
+vi.mock('../../../api/queries', () => ({
+  useMe: () => ({ data: { full_name: 'Admin User', role: 'ADMIN' } }),
+}))
 
 vi.mock('../../../api/admin-data-ops', () => ({
   getWorkstations: vi.fn(),
@@ -84,5 +97,16 @@ describe('WorkstationMonitorPage', () => {
     expect(screen.getByText('Online')).toBeInTheDocument()
     expect(screen.getByText('Idle')).toBeInTheDocument()
     expect(screen.getByText('Offline')).toBeInTheDocument()
+  })
+
+  it('wraps the page in AppShell with admin identity (M15)', async () => {
+    vi.mocked(adminDataOps.getWorkstations).mockResolvedValue([])
+
+    render(<WorkstationMonitorPage />)
+
+    await screen.findByText('LAN Workstations Monitor')
+    const shell = screen.getByTestId('app-shell')
+    expect(shell).toHaveAttribute('data-role', 'ADMIN')
+    expect(shell).toHaveAttribute('data-name', 'Admin User')
   })
 })

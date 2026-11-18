@@ -1,8 +1,22 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import type { ReactNode } from 'react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import '../../../test/dialog-shim'
 import { DuplicateMergePage } from '../DuplicateMergePage'
 import * as adminDataOps from '../../../api/admin-data-ops'
+
+vi.mock('../../../components/AppShell', () => ({
+  AppShell: ({ name, role, children }: { name: string; role: string; children: ReactNode }) => (
+    <div data-testid="app-shell" data-name={name} data-role={role}>
+      {children}
+    </div>
+  ),
+}))
+
+vi.mock('../../../api/queries', () => ({
+  useMe: () => ({ data: { full_name: 'Admin User', role: 'ADMIN' } }),
+}))
 
 vi.mock('../../../api/admin-data-ops', () => ({
   getDuplicateCandidates: vi.fn(),
@@ -130,5 +144,52 @@ describe('DuplicateMergePage', () => {
     await waitFor(() => {
       expect(adminDataOps.unmergePatient).toHaveBeenCalledWith(2, expect.any(String))
     })
+  })
+
+  it('wraps the page in AppShell with admin identity (M15)', async () => {
+    vi.mocked(adminDataOps.getDuplicateCandidates).mockResolvedValue([])
+
+    render(<DuplicateMergePage />)
+
+    await screen.findByText('Duplicate Patient Resolution')
+    const shell = screen.getByTestId('app-shell')
+    expect(shell).toHaveAttribute('data-role', 'ADMIN')
+    expect(shell).toHaveAttribute('data-name', 'Admin User')
+  })
+
+  it('uses shared Modal dialog with Escape close, focus restore, and busy guard (M16-Phase23)', async () => {
+    vi.mocked(adminDataOps.getDuplicateCandidates).mockResolvedValue([mockPair])
+    let resolveMerge!: (value: adminDataOps.PatientMergeResult) => void
+    vi.mocked(adminDataOps.mergePatients).mockImplementation(
+      () => new Promise((resolve) => { resolveMerge = resolve }),
+    )
+
+    const user = userEvent.setup()
+    render(<DuplicateMergePage />)
+
+    const trigger = await screen.findByRole('button', { name: /compare & merge/i })
+    await user.click(trigger)
+
+    // Native <dialog> semantics and Escape dismissal + focus restore
+    expect(screen.getByRole('dialog')).toBeInTheDocument()
+    fireEvent.keyDown(document, { key: 'Escape' })
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+    await waitFor(() => expect(trigger).toHaveFocus())
+
+    // Reopen and verify busy state blocks Escape and disables Cancel
+    await user.click(trigger)
+    expect(screen.getByRole('dialog')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: /confirm alias merge/i }))
+
+    expect(screen.getByRole('button', { name: /^cancel$/i })).toBeDisabled()
+    fireEvent.keyDown(document, { key: 'Escape' })
+    expect(screen.getByRole('dialog')).toBeInTheDocument()
+
+    resolveMerge({
+      master: mockPair.master,
+      secondary: { ...mockPair.duplicate, is_active: false },
+      message: 'Merged',
+    })
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
   })
 })

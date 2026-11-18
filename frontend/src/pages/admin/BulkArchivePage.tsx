@@ -1,5 +1,8 @@
 import { useState, useEffect, useCallback } from 'react'
 import { AdminPageHeader } from '../../components/admin/AdminPageHeader'
+import { AppShell } from '../../components/AppShell'
+import { Modal } from '../../components/Modal'
+import { useMe } from '../../api/queries'
 import {
   getArchivalCandidates,
   bulkArchivePatients,
@@ -9,8 +12,10 @@ import {
 import { apiFetch } from '../../api/client'
 import type { PatientOut } from '../../api/types'
 import { IconAlertTriangle, IconCheck, IconServer } from '../../components/icons'
+import { toast } from '../../components/ToastHost'
 
 export function BulkArchivePage() {
+  const { data: me } = useMe()
   const [tab, setTab] = useState<'candidates' | 'archived'>('candidates')
 
   // Candidate Filter State
@@ -23,7 +28,6 @@ export function BulkArchivePage() {
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set())
   const [loading, setLoading] = useState<boolean>(true)
   const [error, setError] = useState<string | null>(null)
-  const [success, setSuccess] = useState<string | null>(null)
 
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState<boolean>(false)
@@ -58,9 +62,9 @@ export function BulkArchivePage() {
     try {
       setLoadingArchived(true)
       setError(null)
-      // Query patients that are archived
-      const data = await apiFetch<PatientOut[]>('/patients?limit=100')
-      setArchivedPatients(data.filter((p) => p.is_archived))
+      // Backend defaults to status=active; request status=archived explicitly.
+      const data = await apiFetch<PatientOut[]>('/patients?status=archived&limit=100')
+      setArchivedPatients(data)
     } catch (err: any) {
       setError(err?.message || 'Failed to fetch archived patients')
     } finally {
@@ -101,23 +105,22 @@ export function BulkArchivePage() {
   const handleExecuteBulkArchive = async () => {
     if (selectedIds.size === 0) return
     if (!archiveReason.trim() || archiveReason.trim().length < 3) {
-      setError('Please provide an archival reason of at least 3 characters.')
+      toast.error('Please provide an archival reason of at least 3 characters.')
       return
     }
 
     try {
       setIsArchiving(true)
-      setError(null)
       const res = await bulkArchivePatients({
         patient_ids: Array.from(selectedIds),
         reason: archiveReason.trim(),
       })
-      setSuccess(res.message || `Successfully archived ${res.archived_count} patient record(s).`)
+      toast.success(res.message || `Successfully archived ${res.archived_count} patient record(s).`)
       setIsModalOpen(false)
       setSelectedIds(new Set())
       await fetchCandidates()
     } catch (err: any) {
-      setError(err?.message || 'Bulk archival failed')
+      toast.error(err?.message || 'Bulk archival failed')
     } finally {
       setIsArchiving(false)
     }
@@ -126,19 +129,19 @@ export function BulkArchivePage() {
   const handleRestorePatient = async (patient: PatientOut) => {
     try {
       setIsUnarchiving(patient.id)
-      setError(null)
       await unarchivePatient(patient.id, 'Administrative restore requested from UI')
-      setSuccess(`Restored patient record ${patient.urn} to active status.`)
+      toast.success(`Restored patient record ${patient.urn} to active status.`)
       await fetchArchivedPatients()
     } catch (err: any) {
-      setError(err?.message || 'Failed to unarchive patient')
+      toast.error(err?.message || 'Failed to unarchive patient')
     } finally {
       setIsUnarchiving(null)
     }
   }
 
   return (
-    <div className="mx-auto max-w-7xl space-y-6 px-4 py-6 sm:px-6">
+    <AppShell name={me?.full_name ?? 'Admin'} role={me?.role ?? 'ADMIN'}>
+    <div className="space-y-6">
       <AdminPageHeader
         title="Patient Record Archival"
         description="Filter and soft-archive inactive patient records with strict financial dues guards. Historical clinical records and financial audits remain immutable."
@@ -172,18 +175,11 @@ export function BulkArchivePage() {
         </button>
       </div>
 
-      {/* Alerts */}
+      {/* Load Error Alert */}
       {error && (
         <div role="alert" className="flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800">
           <IconAlertTriangle className="h-5 w-5 shrink-0 text-red-600" />
           <span>{error}</span>
-        </div>
-      )}
-
-      {success && (
-        <div role="status" className="flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800">
-          <IconCheck className="h-5 w-5 shrink-0 text-emerald-700" />
-          <span>{success}</span>
         </div>
       )}
 
@@ -361,6 +357,12 @@ export function BulkArchivePage() {
             </p>
           </div>
 
+          {archivedPatients.length >= 100 && (
+            <div role="status" className="border-b border-amber-200 bg-amber-50 px-5 py-2.5 text-xs font-medium text-amber-900">
+              Showing first 100 archived patient records. Use Patient Records with the Archived filter to search older entries.
+            </div>
+          )}
+
           {loadingArchived ? (
             <div className="py-12 text-center text-sm text-slate-600">Loading archived records...</div>
           ) : archivedPatients.length === 0 ? (
@@ -407,49 +409,56 @@ export function BulkArchivePage() {
       )}
 
       {/* Confirmation Modal */}
-      {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4 backdrop-blur-xs">
-          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
-            <h3 className="text-lg font-bold text-slate-900">Confirm Bulk Archival</h3>
-            <p className="mt-2 text-xs text-slate-600">
-              You are about to soft-archive <strong className="text-slate-900">{selectedIds.size}</strong> patient file(s).
-              Archived files will be excluded from standard active searches and check-ins, but can be restored by an
-              administrator.
-            </p>
+      <Modal
+        open={isModalOpen}
+        onClose={() => { if (!isArchiving) setIsModalOpen(false) }}
+        variant="destructive"
+        title="Confirm Bulk Archival"
+        busy={isArchiving}
+        className="max-w-md"
+      >
+        <div className="space-y-4">
+          <p className="text-xs text-slate-600">
+            You are about to soft-archive <strong className="text-slate-900">{selectedIds.size}</strong> patient file(s).
+            Archived files will be excluded from standard active searches and check-ins, but can be restored by an
+            administrator.
+          </p>
 
-            <div className="mt-4">
-              <label htmlFor="archive-reason" className="block text-xs font-semibold text-slate-700">
-                Archival Justification / Policy Reason *
-              </label>
-              <textarea
-                id="archive-reason"
-                rows={3}
-                value={archiveReason}
-                onChange={(e) => setArchiveReason(e.target.value)}
-                className="mt-1 w-full rounded-lg border border-slate-300 p-2 text-xs text-slate-900 focus:border-brand-700 focus:outline-none"
-              />
-            </div>
+          <div>
+            <label htmlFor="archive-reason" className="block text-xs font-semibold text-slate-700">
+              Archival Justification / Policy Reason *
+            </label>
+            <textarea
+              id="archive-reason"
+              rows={3}
+              value={archiveReason}
+              onChange={(e) => setArchiveReason(e.target.value)}
+              className="mt-1 w-full rounded-lg border border-slate-300 p-2 text-xs text-slate-900 focus:border-brand-700 focus-visible:outline-2 focus-visible:outline-brand-700"
+            />
+          </div>
 
-            <div className="mt-5 flex justify-end gap-2 border-t border-slate-200 pt-4">
-              <button
-                type="button"
-                onClick={() => setIsModalOpen(false)}
-                className="rounded-lg border border-slate-300 px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                disabled={isArchiving || archiveReason.trim().length < 3}
-                onClick={handleExecuteBulkArchive}
-                className="rounded-lg bg-red-700 px-4 py-2 text-xs font-semibold text-white hover:bg-red-800 disabled:opacity-50"
-              >
-                {isArchiving ? 'Archiving...' : `Archive ${selectedIds.size} Files`}
-              </button>
-            </div>
+          <div className="flex justify-end gap-2 border-t border-slate-200 pt-4">
+            <button
+              type="button"
+              data-autofocus
+              disabled={isArchiving}
+              onClick={() => setIsModalOpen(false)}
+              className="min-h-11 rounded-lg border border-slate-300 px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              disabled={isArchiving || archiveReason.trim().length < 3}
+              onClick={handleExecuteBulkArchive}
+              className="min-h-11 rounded-lg bg-red-700 px-4 py-2 text-xs font-semibold text-white hover:bg-red-800 disabled:opacity-50"
+            >
+              {isArchiving ? 'Archiving...' : `Archive ${selectedIds.size} Files`}
+            </button>
           </div>
         </div>
-      )}
+      </Modal>
     </div>
+    </AppShell>
   )
 }

@@ -4,6 +4,7 @@ import { AppShell } from '../../components/AppShell'
 import { AdminPageHeader } from '../../components/admin/AdminPageHeader'
 import { TableSkeleton } from '../../components/AdminSkeleton'
 import { Modal } from '../../components/Modal'
+import { toast } from '../../components/ToastHost'
 import { useBackups, useCreateBackup, useRestoreBackup, useMe } from '../../api/queries'
 import type { BackupArchiveInfo } from '../../api/types'
 import { PatientExportDialog } from '../../components/admin/PatientExportDialog'
@@ -14,7 +15,7 @@ type ArchiveKind = 'manual' | 'scheduled' | 'safety' | 'test'
 type ArchiveFilter = 'all' | ArchiveKind
 type ViewTab = 'archives' | 'schedule'
 
-const RESTORE_CONFIRMATION = 'RESTORE-DATABASE-OVERWRITE'
+const RESTORE_CONFIRMATION = 'RESTORE'
 const PAGE_SIZES = [10, 25, 50] as const
 
 function archiveKind(archive: BackupArchiveInfo): ArchiveKind {
@@ -49,6 +50,7 @@ export function BackupManagerPage() {
   const { data: me } = useMe()
   const [searchParams, setSearchParams] = useSearchParams()
   const [showImportModal, setShowImportModal] = useState(() => searchParams.get('action') === 'import')
+  const [importBusy, setImportBusy] = useState(false)
   const [showExportDialog, setShowExportDialog] = useState(() => searchParams.get('action') === 'export')
 
   const clearActionParam = () => {
@@ -77,7 +79,7 @@ export function BackupManagerPage() {
   const [restoreArchive, setRestoreArchive] = useState<BackupArchiveInfo | null>(null)
   const [restorePhrase, setRestorePhrase] = useState('')
   const [restoreReason, setRestoreReason] = useState('')
-  const [feedback, setFeedback] = useState<{ tone: 'success' | 'error' | 'warning'; message: string } | null>(null)
+  const [restoreError, setRestoreError] = useState<string | null>(null)
 
   const { data, isPending, isError, error, refetch, isFetching } = useBackups()
   const createBackup = useCreateBackup()
@@ -111,15 +113,14 @@ export function BackupManagerPage() {
 
   const handleCreate = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
-    setFeedback(null)
     try {
       const created = await createBackup.mutateAsync({ label: label.trim() || undefined })
       setLabel('')
       setShowCreateForm(false)
-      setFeedback({ tone: 'success', message: `Backup created: ${created.filename}` })
+      toast.success(`Backup created: ${created.filename}`)
       await refetch()
     } catch (err) {
-      setFeedback({ tone: 'error', message: `Backup could not be created: ${err instanceof Error ? err.message : 'Unknown error'}` })
+      toast.error(`Backup could not be created: ${err instanceof Error ? err.message : 'Unknown error'}`)
     }
   }
 
@@ -127,13 +128,14 @@ export function BackupManagerPage() {
     setRestoreArchive(null)
     setRestorePhrase('')
     setRestoreReason('')
+    setRestoreError(null)
   }
 
   const handleRestore = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     if (!restoreArchive || restorePhrase !== RESTORE_CONFIRMATION || restoreReason.trim().length < 10) return
 
-    setFeedback(null)
+    setRestoreError(null)
     try {
       const result = await restoreBackup.mutateAsync({
         archive_filename: restoreArchive.filename,
@@ -141,14 +143,11 @@ export function BackupManagerPage() {
         confirmation_phrase: RESTORE_CONFIRMATION,
         reason: restoreReason.trim(),
       })
-      setFeedback({
-        tone: 'success',
-        message: `Restore completed. Safety snapshot: ${result.prerestore_snapshot || 'not reported'}.`,
-      })
+      toast.success(`Restore completed. Safety snapshot: ${result.prerestore_snapshot || 'not reported'}.`)
       closeRestore()
       await refetch()
     } catch (err) {
-      setFeedback({ tone: 'error', message: `Restore failed: ${err instanceof Error ? err.message : 'Unknown error'}` })
+      setRestoreError(`Restore failed: ${err instanceof Error ? err.message : 'Unknown error'}`)
     }
   }
 
@@ -213,16 +212,6 @@ export function BackupManagerPage() {
             </button>
           </div>
         </header>
-
-        {!restoreArchive && feedback && (
-          <div role={feedback.tone === 'error' ? 'alert' : 'status'} className={`flex items-start justify-between gap-3 rounded-lg border p-3 text-sm ${feedback.tone === 'success' ? 'border-emerald-200 bg-emerald-50 text-emerald-900'
-              : feedback.tone === 'error' ? 'border-red-200 bg-red-50 text-red-900'
-                : 'border-amber-200 bg-amber-50 text-amber-900'
-            }`}>
-            <span>{feedback.message}</span>
-            <button type="button" onClick={() => setFeedback(null)} aria-label="Dismiss message" className="font-bold">×</button>
-          </div>
-        )}
 
         <section aria-label="Backup overview" className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
           <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
@@ -468,10 +457,9 @@ export function BackupManagerPage() {
             clearActionParam()
           }}
           onExportSuccess={(filename) => {
-            setFeedback({
-              tone: 'success',
-              message: `Dataset export completed. File ${filename || 'export.csv'} streamed directly to your browser.`,
-            })
+            toast.success(
+              `Dataset export completed. File ${filename || 'export.csv'} streamed directly to your browser.`,
+            )
           }}
         />
 
@@ -480,16 +468,18 @@ export function BackupManagerPage() {
           open={showImportModal}
           onClose={() => {
             setShowImportModal(false)
+            setImportBusy(false)
             clearActionParam()
           }}
           title="Patient Import Centre"
           description="Staged 8-stage spreadsheet ingestion pipeline for bulk patient registration with automated pre-commit safety backup."
           variant="info"
           dismiss="closerequest"
+          busy={importBusy}
           className="max-w-5xl w-full"
         >
           <div className="max-h-[75vh] overflow-y-auto px-1 py-2">
-            <ImportWizard />
+            <ImportWizard onBusyChange={setImportBusy} />
           </div>
         </Modal>
 
@@ -507,9 +497,9 @@ export function BackupManagerPage() {
                 <p className="text-xs font-bold uppercase tracking-wide text-red-800">Destructive operation</p>
                 <p className="mt-2 text-sm leading-6 text-slate-600">Restoring replaces the current database with the selected archive. Newer patient, treatment and payment records may be lost.</p>
               </div>
-              {feedback && feedback.tone === 'error' && (
+              {restoreError && (
                 <div role="alert" className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-900">
-                  {feedback.message}
+                  {restoreError}
                 </div>
               )}
               <div className="break-all rounded-lg bg-slate-50 p-3 font-mono text-xs text-slate-800">{restoreArchive.filename}</div>
