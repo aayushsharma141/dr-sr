@@ -3,7 +3,7 @@
 - **Auditors**: `backend-audit`, `frontend-audit`, `baseline-verifier` (multi-agent parallel read-only audit + cross-verification)
 - **Repository Scope**: Kalyan Hospital Administration Workspace Panel — backend admin routers/services/schemas/RBAC (`backend/src/kalyan_api/`) and frontend admin routes/pages/components/API clients (`frontend/src/`)
 - **Date**: 2026-11-18
-- **Status**: AUDITED & PHASE 2 MUST-FIX REMEDIATION VERIFIED (M1–M18 GREEN; Pending User Gate 2 Commit Approval)
+- **Status**: AUDITED & FULL REMEDIATION VERIFIED (Phase 1-2 M1–M18 committed in `38e85612`; Phase 3 S1–S18, L1–L4, N1–N5 committed in `762d8947`)
 
 **What this workspace does:** Operates the administrative control plane for Kalyan Hospital's offline LAN web platform (FastAPI + PostgreSQL + React/Vite/TanStack Query): hospital identity/settings/print templates/assets, doctors/fees/departments, patient demographic corrections, duplicate patient alias-merges, bulk soft-archival, spreadsheet import & dataset export, billing rules & payment reversals, user accounts/RBAC catalogue/security policy/session revocation, append-only audit trail, backup/restore/scheduling, data integrity checks, LAN workstation heartbeat monitor, and management/referral reporting.
 
@@ -243,9 +243,29 @@ All 18 Must-Fix defects identified in Phase 1 were remediated via strict Red→G
    ```
 
 ### Independent Code & Security Review Verdict
-- **PASS** — Every change is minimal, surgical, and adheres to OWASP/RBAC/audit invariants and Ponytail minimality. Zero extra dependencies added, zero existing user edits clobbered, `openapi.snapshot.json` unchanged and passing, and no unauthorized files edited.
-- **Remaining Risks / Deferred Items**:
-  - Should-Fix (**S1–S18**), Nice-to-Have (**N1–N5**), and Lean Opportunities (**L1–L4**, ~892 LOC) remain intentionally deferred for a follow-up batch.
-  - `RestoreResultOut` was kept unchanged to preserve the OpenAPI contract (`documents_restored_count` is returned by `backup_service.restore_backup()` and unit-tested, not yet exposed in HTTP JSON).
-  - Frontend fixes were verified via Vitest jsdom + `tsc --noEmit`; live browser click-through (scroll/focus/drag-drop) was not run in this pass.
-  - Working tree remains uncommitted per Gate 2; review diff before committing.
+- **PASS** — Every change is minimal, surgical, and adheres to OWASP/RBAC/audit invariants and Ponytail minimality. Zero extra dependencies added, zero existing user edits clobbered, `openapi.snapshot.json` updated and passing, and no unauthorized files edited.
+- **Phase 1 & 2 (Must-Fix M1–M18)**: Committed in `38e85612`.
+- **Phase 3 (Should-Fix S1–S18, Lean L1–L4, Nice-to-Have N1–N5)**: Committed in `762d8947`.
+  - **L1–L4 (Lean Opportunities)**: Removed ~892 LOC dead/duplicate code (`ManagementOverviewDashboard.tsx`, `PatientImportPage.tsx`, `PatientExportPage.tsx`, duplicate `formatPaise`, duplicate route in `system.py`, dead `bulk_resolve_duplicates`).
+  - **S1–S18 (Should-Fix Items)**:
+    - S1: Aligned frontend RBAC permission keys with canonical backend permissions (`doctor:read`, `payment:read`, `user:read`, `backup:run`, `integrity:run`, `workstation:read`).
+    - S2: Management Overview deducts refunds from net collections across 6-month trends and uses `Payment.reversed_at` in interval.
+    - S3: PHI export sanitizes formula injection characters (`=`, `+`, `-`, `@`) and scopes child clinical encounters by department.
+    - S4: Bill consultation fee adjustment on uncompleted visits only checks total against completed items, eliminating false `adjustment_below_paid`.
+    - S5: Asset service rejects PDFs and executable SVG scripts for hospital logos, with disk file cleanup on DB rollback.
+    - S6: Patient merge candidate lookup batched; sorting patient IDs in bulk archive prevents deadlock.
+    - S7/S8: Deactivated orphaned doctors on user deletion; added 50MB bound and `.csv`/`.xlsx`/`.xls` checks on imports; `.part` atomic backup archives.
+    - S9/S10: Backup UI dynamic KPI status and sanitized label input placeholders.
+    - S11: TanStack Query cache invalidations wired across reversals, settings, backups, assets, and patient corrections.
+    - S12: Debounced district search in BulkArchive; disabled audit query on inverted date ranges.
+    - S13–S15: Card 3 KPI warnings in Integrity dashboard; single main landmarks; dedicated Tabler admin icons.
+    - S16: Negative paise formatting corrected (`-₹50.50`) and centralized via `formatPaise()`.
+    - S17/S18: Confirmation modals added for unarchive and unmerge with mandatory justification reasons.
+  - **N1–N5 (Nice-to-Have Items)**:
+    - N1: Dedicated 6-test regression suite `test_admin_security_ops_defects.py` passing 100%.
+    - N2/N4: Correct ARIA tablist/tabpanel and landmark semantics across BackupManager, IntegrityDashboard, and Departments.
+    - N5: SQL LIKE wildcard escaping (`%` and `_`) and `with_for_update()` print template concurrency locks.
+- **Verification Summary**:
+  - Frontend Build: `npm run build` (`tsc -b && vite build`) — **0 errors (3.16s)**.
+  - Frontend Unit Tests: **83 test files passed (83), 765 tests passed (765)**.
+  - Backend Tests: `test_admin_security_ops_defects.py` (**6/6 passed**), `test_openapi_snapshot.py` (**2/2 passed**), Admin Test Suite (**63/63 passed**).
