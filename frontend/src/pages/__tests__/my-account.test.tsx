@@ -125,8 +125,8 @@ describe('MyAccount Page', () => {
     // Profile card
     expect(screen.getAllByText(/Dr Vikram Rane/).length).toBeGreaterThanOrEqual(1)
     expect((await screen.findAllByText(/MPT \(Orthopaedics\)/)).length).toBeGreaterThanOrEqual(1)
-    expect(screen.getByText(/MH-PT-20413/)).toBeInTheDocument()
-    expect(screen.getByText(/Room 104/)).toBeInTheDocument()
+    expect(screen.getAllByText(/MH-PT-20413/).length).toBeGreaterThanOrEqual(1)
+    expect(screen.getAllByText(/Room 104/).length).toBeGreaterThanOrEqual(1)
 
     // Change password form
     expect(screen.getByLabelText(/Current password/)).toBeInTheDocument()
@@ -247,5 +247,66 @@ describe('MyAccount Page', () => {
 
     const calls = (fetch as unknown as ReturnType<typeof vi.fn>).mock.calls
     expect(calls.some(([, init]) => (init as RequestInit | undefined)?.method === 'POST')).toBe(false)
+  })
+
+  it('never calls /api/sessions after a doctor without session:read changes password', async () => {
+    const user = userEvent.setup()
+    const fetchedUrls: string[] = []
+    const mockFetch = vi.fn().mockImplementation((url: string, init?: RequestInit) => {
+      fetchedUrls.push(`${init?.method ?? 'GET'} ${url}`)
+      if (url.includes('/api/auth/change-password') && init?.method === 'POST') {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          headers: new Headers({ 'content-type': 'application/json' }),
+          text: () => Promise.resolve(JSON.stringify({ ok: true })),
+        })
+      }
+      if (url.includes('/api/auth/me')) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          headers: new Headers({ 'content-type': 'application/json' }),
+          text: () => Promise.resolve(JSON.stringify(mockMeDoctor)),
+        })
+      }
+      if (url.includes('/api/doctors')) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          headers: new Headers({ 'content-type': 'application/json' }),
+          text: () => Promise.resolve(JSON.stringify(mockDoctors)),
+        })
+      }
+      if (url.includes('/api/sessions')) {
+        return Promise.resolve({
+          ok: false,
+          status: 403,
+          headers: new Headers({ 'content-type': 'application/json' }),
+          text: () => Promise.resolve(JSON.stringify({ detail: 'Forbidden' })),
+        })
+      }
+      return Promise.reject(new Error(`Unhandled: ${url}`))
+    })
+    vi.stubGlobal('fetch', mockFetch)
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter>
+          <MyAccount />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    )
+
+    await user.type(screen.getByLabelText(/Current password/i), 'OldPassWord123!')
+    await user.type(screen.getByLabelText(/^New password/i), 'NewStrongPass99!')
+    await user.type(screen.getByLabelText(/Repeat new password/i), 'NewStrongPass99!')
+    await user.click(screen.getByRole('button', { name: 'Change password' }))
+
+    expect(
+      await screen.findByText(/Password changed successfully/i),
+    ).toBeInTheDocument()
+    expect(fetchedUrls.some((entry) => entry.includes('/api/auth/change-password'))).toBe(true)
+    expect(fetchedUrls.some((entry) => entry.includes('/api/sessions'))).toBe(false)
   })
 })

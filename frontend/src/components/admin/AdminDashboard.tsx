@@ -57,12 +57,13 @@ function rupees(paise: number): string {
   return `${sign}₹${Math.floor(Math.abs(paise) / 100).toLocaleString('en-IN')}`
 }
 
-/** Short axis and donut labels: ₹950, ₹12.5k, ₹3.4L. */
+/** Short axis and donut labels: ₹950, ₹12.5k, ₹3.4L, -₹5k. */
 function shortRupees(paise: number): string {
-  const r = Math.round(paise / 100)
-  if (r >= 100000) return `₹${(r / 100000).toFixed(r >= 1000000 ? 0 : 1)}L`
-  if (r >= 1000) return `₹${(r / 1000).toFixed(r >= 10000 ? 0 : 1)}k`
-  return `₹${r}`
+  const sign = paise < 0 ? '-' : ''
+  const r = Math.round(Math.abs(paise) / 100)
+  if (r >= 100000) return `${sign}₹${(r / 100000).toFixed(r >= 1000000 ? 0 : 1)}L`
+  if (r >= 1000) return `${sign}₹${(r / 1000).toFixed(r >= 10000 ? 0 : 1)}k`
+  return `${sign}₹${r}`
 }
 
 function count(n: number | undefined): string {
@@ -113,6 +114,8 @@ const ACTION_WORDS: Record<string, string> = {
   INTEGRITY_CHECK_RUN: 'Ran the data integrity check',
   BACKUP_CREATED: 'Created a backup',
   SETTINGS_UPDATED: 'Updated hospital settings',
+  PATIENT_MERGED: 'Merged duplicate patient record',
+  PATIENT_ARCHIVED: 'Archived patient file',
 }
 
 const METHOD_WORDS: Record<string, string> = { CASH: 'Cash', UPI: 'UPI', CARD: 'Card' }
@@ -655,7 +658,7 @@ function NeedsAttention({ overview, className }: { overview: Partial<AdminOvervi
 // ------------------------------------------------------------------------------ row panels
 
 const APPOINTMENT_SEGMENTS = [
-  { key: 'waiting', label: 'Waiting', color: 'bg-amber-500', codes: ['BOOKED', 'ARRIVED'] },
+  { key: 'waiting', label: 'Waiting', color: 'bg-amber-500', codes: ['BOOKED', 'ARRIVED', 'CHECKED_IN'] },
   { key: 'in', label: 'In consultation', color: 'bg-consult-600', codes: ['IN_CONSULTATION'] },
   { key: 'done', label: 'Done', color: 'bg-emerald-600', codes: ['DONE'] },
   { key: 'off', label: 'Cancelled or no-show', color: 'bg-slate-400', codes: ['CANCELLED', 'NO_SHOW'] },

@@ -28,6 +28,7 @@ from kalyan_api.models import (
     TreatmentSession,
     TreatmentSessionAddendum,
 )
+from kalyan_api.routers.treatment_plans import _require_physiotherapy_doctor
 from kalyan_api.schemas.treatment_sessions import (
     TreatmentSessionAddendumCreate,
     TreatmentSessionAddendumOut,
@@ -101,6 +102,7 @@ def log_treatment_session(
             code="doctor_only",
             message="Only authenticated doctors can log treatment sessions.",
         )
+    _require_physiotherapy_doctor(session, principal)
 
     # Check plan write scope before allocating
     get_scoped_or_404(
@@ -111,10 +113,19 @@ def log_treatment_session(
         family=ScopeFamily.CLINICAL_WRITE,
         doctor_id_col=TreatmentPlan.doctor_id,
     )
+
+    today_ist = clock.ist_today()
+    if payload.session_date is not None and payload.session_date > today_ist:
+        raise ApiError(
+            status_code=422,
+            code="future_session_date_not_allowed",
+            message="Treatment sessions cannot be logged for a future date.",
+        )
+
     # Concurrency-safe atomic allocation locking plan row
     plan, next_session_number = allocate_next_session_number(session, plan_id)
 
-    session_date = payload.session_date or clock.ist_today()
+    session_date = payload.session_date or today_ist
 
     sess = TreatmentSession(
         treatment_plan_id=plan.id,

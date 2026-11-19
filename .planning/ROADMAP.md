@@ -13,17 +13,19 @@ Ordering notes:
 
 ## Phases
 
-- [ ] **Phase 11: Decisions Gate, Foundation & Auth** - Open decisions closed, repo/PostgreSQL/Alembic scaffold, individual accounts, role-routed login, server-enforced permissions, optimistic concurrency, and the audit-event writer.
-- [x] **Phase 12: Clinic Settings & Patient Registration** - Clinic details, doctor profiles, fee list, patient registration with atomic URN, search, edit, duplicate warning and photos (print spike starts).
-- [ ] **Phase 13: Appointments & Clinical Encounters** - Per-doctor daily appointments with tokens and status, doctor queue, encounters, finalised notes with addenda.
-- [ ] **Phase 14: Prescriptions, Treatment Plans & Sessions** - Bilingual prescriptions, treatment plans/packages, immutable physiotherapy session log with VAS.
-- [ ] **Phase 15: Billing, Receipts & Reversals** - Integer-paise payments, computed balances, dues list, gap-free receipts with DUPLICATE reprints, admin reversals, unified patient timeline.
-- [ ] **Phase 16: Audit Viewer, Backup/Restore & Integrity** - Audit log viewer, scheduled checksummed backups on a second drive, verified restore, integrity report.
-- [ ] **Phase 17: LAN Deployment, Printer & Acceptance** - One-time server install, auto-recovery after power cut, LAN multi-PC offline operation, real-printer sign-off, full acceptance suite.
-- [ ] **Phase 18: UI/UX Review Hardening** - Receipt printing from the app, native modal dialogs, non-blocking errors, 12px text and contrast floor, bundled Hindi font and language marking, form accessibility, webcam HTTPS decision, headless print verification.
+- [x] **Phase 11: Decisions Gate, Foundation & Auth** - Open decisions closed, repo/PostgreSQL/Alembic scaffold, individual accounts, role-routed login, server-enforced permissions, optimistic concurrency, and the audit-event writer. (completed 2026-10-31)
+- [x] **Phase 12: Clinic Settings & Patient Registration** - Clinic details, doctor profiles, fee list, patient registration with atomic URN, search, edit, duplicate warning and photos (print spike starts). (completed 2026-11-01)
+- [x] **Phase 13: Appointments & Clinical Encounters** - Per-doctor daily appointments with tokens and status, doctor queue, encounters, finalised notes with addenda. (completed 2026-11-01)
+- [x] **Phase 14: Prescriptions, Treatment Plans & Sessions** - Bilingual prescriptions, treatment plans/packages, immutable physiotherapy session log with VAS. (completed 2026-11-02)
+- [x] **Phase 15: Billing, Receipts & Reversals** - Integer-paise payments, computed balances, dues list, gap-free receipts with DUPLICATE reprints, admin reversals, unified patient timeline. (completed 2026-11-02)
+- [x] **Phase 16: Audit Viewer, Backup/Restore & Integrity** - Audit log viewer, scheduled checksummed backups on a second drive, verified restore, integrity report. (completed 2026-11-04)
+- [x] **Phase 17: LAN Deployment, Printer & Acceptance** - One-time server install, auto-recovery after power cut, LAN multi-PC offline operation, real-printer sign-off, full acceptance suite. (completed 2026-11-05)
+- [x] **Phase 18: UI/UX Review Hardening** - Receipt printing from the app, native modal dialogs, non-blocking errors, 12px text and contrast floor, bundled Hindi font and language marking, form accessibility, webcam HTTPS decision, headless print verification. (completed 2026-11-05)
 - [x] **Phase 19: Universal Consultation Workspace** - One consultation for Physiotherapy and Ophthalmology: real drafts with auto-save, new and follow-up encounters, versioned specialty templates, vitals, integrated prescription, follow-up recommendations, read-all edit-own access, one login at a time and a printed summary. (completed 2026-11-06)
 - [x] **Phase 20: Admin Data Governance & Asset Management** - Patient demographic correction with audit; CSV/XLSX import centre (8-stage staging pipeline: upload → inspect → map → validate → resolve → preview → commit → reconcile); controlled patient export (permission-checked, field-selective, audited); hospital identity and logo/asset CRUD with version history; bilingual print template management per document type (prescription, receipt, registration card); five-section Admin navigation reorganization (Hospital Configuration, Patient & Data Management, Users/Security/Governance, System & Maintenance). Uses existing RBAC; no new permission system. All existing admin pages preserved and reorganized, not removed. (completed 2026-11-08)
-- [ ] **Phase 21: Advanced Data Operations** (deferred) - Duplicate patient detection and merge workflow (high-risk FK cascade; dedicated transaction design); bulk archive and bulk delete for eligible records; extended data-edit permission controls; LAN workstation status monitoring. Depends on Phase 20 stable data foundation.
+- [x] **Phase 22: Integrated OPD Workflow** - Check-in with Referred By and classification, emergency acknowledgement, same-visit reassignment, fee-snapshot bill lines, checkout and receipts. (completed 2026-11-16)
+- [x] **Phase 23: Advanced Data Operations** (deferred; formerly numbered 22) - Duplicate patient detection and merge workflow (high-risk FK cascade; dedicated transaction design); bulk archive and bulk delete for eligible records; extended data-edit permission controls; LAN workstation status monitoring. Depends on Phase 20 stable data foundation.
+- [x] **Phase 25: Codebase Audit & System Hardening** - Resolve 20 audit findings across backup restore permissions, RBAC matrix completeness, appointment check-in state machine alignment, workstation heartbeat isolation, and lean clutter removal. (completed 2026-11-17)
 
 ## Phase Details
 
@@ -266,8 +268,9 @@ Phases execute in numeric order: 11 → 12 → 13 → 14 → 15 → 16 → 17 �
 | 18. UI/UX Review Hardening | 5/8 | Skipped / Superseded by current build | - |
 | 19. Universal Consultation Workspace | 7/7 | Complete | 2026-11-06 |
 | 20. Admin Data Governance & Asset Management | 8/8 | Complete | 2026-11-08 |
-| 21. Build Takeover & System Stabilization | 0/2 | In progress | - |
-| 22. Advanced Data Operations | 0/0 | Deferred — depends on Phase 21 | - |
+| 21. Build Takeover & System Stabilization | 2/2 | Complete | 2026-11-14 |
+| 22. Integrated OPD Workflow | 20/20 | Complete | 2026-11-16 |
+| 23. Advanced Data Operations | 0/0 | Deferred — depends on Phase 21 | - |
 
 ---
 *Roadmap created: 2026-10-30*
@@ -312,17 +315,96 @@ Plans:
 
 **Depends on**: Current build in tree (Phase 20 foundation)
 
-**Plans:** 2 plans
+**Plans:** 2/2 plans complete
 
 Plans:
 
-- [ ] 21-01-PLAN.md — Reconcile admin navigation architecture test with real AdminDashboard component shape and types (Wave 1)
-- [ ] 21-02-PLAN.md — Full-stack regression verification gate (Vitest 54/54 suites, pytest 1,064 tests, typecheck) (Wave 2)
+- [x] 21-01-PLAN.md — Reconcile admin navigation architecture test with real AdminDashboard component shape and types (Wave 1)
+- [x] 21-02-PLAN.md — Full-stack regression verification gate (Vitest 54/54 suites, pytest 1,064 tests, typecheck) (Wave 2)
 
 ---
 
-### Phase 22: Advanced Data Operations
+### Phase 22: Integrated OPD Workflow
 
-**Goal**: Duplicate patient detection and merge workflow (high-risk FK cascade; dedicated transaction design); bulk archive and bulk delete for eligible records; extended data-edit permission controls; LAN workstation status monitoring.
+**Goal**: Reception, waiting room, doctor and billing run as one OPD workflow on the existing patient, visit, consultation and payment chain: check-in with Referred By and classification, emergency acknowledgement, doctor-to-doctor reassignment on the same visit, bill lines with a fee snapshot, checkout and receipts. Specification and decisions live in `.planning/phases/22-integrated-opd-workflow/` (22-DESIGN.md, 22-UI-SPEC.md).
 
-**Depends on**: Phase 21 stable data foundation
+**Depends on**: Phase 21 build takeover and stabilisation
+
+**Status**: Complete
+
+**Plans:** 20/20 plans complete
+
+Plans:
+- [x] 22-01-PLAN.md — Doctor queue: PriorityBadge, pinned consultation, last-updated line (design Wave 2)
+- [x] 22-02-PLAN.md — Check-in list labels and keyboard tabs, Waiting Room copy, LAN status decision OD-F (design Wave 2)
+- [x] 22-03-PLAN.md — Baseline run; permissions catalogue bill:write and report:referral (step a)
+- [x] 22-04-PLAN.md — Migration 0029: bill line status/void/unit/links, payments.visit_id (step b)
+- [x] 22-05-PLAN.md — Visit-level balance switch with before/after regression and compare script (step c)
+- [x] 22-06-PLAN.md — Visit payment guard, visit-level dues, fee guard on visit totals (steps c, d)
+- [x] 22-07-PLAN.md — Checkout and dues forms pay the visit (visit_id); receipts totals only
+- [x] 22-08-PLAN.md — Reception medicine and particular lines API (step e)
+- [x] 22-09-PLAN.md — Visit bill view API; checkout list token and completion time
+- [x] 22-10-PLAN.md — Line-edit decisions; void API (OD-G)
+- [x] 22-11-PLAN.md — Quantity change API; prescribed-medicine reference (OD-B)
+- [x] 22-12-PLAN.md — Doctor charges API (procedure, package reference, own view)
+- [x] 22-13-PLAN.md — Billing & Checkout bill panel, totals, previous dues (design Wave 4)
+- [x] 22-14-PLAN.md — Bill line actions UI: add medicine/particular, void, change, admin fee correction
+- [x] 22-15-PLAN.md — Receipts tab and reception Reports tab
+- [x] 22-16-PLAN.md — Doctor charges panel on the consultation page
+- [x] 22-17-PLAN.md — Admin referral report API (design Wave 5)
+- [x] 22-18-PLAN.md — Admin referral report page
+- [x] 22-19-PLAN.md — UAT re-run on kalyan_test, docs sync, full regression
+- [x] 22-20-PLAN.md — Approval-gated deploy to kalyan_dev (backup, migrate, compare, build, restart)
+
+---
+
+### Phase 23: Advanced Data Operations
+
+**Goal**: Duplicate patient detection and merge workflow (Alias Pointer architecture; trigger immutability preserved); bulk archive for eligible records with hard financial dues guard; extended data-edit permission controls; LAN workstation status monitoring.
+
+**Depends on**: Phase 22 stable foundation
+
+**Plans:** 5 plans (Waves 1-4)
+
+Plans:
+
+- [x] 23-01-PLAN.md — Migration 0030, Models & RBAC Permissions Matrix (Wave 1)
+- [x] 23-02-PLAN.md — Duplicate Detection, Open Visit Guard & Alias-Pointer Merge/Unmerge Service (Wave 2)
+- [x] 23-03-PLAN.md — Consolidated Patient Aggregations (Timeline, Visits, Dues) & Merged URN Routing (Wave 2)
+- [x] 23-04-PLAN.md — Filtered Bulk Archival, Hard Financial Dues Guard & Workstation Monitoring Backend (Wave 3)
+- [x] 23-05-PLAN.md — Frontend Admin UI (/admin/duplicates, /admin/patients/archive, /admin/workstations) & Verification Gate (Wave 4)
+
+---
+
+### Phase 24: OPD Reception Dashboard Reliability & Efficiency
+
+**Status:** In progress — technical verification pending; receptionist acceptance not run.
+
+**Goal:** Make reception queue and overview data visibly fresh and accurate, and make common queue actions faster to use without changing clinical, queue, payment, or authorization policy.
+
+**Depends on:** Phase 22 integrated OPD workflow; reconcile the current uncommitted OPD worktree before implementation.
+
+**Plan:** `.planning/phases/24-reception-dashboard-reliability/24-01-PLAN.md`
+
+**Design:** `.planning/phases/24-reception-dashboard-reliability/24-DESIGN.md`
+
+**Work areas:** Dashboard freshness/error states; backend-defined payment and reversal activity; authoritative department labels; delayed-queue navigation and accessible controls; synthetic-data regression and receptionist acceptance.
+
+**Acceptance gate:** Follow `AGENTS.md` Definition of Done. Receptionist satisfaction remains unmeasured until an on-site or representative staff walkthrough is recorded.
+
+---
+
+### Phase 25: Codebase Audit & System Hardening
+
+**Goal**: Resolve 20 audit findings across backup restore permissions, RBAC matrix completeness, appointment check-in state machine backwards compatibility, workstation heartbeat isolation, and lean workspace cleanup.
+
+**Depends on**: Audit findings baseline
+
+**Plans:** 4 plans (Waves 1-4)
+
+Plans:
+
+- [x] 25-01-PLAN.md — Backend Security, Permissions & State Machine Alignment (Wave 1) (completed 2026-11-17)
+- [x] 25-02-PLAN.md — Workstation Heartbeat & Frontend Mock Isolation (Wave 2) (completed 2026-11-17)
+- [x] 25-03-PLAN.md — Data Safety, Integrity & Efficiency (Wave 3) (completed 2026-11-17)
+- [x] 25-04-PLAN.md — Lean Cleanup & Documentation Synchronization (Wave 4) (completed 2026-11-17)

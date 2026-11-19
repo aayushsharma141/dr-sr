@@ -39,11 +39,16 @@ export const PendingDuesPage: React.FC = () => {
           title="Pending Dues"
           description="Dynamically computed outstanding balances across active treatment packages (BIL-03)."
           actions={
-            <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 shadow-2xs">
-              <div className="text-xs font-semibold uppercase tracking-wider text-amber-800">
-                Total Outstanding
+            <div className="rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-2xs">
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-xs font-semibold text-slate-600">
+                  Total Outstanding
+                </span>
+                <span className="rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-xs font-semibold text-amber-900">
+                  {filteredDues.length} {filteredDues.length === 1 ? 'package' : 'packages'}
+                </span>
               </div>
-              <div className="text-xl font-black text-amber-900">
+              <div className="mt-1 font-mono tabular-nums text-xl font-bold text-amber-900">
                 ₹{totalDuesRupees}
               </div>
             </div>
@@ -58,24 +63,24 @@ export const PendingDuesPage: React.FC = () => {
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             placeholder="Search by patient name, URN, or package..."
-            className="w-full max-w-md rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-2xs placeholder:text-slate-400 focus:border-[#8E1C3D] focus:outline-none focus:ring-1 focus:ring-[#8E1C3D]"
+            className="w-full max-w-md rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-2xs placeholder:text-slate-400 focus:border-brand-700 focus:outline-none focus:ring-2 focus:ring-brand-700/20"
           />
         </div>
 
         {/* Table */}
         <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-2xs">
           {isLoading ? (
-            <div className="p-8 text-center text-sm text-slate-500">Loading pending dues ledger...</div>
+            <div className="p-8 text-center text-sm text-slate-600">Loading pending dues ledger...</div>
           ) : error ? (
-            <div className="p-8 text-center text-sm text-red-600">Failed to load pending dues ledger.</div>
+            <div className="p-8 text-center text-sm font-medium text-red-700">Failed to load pending dues ledger.</div>
           ) : filteredDues.length === 0 ? (
-            <div className="p-8 text-center text-sm text-slate-500">
+            <div className="p-8 text-center text-sm text-slate-600">
               No active packages with pending dues found.
             </div>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-left text-sm text-slate-600">
-                <thead className="border-b border-slate-200 bg-slate-50 text-xs font-bold uppercase tracking-wider text-slate-700">
+                <thead className="border-b border-slate-200 bg-slate-50 text-xs font-semibold text-slate-600">
                   <tr>
                     <th className="px-4 py-3">Patient</th>
                     <th className="px-4 py-3">Package Details</th>
@@ -86,9 +91,9 @@ export const PendingDuesPage: React.FC = () => {
                     <th className="px-4 py-3 text-center">Action</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-200">
-                  {filteredDues.map((due, index) => (
-                    <tr key={due.treatment_plan_id} className="hover:bg-slate-50/70 transition-colors" style={{ transitionDelay: `${index * 50}ms` }}>
+                <tbody className="divide-y divide-slate-100">
+                  {filteredDues.map((due) => (
+                    <tr key={due.treatment_plan_id} className="hover:bg-slate-50/80 transition-colors duration-150">
                       <td className="px-4 py-3">
                         <div className="font-semibold text-slate-900">{due.patient_name}</div>
                         <div className="font-mono text-xs text-slate-500">{due.patient_urn}</div>
@@ -96,17 +101,25 @@ export const PendingDuesPage: React.FC = () => {
                       <td className="px-4 py-3">
                         <div className="font-medium text-slate-900">{due.plan_name}</div>
                       </td>
-                      <td className="px-4 py-3 text-right font-medium text-slate-900">
+                      <td className="px-4 py-3 text-right font-mono tabular-nums font-medium text-slate-900">
                         ₹{(due.agreed_price_paise / 100).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                       </td>
-                      <td className="px-4 py-3 text-right font-medium text-emerald-700">
+                      <td className="px-4 py-3 text-right font-mono tabular-nums font-semibold text-emerald-800">
                         ₹{(due.paid_paise / 100).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                       </td>
-                      <td className="px-4 py-3 text-right font-bold text-red-700">
-                        ₹{(due.balance_paise / 100).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                      <td className="px-4 py-3 text-right">
+                        <span
+                          className={`inline-flex items-center rounded-md border px-2 py-0.5 font-mono tabular-nums font-bold ${
+                            due.completed_sessions >= due.total_sessions
+                              ? 'border-red-200 bg-red-50 text-red-800'
+                              : 'border-amber-200 bg-amber-50 text-amber-900'
+                          }`}
+                        >
+                          ₹{(due.balance_paise / 100).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                        </span>
                       </td>
                       <td className="px-4 py-3 text-center text-xs">
-                        <span className="rounded-full bg-slate-100 px-2 py-0.5 font-medium text-slate-700">
+                        <span className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-0.5 font-mono tabular-nums font-medium text-slate-700">
                           {due.completed_sessions} / {due.total_sessions}
                         </span>
                       </td>
@@ -114,7 +127,7 @@ export const PendingDuesPage: React.FC = () => {
                         <button
                           type="button"
                           onClick={() => handleCollect(due)}
-                          className="min-h-9 cursor-pointer rounded-lg bg-[#8E1C3D] px-3.5 py-1.5 text-xs font-bold text-white shadow-2xs hover:bg-[#741732] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[#8E1C3D]"
+                          className="min-h-9 cursor-pointer rounded-lg bg-brand-700 px-3.5 py-1.5 text-xs font-semibold text-white shadow-2xs transition-colors duration-150 hover:bg-brand-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-700"
                         >
                           Collect Payment
                         </button>

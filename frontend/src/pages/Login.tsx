@@ -142,11 +142,11 @@ export function Login() {
 
   const noticeClasses =
     loginNotice?.tone === 'warning'
-      ? 'border-amber-200 bg-amber-50 text-amber-950'
-      : 'border-rose-200 bg-rose-50 text-rose-950'
+      ? 'border-amber-200 bg-amber-50 text-amber-900'
+      : 'border-red-200 bg-red-50 text-red-800'
 
   return (
-    <main className="relative min-h-screen h-full w-full overflow-y-auto overflow-x-hidden bg-[#FAF6F3] text-[#1F2937]">
+    <main className="relative min-h-screen h-full w-full overflow-y-auto overflow-x-hidden bg-[#FAF6F3] text-slate-900">
       {/* Desktop Background Layer */}
       <div
         aria-hidden="true"
@@ -159,7 +159,7 @@ export function Login() {
         {/* Left Hero Section (Desktop) */}
         <section
           aria-label="Kalyan Hospital"
-          className="relative hidden min-h-screen flex-col justify-between overflow-hidden p-8 lg:flex xl:p-12 text-white"
+          className="relative hidden min-h-screen flex-col justify-between overflow-hidden p-8 text-white lg:flex xl:p-12"
         >
           {/* Accessible screen-reader content that mirrors the visual banner */}
           <div className="sr-only">
@@ -177,7 +177,7 @@ export function Login() {
         >
           {/* Mobile Hospital Crest Header (visible only on small screens) */}
           <div className="mb-6 flex w-full max-w-[500px] items-center gap-3.5 lg:hidden">
-            <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-white p-1 shadow-md ring-1 ring-[#E8DCD5]">
+            <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl border border-[#E7DDD5] bg-white p-1.5 shadow-sm">
               <img
                 src="/api/assets/active-logo"
                 alt="Sri Vashishtha Kalyan Trust crest"
@@ -188,28 +188,28 @@ export function Login() {
               />
             </div>
             <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#6D021A]">
+              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-brand-800">
                 Sri Vashishtha Kalyan Trust
               </p>
-              <p className="text-xl font-bold tracking-tight text-[#2B000B]">
+              <p className="text-xl font-bold tracking-tight text-brand-900">
                 Kalyan Hospital
               </p>
-              <p className="text-xs text-[#71717A]">Hospital Management Workspace</p>
+              <p className="text-xs text-slate-600">कल्याण अस्पताल · Hospital Management Workspace</p>
             </div>
           </div>
 
           {/* Floating Sign-in Card */}
-          <div className="relative w-full max-w-[510px] rounded-[30px] border border-[#F2ECE6] bg-white p-8 sm:p-11 shadow-[0_24px_60px_-15px_rgba(50,10,20,0.08),0_15px_35px_-10px_rgba(226,183,85,0.28)] after:pointer-events-none after:absolute after:bottom-0 after:left-14 after:right-14 after:h-[2.5px] after:bg-gradient-to-r after:from-transparent after:via-[#E2B755]/80 after:to-transparent after:blur-[0.5px]">
+          <div className="relative w-full max-w-[510px] rounded-[28px] border border-[#E7DDD5] bg-white/95 p-8 shadow-[0_20px_50px_-16px_rgba(93,11,38,0.12),0_4px_16px_-4px_rgba(15,23,42,0.06)] ring-1 ring-white/70 backdrop-blur-sm sm:p-11 after:pointer-events-none after:absolute after:bottom-0 after:left-14 after:right-14 after:h-[2px] after:bg-gradient-to-r after:from-transparent after:via-gold-400/65 after:to-transparent">
             {/* Header: Gold accent dash + Title + Subtitle */}
             <div className="mb-7">
               <div
                 aria-hidden="true"
-                className="mb-3.5 h-1.5 w-8 rounded-full bg-gradient-to-r from-[#D4AF37] to-[#B8860B]"
+                className="mb-3.5 h-1.5 w-9 rounded-full bg-gradient-to-r from-gold-400 to-gold-600"
               />
-              <h2 className="text-[32px] sm:text-[34px] font-bold tracking-tight text-[#4F071D] leading-tight">
+              <h2 className="text-[32px] sm:text-[34px] font-bold tracking-tight text-brand-900 leading-tight">
                 Welcome back
               </h2>
-              <p className="mt-2 text-[14.5px] leading-relaxed text-[#71717A]">
+              <p className="mt-2 text-sm leading-relaxed text-slate-600">
                 Sign in with your hospital staff account to continue.
               </p>
             </div>
@@ -218,7 +218,7 @@ export function Login() {
             {notice === 'created' && (
               <div
                 role="status"
-                className="mb-5 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900"
+                className="mb-5 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800"
               >
                 Administrator created. Please sign in.
               </div>
@@ -227,7 +227,7 @@ export function Login() {
             {notice === 'closed' && (
               <div
                 role="status"
-                className="mb-5 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950"
+                className="mb-5 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900"
               >
                 Setup wizard is closed. Administrator already exists.
               </div>
@@ -236,7 +236,7 @@ export function Login() {
             {reason === 'expired' && (
               <div
                 role="status"
-                className="mb-5 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950"
+                className="mb-5 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900"
               >
                 You were signed out after 30 minutes of inactivity
               </div>
@@ -245,12 +245,12 @@ export function Login() {
             {setupStatus?.setup_required && (
               <div
                 role="status"
-                className="mb-5 rounded-xl border border-[#D7E4F2] bg-[#F2F7FC] px-4 py-3 text-sm text-[#21486B] flex flex-col gap-1"
+                className="mb-5 flex flex-col gap-1 rounded-xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-900"
               >
                 <p>No administrator exists yet - open the setup wizard</p>
                 <Link
                   to="/setup"
-                  className="font-semibold underline underline-offset-4 hover:text-[#14334F] inline-block"
+                  className="inline-block w-fit rounded-sm font-semibold text-sky-900 underline underline-offset-4 transition-colors hover:text-sky-950 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-700"
                 >
                   Setup Wizard
                 </Link>
@@ -260,7 +260,7 @@ export function Login() {
             {setupStatusError && (
               <div
                 role="status"
-                className="mb-5 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950"
+                className="mb-5 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900"
               >
                 Could not verify the setup status. You can still try signing in; check the local server if this continues.
               </div>
@@ -282,8 +282,8 @@ export function Login() {
             <form onSubmit={handleSubmit} className="space-y-5" aria-busy={loginMutation.isPending}>
               {/* Username Input */}
               <div>
-                <div className="mb-2 flex items-center gap-2 text-sm font-semibold text-[#18181B]">
-                  <IconUser className="h-[18px] w-[18px] text-[#4F071D]" stroke={1.8} />
+                <div className="mb-2 flex items-center gap-2 text-sm font-semibold text-slate-900">
+                  <IconUser className="h-[18px] w-[18px] text-brand-800" stroke={1.8} />
                   <label htmlFor="username-input">Username</label>
                 </div>
                 <input
@@ -303,18 +303,18 @@ export function Login() {
                   aria-invalid={loginNotice?.title === 'Username required'}
                   aria-describedby={loginNotice?.title === 'Username required' ? 'login-alert' : undefined}
                   placeholder="Enter your staff username"
-                  className="min-h-[52px] w-full rounded-[16px] border border-[#E4E4E7] bg-[#FCFCFD] px-4 text-sm text-[#18181B] placeholder:text-[#A1A1AA] outline-none transition hover:border-[#D1D5DB] focus:border-[#6B0A26] focus:ring-4 focus:ring-[#6B0A26]/10"
+                  className="min-h-[50px] w-full rounded-xl border border-slate-300 bg-white px-4 text-sm text-slate-900 placeholder:text-slate-400 outline-none transition-colors duration-150 hover:border-slate-400 focus:border-brand-700 focus:ring-2 focus:ring-brand-700/20"
                 />
               </div>
 
               {/* Password Input */}
               <div>
                 <div className="mb-2 flex items-center justify-between">
-                  <div className="flex items-center gap-2 text-sm font-semibold text-[#18181B]">
-                    <IconLock className="h-[18px] w-[18px] text-[#4F071D]" stroke={1.8} />
+                  <div className="flex items-center gap-2 text-sm font-semibold text-slate-900">
+                    <IconLock className="h-[18px] w-[18px] text-brand-800" stroke={1.8} />
                     <label htmlFor="password-input">Password</label>
                   </div>
-                  <span className="text-xs text-[#71717A]">Keep it private</span>
+                  <span className="text-xs text-slate-600">Keep it private</span>
                 </div>
                 <div className="relative">
                   <input
@@ -331,14 +331,14 @@ export function Login() {
                     aria-invalid={loginNotice?.tone === 'danger' && loginNotice.title !== 'Username required'}
                     aria-describedby={loginNotice && loginNotice.title !== 'Username required' ? 'login-alert' : undefined}
                     placeholder="Enter your password"
-                    className="min-h-[52px] w-full rounded-[16px] border border-[#E4E4E7] bg-[#FCFCFD] px-4 pr-12 text-sm text-[#18181B] placeholder:text-[#A1A1AA] outline-none transition hover:border-[#D1D5DB] focus:border-[#6B0A26] focus:ring-4 focus:ring-[#6B0A26]/10"
+                    className="min-h-[50px] w-full rounded-xl border border-slate-300 bg-white px-4 pr-12 text-sm text-slate-900 placeholder:text-slate-400 outline-none transition-colors duration-150 hover:border-slate-400 focus:border-brand-700 focus:ring-2 focus:ring-brand-700/20"
                   />
                   <button
                     type="button"
                     onClick={() => setShowPassword((current) => !current)}
                     aria-label={showPassword ? 'Hide password' : 'Show password'}
                     aria-pressed={showPassword}
-                    className="absolute inset-y-0 right-3.5 inline-flex items-center text-[#71717A] hover:text-[#4F071D] focus-visible:outline-2 focus-visible:outline-[#6B0A26] transition"
+                    className="absolute inset-y-0 right-1.5 my-auto inline-flex h-9 w-9 cursor-pointer items-center justify-center rounded-lg text-slate-600 transition-colors duration-150 hover:bg-slate-100 hover:text-brand-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-700"
                   >
                     {showPassword ? (
                       <IconEyeOff className="h-4 w-4" stroke={1.8} />
@@ -353,7 +353,7 @@ export function Login() {
               <button
                 type="submit"
                 disabled={loginMutation.isPending || !username.trim() || !password}
-                className="mt-4 flex min-h-[54px] w-full items-center justify-center gap-2.5 rounded-[18px] bg-gradient-to-r from-[#56041A] via-[#6D0824] to-[#56041A] px-5 py-3.5 text-base font-semibold text-white shadow-[0_8px_20px_rgba(86,4,26,0.35)] transition-all hover:brightness-110 hover:shadow-[0_10px_26px_rgba(86,4,26,0.45)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#6D0824] disabled:cursor-not-allowed disabled:opacity-50"
+                className="mt-4 flex min-h-[52px] w-full cursor-pointer items-center justify-center gap-2.5 rounded-xl bg-gradient-to-r from-brand-800 via-brand-700 to-brand-800 px-5 py-3.5 text-base font-semibold text-white shadow-[0_6px_18px_-4px_rgba(116,23,50,0.4)] transition-all duration-150 hover:-translate-y-0.5 hover:from-brand-900 hover:via-brand-800 hover:to-brand-900 hover:shadow-[0_10px_24px_-4px_rgba(93,11,38,0.45)] active:translate-y-0 active:shadow-[0_4px_12px_-2px_rgba(93,11,38,0.35)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-700 disabled:translate-y-0 disabled:cursor-not-allowed disabled:opacity-50 disabled:shadow-none"
               >
                 {loginMutation.isPending ? (
                   <span

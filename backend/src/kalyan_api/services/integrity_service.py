@@ -19,6 +19,9 @@ Checks implemented:
    - Every patient with a non-null photo_path must have an existing file on disk.
    - Identifies any orphan files on disk in settings.photos_dir that have no corresponding patient.
 6. Hospital Asset Storage Integrity: the same two checks for uploaded hospital assets.
+7. Financial Ledger Reconciliation: append-only ledger matches charges minus net paid.
+8. Patient Document Storage Integrity: every patient_documents.stored_filename exists in
+   settings.documents_dir and any orphan files on disk are flagged as CLEANUP.
 
 Every finding carries a stable ``issue`` code and its own ``severity``:
 - ERROR: a record is wrong or points at something missing (makes the report unhealthy).
@@ -35,17 +38,28 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Any, Literal
 
-from sqlalchemy import func, select
+from sqlalchemy import and_, exists, func, or_, select
 from sqlalchemy.orm import Session
 
 from kalyan_api.config import Settings, get_settings
 from kalyan_api.models import (
+    Appointment,
+    AppointmentStatus,
+    BillItem,
+    BillItemCategory,
+    BillItemStatus,
+    ConsultationStatus,
     HospitalAsset,
+    LedgerEntry,
     Patient,
+    PatientDocument,
     Payment,
+    Refund,
     TreatmentPlan,
+    TreatmentPlanStatus,
     TreatmentSession,
     UrnSequence,
+    Visit,
 )
 
 Severity = Literal["ERROR", "WARNING", "CLEANUP"]
@@ -64,6 +78,9 @@ ISSUE_SEVERITY: dict[str, Severity] = {
     "orphan_photo_file": "CLEANUP",
     "missing_asset_file": "ERROR",
     "orphan_asset_file": "CLEANUP",
+    "missing_document_file": "ERROR",
+    "orphan_document_file": "CLEANUP",
+    "ledger_balance_mismatch": "ERROR",
 }
 
 URN_PATTERN = re.compile(r"^KH-(\d{2})-P-(\d{2})-(\d{5})$")
@@ -157,6 +174,18 @@ def check_financial_ledger_integrity(session: Session) -> CheckResult:
             .group_by(Payment.treatment_plan_id)
         ).all()
     }
+    refunds_by_plan = {
+        int(plan_id): int(refund_sum or 0)
+        for plan_id, refund_sum in session.execute(
+            select(Payment.treatment_plan_id, func.sum(Refund.amount_paise))
+            .join(Payment, Payment.id == Refund.payment_id)
+            .where(
+                Payment.treatment_plan_id.is_not(None),
+                Payment.is_reversed.is_(False),
+            )
+            .group_by(Payment.treatment_plan_id)
+        ).all()
+    }
 
     for plan in plans:
         agreed = plan.agreed_price_paise or 0
@@ -170,7 +199,10 @@ def check_financial_ledger_integrity(session: Session) -> CheckResult:
                 }
             )
 
-        paid_sum = active_payments_by_plan.get(plan.id, 0)
+        paid_sum = max(
+            0,
+            active_payments_by_plan.get(plan.id, 0) - refunds_by_plan.get(plan.id, 0),
+        )
 
         if paid_sum > agreed:
             discrepancies.append(
@@ -484,6 +516,313 @@ def check_asset_storage_integrity(
     )
 
 
+def check_document_storage_integrity(
+    session: Session, settings: Settings | None = None
+) -> CheckResult:
+    """Verify patient document files exist on disk and identify orphan files (Milestone 4)."""
+    cfg = settings or get_settings()
+    discrepancies: list[dict[str, Any]] = []
+
+    docs = session.execute(select(PatientDocument)).scalars().all()
+    db_doc_filenames: set[str] = set()
+
+    for doc in docs:
+        fname = doc.stored_filename
+        db_doc_filenames.add(fname)
+        expected_file = cfg.documents_dir / fname
+        if not expected_file.is_file():
+            discrepancies.append(
+                {
+                    "document_id": doc.id,
+                    "patient_id": doc.patient_id,
+                    "stored_filename": fname,
+                    "original_filename": doc.original_filename,
+                    "category": doc.category,
+                    "is_archived": doc.is_archived,
+                    "issue": "missing_document_file",
+                }
+            )
+
+    if cfg.documents_dir.exists() and cfg.documents_dir.is_dir():
+        for disk_file in cfg.documents_dir.glob("*"):
+            if disk_file.is_file():
+                if disk_file.name not in db_doc_filenames and not disk_file.name.startswith(
+                    "test_"
+                ):
+                    discrepancies.append(
+                        {
+                            "issue": "orphan_document_file",
+                            "filename": disk_file.name,
+                            "bytes": disk_file.stat().st_size,
+                        }
+                    )
+
+    passed = len(discrepancies) == 0
+    return CheckResult(
+        code="document_storage",
+        name="Patient Document Storage Consistency",
+        passed=passed,
+        details=(
+            "All patient documents exist on disk and no untracked orphans found"
+            if passed
+            else f"Found {len(discrepancies)} document storage discrepancies"
+        ),
+        discrepancies=discrepancies,
+    )
+
+
+def check_ledger_reconciliation(session: Session) -> CheckResult:
+    """Verify append-only ledger sums match active charges minus net paid to 0 paise.
+
+    Checks both:
+    - Per-visit scope: SUM(ledger_entries.signed_amount_paise WHERE visit_id = v.id) ==
+      SUM(active non-package, non-cancelled bill_items.amount_paise)
+      - (visit_payments - visit_refunds).
+    - Per-patient scope: SUM(ledger_entries.signed_amount_paise WHERE patient_id = p.id) ==
+      (visit active charges + package net charges + legacy appointment charges)
+      - (patient_payments - patient_refunds).
+    """
+    discrepancies: list[dict[str, Any]] = []
+
+    non_cancelled_bill_item = and_(
+        BillItem.status == BillItemStatus.ACTIVE.value,
+        BillItem.category != BillItemCategory.PACKAGE.value,
+        BillItem.amount_paise > 0,
+        or_(
+            BillItem.appointment_id.is_(None),
+            and_(
+                func.coalesce(Appointment.consultation_status, "")
+                != ConsultationStatus.CANCELLED.value,
+                func.coalesce(Appointment.status, "") != AppointmentStatus.CANCELLED.value,
+            ),
+        ),
+    )
+
+    # --- 1. Per-visit reconciliation ---
+    ledger_by_visit = {
+        int(v_id): int(total or 0)
+        for v_id, total in session.execute(
+            select(
+                LedgerEntry.visit_id,
+                func.coalesce(func.sum(LedgerEntry.signed_amount_paise), 0),
+            )
+            .where(LedgerEntry.visit_id.is_not(None))
+            .group_by(LedgerEntry.visit_id)
+        ).all()
+    }
+    charges_by_visit = {
+        int(v_id): int(total or 0)
+        for v_id, total in session.execute(
+            select(BillItem.visit_id, func.coalesce(func.sum(BillItem.amount_paise), 0))
+            .outerjoin(Appointment, Appointment.id == BillItem.appointment_id)
+            .where(non_cancelled_bill_item)
+            .group_by(BillItem.visit_id)
+        ).all()
+    }
+    pay_visit_col = func.coalesce(Payment.visit_id, Appointment.visit_id)
+    gross_paid_by_visit = {
+        int(v_id): int(total or 0)
+        for v_id, total in session.execute(
+            select(pay_visit_col, func.coalesce(func.sum(Payment.amount_paise), 0))
+            .outerjoin(Appointment, Appointment.id == Payment.appointment_id)
+            .where(
+                Payment.is_reversed.is_(False),
+                pay_visit_col.is_not(None),
+            )
+            .group_by(pay_visit_col)
+        ).all()
+    }
+    refund_visit_col = func.coalesce(Refund.visit_id, Payment.visit_id, Appointment.visit_id)
+    refunded_by_visit = {
+        int(v_id): int(total or 0)
+        for v_id, total in session.execute(
+            select(refund_visit_col, func.coalesce(func.sum(Refund.amount_paise), 0))
+            .join(Payment, Payment.id == Refund.payment_id)
+            .outerjoin(Appointment, Appointment.id == Payment.appointment_id)
+            .where(
+                Payment.is_reversed.is_(False),
+                refund_visit_col.is_not(None),
+            )
+            .group_by(refund_visit_col)
+        ).all()
+    }
+
+    visit_ids = sorted(
+        set(ledger_by_visit)
+        | set(charges_by_visit)
+        | set(gross_paid_by_visit)
+        | set(refunded_by_visit)
+    )
+    visit_patient_map: dict[int, int] = {}
+    if visit_ids:
+        visit_patient_map = {
+            int(v_id): int(p_id)
+            for v_id, p_id in session.execute(
+                select(Visit.id, Visit.patient_id).where(Visit.id.in_(visit_ids))
+            ).all()
+        }
+
+    for v_id in visit_ids:
+        actual = ledger_by_visit.get(v_id, 0)
+        net_paid = gross_paid_by_visit.get(v_id, 0) - refunded_by_visit.get(v_id, 0)
+        expected = charges_by_visit.get(v_id, 0) - net_paid
+        if actual != expected:
+            discrepancies.append(
+                {
+                    "issue": "ledger_balance_mismatch",
+                    "scope": "visit",
+                    "visit_id": v_id,
+                    "patient_id": visit_patient_map.get(v_id),
+                    "ledger_balance_paise": actual,
+                    "expected_balance_paise": expected,
+                    "discrepancy_paise": actual - expected,
+                }
+            )
+
+    # --- 2. Per-patient reconciliation ---
+    ledger_by_patient = {
+        int(p_id): int(total or 0)
+        for p_id, total in session.execute(
+            select(
+                LedgerEntry.patient_id,
+                func.coalesce(func.sum(LedgerEntry.signed_amount_paise), 0),
+            ).group_by(LedgerEntry.patient_id)
+        ).all()
+    }
+    charges_by_patient = {
+        int(p_id): int(total or 0)
+        for p_id, total in session.execute(
+            select(BillItem.patient_id, func.coalesce(func.sum(BillItem.amount_paise), 0))
+            .outerjoin(Appointment, Appointment.id == BillItem.appointment_id)
+            .where(non_cancelled_bill_item)
+            .group_by(BillItem.patient_id)
+        ).all()
+    }
+
+    plan_gross_paid = {
+        int(plan_id): int(total or 0)
+        for plan_id, total in session.execute(
+            select(Payment.treatment_plan_id, func.coalesce(func.sum(Payment.amount_paise), 0))
+            .where(
+                Payment.treatment_plan_id.is_not(None),
+                Payment.is_reversed.is_(False),
+            )
+            .group_by(Payment.treatment_plan_id)
+        ).all()
+    }
+    plan_refunded = {
+        int(plan_id): int(total or 0)
+        for plan_id, total in session.execute(
+            select(Payment.treatment_plan_id, func.coalesce(func.sum(Refund.amount_paise), 0))
+            .join(Payment, Payment.id == Refund.payment_id)
+            .where(
+                Payment.treatment_plan_id.is_not(None),
+                Payment.is_reversed.is_(False),
+            )
+            .group_by(Payment.treatment_plan_id)
+        ).all()
+    }
+    package_charges_by_patient: dict[int, int] = {}
+    for plan_id, patient_id, status, agreed_price in session.execute(
+        select(
+            TreatmentPlan.id,
+            TreatmentPlan.patient_id,
+            TreatmentPlan.status,
+            TreatmentPlan.agreed_price_paise,
+        ).where(TreatmentPlan.agreed_price_paise > 0)
+    ).all():
+        price = int(agreed_price or 0)
+        if status == TreatmentPlanStatus.CANCELLED.value:
+            net_plan_paid = max(
+                0,
+                plan_gross_paid.get(int(plan_id), 0) - plan_refunded.get(int(plan_id), 0),
+            )
+            effective_charge = min(price, net_plan_paid)
+        else:
+            effective_charge = price
+        package_charges_by_patient[int(patient_id)] = (
+            package_charges_by_patient.get(int(patient_id), 0) + effective_charge
+        )
+
+    legacy_charges_by_patient = {
+        int(p_id): int(total or 0)
+        for p_id, total in session.execute(
+            select(Payment.patient_id, func.coalesce(func.sum(Payment.amount_paise), 0))
+            .where(
+                Payment.visit_id.is_(None),
+                Payment.treatment_plan_id.is_(None),
+                Payment.appointment_id.is_not(None),
+                Payment.is_reversed.is_(False),
+                ~exists(
+                    select(1).where(BillItem.appointment_id == Payment.appointment_id)
+                ),
+            )
+            .group_by(Payment.patient_id)
+        ).all()
+    }
+
+    gross_paid_by_patient = {
+        int(p_id): int(total or 0)
+        for p_id, total in session.execute(
+            select(Payment.patient_id, func.coalesce(func.sum(Payment.amount_paise), 0))
+            .where(Payment.is_reversed.is_(False))
+            .group_by(Payment.patient_id)
+        ).all()
+    }
+    refunded_by_patient = {
+        int(p_id): int(total or 0)
+        for p_id, total in session.execute(
+            select(Refund.patient_id, func.coalesce(func.sum(Refund.amount_paise), 0))
+            .join(Payment, Payment.id == Refund.payment_id)
+            .where(Payment.is_reversed.is_(False))
+            .group_by(Refund.patient_id)
+        ).all()
+    }
+
+    patient_ids = sorted(
+        set(ledger_by_patient)
+        | set(charges_by_patient)
+        | set(package_charges_by_patient)
+        | set(legacy_charges_by_patient)
+        | set(gross_paid_by_patient)
+        | set(refunded_by_patient)
+    )
+    for p_id in patient_ids:
+        actual = ledger_by_patient.get(p_id, 0)
+        expected_charges = (
+            charges_by_patient.get(p_id, 0)
+            + package_charges_by_patient.get(p_id, 0)
+            + legacy_charges_by_patient.get(p_id, 0)
+        )
+        expected_net_paid = gross_paid_by_patient.get(p_id, 0) - refunded_by_patient.get(p_id, 0)
+        expected = expected_charges - expected_net_paid
+        if actual != expected:
+            discrepancies.append(
+                {
+                    "issue": "ledger_balance_mismatch",
+                    "scope": "patient",
+                    "patient_id": p_id,
+                    "ledger_balance_paise": actual,
+                    "expected_balance_paise": expected,
+                    "discrepancy_paise": actual - expected,
+                }
+            )
+
+    passed = len(discrepancies) == 0
+    return CheckResult(
+        code="ledger_reconciliation",
+        name="Financial Ledger Reconciliation",
+        passed=passed,
+        severity="ERROR",
+        details=(
+            "All visit and patient financial ledgers reconcile to 0 paise discrepancy"
+            if passed
+            else f"Found {len(discrepancies)} ledger reconciliation discrepancies"
+        ),
+        discrepancies=discrepancies,
+    )
+
+
 def run_integrity_audit(session: Session, settings: Settings | None = None) -> IntegrityReport:
     """Execute complete suite of clinical and financial integrity checks (BAK-03)."""
     cfg = settings or get_settings()
@@ -497,6 +836,8 @@ def run_integrity_audit(session: Session, settings: Settings | None = None) -> I
         check_session_progress_synchronization(session),
         check_photo_storage_integrity(session, cfg),
         check_asset_storage_integrity(session, cfg),
+        check_ledger_reconciliation(session),
+        check_document_storage_integrity(session, cfg),
     ]
 
     total = len(checks)

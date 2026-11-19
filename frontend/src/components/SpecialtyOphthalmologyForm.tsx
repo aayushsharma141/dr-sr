@@ -79,14 +79,14 @@ export function SpecialtyOphthalmologyForm({
 
       {/* Visual Acuity */}
       <div className="bg-neutral-50 p-4 rounded-lg border border-neutral-200 space-y-4">
-        <h4 className="text-sm font-semibold text-neutral-800 uppercase tracking-wider">
+        <h4 className="text-sm font-semibold text-neutral-800">
           1. Visual Acuity
         </h4>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {/* Right Eye OD */}
           <div className="p-3 bg-blue-50/40 rounded-lg border border-blue-200 space-y-3">
-            <span className="text-xs font-bold text-blue-900 uppercase tracking-wider flex items-center gap-1.5">
+            <span className="text-xs font-bold text-blue-900 flex items-center gap-1.5">
               <span className="w-2.5 h-2.5 rounded-full bg-blue-600 inline-block" />
               Right Eye (OD)
             </span>
@@ -161,7 +161,7 @@ export function SpecialtyOphthalmologyForm({
 
           {/* Left Eye OS */}
           <div className="p-3 bg-emerald-50/40 rounded-lg border border-emerald-200 space-y-3">
-            <span className="text-xs font-bold text-emerald-900 uppercase tracking-wider flex items-center gap-1.5">
+            <span className="text-xs font-bold text-emerald-900 flex items-center gap-1.5">
               <span className="w-2.5 h-2.5 rounded-full bg-emerald-600 inline-block" />
               Left Eye (OS)
             </span>
@@ -249,7 +249,7 @@ export function SpecialtyOphthalmologyForm({
 
       {/* Intraocular Pressure (IOP) */}
       <div className="bg-neutral-50 p-4 rounded-lg border border-neutral-200 space-y-4">
-        <h4 className="text-sm font-semibold text-neutral-800 uppercase tracking-wider">
+        <h4 className="text-sm font-semibold text-neutral-800">
           2. Intraocular Pressure (IOP)
         </h4>
 
@@ -315,14 +315,14 @@ export function SpecialtyOphthalmologyForm({
 
       {/* Anterior Segment Examination */}
       <div className="bg-neutral-50 p-4 rounded-lg border border-neutral-200 space-y-4">
-        <h4 className="text-sm font-semibold text-neutral-800 uppercase tracking-wider">
+        <h4 className="text-sm font-semibold text-neutral-800">
           3. Slit Lamp Biomicroscopy (Anterior Segment)
         </h4>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {/* OD fields */}
           <div className="p-3 bg-blue-50/40 rounded-lg border border-blue-200 space-y-3">
-            <span className="text-xs font-bold text-blue-900 uppercase tracking-wider">OD (Right Eye)</span>
+            <span className="text-xs font-bold text-blue-900">OD (Right Eye)</span>
             <div>
               <label htmlFor="lids-od" className="block text-xs font-medium text-neutral-700 mb-1">Lids / Adnexa</label>
               <input
@@ -405,7 +405,7 @@ export function SpecialtyOphthalmologyForm({
 
           {/* OS fields */}
           <div className="p-3 bg-emerald-50/40 rounded-lg border border-emerald-200 space-y-3">
-            <span className="text-xs font-bold text-emerald-900 uppercase tracking-wider">OS (Left Eye)</span>
+            <span className="text-xs font-bold text-emerald-900">OS (Left Eye)</span>
             <div>
               <label htmlFor="lids-os" className="block text-xs font-medium text-neutral-700 mb-1">Lids / Adnexa</label>
               <input
@@ -490,13 +490,13 @@ export function SpecialtyOphthalmologyForm({
 
       {/* Fundus & Refraction */}
       <div className="bg-neutral-50 p-4 rounded-lg border border-neutral-200 space-y-4">
-        <h4 className="text-sm font-semibold text-neutral-800 uppercase tracking-wider">
+        <h4 className="text-sm font-semibold text-neutral-800">
           4. Funduscopy & Refraction
         </h4>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="p-3 bg-blue-50/40 rounded-lg border border-blue-200 space-y-3">
-            <span className="text-xs font-bold text-blue-900 uppercase tracking-wider">OD Posterior & Refraction</span>
+            <span className="text-xs font-bold text-blue-900">OD Posterior & Refraction</span>
             <div className="grid grid-cols-2 gap-2">
               <div>
                 <label htmlFor="optic-od" className="block text-xs font-medium text-neutral-700 mb-1">Optic Disc (C:D)</label>
@@ -528,7 +528,7 @@ export function SpecialtyOphthalmologyForm({
 
             {/* Refraction grid OD */}
             <div className="pt-2 border-t border-blue-200">
-              <span className="text-xs font-semibold text-neutral-600 uppercase">Refraction (OD)</span>
+              <span className="text-xs font-semibold text-neutral-600">Refraction (OD)</span>
               <div className="grid grid-cols-4 gap-1.5 mt-1">
                 <div>
                   <label htmlFor="od-sph" className="block text-xs text-neutral-500">Sph</label>
@@ -587,7 +587,7 @@ export function SpecialtyOphthalmologyForm({
           </div>
 
           <div className="p-3 bg-emerald-50/40 rounded-lg border border-emerald-200 space-y-3">
-            <span className="text-xs font-bold text-emerald-900 uppercase tracking-wider">OS Posterior & Refraction</span>
+            <span className="text-xs font-bold text-emerald-900">OS Posterior & Refraction</span>
             <div className="grid grid-cols-2 gap-2">
               <div>
                 <label htmlFor="optic-os" className="block text-xs font-medium text-neutral-700 mb-1">Optic Disc (C:D)</label>
@@ -619,7 +619,7 @@ export function SpecialtyOphthalmologyForm({
 
             {/* Refraction grid OS */}
             <div className="pt-2 border-t border-emerald-200">
-              <span className="text-xs font-semibold text-neutral-600 uppercase">Refraction (OS)</span>
+              <span className="text-xs font-semibold text-neutral-600">Refraction (OS)</span>
               <div className="grid grid-cols-4 gap-1.5 mt-1">
                 <div>
                   <label htmlFor="os-sph" className="block text-xs text-neutral-500">Sph</label>

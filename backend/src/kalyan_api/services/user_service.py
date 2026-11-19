@@ -187,12 +187,13 @@ def update_user(
         # Guard 3: Prevent demoting the last active administrator
         if user.role == Role.ADMIN.value and target_role != Role.ADMIN.value:
             if user.is_active:
-                active_admin_count = session.scalar(
-                    select(func.count(User.id)).where(
+                active_admins = session.scalars(
+                    select(User.id).where(
                         User.role == Role.ADMIN.value, User.is_active.is_(True)
-                    )
-                )
-                if active_admin_count is not None and active_admin_count <= 1:
+                    ).with_for_update()
+                ).all()
+                active_admin_count = len(active_admins)
+                if active_admin_count <= 1:
                     raise ApiError(
                         status_code=409,
                         code="last_admin",
@@ -257,12 +258,12 @@ def deactivate_user(
         )
 
     if user.role == Role.ADMIN.value:
-        active_count = session.scalar(
-            select(func.count(User.id)).where(
+        active_admins = session.scalars(
+            select(User.id).where(
                 User.role == Role.ADMIN.value, User.is_active.is_(True)
-            )
-        )
-        if active_count is not None and active_count <= 1:
+            ).with_for_update()
+        ).all()
+        if len(active_admins) <= 1:
             raise ApiError(
                 status_code=409,
                 code="last_admin",
@@ -395,7 +396,11 @@ def _authorise_super_admin(
         return "throttled"
 
     super_admins = session.scalars(
-        select(User).where(User.is_super_admin.is_(True), User.is_active.is_(True))
+        select(User).where(
+            User.is_super_admin.is_(True),
+            User.is_active.is_(True),
+            User.must_change_password.is_(False),
+        )
     ).all()
     if not super_admins:
         raise ApiError(
@@ -447,6 +452,18 @@ def _perform_delete(session: Session, ctx: AuditContext, user: User, reason: str
         ) from exc
     if not deleted:
         raise ApiError(status_code=404, code="not_found", message=f"User #{user_id} not found")
+
+    # If this user was linked to a Doctor and no other user is linked, deactivate the orphan doctor
+    if user.doctor_id:
+        doc_id = user.doctor_id
+        other_users = session.scalar(
+            select(func.count(User.id)).where(User.doctor_id == doc_id, User.id != user_id)
+        )
+        if not other_users:
+            doc = session.get(Doctor, doc_id)
+            if doc:
+                doc.is_active = False
+                session.flush()
 
     session.expunge(user)
     audit_service.record(
@@ -601,6 +618,13 @@ def reset_password(
             status_code=409,
             code="self_action_forbidden",
             message="Administrators cannot reset their own password via admin API",
+        )
+
+    if user.is_super_admin:
+        raise ApiError(
+            status_code=409,
+            code="super_admin_protected",
+            message="Super admin passwords cannot be reset via admin API",
         )
 
     old_must_change = user.must_change_password

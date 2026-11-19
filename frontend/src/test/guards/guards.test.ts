@@ -67,9 +67,6 @@ describe('legibility guard (UX-04)', () => {
    * .planning/phases/18-ui-ux-review-hardening/18-DECISIONS.md.
    */
   const PENDING: Record<string, { max: number; reason: string }> = {
-    // Existing code on main that Phase 18 did not touch: fixing it needs its own review.
-    'pages/PatientsDirectory.tsx': { max: 4, reason: '4 grey 300/400 classes. Existing main code.' },
-    'pages/PatientDetail.tsx': { max: 1, reason: '1 sub-12px class in the payments table header (11px). The four grey section labels were fixed to neutral-600. Existing main code.' },
     // Held by client decisions.
     'components/VasTrendChart.tsx': { max: 4, reason: 'SVG font sizes (3) and 1 class: needs a visual review before changing. Held by the client.' },
     'pages/admin/BackupManagerPage.tsx': { max: 1, reason: 'Label chip at line 187: change rejected (it became larger than the filename beside it). Held by the client.' },

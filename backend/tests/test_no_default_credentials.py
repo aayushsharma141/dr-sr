@@ -13,22 +13,23 @@ from pathlib import Path
 from fastapi.testclient import TestClient
 
 
+def _get_legacy_credentials() -> tuple[str, str]:
+    """Extract legacy credentials from file if present, or use pinned v2.0 retired credentials."""
+    repo_root = Path(__file__).resolve().parents[2]
+    legacy_auth_file = repo_root / "legacy" / "app" / "services" / "auth_service.py"
+    if legacy_auth_file.exists():
+        legacy_content = legacy_auth_file.read_text(encoding="utf-8")
+        pw_match = re.search(r'default_password:\s*str\s*=\s*"([^"]+)"', legacy_content)
+        user_match = re.search(r'default_username:\s*str\s*=\s*"([^"]+)"', legacy_content)
+        if pw_match and user_match:
+            return user_match.group(1).strip(), pw_match.group(1).strip()
+    return "admin", "kalyan@admin"
+
+
 def test_legacy_credentials_absent_from_v3_codebase() -> None:
     """Legacy v2.0 credentials must NOT exist anywhere in v3.0 backend/ or frontend/ trees."""
     repo_root = Path(__file__).resolve().parents[2]
-    legacy_auth_file = repo_root / "legacy" / "app" / "services" / "auth_service.py"
-    assert legacy_auth_file.exists(), (
-        "Legacy auth_service.py must exist to extract legacy credentials"
-    )
-
-    legacy_content = legacy_auth_file.read_text(encoding="utf-8")
-    pw_match = re.search(r'default_password:\s*str\s*=\s*"([^"]+)"', legacy_content)
-    user_match = re.search(r'default_username:\s*str\s*=\s*"([^"]+)"', legacy_content)
-
-    assert pw_match is not None, "Could not extract default_password from legacy auth_service.py"
-    assert user_match is not None, "Could not extract default_username from legacy auth_service.py"
-
-    legacy_password = pw_match.group(1).strip()
+    _, legacy_password = _get_legacy_credentials()
     assert len(legacy_password) > 0
 
     # Search backend/ and frontend/ excluding build/venv/node_modules/test_no_default_credentials.py
@@ -71,15 +72,7 @@ def test_legacy_credentials_absent_from_v3_codebase() -> None:
 
 def test_login_with_legacy_credentials_fails(client: TestClient) -> None:
     """Attempting authentication with legacy default credentials returns 401."""
-    repo_root = Path(__file__).resolve().parents[2]
-    legacy_auth_file = repo_root / "legacy" / "app" / "services" / "auth_service.py"
-    legacy_content = legacy_auth_file.read_text(encoding="utf-8")
-    pw_match = re.search(r'default_password:\s*str\s*=\s*"([^"]+)"', legacy_content)
-    user_match = re.search(r'default_username:\s*str\s*=\s*"([^"]+)"', legacy_content)
-
-    assert pw_match and user_match
-    legacy_user = user_match.group(1).strip()
-    legacy_password = pw_match.group(1).strip()
+    legacy_user, legacy_password = _get_legacy_credentials()
 
     resp = client.post(
         "/api/auth/login",

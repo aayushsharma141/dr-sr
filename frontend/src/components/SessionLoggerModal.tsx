@@ -42,6 +42,8 @@ export function SessionLoggerModal({ plan, onClose, onSuccess }: SessionLoggerMo
 
   const logSessionMutation = useLogTreatmentSession()
 
+  const today = istToday()
+
   const handleToggleModality = (modality: string) => {
     setSelectedModalities((prev) =>
       prev.includes(modality) ? prev.filter((m) => m !== modality) : [...prev, modality]
@@ -52,8 +54,17 @@ export function SessionLoggerModal({ plan, onClose, onSuccess }: SessionLoggerMo
     e.preventDefault()
     setErrorMessage(null)
 
-    if (!clinicalNotes.trim()) {
-      setErrorMessage('Clinical notes and patient observations are required.')
+    const maxDate = istToday()
+    if (!sessionDate) {
+      setErrorMessage('Session date is required.')
+      return
+    }
+    if (sessionDate > maxDate) {
+      setErrorMessage('Session date cannot be in the future.')
+      return
+    }
+    if (clinicalNotes.trim().length < 2) {
+      setErrorMessage('Clinical notes must be at least 2 characters.')
       return
     }
 
@@ -61,7 +72,7 @@ export function SessionLoggerModal({ plan, onClose, onSuccess }: SessionLoggerMo
       await logSessionMutation.mutateAsync({
         planId: plan.id,
         body: {
-          session_date: sessionDate || null,
+          session_date: sessionDate,
           vas_score: vasScore,
           modalities: selectedModalities,
           clinical_notes: clinicalNotes.trim(),
@@ -93,7 +104,7 @@ export function SessionLoggerModal({ plan, onClose, onSuccess }: SessionLoggerMo
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} noValidate className="space-y-4">
           {/* Session Date */}
           <div>
             <label htmlFor="session-date" className="block text-xs font-semibold text-gray-700 mb-1">
@@ -103,6 +114,7 @@ export function SessionLoggerModal({ plan, onClose, onSuccess }: SessionLoggerMo
               id="session-date"
               data-autofocus
               type="date"
+              max={today}
               value={sessionDate}
               onChange={(e) => setSessionDate(e.target.value)}
               className="w-full rounded-lg border border-gray-300 p-2 text-sm focus:border-teal-600 focus:ring-1 focus:ring-teal-600"
@@ -169,6 +181,7 @@ export function SessionLoggerModal({ plan, onClose, onSuccess }: SessionLoggerMo
               id="session-notes"
               rows={3}
               required
+              minLength={2}
               value={clinicalNotes}
               onChange={(e) => setClinicalNotes(e.target.value)}
               placeholder="Record range of motion, muscle spasm, tolerance to modalities, and home exercise instructions..."

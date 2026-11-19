@@ -6,6 +6,7 @@ import { AdminPageHeader } from '../../components/admin/AdminPageHeader'
 import { TableSkeleton } from '../../components/AdminSkeleton'
 import { InlineAlert } from '../../components/InlineAlert'
 import { Modal } from '../../components/Modal'
+import { toast } from '../../components/ToastHost'
 import { SecurityPolicyEditor } from './SecurityPolicyEditor'
 import { ADMIN_REASON_MAX_LENGTH, type ActiveSessionOut, type Role } from '../../api/types'
 
@@ -184,7 +185,6 @@ function ActiveSessionsSection() {
   const [target, setTarget] = useState<ActiveSessionOut | null>(null)
   const [reason, setReason] = useState('')
   const [revokeError, setRevokeError] = useState<string | null>(null)
-  const [notice, setNotice] = useState<string | null>(null)
 
   const openRevoke = (s: ActiveSessionOut) => {
     setTarget(s)
@@ -205,7 +205,7 @@ function ActiveSessionsSection() {
         id: target.id,
         payload: { reason: reason.trim() === '' ? null : reason.trim() },
       })
-      setNotice(`Session ended for ${target.username}. They must sign in again on that computer.`)
+      toast.success(`Session ended for ${target.username}. They must sign in again on that computer.`)
       closeRevoke()
     } catch (err: unknown) {
       if (err instanceof ApiError && err.code === 'session_not_found') {
@@ -237,11 +237,6 @@ function ActiveSessionsSection() {
         </button>
       </div>
 
-      {notice && (
-        <InlineAlert tone="success" onDismiss={() => setNotice(null)} className="mt-4">
-          {notice}
-        </InlineAlert>
-      )}
       {isPending && <TableSkeleton label="Loading active sessions..." rows={4} columns={5} className="mt-4" />}
       {isError && (
         <InlineAlert tone="error" className="mt-4">

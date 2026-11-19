@@ -31,7 +31,7 @@ export function VasTrendChart({ sessions }: VasTrendChartProps) {
   return (
     <div className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm space-y-2">
       <div className="flex justify-between items-center">
-        <h4 className="text-xs font-bold uppercase tracking-wider text-gray-700">
+        <h4 className="text-xs font-bold text-gray-700">
           VAS Pain Trend Across Sessions (दर्द में सुधार का ग्राफ़)
         </h4>
         <span className="text-[11px] text-gray-500 font-medium">Visual Analog Scale (0–10)</span>

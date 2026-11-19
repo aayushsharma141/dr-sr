@@ -34,8 +34,33 @@ from kalyan_api.models import (
 ALLOWED_TRANSITIONS: dict[AppointmentStatus, set[AppointmentStatus]] = {
     AppointmentStatus.BOOKED: {
         AppointmentStatus.ARRIVED,
+        AppointmentStatus.CHECKED_IN,
         AppointmentStatus.CANCELLED,
         AppointmentStatus.NO_SHOW,
+    },
+    AppointmentStatus.TO_ARRIVE: {
+        AppointmentStatus.REGISTERED,
+        AppointmentStatus.CHECKED_IN,
+        AppointmentStatus.ARRIVED,
+        AppointmentStatus.WAITING,
+        AppointmentStatus.CANCELLED,
+        AppointmentStatus.NO_SHOW,
+        AppointmentStatus.RESCHEDULED,
+    },
+    AppointmentStatus.REGISTERED: {
+        AppointmentStatus.CHECKED_IN,
+        AppointmentStatus.ARRIVED,
+        AppointmentStatus.WAITING,
+        AppointmentStatus.CANCELLED,
+    },
+    AppointmentStatus.CHECKED_IN: {
+        AppointmentStatus.WAITING,
+        AppointmentStatus.IN_CONSULTATION,
+        AppointmentStatus.CANCELLED,
+    },
+    AppointmentStatus.WAITING: {
+        AppointmentStatus.IN_CONSULTATION,
+        AppointmentStatus.CANCELLED,
     },
     AppointmentStatus.ARRIVED: {
         AppointmentStatus.IN_CONSULTATION,
@@ -44,11 +69,14 @@ ALLOWED_TRANSITIONS: dict[AppointmentStatus, set[AppointmentStatus]] = {
     },
     AppointmentStatus.IN_CONSULTATION: {
         AppointmentStatus.DONE,
+        AppointmentStatus.COMPLETED,
         AppointmentStatus.CANCELLED,
     },
     AppointmentStatus.DONE: set(),
+    AppointmentStatus.COMPLETED: set(),
     AppointmentStatus.CANCELLED: set(),
     AppointmentStatus.NO_SHOW: set(),
+    AppointmentStatus.RESCHEDULED: set(),
 }
 
 
@@ -104,8 +132,12 @@ def validate_status_transition(
                 ),
             )
 
-    # Doctor-only transition enforcement: IN_CONSULTATION and DONE must be initiated by DOCTOR
-    if target_status in (AppointmentStatus.IN_CONSULTATION, AppointmentStatus.DONE):
+    # Doctor-only transition enforcement: IN_CONSULTATION and DONE/COMPLETED require DOCTOR.
+    if target_status in (
+        AppointmentStatus.IN_CONSULTATION,
+        AppointmentStatus.DONE,
+        AppointmentStatus.COMPLETED,
+    ):
         if principal.role != Role.DOCTOR:
             raise ApiError(
                 status_code=403,
@@ -127,14 +159,35 @@ BOOKING_TRANSITIONS: dict[AppointmentStatus, frozenset[AppointmentStatus]] = {
     AppointmentStatus.BOOKED: frozenset(
         {
             AppointmentStatus.ARRIVED,
+            AppointmentStatus.CHECKED_IN,
             AppointmentStatus.NO_SHOW,
             AppointmentStatus.CANCELLED,
             AppointmentStatus.RESCHEDULED,
         }
     ),
+    AppointmentStatus.TO_ARRIVE: frozenset(
+        {
+            AppointmentStatus.REGISTERED,
+            AppointmentStatus.CHECKED_IN,
+            AppointmentStatus.ARRIVED,
+            AppointmentStatus.NO_SHOW,
+            AppointmentStatus.CANCELLED,
+            AppointmentStatus.RESCHEDULED,
+        }
+    ),
+    AppointmentStatus.REGISTERED: frozenset(
+        {
+            AppointmentStatus.CHECKED_IN,
+            AppointmentStatus.ARRIVED,
+            AppointmentStatus.CANCELLED,
+        }
+    ),
+    AppointmentStatus.CHECKED_IN: frozenset(),
+    AppointmentStatus.WAITING: frozenset(),
+    AppointmentStatus.COMPLETED: frozenset(),
     # A late arrival checks in the same day; otherwise the booking moves to a new date.
     AppointmentStatus.NO_SHOW: frozenset(
-        {AppointmentStatus.ARRIVED, AppointmentStatus.RESCHEDULED}
+        {AppointmentStatus.ARRIVED, AppointmentStatus.CHECKED_IN, AppointmentStatus.RESCHEDULED}
     ),
     # After check-in the booking is settled; the consultation status carries on from there.
     AppointmentStatus.ARRIVED: frozenset(),
@@ -144,7 +197,7 @@ BOOKING_TRANSITIONS: dict[AppointmentStatus, frozenset[AppointmentStatus]] = {
 
 # Check-in and reschedule belong to reception (owner decision 10: Admin is oversight only).
 RECEPTION_ONLY_BOOKING_TARGETS = frozenset(
-    {AppointmentStatus.ARRIVED, AppointmentStatus.RESCHEDULED}
+    {AppointmentStatus.ARRIVED, AppointmentStatus.CHECKED_IN, AppointmentStatus.RESCHEDULED}
 )
 
 
@@ -206,7 +259,7 @@ def validate_booking_transition(
     _require_booking_actor(appt, target, principal)
 
     today = clock.ist_today()
-    if target == AppointmentStatus.ARRIVED and appt.appointment_date != today:
+    if target in (AppointmentStatus.ARRIVED, AppointmentStatus.CHECKED_IN) and appt.appointment_date != today:
         raise ApiError(
             status_code=422,
             code="check_in_wrong_day",
@@ -345,6 +398,7 @@ MIRRORED_STATUS: dict[ConsultationStatus, AppointmentStatus] = {
 _STATUS_TO_CONSULTATION: dict[AppointmentStatus, ConsultationStatus] = {
     AppointmentStatus.IN_CONSULTATION: ConsultationStatus.IN_CONSULTATION,
     AppointmentStatus.DONE: ConsultationStatus.COMPLETED,
+    AppointmentStatus.COMPLETED: ConsultationStatus.COMPLETED,
     AppointmentStatus.CANCELLED: ConsultationStatus.CANCELLED,
 }
 
@@ -358,7 +412,7 @@ def validate_status_update(
 ) -> ConsultationStatus | None:
     """Check a PATCH /appointments/{id}/status request; return the consultation status it sets.
 
-    Check-in (target ARRIVED) is handled by booking_service.check_in, not here. A checked-in
+    Check-in (target ARRIVED or CHECKED_IN) is handled by booking_service.check_in, not here. A checked-in
     patient can only move through the consultation: start, complete or cancel it. A booking that
     is not checked in can be marked not arrived or cancelled. Raises ApiError when refused; the
     error codes of the old status machine are kept (invalid_status_transition).

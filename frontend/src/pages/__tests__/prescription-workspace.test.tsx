@@ -5,7 +5,7 @@ import { MemoryRouter, Route, Routes } from 'react-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import '../../test/dialog-shim'
 import { PrescriptionWorkspace } from '../PrescriptionWorkspace'
-import type { Me, PatientOut, PrescriptionOut } from '../../api/types'
+import type { Me, PatientAllergyOut, PatientOut, PrescriptionOut } from '../../api/types'
 
 const mockMeDoctor: Me = {
   id: 3,
@@ -117,6 +117,14 @@ describe('Prescription Workspace & Print Slip', () => {
           text: () => Promise.resolve(JSON.stringify([])),
         })
       }
+      if (url.includes('/api/patients/101/allergies')) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          headers: new Headers({ 'content-type': 'application/json' }),
+          text: () => Promise.resolve(JSON.stringify([])),
+        })
+      }
       if (url.includes('/api/patients/101')) {
         return Promise.resolve({
           ok: true,
@@ -185,6 +193,14 @@ describe('Prescription Workspace & Print Slip', () => {
         })
       }
       if (url.includes('/api/patients/101/prescriptions')) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          headers: new Headers({ 'content-type': 'application/json' }),
+          text: () => Promise.resolve(JSON.stringify([])),
+        })
+      }
+      if (url.includes('/api/patients/101/allergies')) {
         return Promise.resolve({
           ok: true,
           status: 200,
@@ -280,6 +296,368 @@ describe('Prescription Workspace & Print Slip', () => {
     const closeBtn = screen.getByText(/Close \(बंद करें\)/i)
     await userEvent.click(closeBtn)
     expect(screen.queryByText(/Print Prescription Slip/i)).not.toBeInTheDocument()
+  })
+
+  it('displays Linked to Appointment badge and sends appointment_id in POST /prescriptions (C3)', async () => {
+    let capturedBody: any = null
+
+    const mockFetch = vi.fn().mockImplementation((url: string, opts?: any) => {
+      if (url.includes('/api/auth/me')) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          headers: new Headers({ 'content-type': 'application/json' }),
+          text: () => Promise.resolve(JSON.stringify(mockMeDoctor)),
+        })
+      }
+      if (url.includes('/api/patients/101/prescriptions')) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          headers: new Headers({ 'content-type': 'application/json' }),
+          text: () => Promise.resolve(JSON.stringify([])),
+        })
+      }
+      if (url.includes('/api/patients/101/allergies')) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          headers: new Headers({ 'content-type': 'application/json' }),
+          text: () => Promise.resolve(JSON.stringify([])),
+        })
+      }
+      if (url.includes('/api/patients/101')) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          headers: new Headers({ 'content-type': 'application/json' }),
+          text: () => Promise.resolve(JSON.stringify(mockPatient)),
+        })
+      }
+      if (url.includes('/api/settings/clinic')) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          headers: new Headers({ 'content-type': 'application/json' }),
+          text: () => Promise.resolve(JSON.stringify({ clinic_name_en: 'Kalyan Hospital' })),
+        })
+      }
+      if (url.endsWith('/api/prescriptions') && opts?.method === 'POST') {
+        capturedBody = JSON.parse(opts.body)
+        return Promise.resolve({
+          ok: true,
+          status: 201,
+          headers: new Headers({ 'content-type': 'application/json' }),
+          text: () => Promise.resolve(JSON.stringify({ ...mockCreatedPrescription, encounter_id: 88 })),
+        })
+      }
+      return Promise.reject(new Error(`Unhandled: ${url}`))
+    })
+    vi.stubGlobal('fetch', mockFetch)
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter initialEntries={['/doctor/prescriptions/new?patient_id=101&appointment_id=77']}>
+          <Routes>
+            <Route path="/doctor/prescriptions/new" element={<PrescriptionWorkspace />} />
+          </Routes>
+        </MemoryRouter>
+      </QueryClientProvider>,
+    )
+
+    expect(await screen.findByText(/Linked to Appointment #77/i)).toBeInTheDocument()
+
+    await userEvent.type(screen.getByPlaceholderText(/e\.g\. Lumbar Canal Stenosis/i), 'Acute Cervical Strain')
+    await userEvent.type(screen.getByPlaceholderText(/e\.g\. Tab Pregabalin/i), 'Tab Aceclofenac')
+    await userEvent.type(screen.getByPlaceholderText('75 mg'), '100 mg')
+    await userEvent.click(screen.getByText(/Issue Prescription/i))
+
+    await waitFor(() => {
+      expect(capturedBody).not.toBeNull()
+    })
+    expect(capturedBody.patient_id).toBe(101)
+    expect(capturedBody.appointment_id).toBe(77)
+    expect(capturedBody.encounter_id).toBeNull()
+  })
+
+  it('displays rx-allergy-alert for active structured allergies and never shows no-known-allergies (C4)', async () => {
+    const activeAllergies: PatientAllergyOut[] = [
+      {
+        id: 1,
+        patient_id: 101,
+        substance: 'Penicillin',
+        category: 'DRUG',
+        severity: 'SEVERE',
+        reaction: 'Anaphylaxis',
+        clinical_notes: null,
+        status: 'ACTIVE',
+        doctor_id: 1,
+        recorded_by_user_id: 3,
+        recorded_by_username: 'doctor',
+        created_at: '2026-01-01T10:00:00Z',
+        updated_at: '2026-01-01T10:00:00Z',
+        version_id: 1,
+      },
+    ]
+
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockImplementation((url: string) => {
+        const ok = (body: unknown) =>
+          Promise.resolve({
+            ok: true,
+            status: 200,
+            headers: new Headers({ 'content-type': 'application/json' }),
+            text: () => Promise.resolve(JSON.stringify(body)),
+          })
+        if (url.includes('/api/auth/me')) return ok(mockMeDoctor)
+        if (url.includes('/api/patients/101/prescriptions')) return ok([])
+        if (url.includes('/api/patients/101/allergies')) return ok(activeAllergies)
+        if (url.includes('/api/patients/101')) return ok(mockPatient)
+        if (url.includes('/api/settings/clinic')) return ok({ clinic_name_en: 'Kalyan Hospital' })
+        return Promise.reject(new Error(`Unhandled: ${url}`))
+      }),
+    )
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter initialEntries={['/doctor/prescriptions/new?patient_id=101']}>
+          <Routes>
+            <Route path="/doctor/prescriptions/new" element={<PrescriptionWorkspace />} />
+          </Routes>
+        </MemoryRouter>
+      </QueryClientProvider>,
+    )
+
+    const alert = await screen.findByTestId('rx-allergy-alert')
+    expect(alert).toHaveTextContent(/Penicillin \(SEVERE\) — Anaphylaxis/i)
+    expect(screen.queryByTestId('rx-allergy-clear')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('rx-allergy-unavailable')).not.toBeInTheDocument()
+    expect(screen.queryByText(/No known allergies/i)).not.toBeInTheDocument()
+  })
+
+  it('displays rx-allergy-clear when allergies fetch succeeds with no active or legacy allergies (C4)', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockImplementation((url: string) => {
+        const ok = (body: unknown) =>
+          Promise.resolve({
+            ok: true,
+            status: 200,
+            headers: new Headers({ 'content-type': 'application/json' }),
+            text: () => Promise.resolve(JSON.stringify(body)),
+          })
+        if (url.includes('/api/auth/me')) return ok(mockMeDoctor)
+        if (url.includes('/api/patients/101/prescriptions')) return ok([])
+        if (url.includes('/api/patients/101/allergies')) return ok([])
+        if (url.includes('/api/patients/101')) return ok(mockPatient)
+        if (url.includes('/api/settings/clinic')) return ok({ clinic_name_en: 'Kalyan Hospital' })
+        return Promise.reject(new Error(`Unhandled: ${url}`))
+      }),
+    )
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter initialEntries={['/doctor/prescriptions/new?patient_id=101']}>
+          <Routes>
+            <Route path="/doctor/prescriptions/new" element={<PrescriptionWorkspace />} />
+          </Routes>
+        </MemoryRouter>
+      </QueryClientProvider>,
+    )
+
+    const clearBanner = await screen.findByTestId('rx-allergy-clear')
+    expect(clearBanner).toHaveTextContent(/No known allergies recorded/i)
+    expect(screen.queryByTestId('rx-allergy-alert')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('rx-allergy-unavailable')).not.toBeInTheDocument()
+  })
+
+  it('displays rx-allergy-unrecorded when allergy screening is not recorded (null or empty) and never shows no-known-allergies', async () => {
+    const unrecordedPatient: PatientOut = {
+      ...mockPatient,
+      allergies: '',
+    }
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockImplementation((url: string) => {
+        const ok = (body: unknown) =>
+          Promise.resolve({
+            ok: true,
+            status: 200,
+            headers: new Headers({ 'content-type': 'application/json' }),
+            text: () => Promise.resolve(JSON.stringify(body)),
+          })
+        if (url.includes('/api/auth/me')) return ok(mockMeDoctor)
+        if (url.includes('/api/patients/101/prescriptions')) return ok([])
+        if (url.includes('/api/patients/101/allergies')) return ok([])
+        if (url.includes('/api/patients/101')) return ok(unrecordedPatient)
+        if (url.includes('/api/settings/clinic')) return ok({ clinic_name_en: 'Kalyan Hospital' })
+        return Promise.reject(new Error(`Unhandled: ${url}`))
+      }),
+    )
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter initialEntries={['/doctor/prescriptions/new?patient_id=101']}>
+          <Routes>
+            <Route path="/doctor/prescriptions/new" element={<PrescriptionWorkspace />} />
+          </Routes>
+        </MemoryRouter>
+      </QueryClientProvider>,
+    )
+
+    const unrecordedBanner = await screen.findByTestId('rx-allergy-unrecorded')
+    expect(unrecordedBanner).toHaveTextContent(
+      /Allergy screening not recorded\. Verify with patient before prescribing\./i,
+    )
+    expect(screen.queryByTestId('rx-allergy-clear')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('rx-allergy-alert')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('rx-allergy-unavailable')).not.toBeInTheDocument()
+  })
+
+  it('displays rx-allergy-unavailable and never shows No known allergies when allergies fetch fails with 500 (C4)', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockImplementation((url: string) => {
+        const ok = (body: unknown) =>
+          Promise.resolve({
+            ok: true,
+            status: 200,
+            headers: new Headers({ 'content-type': 'application/json' }),
+            text: () => Promise.resolve(JSON.stringify(body)),
+          })
+        if (url.includes('/api/auth/me')) return ok(mockMeDoctor)
+        if (url.includes('/api/patients/101/prescriptions')) return ok([])
+        if (url.includes('/api/patients/101/allergies')) {
+          return Promise.resolve({
+            ok: false,
+            status: 500,
+            headers: new Headers({ 'content-type': 'application/json' }),
+            text: () => Promise.resolve(JSON.stringify({ code: 'internal_error', message: 'DB error' })),
+          })
+        }
+        if (url.includes('/api/patients/101')) return ok(mockPatient)
+        if (url.includes('/api/settings/clinic')) return ok({ clinic_name_en: 'Kalyan Hospital' })
+        return Promise.reject(new Error(`Unhandled: ${url}`))
+      }),
+    )
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter initialEntries={['/doctor/prescriptions/new?patient_id=101']}>
+          <Routes>
+            <Route path="/doctor/prescriptions/new" element={<PrescriptionWorkspace />} />
+          </Routes>
+        </MemoryRouter>
+      </QueryClientProvider>,
+    )
+
+    const unavailable = await screen.findByTestId('rx-allergy-unavailable')
+    expect(unavailable).toHaveTextContent(/Allergy status unavailable/i)
+    expect(screen.queryByTestId('rx-allergy-clear')).not.toBeInTheDocument()
+    expect(screen.queryByText(/No known allergies/i)).not.toBeInTheDocument()
+  })
+
+  it('displays status badges on historical prescriptions and restricts View / Print Slip to AUTHORISED rows', async () => {
+    const historicalList = [
+      {
+        id: 501,
+        patient_id: 101,
+        patient_urn: 'KH-2026-0001',
+        patient_name: 'Aarav Kumar',
+        doctor_id: 1,
+        doctor_name: 'Madan Mohan Dwivedi',
+        encounter_id: null,
+        status: 'AUTHORISED',
+        diagnosis: 'Authorised Cervical Strain',
+        items_count: 2,
+        follow_up_date: '2026-11-15',
+        created_at: '2026-11-01T10:00:00Z',
+      },
+      {
+        id: 502,
+        patient_id: 101,
+        patient_urn: 'KH-2026-0001',
+        patient_name: 'Aarav Kumar',
+        doctor_id: 1,
+        doctor_name: 'Madan Mohan Dwivedi',
+        encounter_id: null,
+        status: 'DRAFT',
+        diagnosis: 'Draft Knee Plan',
+        items_count: 1,
+        follow_up_date: null,
+        created_at: '2026-11-02T10:00:00Z',
+      },
+      {
+        id: 503,
+        patient_id: 101,
+        patient_urn: 'KH-2026-0001',
+        patient_name: 'Aarav Kumar',
+        doctor_id: 1,
+        doctor_name: 'Madan Mohan Dwivedi',
+        encounter_id: null,
+        status: 'CANCELLED',
+        diagnosis: 'Cancelled Shoulder Plan',
+        items_count: 1,
+        follow_up_date: null,
+        created_at: '2026-11-03T10:00:00Z',
+      },
+      {
+        id: 504,
+        patient_id: 101,
+        patient_urn: 'KH-2026-0001',
+        patient_name: 'Aarav Kumar',
+        doctor_id: 1,
+        doctor_name: 'Madan Mohan Dwivedi',
+        encounter_id: null,
+        status: 'SUPERSEDED',
+        diagnosis: 'Superseded Back Plan',
+        items_count: 1,
+        follow_up_date: null,
+        created_at: '2026-11-04T10:00:00Z',
+      },
+    ]
+
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockImplementation((url: string) => {
+        const ok = (body: unknown) =>
+          Promise.resolve({
+            ok: true,
+            status: 200,
+            headers: new Headers({ 'content-type': 'application/json' }),
+            text: () => Promise.resolve(JSON.stringify(body)),
+          })
+        if (url.includes('/api/auth/me')) return ok(mockMeDoctor)
+        if (url.includes('/api/patients/101/prescriptions')) return ok(historicalList)
+        if (url.includes('/api/patients/101/allergies')) return ok([])
+        if (url.includes('/api/patients/101')) return ok(mockPatient)
+        if (url.includes('/api/settings/clinic')) return ok({ name_en: 'Kalyan Hospital' })
+        return Promise.reject(new Error(`Unhandled: ${url}`))
+      }),
+    )
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter initialEntries={['/doctor/prescriptions/new?patient_id=101']}>
+          <Routes>
+            <Route path="/doctor/prescriptions/new" element={<PrescriptionWorkspace />} />
+          </Routes>
+        </MemoryRouter>
+      </QueryClientProvider>,
+    )
+
+    expect(await screen.findByText(/Authorised Cervical Strain/)).toBeInTheDocument()
+    expect(screen.getByText('Authorised')).toBeInTheDocument()
+    expect(screen.getByText('Draft')).toBeInTheDocument()
+    expect(screen.getByText('Cancelled')).toBeInTheDocument()
+    expect(screen.getByText('Superseded')).toBeInTheDocument()
+
+    // Only the AUTHORISED prescription gets a printable button
+    expect(screen.getAllByRole('button', { name: /View \/ Print Slip/i })).toHaveLength(1)
+    expect(screen.getByText('Not printable (Draft)')).toBeInTheDocument()
+    expect(screen.getByText('Not printable (Cancelled)')).toBeInTheDocument()
+    expect(screen.getByText('Not printable (Superseded)')).toBeInTheDocument()
   })
 })
 

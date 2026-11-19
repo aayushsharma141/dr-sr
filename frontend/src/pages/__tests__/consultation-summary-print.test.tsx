@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { cleanup, render, screen } from '@testing-library/react'
+import { cleanup, render, screen, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   ConsultationSummaryPrint,
@@ -86,6 +86,7 @@ describe('ConsultationSummaryPrint component', () => {
         <ConsultationSummaryPrint
           encounter={mockFinalisedEncounter}
           patient={mockPatient}
+          advice="Quadriceps strengthening exercises advised twice daily. Avoid squatting."
           followUp={{
             recommended_date: '2026-11-20',
             doctor_name: 'Dr. Madan Mohan Dwivedi',
@@ -182,5 +183,92 @@ describe('ConsultationSummaryPrint component', () => {
     const stamp = screen.getByTestId('reprint-stamp')
     expect(stamp).toBeInTheDocument()
     expect(stamp).toHaveTextContent('Reprinted on: 06/11/2026 at 15:30')
+  })
+
+  it('never leaks internal encounter.clinical_notes into Advice when advice prop is omitted', () => {
+    const encounterWithPrivateNotes: EncounterRead = {
+      ...mockFinalisedEncounter,
+      clinical_notes: 'INTERNAL EXAM ONLY: Medial joint line tenderness + crepitus; rule out meniscal tear.',
+    }
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <ConsultationSummaryPrint
+          encounter={encounterWithPrivateNotes}
+          patient={mockPatient}
+        />
+      </QueryClientProvider>,
+    )
+
+    expect(screen.queryByText(/INTERNAL EXAM ONLY/i)).not.toBeInTheDocument()
+    expect(screen.queryByText(/meniscal tear/i)).not.toBeInTheDocument()
+    expect(
+      screen.getByText('Follow prescribed instructions and return for follow-up as advised.'),
+    ).toBeInTheDocument()
+  })
+
+  it('renders chronological clinical addenda with author title and IST timestamp when present', () => {
+    const encounterWithAddenda: EncounterRead = {
+      ...mockFinalisedEncounter,
+      addenda: [
+        {
+          id: 20,
+          encounter_id: 77,
+          doctor_id: 2,
+          doctor_name: 'Chandan Kr. Dwivedi',
+          addendum_text: 'Second note: patient tolerated hot fomentation well.',
+          created_at: '2026-11-08T10:15:00Z',
+        },
+        {
+          id: 19,
+          encounter_id: 77,
+          doctor_id: 1,
+          doctor_name: 'Madan Mohan Dwivedi',
+          addendum_text: 'First note: X-Ray confirms Grade II medial narrowing.',
+          created_at: '2026-11-07T04:30:00Z',
+        },
+      ],
+    }
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <ConsultationSummaryPrint
+          encounter={encounterWithAddenda}
+          patient={mockPatient}
+        />
+      </QueryClientProvider>,
+    )
+
+    const addendaSection = screen.getByTestId('summary-addenda-section')
+    const items = within(addendaSection).getAllByRole('listitem')
+    expect(items).toHaveLength(2)
+    expect(items[0]).toHaveTextContent('Addendum #1 · Dr. Madan Mohan Dwivedi')
+    expect(items[0]).toHaveTextContent('First note: X-Ray confirms Grade II medial narrowing.')
+    expect(items[0]).toHaveTextContent(/10:00\s*am/i)
+    expect(items[1]).toHaveTextContent('Addendum #2 · Dr. Chandan Kr. Dwivedi')
+    expect(items[1]).toHaveTextContent('Second note: patient tolerated hot fomentation well.')
+    expect(items[1]).toHaveTextContent(/03:45\s*pm/i)
+  })
+
+  it('passes departmentName to LetterheadBanner and uses authoring doctor block for non-Physiotherapy summaries', () => {
+    render(
+      <QueryClientProvider client={queryClient}>
+        <ConsultationSummaryPrint
+          encounter={{
+            ...mockFinalisedEncounter,
+            doctor_id: 2,
+            doctor_name: 'Priya Sharma',
+          }}
+          patient={mockPatient}
+          departmentName="Ophthalmology"
+        />
+      </QueryClientProvider>,
+    )
+
+    const banner = screen.getByTestId('letterhead-banner')
+    expect(banner).toHaveTextContent('Ophthalmology')
+    expect(banner).not.toHaveTextContent('Physiotherapy Department')
+    expect(screen.getByTestId('letterhead-authoring-doctor')).toHaveTextContent('Dr. Priya Sharma')
+    expect(screen.queryByText('Dr. Chandan Kr. Dwivedi')).not.toBeInTheDocument()
   })
 })

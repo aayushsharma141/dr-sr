@@ -5,6 +5,7 @@ import { RouterProvider } from 'react-router/dom'
 import { queryClient } from './api/queries'
 import { router } from './router'
 import { ReceiptHost } from './components/ReceiptHost'
+import { ToastHost } from './components/ToastHost'
 import './index.css'
 import './print.css'
 
@@ -16,6 +17,7 @@ if (container) {
       <QueryClientProvider client={queryClient}>
         <RouterProvider router={router} />
         <ReceiptHost />
+        <ToastHost />
       </QueryClientProvider>
     </StrictMode>,
   )

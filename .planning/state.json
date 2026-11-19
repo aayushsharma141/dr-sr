@@ -41,7 +41,7 @@
     {
       "number": "18",
       "name": "UI/UX Review Hardening",
-      "status": "complete"
+      "status": "pending"
     },
     {
       "number": "19",
@@ -60,14 +60,19 @@
     },
     {
       "number": "22",
+      "name": "Integrated OPD Workflow",
+      "status": "complete"
+    },
+    {
+      "number": "23",
       "name": "Advanced Data Operations",
       "status": "pending"
     }
   ],
   "next": {
-    "command": "/gsd-complete-milestone",
-    "label": "Complete milestone v3.0",
-    "reason": "Release blockers and P1 clinical UX gaps remediated; full test suites green"
+    "command": "/gsd-progress --next",
+    "label": "Advance to the next step (verify)",
+    "reason": "Phase 1 of 13 · 90% · ready to verify"
   },
-  "updated_at": "2026-11-11T21:55:00.000Z"
+  "updated_at": "2026-11-16T10:53:50.175Z"
 }

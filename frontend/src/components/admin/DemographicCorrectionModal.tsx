@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import type { PatientOut, AdminPatientDemographicCorrection } from '../../api/types'
 import { Modal } from '../Modal'
 
@@ -30,6 +30,12 @@ export const DemographicCorrectionModal: React.FC<DemographicCorrectionModalProp
   const [reason, setReason] = useState('')
   const [reasonError, setReasonError] = useState<string | null>(null)
   const [showConfirmDialog, setShowConfirmDialog] = useState(false)
+
+  useEffect(() => {
+    setReason('')
+    setReasonError(null)
+    setShowConfirmDialog(false)
+  }, [open, patient.id])
 
   const formatGender = (g: string) => (g === 'M' ? 'Male' : g === 'F' ? 'Female' : 'Other')
 

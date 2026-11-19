@@ -39,3 +39,16 @@ def test_startup_script_verifies_database_durability():
     assert "check-db" in start_bat
     assert "uvicorn" in start_bat
     assert "--port 8000" in start_bat
+
+
+def test_stop_script_targets_kalyan_uvicorn_processes_and_reports_failures():
+    """Verify stop-server.bat stops python -m uvicorn kalyan_api processes rather than WINDOWTITLE."""
+    repo_root = Path(__file__).resolve().parent.parent.parent
+    stop_bat = (repo_root / "deploy" / "stop-server.bat").read_text(encoding="utf-8")
+
+    assert "WINDOWTITLE" not in stop_bat
+    assert "kalyan_api" in stop_bat
+    assert "uvicorn" in stop_bat
+    assert "LocalPort 8000" in stop_bat
+    assert "KalyanHospitalServerAutoStart" in stop_bat
+    assert "exit /b %ERRORLEVEL%" in stop_bat

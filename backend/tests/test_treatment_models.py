@@ -71,6 +71,7 @@ def test_treatment_models_persistence(db_session, doctor_a_user):
         dietary_advice="Avoid excess sodium and processed food",
         general_advice="Maintain ergonomic neck posture, use cervical pillow",
         follow_up_date=date(2026, 11, 15),
+        status="DRAFT",
     )
     db_session.add(rx)
     db_session.flush()
@@ -87,6 +88,8 @@ def test_treatment_models_persistence(db_session, doctor_a_user):
         instructions="Take after food at bedtime",
     )
     db_session.add(item1)
+    db_session.flush()
+    rx.status = "AUTHORISED"
     db_session.flush()
     assert item1.id is not None
     assert len(rx.items) == 1

@@ -208,6 +208,8 @@ class BackupManifest:
     photos_manifest: list[dict[str, Any]]
     assets_count: int = 0
     assets_manifest: list[dict[str, Any]] | None = None
+    documents_count: int = 0
+    documents_manifest: list[dict[str, Any]] | None = None
     label: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
@@ -221,6 +223,10 @@ class BackupManifest:
             "photos_manifest": self.photos_manifest,
             "assets_count": self.assets_count,
             "assets_manifest": self.assets_manifest if self.assets_manifest is not None else [],
+            "documents_count": self.documents_count,
+            "documents_manifest": (
+                self.documents_manifest if self.documents_manifest is not None else []
+            ),
             "label": self.label,
         }
 
@@ -332,6 +338,36 @@ RUNTIME_TABLE_GRANTS: dict[str, tuple[str, ...]] = {
     "integrity_runs": ("SELECT", "INSERT"),
     # Visits are never deleted (RF-10, migration 0025).
     "visits": ("SELECT", "INSERT", "UPDATE"),
+    # Classification history is append-only (OD-22-06, migration 0026).
+    "consultation_priority_events": ("SELECT", "INSERT"),
+    # Bill lines are financial records (Phase 22, migration 0027, K-63). Amounts move only through a
+    # logged adjustment (migration 0028), so UPDATE is granted; rows are never deleted.
+    "bill_items": ("SELECT", "INSERT", "UPDATE"),
+    # Adjustment history is append-only (Phase 22, migration 0028).
+    "bill_item_adjustments": ("SELECT", "INSERT"),
+    # LAN Workstation heartbeat registry (Phase 23, migration 0030).
+    "workstations": ("SELECT", "INSERT", "UPDATE", "DELETE"),
+    # Pending OPD arrivals prior to permanent registration (Phase 22, migration 0031).
+    "pending_opd_arrivals": ("SELECT", "INSERT", "UPDATE", "DELETE"),
+    # Patient workspace master codes & structured allergies (Milestone 1, migration 0034).
+    "visit_sequences": ("SELECT", "INSERT", "UPDATE"),
+    "encounter_sequences": ("SELECT", "INSERT", "UPDATE"),
+    "patient_allergies": ("SELECT", "INSERT", "UPDATE"),
+    # Longitudinal conditions, encounter diagnoses & investigations (Milestone 2, migration 0035).
+    "patient_conditions": ("SELECT", "INSERT", "UPDATE"),
+    "encounter_diagnoses": ("SELECT", "INSERT", "UPDATE", "DELETE"),
+    "investigation_orders": ("SELECT", "INSERT", "UPDATE"),
+    "investigation_results": ("SELECT", "INSERT"),
+    # Financial refunds & append-only ledger (Milestone 3, migration 0036).
+    "refund_sequences": ("SELECT", "INSERT", "UPDATE"),
+    "refunds": ("SELECT", "INSERT"),
+    "ledger_entries": ("SELECT", "INSERT"),
+    # Patient uploaded documents (Milestone 4, migration 0037).
+    "patient_documents": ("SELECT", "INSERT", "UPDATE"),
+    # Ephemeral 24h mutation idempotency keys (Appointments hardening, migration 0038).
+    "idempotency_keys": ("SELECT", "INSERT", "UPDATE", "DELETE"),
+    # Persistent clinical quick phrases (Doctor workspace Phase 3, migration 0039).
+    "clinical_quick_phrases": ("SELECT", "INSERT", "UPDATE", "DELETE"),
 }
 
 
@@ -360,6 +396,13 @@ def runtime_grant_sql(app_user: str) -> str:
             "END IF; END $grant$;"
         )
     statements.append(f'GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO "{app_user}";')
+    statements.append(
+        "DO $grant$ BEGIN IF to_regprocedure('public.delete_unreferenced_user(bigint)') "
+        "IS NOT NULL THEN "
+        "REVOKE ALL ON FUNCTION public.delete_unreferenced_user(bigint) FROM PUBLIC; "
+        f'GRANT EXECUTE ON FUNCTION public.delete_unreferenced_user(bigint) TO "{app_user}"; '
+        "END IF; END $grant$;"
+    )
     return "\n".join(statements) + "\n"
 
 
@@ -509,6 +552,24 @@ def create_backup(
                         }
                     )
 
+        # 3b. Copy patient documents
+        documents_target_dir = payload_dir / "documents"
+        documents_target_dir.mkdir()
+        documents_manifest: list[dict[str, Any]] = []
+
+        if cfg.documents_dir.exists() and cfg.documents_dir.is_dir():
+            for doc_path in cfg.documents_dir.glob("*"):
+                if doc_path.is_file():
+                    dest_doc = documents_target_dir / doc_path.name
+                    shutil.copy2(doc_path, dest_doc)
+                    documents_manifest.append(
+                        {
+                            "filename": doc_path.name,
+                            "sha256": compute_sha256(dest_doc),
+                            "bytes": dest_doc.stat().st_size,
+                        }
+                    )
+
         # 4. Create manifest.json
         manifest = BackupManifest(
             version="1.0",
@@ -520,21 +581,31 @@ def create_backup(
             photos_manifest=photos_manifest,
             assets_count=len(assets_manifest),
             assets_manifest=assets_manifest,
+            documents_count=len(documents_manifest),
+            documents_manifest=documents_manifest,
             label=safe_label,
         )
         manifest_path = payload_dir / "manifest.json"
         manifest_path.write_text(json.dumps(manifest.to_dict(), indent=2), encoding="utf-8")
 
-        # 5. Create .tar.gz bundle
-        with tarfile.open(final_archive_path, "w:gz") as tar:
-            # Add manifest
-            tar.add(manifest_path, arcname="manifest.json")
-            # Add db.sql
-            tar.add(db_dump_file, arcname="db.sql")
-            # Add photos dir
-            tar.add(photos_target_dir, arcname="photos")
-            # Add assets dir
-            tar.add(assets_target_dir, arcname="assets")
+        # 5. Create .tar.gz bundle atomically via .part file
+        part_path = final_archive_path.with_name(f"{final_archive_path.name}.part")
+        try:
+            with tarfile.open(part_path, "w:gz") as tar:
+                # Add manifest
+                tar.add(manifest_path, arcname="manifest.json")
+                # Add db.sql
+                tar.add(db_dump_file, arcname="db.sql")
+                # Add photos dir
+                tar.add(photos_target_dir, arcname="photos")
+                # Add assets dir
+                tar.add(assets_target_dir, arcname="assets")
+                # Add documents dir
+                tar.add(documents_target_dir, arcname="documents")
+            part_path.replace(final_archive_path)
+        finally:
+            if part_path.exists():
+                part_path.unlink(missing_ok=True)
 
     return final_archive_path
 
@@ -626,6 +697,29 @@ def verify_backup_bundle(archive_path: Path) -> tuple[bool, str, dict[str, Any] 
                         manifest_data,
                     )
 
+            # Verify documents (backward compatibility: optional in manifest)
+            for doc_entry in manifest_data.get("documents_manifest", []):
+                fname = doc_entry["filename"]
+                arcname = f"documents/{fname}"
+                if arcname not in names:
+                    return (
+                        False,
+                        f"Missing document file declared in manifest: {fname}",
+                        manifest_data,
+                    )
+                d_file = tar.extractfile(arcname)
+                if not d_file:
+                    return False, f"Failed to extract document {fname}", manifest_data
+                d_hasher = hashlib.sha256()
+                while chunk := d_file.read(65536):
+                    d_hasher.update(chunk)
+                if d_hasher.hexdigest() != doc_entry["sha256"]:
+                    return (
+                        False,
+                        f"Checksum mismatch for document {fname}",
+                        manifest_data,
+                    )
+
             return True, "Backup bundle is cryptographically verified and intact", manifest_data
 
     except Exception as e:
@@ -699,6 +793,16 @@ def restore_backup(
                     shutil.copy2(asset_file, cfg.assets_dir / asset_file.name)
                     assets_restored += 1
 
+        # Restore patient documents
+        documents_src_dir = extract_dir / "documents"
+        cfg.documents_dir.mkdir(parents=True, exist_ok=True)
+        documents_restored = 0
+        if documents_src_dir.exists() and documents_src_dir.is_dir():
+            for doc_file in documents_src_dir.glob("*"):
+                if doc_file.is_file():
+                    shutil.copy2(doc_file, cfg.documents_dir / doc_file.name)
+                    documents_restored += 1
+
     return {
         "status": "SUCCESS",
         "archive_restored": str(path.resolve()),
@@ -706,5 +810,6 @@ def restore_backup(
         "database_restored": True,
         "photos_restored_count": photos_restored,
         "assets_restored_count": assets_restored,
+        "documents_restored_count": documents_restored,
         "manifest": manifest_data,
     }

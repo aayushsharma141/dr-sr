@@ -148,6 +148,118 @@ describe('DoctorDashboardUnfinishedCard component', () => {
 
     expect(navigatedEncounterId).toBe(42)
   })
+
+  it('does not fetch /encounters/unfinished when encounters prop is supplied', () => {
+    const fetchSpy = vi.spyOn(global, 'fetch')
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter>
+          <DoctorDashboardUnfinishedCard encounters={mockDrafts} isLoading={false} />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    )
+
+    expect(fetchSpy).not.toHaveBeenCalled()
+  })
+
+  it('renders an explicit error alert with Retry instead of green empty state when the API fails', async () => {
+    const user = userEvent.setup()
+    let shouldFail = true
+
+    vi.spyOn(global, 'fetch').mockImplementation((input) => {
+      const url = String(input)
+      if (url.includes('/encounters/unfinished')) {
+        if (shouldFail) {
+          return Promise.resolve(
+            new Response(JSON.stringify({ message: 'Database unavailable' }), {
+              status: 500,
+              headers: { 'content-type': 'application/json' },
+            }),
+          )
+        }
+        return Promise.resolve(
+          new Response(JSON.stringify(mockDrafts), {
+            status: 200,
+            headers: { 'content-type': 'application/json' },
+          }),
+        )
+      }
+      return Promise.resolve(new Response(JSON.stringify({}), { status: 200 }))
+    })
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter>
+          <DoctorDashboardUnfinishedCard />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    )
+
+    const errorAlert = await screen.findByTestId('unfinished-consultations-error')
+    expect(errorAlert).toHaveAttribute('role', 'alert')
+    expect(screen.queryByText('No Unfinished Consultations')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('unfinished-empty-state')).not.toBeInTheDocument()
+
+    // Retrying after recovery loads the unfinished drafts
+    shouldFail = false
+    await user.click(screen.getByRole('button', { name: 'Retry' }))
+
+    expect(await screen.findByText('Rameshwar Singh')).toBeInTheDocument()
+    expect(screen.queryByTestId('unfinished-consultations-error')).not.toBeInTheDocument()
+  })
+
+  it('disables the retry button and renders "Retrying…" while refetch is in progress', async () => {
+    let shouldFail = true
+    let finishRetryFetch: () => void = () => {}
+
+    vi.spyOn(global, 'fetch').mockImplementation((input) => {
+      const url = String(input)
+      if (url.includes('/encounters/unfinished')) {
+        if (shouldFail) {
+          return Promise.resolve(
+            new Response(JSON.stringify({ message: 'Internal server error' }), {
+              status: 500,
+              headers: { 'content-type': 'application/json' },
+            }),
+          )
+        }
+        return new Promise<Response>((resolve) => {
+          finishRetryFetch = () =>
+            resolve(
+              new Response(JSON.stringify(mockDrafts), {
+                status: 200,
+                headers: { 'content-type': 'application/json' },
+              }),
+            )
+        })
+      }
+      return Promise.resolve(new Response(JSON.stringify({}), { status: 200 }))
+    })
+
+    const user = userEvent.setup()
+    render(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter>
+          <DoctorDashboardUnfinishedCard />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    )
+
+    await screen.findByTestId('unfinished-consultations-error')
+    const retryBtn = screen.getByRole('button', { name: 'Retry' })
+    expect(retryBtn).toBeEnabled()
+
+    shouldFail = false
+    await user.click(retryBtn)
+
+    // Button should now be disabled and text should be "Retrying…"
+    expect(screen.getByRole('button', { name: 'Retrying…' })).toBeDisabled()
+
+    // Complete the fetch
+    finishRetryFetch()
+    expect(await screen.findByText('Rameshwar Singh')).toBeInTheDocument()
+  })
 })
 
 describe('DoctorDashboard integration with Unfinished Consultations card', () => {
@@ -198,6 +310,6 @@ describe('DoctorDashboard integration with Unfinished Consultations card', () =>
     expect(screen.getByText('KH-2026-8801')).toBeInTheDocument()
 
     // Today's consultation queue is also visible below
-    expect(screen.getByText('Doctor Dashboard')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { level: 1, name: 'My Queue' })).toBeInTheDocument()
   })
 })

@@ -259,3 +259,68 @@ def test_duplicate_same_day_booking_requires_override_reason(
     appt4_id = resp4.json()["id"]
     appt4 = db_session.get(Appointment, appt4_id)
     assert "[Override: Emergency second consult today]" in appt4.notes
+
+
+def test_book_appointment_doctor_silo_rbac(
+    login_client, reception_user, doctor_a_user, doctor_b_user, db_session
+):
+    """Doctors can only book appointments for themselves; cross-doctor booking returns 403."""
+    from kalyan_api.models import Appointment
+
+    patient = Patient(
+        urn="KH-2026-8877",
+        full_name="Silo RBAC Patient",
+        guardian_name="Guardian",
+        gender="M",
+        age_years=34,
+        mobile="9876543877",
+        address="Ara",
+    )
+    db_session.add(patient)
+    db_session.flush()
+
+    doc_a = doctor_a_user.doctor
+    dept_a = doc_a.departments[0]
+
+    # 1. Doctor B attempting to book for Doctor A is forbidden (403 scope_forbidden)
+    doc_b_client = login_client(doctor_b_user)
+    resp_forbidden = doc_b_client.post(
+        "/api/appointments",
+        json={
+            "patient_id": patient.id,
+            "doctor_id": doc_a.id,
+            "department_id": dept_a.id,
+            "appointment_date": "2026-11-12",
+        },
+    )
+    assert resp_forbidden.status_code == 403, resp_forbidden.text
+    assert resp_forbidden.json()["code"] == "scope_forbidden"
+    assert db_session.query(Appointment).filter_by(patient_id=patient.id).count() == 0
+
+    # 2. Doctor A booking for themselves succeeds (201)
+    doc_a_client = login_client(doctor_a_user)
+    resp_self = doc_a_client.post(
+        "/api/appointments",
+        json={
+            "patient_id": patient.id,
+            "doctor_id": doc_a.id,
+            "department_id": dept_a.id,
+            "appointment_date": "2026-11-12",
+        },
+    )
+    assert resp_self.status_code == 201, resp_self.text
+    assert resp_self.json()["doctor_id"] == doc_a.id
+
+    # 3. Reception booking for Doctor A succeeds (201)
+    rec_client = login_client(reception_user)
+    resp_rec = rec_client.post(
+        "/api/appointments",
+        json={
+            "patient_id": patient.id,
+            "doctor_id": doc_a.id,
+            "department_id": dept_a.id,
+            "appointment_date": "2026-11-13",
+        },
+    )
+    assert resp_rec.status_code == 201, resp_rec.text
+    assert resp_rec.json()["doctor_id"] == doc_a.id

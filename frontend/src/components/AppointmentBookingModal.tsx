@@ -1,13 +1,15 @@
 import { useState } from 'react'
 import { Modal } from './Modal'
+import { useDebouncedValue, useIstToday } from './reception/AppointmentStatusBadge'
+import { ApiError } from '../api/client'
 import { useDepartments, useDepartmentDoctors, usePatients, useBookAppointment } from '../api/queries'
 import type { PatientOut, DepartmentDoctorOut } from '../api/types'
-import { istToday } from '../format'
 
 interface AppointmentBookingModalProps {
   isOpen: boolean
   onClose: () => void
   initialPatient?: PatientOut | null
+  initialDate?: string
   onSuccess?: () => void
 }
 
@@ -15,24 +17,36 @@ export function AppointmentBookingModal({
   isOpen,
   onClose,
   initialPatient,
+  initialDate,
   onSuccess,
 }: AppointmentBookingModalProps) {
+  const today = useIstToday()
   const [patientSearch, setPatientSearch] = useState('')
   const [selectedPatient, setSelectedPatient] = useState<PatientOut | null>(
     initialPatient || null,
   )
   const [selectedDepartmentId, setSelectedDepartmentId] = useState<number | ''>('')
   const [selectedDoctorId, setSelectedDoctorId] = useState<number | ''>('')
-  const [appointmentDate, setAppointmentDate] = useState(istToday)
+  const [appointmentDate, setAppointmentDate] = useState(() =>
+    initialDate && initialDate >= today ? initialDate : today,
+  )
   const [expectedTime, setExpectedTime] = useState('')
   const [notes, setNotes] = useState('')
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
   // The token is issued at check-in, so a booking is confirmed without one.
   const [isBooked, setIsBooked] = useState(false)
 
+  const debouncedQuery = useDebouncedValue(patientSearch, 200)
+  const searchEnabled = isOpen && !selectedPatient && debouncedQuery.trim().length >= 2
+
   const { data: departments } = useDepartments()
   const { data: doctors } = useDepartmentDoctors(selectedDepartmentId || null)
-  const { data: searchResults, isPending: isSearching } = usePatients(patientSearch, 5, 0)
+  const { data: searchResults, isPending: isSearching } = usePatients(
+    debouncedQuery,
+    5,
+    0,
+    { enabled: searchEnabled },
+  )
   const bookMutation = useBookAppointment()
 
   if (!isOpen) return null
@@ -72,7 +86,11 @@ export function AppointmentBookingModal({
       setIsBooked(true)
       if (onSuccess) onSuccess()
     } catch (err: unknown) {
-      if (err instanceof Error) {
+      if (err instanceof ApiError && err.status === 409 && err.code === 'duplicate_appointment') {
+        setErrorMsg(
+          'This patient already has an active appointment with this doctor on this date. Please reschedule or cancel the existing booking instead.',
+        )
+      } else if (err instanceof Error) {
         setErrorMsg(err.message)
       } else {
         setErrorMsg('Failed to book appointment.')
@@ -112,7 +130,7 @@ export function AppointmentBookingModal({
                 {expectedTime ? ` · expected ${expectedTime}` : ''}
               </p>
               <p className="text-xs text-neutral-600 mt-3">
-                The queue token is issued when the patient arrives and is checked in at the Token Desk.
+                The queue token is issued when the patient arrives and is checked in at Appointments.
               </p>
             </div>
             <button
@@ -132,7 +150,7 @@ export function AppointmentBookingModal({
 
             {/* Patient Selector */}
             <div>
-              <label htmlFor="patient-search" className="block text-xs font-semibold text-neutral-700 uppercase mb-1">
+              <label htmlFor="patient-search" className="block text-xs font-semibold text-neutral-700 mb-1">
                 Patient
               </label>
               {selectedPatient ? (
@@ -161,7 +179,7 @@ export function AppointmentBookingModal({
                     placeholder="Search patient by URN, mobile or name..."
                     className="w-full p-2 border border-neutral-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-red-800"
                   />
-                  {isSearching && <p className="text-xs text-neutral-500">Searching patients...</p>}
+                  {searchEnabled && isSearching && <p className="text-xs text-neutral-500">Searching patients...</p>}
                   {searchResults && searchResults.length > 0 && (
                     <div className="max-h-40 overflow-y-auto border border-neutral-200 rounded divide-y divide-neutral-100 bg-white">
                       {searchResults.slice(0, 5).map((p: PatientOut) => (
@@ -186,7 +204,7 @@ export function AppointmentBookingModal({
 
             {/* Department first, then its assigned doctors */}
             <div>
-              <label htmlFor="department-select" className="block text-xs font-semibold text-neutral-700 uppercase mb-1">
+              <label htmlFor="department-select" className="block text-xs font-semibold text-neutral-700 mb-1">
                 Department / Specialty
               </label>
               <select
@@ -208,7 +226,7 @@ export function AppointmentBookingModal({
               </select>
             </div>
             <div>
-              <label htmlFor="doctor-select" className="block text-xs font-semibold text-neutral-700 uppercase mb-1">
+              <label htmlFor="doctor-select" className="block text-xs font-semibold text-neutral-700 mb-1">
                 Consulting Doctor
               </label>
               <select
@@ -233,12 +251,13 @@ export function AppointmentBookingModal({
 
             {/* Date Selector */}
             <div>
-              <label htmlFor="date-input" className="block text-xs font-semibold text-neutral-700 uppercase mb-1">
+              <label htmlFor="date-input" className="block text-xs font-semibold text-neutral-700 mb-1">
                 Appointment Date
               </label>
               <input
                 id="date-input"
                 type="date"
+                min={today}
                 value={appointmentDate}
                 onChange={(e) => setAppointmentDate(e.target.value)}
                 required
@@ -248,7 +267,7 @@ export function AppointmentBookingModal({
 
             {/* Expected time: shown to spot late arrivals; the doctor still sees patients by token. */}
             <div>
-              <label htmlFor="expected-time-input" className="block text-xs font-semibold text-neutral-700 uppercase mb-1">
+              <label htmlFor="expected-time-input" className="block text-xs font-semibold text-neutral-700 mb-1">
                 Expected Time (Optional)
               </label>
               <input
@@ -262,7 +281,7 @@ export function AppointmentBookingModal({
 
             {/* Notes */}
             <div>
-              <label htmlFor="notes-input" className="block text-xs font-semibold text-neutral-700 uppercase mb-1">
+              <label htmlFor="notes-input" className="block text-xs font-semibold text-neutral-700 mb-1">
                 Notes (Optional)
               </label>
               <textarea

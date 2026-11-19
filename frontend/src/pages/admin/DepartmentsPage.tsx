@@ -3,11 +3,24 @@ import { useDepartments, useCreateDepartment, useDoctors, useDoctorDepartments, 
 import { AppShell } from '../../components/AppShell'
 import { TableSkeleton } from '../../components/AdminSkeleton'
 import { AdminPageHeader } from '../../components/admin/AdminPageHeader'
+import { InlineAlert } from '../../components/InlineAlert'
+import { toast } from '../../components/ToastHost'
 
 export function DepartmentsPage() {
   const { data: me } = useMe()
-  const { data: departments = [], isPending } = useDepartments()
-  const { data: doctors = [] } = useDoctors(false)
+  const {
+    data: departments = [],
+    isPending,
+    isError: departmentsIsError,
+    error: departmentsError,
+    refetch: refetchDepartments,
+  } = useDepartments()
+  const {
+    data: doctors = [],
+    isError: doctorsIsError,
+    error: doctorsError,
+    refetch: refetchDoctors,
+  } = useDoctors(false)
   const create = useCreateDepartment()
   const assign = useAssignDoctorDepartments()
   const [name, setName] = useState('')
@@ -15,8 +28,6 @@ export function DepartmentsPage() {
   const [doctorId, setDoctorId] = useState<number | null>(null)
   const { data: assigned, isError: assignmentsFailed } = useDoctorDepartments(doctorId)
   const [ids, setIds] = useState<number[]>([])
-  const [notice, setNotice] = useState('')
-  const [error, setError] = useState('')
 
   useEffect(() => {
     if (assigned) setIds(assigned.map((item) => item.id))
@@ -32,35 +43,29 @@ export function DepartmentsPage() {
   function chooseDoctor(value: string) {
     // ids still holds the previous doctor's departments until the new doctor's load.
     setIds([])
-    setNotice('')
-    setError('')
     setDoctorId(value ? Number(value) : null)
   }
 
   async function createDepartment(event: FormEvent) {
     event.preventDefault()
-    setError(''); setNotice('')
     try {
       await create.mutateAsync({ name_en: name.trim(), name_hi: nameHi.trim() || null })
-      setName(''); setNameHi(''); setNotice('Department created.')
-    } catch (e) { setError(e instanceof Error ? e.message : 'Create failed.') }
+      setName(''); setNameHi(''); toast.success('Department created.')
+    } catch (e) { toast.error(e instanceof Error ? e.message : 'Create failed.') }
   }
 
   async function saveAssignments(event: FormEvent) {
     event.preventDefault()
     const doctor = doctors.find((item) => item.id === doctorId)
     if (!doctor) return
-    setError(''); setNotice('')
     try {
       await assign.mutateAsync({ doctorId: doctor.id, body: { department_ids: ids, version_id: doctor.version_id } })
-      setNotice('Doctor assignments saved.')
-    } catch (e) { setError(e instanceof Error ? e.message : 'Save failed.') }
+      toast.success('Doctor assignments saved.')
+    } catch (e) { toast.error(e instanceof Error ? e.message : 'Save failed.') }
   }
 
-  return <AppShell name={me?.full_name ?? 'Admin'} role={me?.role ?? 'ADMIN'}><main className="mx-auto max-w-4xl space-y-6 p-4 sm:p-6">
+  return <AppShell name={me?.full_name ?? 'Admin'} role={me?.role ?? 'ADMIN'}><div className="mx-auto max-w-4xl space-y-6 p-4 sm:p-6">
     <AdminPageHeader eyebrow="Administration" title="Departments" description="Configure reception departments and doctor memberships." />
-    {notice && <p role="status" className="rounded border border-green-200 bg-green-50 p-3 text-sm text-green-900">{notice}</p>}
-    {error && <p role="alert" className="rounded border border-red-200 bg-red-50 p-3 text-sm text-red-900">{error}</p>}
     <section className="space-y-3 rounded-lg border bg-white p-4">
       <h2 className="font-semibold">Create department</h2>
       <form onSubmit={createDepartment} className="grid gap-3 sm:grid-cols-2">
@@ -71,14 +76,36 @@ export function DepartmentsPage() {
     </section>
     <section className="rounded-lg border bg-white p-4">
       <h2 className="font-semibold">Active department catalogue</h2>
-      {isPending ? <TableSkeleton label="Loading the department catalogue…" rows={2} columns={2} className="mt-2" /> : <ul className="mt-2 divide-y">{departments.map((d, index) => <li key={d.id} className="py-2 text-sm transition-colors hover:bg-neutral-50" style={{ transitionDelay: `${index * 50}ms` }}>{d.name_en}{d.name_hi ? ` / ${d.name_hi}` : ''}</li>)}</ul>}
-      {!isPending && departments.length === 0 && <p className="mt-2 text-sm text-neutral-500">No departments configured.</p>}
+      {isPending ? (
+        <TableSkeleton label="Loading the department catalogue…" rows={2} columns={2} className="mt-2" />
+      ) : departmentsIsError ? (
+        <InlineAlert
+          tone="error"
+          className="mt-2"
+          action={<button type="button" onClick={() => void refetchDepartments()} className="min-h-9 cursor-pointer font-medium underline">Retry</button>}
+        >
+          Could not load departments: {departmentsError instanceof Error ? departmentsError.message : 'Server error.'}
+        </InlineAlert>
+      ) : (
+        <>
+          <ul className="mt-2 divide-y">{departments.map((d, index) => <li key={d.id} className="py-2 text-sm transition-colors hover:bg-neutral-50" style={{ transitionDelay: `${index * 50}ms` }}>{d.name_en}{d.name_hi ? ` / ${d.name_hi}` : ''}</li>)}</ul>
+          {departments.length === 0 && <p className="mt-2 text-sm text-neutral-500">No departments configured.</p>}
+        </>
+      )}
     </section>
     <section className="space-y-3 rounded-lg border bg-white p-4">
       <h2 className="font-semibold">Assign doctor specialties</h2>
+      {doctorsIsError && (
+        <InlineAlert
+          tone="error"
+          action={<button type="button" onClick={() => void refetchDoctors()} className="min-h-9 cursor-pointer font-medium underline">Retry</button>}
+        >
+          Could not load doctors: {doctorsError instanceof Error ? doctorsError.message : 'Server error.'}
+        </InlineAlert>
+      )}
       <label className="block text-sm">Doctor<select value={doctorId ?? ''} onChange={(e) => chooseDoctor(e.target.value)} className="mt-1 w-full rounded border p-2 sm:max-w-md"><option value="">Select doctor</option>{doctors.map((d) => <option key={d.id} value={d.id}>{d.name_en}{d.is_active ? '' : ' (Inactive)'}</option>)}</select></label>
       {doctorId !== null && !assignmentsReady && (assignmentsFailed ? <p role="alert" className="text-sm text-red-900">Could not load this doctor's departments.</p> : <p role="status" className="text-sm text-neutral-600">Loading departments…</p>)}
       {doctorId !== null && <form onSubmit={saveAssignments} className="space-y-3"><fieldset disabled={!assignmentsReady} className="space-y-2"><legend className="text-sm font-medium">Departments</legend>{choices.map((d) => <label key={d.id} className="flex min-h-9 cursor-pointer items-center gap-2 rounded px-1 text-sm transition-colors hover:bg-neutral-50"><input type="checkbox" checked={ids.includes(d.id)} onChange={(e) => setIds((old) => e.target.checked ? [...old, d.id] : old.filter((id) => id !== d.id))} />{d.name_en}{d.name_hi ? ` / ${d.name_hi}` : ''}{d.is_active ? '' : ' (Inactive)'}</label>)}</fieldset><button disabled={assign.isPending || !assignmentsReady || !choices.length} className="min-h-11 cursor-pointer rounded bg-red-900 px-4 py-2 text-sm text-white transition-colors hover:bg-red-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-900 disabled:cursor-not-allowed disabled:opacity-50">{assign.isPending ? 'Saving…' : 'Save assignments'}</button></form>}
     </section>
-  </main></AppShell>
+  </div></AppShell>
 }

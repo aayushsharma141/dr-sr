@@ -1,0 +1,829 @@
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { render, screen, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import * as billApi from '../../api/bill'
+import type { VisitBillOut } from '../../api/bill'
+import { BillPanel } from '../billing/BillPanel'
+
+const baseBill: VisitBillOut = {
+  visit_id: 10,
+  patient_id: 101,
+  patient_urn: 'KH-2026-0001',
+  patient_name: 'Aarav Kumar',
+  status: 'OPEN',
+  visit_date: '2026-11-16',
+  closed_at: null,
+  close_reason: null,
+  locked: false,
+  sections: [
+    {
+      category: 'CONSULTATION',
+      subtotal_paise: 50000,
+      lines: [
+        {
+          id: 1,
+          visit_id: 10,
+          appointment_id: 201,
+          category: 'CONSULTATION',
+          source: 'SYSTEM',
+          description: 'OPD Consultation - Dr. Dwivedi',
+          unit: null,
+          quantity: 1,
+          rate_paise: 50000,
+          amount_paise: 50000,
+          original_amount_paise: 50000,
+          status: 'ACTIVE',
+          counts_toward_total: true,
+          created_by_user_id: 2,
+          created_by_username: 'reception',
+          created_at: '2026-11-16T09:00:00Z',
+          history: [],
+        },
+      ],
+    },
+    {
+      category: 'PROCEDURE',
+      subtotal_paise: 0,
+      lines: [],
+    },
+    {
+      category: 'PACKAGE',
+      subtotal_paise: 0,
+      lines: [],
+    },
+    {
+      category: 'MEDICINE',
+      subtotal_paise: 10000,
+      lines: [
+        {
+          id: 2,
+          visit_id: 10,
+          category: 'MEDICINE',
+          source: 'RECEPTION',
+          description: 'Paracetamol 500mg',
+          unit: 'strip',
+          quantity: 2,
+          rate_paise: 5000,
+          amount_paise: 10000,
+          original_amount_paise: 10000,
+          status: 'ACTIVE',
+          counts_toward_total: true,
+          created_by_user_id: 2,
+          created_by_username: 'reception',
+          created_at: '2026-11-16T09:30:00Z',
+          history: [],
+        },
+      ],
+    },
+    {
+      category: 'ADDITIONAL',
+      subtotal_paise: 0,
+      lines: [],
+    },
+  ],
+  bill_total_paise: 60000,
+  paid_paise: 0,
+  due_paise: 60000,
+  payments: [],
+  voided_lines: [],
+  previous_dues: [],
+  previous_dues_total_paise: 0,
+  packages: [],
+}
+
+function renderWithClient(ui: React.ReactElement) {
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false } },
+  })
+  return render(<QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>)
+}
+
+describe('BillPanel (Task 1 & Task 3)', () => {
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it('renders five section headings in order with subtotals, lines with quantity × rate = amount, source tag and SYSTEM check-in label', () => {
+    renderWithClient(<BillPanel visitId={10} initialBill={baseBill} />)
+
+    // Verify 5 sections rendered
+    expect(screen.getByRole('heading', { name: /Consultation/i })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: /Procedures \/ Services/i })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: /Treatment Packages/i })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: /Medicines/i })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: /Additional Particulars/i })).toBeInTheDocument()
+
+    // Subtotals
+    expect(screen.getByText('₹500.00')).toBeInTheDocument()
+    expect(screen.getByText('₹100.00')).toBeInTheDocument()
+
+    // Medicine line: "2 × ₹50.00 = ₹100.00" and Reception tag (BILL-04)
+    expect(screen.getByText(/Paracetamol 500mg/i)).toBeInTheDocument()
+    expect(screen.getByText(/2 × ₹50\.00 = ₹100\.00/i)).toBeInTheDocument()
+    expect(screen.getByText('Reception')).toBeInTheDocument()
+
+    // Consultation line with SYSTEM source labeled "Fee as billed at check-in"
+    expect(screen.getByText(/OPD Consultation - Dr. Dwivedi/i)).toBeInTheDocument()
+    expect(screen.getByText('Fee as billed at check-in')).toBeInTheDocument()
+  })
+
+  it('renders adjusted consultation line with original amount, reason, staff and time (FEE-09)', () => {
+    const adjustedBill: VisitBillOut = {
+      ...baseBill,
+      sections: [
+        {
+          category: 'CONSULTATION',
+          subtotal_paise: 40000,
+          lines: [
+            {
+              ...baseBill.sections[0].lines[0],
+              rate_paise: 40000,
+              amount_paise: 40000,
+              history: [
+                {
+                  id: 11,
+                  bill_item_id: 1,
+                  kind: 'DISCOUNT',
+                  old_amount_paise: 50000,
+                  new_amount_paise: 40000,
+                  reason: 'Senior citizen discount',
+                  actor_user_id: 3,
+                  actor_username: 'dr_madan',
+                  created_at: '2026-11-16T10:15:00Z',
+                },
+              ],
+            },
+          ],
+        },
+        ...baseBill.sections.slice(1),
+      ],
+      bill_total_paise: 50000,
+      due_paise: 50000,
+    }
+
+    renderWithClient(<BillPanel visitId={10} initialBill={adjustedBill} />)
+
+    // Current amount
+    expect(screen.getByText(/1 × ₹400\.00 = ₹400\.00/i)).toBeInTheDocument()
+
+    // History: "Changed from ₹500.00 · Senior citizen discount · dr_madan · ..."
+    expect(
+      screen.getByText(/Changed from ₹500\.00 · Senior citizen discount · dr_madan/i),
+    ).toBeInTheDocument()
+  })
+
+  it('renders voided lines in a collapsed details disclosure with reason and never in totals', () => {
+    const billWithVoided: VisitBillOut = {
+      ...baseBill,
+      voided_lines: [
+        {
+          id: 99,
+          visit_id: 10,
+          category: 'MEDICINE',
+          source: 'RECEPTION',
+          description: 'Unneeded syringe',
+          quantity: 1,
+          rate_paise: 2000,
+          amount_paise: 2000,
+          original_amount_paise: 2000,
+          status: 'VOIDED',
+          counts_toward_total: false,
+          created_by_user_id: 2,
+          created_at: '2026-11-16T09:10:00Z',
+          history: [],
+          void_reason: 'Entered by mistake',
+          voided_by_username: 'reception',
+          voided_at: '2026-11-16T09:20:00Z',
+        },
+      ],
+    }
+
+    renderWithClient(<BillPanel visitId={10} initialBill={billWithVoided} />)
+
+    expect(screen.getByText(/Voided lines/i)).toBeInTheDocument()
+    expect(screen.getByText(/Unneeded syringe/i)).toBeInTheDocument()
+    expect(screen.getByText(/Entered by mistake · reception/i)).toBeInTheDocument()
+  })
+
+  it('renders empty copy when bill has no charges', () => {
+    const emptyBill: VisitBillOut = {
+      ...baseBill,
+      sections: baseBill.sections.map((s) => ({ ...s, subtotal_paise: 0, lines: [] })),
+      bill_total_paise: 0,
+      due_paise: 0,
+    }
+
+    renderWithClient(<BillPanel visitId={10} initialBill={emptyBill} />)
+    expect(screen.getByText('No charges on this visit yet.')).toBeInTheDocument()
+  })
+
+  it('renders locked copy when visit is closed', () => {
+    const closedBill: VisitBillOut = {
+      ...baseBill,
+      status: 'CLOSED',
+      locked: true,
+      closed_at: '2026-11-16T11:45:00Z',
+      close_reason: 'Normal checkout',
+    }
+
+    renderWithClient(<BillPanel visitId={10} initialBill={closedBill} />)
+    expect(screen.getByText(/Visit closed on .* The bill is locked\./i)).toBeInTheDocument()
+  })
+
+  it('renders payment history list with receipt number, method, amount and reversed badge (W3)', () => {
+    const billWithPayments: VisitBillOut = {
+      ...baseBill,
+      paid_paise: 40000,
+      due_paise: 20000,
+      payments: [
+        {
+          id: 501,
+          receipt_number: 'REC-2026-0010',
+          amount_paise: 40000,
+          payment_method: 'UPI',
+          is_reversed: false,
+          created_at: '2026-11-16T10:00:00Z',
+          created_by_username: 'reception',
+        },
+        {
+          id: 502,
+          receipt_number: 'REC-2026-0011',
+          amount_paise: 10000,
+          payment_method: 'CASH',
+          is_reversed: true,
+          created_at: '2026-11-16T10:05:00Z',
+          created_by_username: 'reception',
+        },
+      ],
+    }
+
+    renderWithClient(<BillPanel visitId={10} initialBill={billWithPayments} />)
+
+    expect(screen.getByText('REC-2026-0010')).toBeInTheDocument()
+    expect(screen.getByText('UPI')).toBeInTheDocument()
+    expect(screen.getByText('Active')).toBeInTheDocument()
+
+    expect(screen.getByText('REC-2026-0011')).toBeInTheDocument()
+    expect(screen.getByText('CASH')).toBeInTheDocument()
+    expect(screen.getByText('Reversed')).toBeInTheDocument()
+  })
+
+  it('renders totals block in exact order and responds to payingNowPaise', () => {
+    renderWithClient(
+      <BillPanel visitId={10} initialBill={baseBill} payingNowPaise={20000} />,
+    )
+
+    // Totals block contains:
+    // Bill total (60000)
+    // Paid earlier (0)
+    // Paying now (20000 -> ₹200.00)
+    // Remaining on this visit (40000 -> ₹400.00)
+    // Previous dues (0)
+    // Total outstanding (40000 -> ₹400.00)
+    expect(screen.getByText('Bill total')).toBeInTheDocument()
+    expect(screen.getByText('Paid earlier')).toBeInTheDocument()
+    expect(screen.getByText('Paying now')).toBeInTheDocument()
+    expect(screen.getByText('Remaining on this visit')).toBeInTheDocument()
+    expect(screen.getByText('Previous dues')).toBeInTheDocument()
+    expect(screen.getByText('Total outstanding')).toBeInTheDocument()
+    expect(screen.getByText('(remaining + previous dues)')).toBeInTheDocument()
+
+    expect(screen.getByText('₹200.00')).toBeInTheDocument() // Paying now
+    expect(screen.getAllByText('₹400.00').length).toBe(2) // Remaining + Total outstanding
+  })
+
+  it('renders previous dues card separately and calls onCollectDue when clicked (LED-01, LED-02)', async () => {
+    const onCollect = vi.fn()
+    const billWithDues: VisitBillOut = {
+      ...baseBill,
+      previous_dues: [
+        {
+          visit_id: 5,
+          visit_date: '2026-11-10',
+          doctor_names: ['Dr. Madan Mohan Dwivedi'],
+          balance_paise: 15000,
+        },
+      ],
+      previous_dues_total_paise: 15000,
+    }
+
+    renderWithClient(
+      <BillPanel
+        visitId={10}
+        initialBill={billWithDues}
+        canCollect={true}
+        onCollectDue={onCollect}
+      />,
+    )
+
+    expect(screen.getByText('Previous dues (separate ledger)')).toBeInTheDocument()
+    expect(screen.getByText('Visit 2026-11-10')).toBeInTheDocument()
+    expect(screen.getByText('Dr. Madan Mohan Dwivedi')).toBeInTheDocument()
+    expect(screen.getAllByText('₹150.00').length).toBe(2)
+
+    const collectBtn = screen.getByRole('button', { name: /Collect previous dues/i })
+    await userEvent.click(collectBtn)
+    expect(onCollect).toHaveBeenCalledWith(billWithDues.previous_dues[0])
+  })
+
+  it('renders treatment packages card with session progress and agreed/paid balances (OD-C)', () => {
+    const billWithPackages: VisitBillOut = {
+      ...baseBill,
+      packages: [
+        {
+          treatment_plan_id: 33,
+          plan_name: 'Knee Rehab 10-Session Package',
+          status: 'ACTIVE',
+          total_sessions: 10,
+          completed_sessions: 4,
+          remaining_sessions: 6,
+          agreed_price_paise: 350000,
+          paid_paise: 200000,
+          balance_paise: 150000,
+        },
+      ],
+    }
+
+    renderWithClient(<BillPanel visitId={10} initialBill={billWithPackages} />)
+
+    expect(screen.getByText('Knee Rehab 10-Session Package')).toBeInTheDocument()
+    expect(
+      screen.getByText(/4 of 10 sessions completed \(6 remaining\)/i),
+    ).toBeInTheDocument()
+    expect(screen.getByText(/Agreed: ₹3,500\.00/i)).toBeInTheDocument()
+    expect(screen.getByText(/Paid: ₹2,000\.00/i)).toBeInTheDocument()
+    expect(screen.getByText(/Balance: ₹1,500\.00/i)).toBeInTheDocument()
+  })
+
+  it('renders loading non-jumping placeholder while fetching', () => {
+    vi.spyOn(billApi, 'useVisitBill').mockReturnValue({
+      data: undefined,
+      isPending: true,
+      error: null,
+    } as any)
+
+    renderWithClient(<BillPanel visitId={10} />)
+    expect(screen.getByText('Loading bill...')).toBeInTheDocument()
+  })
+
+  it('renders InlineAlert with role="alert" when bill load fails', () => {
+    vi.spyOn(billApi, 'useVisitBill').mockReturnValue({
+      data: undefined,
+      isPending: false,
+      error: new Error('Failed to load visit bill from server'),
+    } as any)
+
+    renderWithClient(<BillPanel visitId={10} />)
+    const alert = screen.getByRole('alert')
+    expect(alert).toBeInTheDocument()
+    expect(alert).toHaveTextContent('Failed to load visit bill from server')
+  })
+
+  it('renders checkout summary strip with Bill Total, Discounts (₹0.00), Paid, and Balance Due when unadjusted', () => {
+    const partialPaidBill: VisitBillOut = {
+      ...baseBill,
+      paid_paise: 15000,
+      due_paise: 45000,
+    }
+
+    renderWithClient(
+      <BillPanel visitId={10} initialBill={partialPaidBill} payingNowPaise={10000} />,
+    )
+
+    const strip = screen.getByTestId('checkout-summary-strip')
+    expect(within(strip).getByText('Bill Total')).toBeInTheDocument()
+    expect(within(strip).getByText('₹600.00')).toBeInTheDocument()
+    expect(within(strip).getByText('Discounts')).toBeInTheDocument()
+    expect(within(strip).getByText('₹0.00')).toBeInTheDocument()
+    expect(within(strip).queryByText('included')).not.toBeInTheDocument()
+    expect(within(strip).getByText('Paid')).toBeInTheDocument()
+    expect(within(strip).getByText('₹150.00')).toBeInTheDocument()
+    expect(within(strip).getByText('Balance Due')).toBeInTheDocument()
+    // Balance Due reflects bill.due_paise (₹450.00), not remainingOnVisit (₹350.00)
+    expect(within(strip).getByText('₹450.00')).toBeInTheDocument()
+
+    expect(screen.queryByText('Discounts applied (included above)')).not.toBeInTheDocument()
+  })
+
+  it('displays Discounts with included sublabel and Totals & Settlement row for DISCOUNT and WAIVER lines', () => {
+    const discountedBill: VisitBillOut = {
+      ...baseBill,
+      sections: [
+        {
+          category: 'CONSULTATION',
+          subtotal_paise: 40000,
+          lines: [
+            {
+              ...baseBill.sections[0].lines[0],
+              rate_paise: 40000,
+              amount_paise: 40000,
+              original_amount_paise: 50000,
+              history: [
+                {
+                  id: 11,
+                  bill_item_id: 1,
+                  kind: 'DISCOUNT',
+                  old_amount_paise: 50000,
+                  new_amount_paise: 40000,
+                  reason: 'Senior citizen discount',
+                  actor_user_id: 3,
+                  actor_username: 'dr_madan',
+                  created_at: '2026-11-16T10:15:00Z',
+                },
+              ],
+            },
+          ],
+        },
+        ...baseBill.sections.slice(1),
+      ],
+      bill_total_paise: 50000,
+      paid_paise: 20000,
+      due_paise: 30000,
+    }
+
+    const { unmount } = renderWithClient(<BillPanel visitId={10} initialBill={discountedBill} />)
+
+    const strip = screen.getByTestId('checkout-summary-strip')
+    expect(within(strip).getByText('Bill Total')).toBeInTheDocument()
+    expect(within(strip).getByText('₹500.00')).toBeInTheDocument()
+    expect(within(strip).getByText('Discounts')).toBeInTheDocument()
+    expect(within(strip).getByText('₹100.00')).toBeInTheDocument()
+    expect(within(strip).getByText('included')).toBeInTheDocument()
+    expect(within(strip).getByText('Paid')).toBeInTheDocument()
+    expect(within(strip).getByText('₹200.00')).toBeInTheDocument()
+    expect(within(strip).getByText('Balance Due')).toBeInTheDocument()
+    expect(within(strip).getByText('₹300.00')).toBeInTheDocument()
+
+    const discountRowLabel = screen.getByText('Discounts applied (included above)')
+    expect(discountRowLabel).toBeInTheDocument()
+    expect(discountRowLabel.parentElement).toHaveTextContent('₹100.00')
+    unmount()
+
+    // WAIVER lines are also counted toward Discounts
+    const waivedBill: VisitBillOut = {
+      ...baseBill,
+      sections: [
+        {
+          category: 'CONSULTATION',
+          subtotal_paise: 0,
+          lines: [
+            {
+              ...baseBill.sections[0].lines[0],
+              rate_paise: 0,
+              amount_paise: 0,
+              original_amount_paise: 50000,
+              history: [
+                {
+                  id: 12,
+                  bill_item_id: 1,
+                  kind: 'WAIVER',
+                  old_amount_paise: 50000,
+                  new_amount_paise: 0,
+                  reason: 'Director fee waiver',
+                  actor_user_id: 1,
+                  actor_username: 'admin',
+                  created_at: '2026-11-16T10:20:00Z',
+                },
+              ],
+            },
+          ],
+        },
+        ...baseBill.sections.slice(1),
+      ],
+      bill_total_paise: 10000,
+      paid_paise: 0,
+      due_paise: 10000,
+    }
+
+    renderWithClient(<BillPanel visitId={10} initialBill={waivedBill} />)
+    const waivedStrip = screen.getByTestId('checkout-summary-strip')
+    expect(within(waivedStrip).getByText('₹500.00')).toBeInTheDocument()
+    expect(within(waivedStrip).getByText('included')).toBeInTheDocument()
+    expect(screen.getByText('Discounts applied (included above)')).toBeInTheDocument()
+  })
+
+  it('does not count CORRECTION quantity or rate reductions as Discounts', () => {
+    const correctedBill: VisitBillOut = {
+      ...baseBill,
+      sections: [
+        baseBill.sections[0],
+        baseBill.sections[1],
+        baseBill.sections[2],
+        {
+          category: 'MEDICINE',
+          subtotal_paise: 5000,
+          lines: [
+            {
+              ...baseBill.sections[3].lines[0],
+              quantity: 1,
+              amount_paise: 5000,
+              original_amount_paise: 10000,
+              history: [
+                {
+                  id: 21,
+                  bill_item_id: 2,
+                  kind: 'CORRECTION',
+                  old_amount_paise: 10000,
+                  new_amount_paise: 5000,
+                  reason: 'Fixed quantity typo from 2 to 1',
+                  actor_user_id: 2,
+                  actor_username: 'reception',
+                  created_at: '2026-11-16T09:45:00Z',
+                },
+              ],
+            },
+          ],
+        },
+        baseBill.sections[4],
+      ],
+      bill_total_paise: 55000,
+      paid_paise: 10000,
+      due_paise: 45000,
+    }
+
+    renderWithClient(<BillPanel visitId={10} initialBill={correctedBill} />)
+
+    const strip = screen.getByTestId('checkout-summary-strip')
+    expect(within(strip).getByText('Discounts')).toBeInTheDocument()
+    expect(within(strip).getByText('₹0.00')).toBeInTheDocument()
+    expect(within(strip).queryByText('included')).not.toBeInTheDocument()
+    expect(screen.queryByText('Discounts applied (included above)')).not.toBeInTheDocument()
+  })
+
+  it('computes ₹100.00 discount after an upward CORRECTION (500 → 600) followed by DISCOUNT (600 → 500)', () => {
+    const bill: VisitBillOut = {
+      ...baseBill,
+      sections: [
+        {
+          category: 'CONSULTATION',
+          subtotal_paise: 50000,
+          lines: [
+            {
+              ...baseBill.sections[0].lines[0],
+              rate_paise: 50000,
+              amount_paise: 50000,
+              original_amount_paise: 50000,
+              history: [
+                {
+                  id: 31,
+                  bill_item_id: 1,
+                  kind: 'CORRECTION',
+                  old_amount_paise: 50000,
+                  new_amount_paise: 60000,
+                  reason: 'Specialist fee rate correction',
+                  actor_user_id: 1,
+                  actor_username: 'admin',
+                  created_at: '2026-11-16T09:10:00Z',
+                },
+                {
+                  id: 32,
+                  bill_item_id: 1,
+                  kind: 'DISCOUNT',
+                  old_amount_paise: 60000,
+                  new_amount_paise: 50000,
+                  reason: 'Senior citizen discount',
+                  actor_user_id: 1,
+                  actor_username: 'admin',
+                  created_at: '2026-11-16T09:20:00Z',
+                },
+              ],
+            },
+          ],
+        },
+        ...baseBill.sections.slice(1),
+      ],
+      bill_total_paise: 60000,
+      paid_paise: 0,
+      due_paise: 60000,
+    }
+
+    renderWithClient(<BillPanel visitId={10} initialBill={bill} />)
+
+    const strip = screen.getByTestId('checkout-summary-strip')
+    expect(within(strip).getByText('Discounts')).toBeInTheDocument()
+    expect(within(strip).getByText('₹100.00')).toBeInTheDocument()
+    expect(within(strip).getByText('included')).toBeInTheDocument()
+    const discountRow = screen.getByText('Discounts applied (included above)')
+    expect(discountRow.parentElement).toHaveTextContent('₹100.00')
+  })
+
+  it('computes ₹50.00 discount after a downward CORRECTION (500 → 400) followed by DISCOUNT (400 → 350)', () => {
+    const bill: VisitBillOut = {
+      ...baseBill,
+      sections: [
+        {
+          category: 'CONSULTATION',
+          subtotal_paise: 35000,
+          lines: [
+            {
+              ...baseBill.sections[0].lines[0],
+              rate_paise: 35000,
+              amount_paise: 35000,
+              original_amount_paise: 50000,
+              history: [
+                {
+                  id: 41,
+                  bill_item_id: 1,
+                  kind: 'CORRECTION',
+                  old_amount_paise: 50000,
+                  new_amount_paise: 40000,
+                  reason: 'Follow-up tariff correction',
+                  actor_user_id: 1,
+                  actor_username: 'admin',
+                  created_at: '2026-11-16T09:10:00Z',
+                },
+                {
+                  id: 42,
+                  bill_item_id: 1,
+                  kind: 'DISCOUNT',
+                  old_amount_paise: 40000,
+                  new_amount_paise: 35000,
+                  reason: 'Staff courtesy discount',
+                  actor_user_id: 1,
+                  actor_username: 'admin',
+                  created_at: '2026-11-16T09:20:00Z',
+                },
+              ],
+            },
+          ],
+        },
+        ...baseBill.sections.slice(1),
+      ],
+      bill_total_paise: 45000,
+      paid_paise: 0,
+      due_paise: 45000,
+    }
+
+    renderWithClient(<BillPanel visitId={10} initialBill={bill} />)
+
+    const strip = screen.getByTestId('checkout-summary-strip')
+    expect(within(strip).getByText('₹50.00')).toBeInTheDocument()
+    expect(within(strip).queryByText('₹150.00')).not.toBeInTheDocument()
+    expect(within(strip).getByText('included')).toBeInTheDocument()
+    const discountRow = screen.getByText('Discounts applied (included above)')
+    expect(discountRow.parentElement).toHaveTextContent('₹50.00')
+  })
+
+  it('clears discount to ₹0.00 when DISCOUNT (500 → 400) is undone by upward CORRECTION (400 → 500)', () => {
+    const bill: VisitBillOut = {
+      ...baseBill,
+      sections: [
+        {
+          category: 'CONSULTATION',
+          subtotal_paise: 50000,
+          lines: [
+            {
+              ...baseBill.sections[0].lines[0],
+              rate_paise: 50000,
+              amount_paise: 50000,
+              original_amount_paise: 50000,
+              history: [
+                {
+                  id: 51,
+                  bill_item_id: 1,
+                  kind: 'DISCOUNT',
+                  old_amount_paise: 50000,
+                  new_amount_paise: 40000,
+                  reason: 'Entered discount on wrong patient',
+                  actor_user_id: 1,
+                  actor_username: 'admin',
+                  created_at: '2026-11-16T09:10:00Z',
+                },
+                {
+                  id: 52,
+                  bill_item_id: 1,
+                  kind: 'CORRECTION',
+                  old_amount_paise: 40000,
+                  new_amount_paise: 50000,
+                  reason: 'Reverted mistaken discount',
+                  actor_user_id: 1,
+                  actor_username: 'admin',
+                  created_at: '2026-11-16T09:15:00Z',
+                },
+              ],
+            },
+          ],
+        },
+        ...baseBill.sections.slice(1),
+      ],
+      bill_total_paise: 60000,
+      paid_paise: 10000,
+      due_paise: 50000,
+    }
+
+    renderWithClient(<BillPanel visitId={10} initialBill={bill} />)
+
+    const strip = screen.getByTestId('checkout-summary-strip')
+    expect(within(strip).getByText('Discounts')).toBeInTheDocument()
+    expect(within(strip).getByText('₹0.00')).toBeInTheDocument()
+    expect(within(strip).queryByText('included')).not.toBeInTheDocument()
+    expect(screen.queryByText('Discounts applied (included above)')).not.toBeInTheDocument()
+  })
+
+  it('excludes counts_toward_total: false lines from Discounts and sums across multiple active counted lines', () => {
+    const bill: VisitBillOut = {
+      ...baseBill,
+      sections: [
+        {
+          category: 'CONSULTATION',
+          subtotal_paise: 40000,
+          lines: [
+            {
+              ...baseBill.sections[0].lines[0],
+              rate_paise: 40000,
+              amount_paise: 40000,
+              original_amount_paise: 50000,
+              history: [
+                {
+                  id: 61,
+                  bill_item_id: 1,
+                  kind: 'DISCOUNT',
+                  old_amount_paise: 50000,
+                  new_amount_paise: 40000,
+                  reason: 'Consultation discount',
+                  actor_user_id: 1,
+                  actor_username: 'admin',
+                  created_at: '2026-11-16T09:10:00Z',
+                },
+              ],
+            },
+          ],
+        },
+        {
+          category: 'PROCEDURE',
+          subtotal_paise: 0,
+          lines: [
+            {
+              id: 3,
+              visit_id: 10,
+              category: 'PROCEDURE',
+              source: 'DOCTOR',
+              description: 'Package-covered session',
+              quantity: 1,
+              rate_paise: 0,
+              amount_paise: 0,
+              original_amount_paise: 20000,
+              status: 'ACTIVE',
+              counts_toward_total: false,
+              created_by_user_id: 5,
+              created_by_username: 'dr_madan',
+              created_at: '2026-11-16T09:20:00Z',
+              history: [
+                {
+                  id: 62,
+                  bill_item_id: 3,
+                  kind: 'WAIVER',
+                  old_amount_paise: 20000,
+                  new_amount_paise: 0,
+                  reason: 'Excluded from total',
+                  actor_user_id: 1,
+                  actor_username: 'admin',
+                  created_at: '2026-11-16T09:25:00Z',
+                },
+              ],
+            },
+          ],
+        },
+        baseBill.sections[2],
+        {
+          category: 'MEDICINE',
+          subtotal_paise: 5000,
+          lines: [
+            {
+              ...baseBill.sections[3].lines[0],
+              amount_paise: 5000,
+              original_amount_paise: 10000,
+              history: [
+                {
+                  id: 63,
+                  bill_item_id: 2,
+                  kind: 'DISCOUNT',
+                  old_amount_paise: 10000,
+                  new_amount_paise: 5000,
+                  reason: 'Medicine discount',
+                  actor_user_id: 1,
+                  actor_username: 'admin',
+                  created_at: '2026-11-16T09:35:00Z',
+                },
+              ],
+            },
+          ],
+        },
+        baseBill.sections[4],
+      ],
+      bill_total_paise: 45000,
+      paid_paise: 0,
+      due_paise: 45000,
+    }
+
+    renderWithClient(<BillPanel visitId={10} initialBill={bill} />)
+
+    const strip = screen.getByTestId('checkout-summary-strip')
+    // 100.00 (consultation) + 50.00 (medicine) = 150.00; 200.00 waiver on counts_toward_total: false excluded
+    expect(within(strip).getByText('₹150.00')).toBeInTheDocument()
+    expect(within(strip).getByText('included')).toBeInTheDocument()
+    const discountRow = screen.getByText('Discounts applied (included above)')
+    expect(discountRow.parentElement).toHaveTextContent('₹150.00')
+  })
+})

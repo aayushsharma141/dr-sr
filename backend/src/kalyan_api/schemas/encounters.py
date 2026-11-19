@@ -31,6 +31,9 @@ class EncounterCreate(BaseModel):
     appointment_id: int | None = Field(
         default=None, gt=0, description="Optional linked appointment ID"
     )
+    visit_id: int | None = Field(
+        default=None, gt=0, description="Optional linked visit ID for walk-in encounters"
+    )
     department_id: int | None = Field(
         default=None, gt=0, description="Optional department/specialty ID"
     )
@@ -76,6 +79,7 @@ class EncounterRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: int
+    encounter_code: str
     patient_id: int
     patient_urn: str
     patient_name: str
@@ -84,6 +88,7 @@ class EncounterRead(BaseModel):
     doctor_id: int
     doctor_name: str
     appointment_id: int | None = None
+    visit_id: int | None = None
     department_id: int | None = None
     encounter_date: datetime
     symptoms: str

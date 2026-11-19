@@ -7,8 +7,10 @@ Guarantees:
 - Doctor dashboard isolation verifies doctor A and doctor B only observe their own identities.
 """
 
+import hashlib
 import uuid
 from datetime import UTC, datetime
+from decimal import Decimal
 from typing import Any
 
 import pytest
@@ -32,12 +34,22 @@ from kalyan_api.models import (
     Appointment,
     AuthSession,
     BackupSettings,
+    BillItem,
+    BillItemCategory,
+    BillItemSource,
+    BillItemStatus,
     ClinicalEncounter,
+    ClinicalQuickPhrase,
     ClinicSettings,
     ConsultationFee,
     Department,
     Doctor,
+    EncounterDiagnosis,
+    InvestigationOrder,
     Patient,
+    PatientAllergy,
+    PatientCondition,
+    PatientDocument,
     Payment,
     Prescription,
     SecuritySettings,
@@ -293,8 +305,48 @@ def test_rbac_matrix_cell(
                 status="BOOKED",
                 created_by_user_id=admin_u.id,
             )
-            db_session.add(appt)
-            db_session.flush()
+            if row.path.endswith("/priority"):
+                # Classification applies to a patient already waiting for the doctor.
+                appt.status = "ARRIVED"
+                appt.consultation_status = "WAITING"
+                db_session.add(appt)
+                db_session.flush()
+            elif row.path.endswith("/bill-items"):
+                visit = Visit(
+                    patient_id=pat.id,
+                    visit_date=app_clock.ist_today(),
+                    status="OPEN",
+                    opened_by_user_id=admin_u.id,
+                )
+                db_session.add(visit)
+                db_session.flush()
+                appt.visit_id = visit.id
+                appt.status = "ARRIVED"
+                appt.consultation_status = "IN_CONSULTATION"
+                db_session.add(appt)
+                db_session.flush()
+                consult_line = BillItem(
+                    visit_id=visit.id,
+                    patient_id=pat.id,
+                    appointment_id=appt.id,
+                    treatment_plan_id=None,
+                    prescription_item_id=None,
+                    category=BillItemCategory.CONSULTATION.value,
+                    source=BillItemSource.SYSTEM.value,
+                    status=BillItemStatus.ACTIVE.value,
+                    description=f"Consultation Fee - {doc_a_obj.name_en}",
+                    unit=None,
+                    quantity=Decimal("1"),
+                    rate_paise=50000,
+                    original_amount_paise=50000,
+                    amount_paise=50000,
+                    created_by_user_id=admin_u.id,
+                )
+                db_session.add(consult_line)
+                db_session.flush()
+            else:
+                db_session.add(appt)
+                db_session.flush()
             target_entity = appt
             resolved_path = row.path.replace("{id}", str(appt.id))
         else:
@@ -320,6 +372,96 @@ def test_rbac_matrix_cell(
         db_session.flush()
         target_entity = pat
         resolved_path = row.path.replace("{patient_id}", str(pat.id))
+        if "{allergy_id}" in resolved_path:
+            doc_u = make_user(
+                db_session, test_settings, "DOCTOR", f"mat_allergy_doc_{uuid.uuid4().hex[:6]}"
+            )
+            allergy = PatientAllergy(
+                patient_id=pat.id,
+                substance="Aspirin",
+                category="DRUG",
+                severity="MODERATE",
+                reaction="Rash",
+                clinical_notes="Seeded for RBAC matrix",
+                status="ACTIVE",
+                doctor_id=doc_u.doctor_id,
+                recorded_by_user_id=doc_u.id,
+            )
+            db_session.add(allergy)
+            db_session.flush()
+            target_entity = allergy
+            resolved_path = resolved_path.replace("{allergy_id}", str(allergy.id))
+        elif "{condition_id}" in resolved_path:
+            if identity == "doctor_a" and current_user and current_user.doctor_id:
+                cond_doc_id = current_user.doctor_id
+            else:
+                doc = Doctor(name_en=f"Dr. Cond {uuid.uuid4().hex[:6]}")
+                db_session.add(doc)
+                db_session.flush()
+                cond_doc_id = doc.id
+            cond = PatientCondition(
+                patient_id=pat.id,
+                doctor_id=cond_doc_id,
+                condition_name="Matrix Seeded Hypertension",
+                icd10_code="I10",
+                status="ACTIVE",
+                notes="Seeded for RBAC matrix",
+            )
+            db_session.add(cond)
+            db_session.flush()
+            target_entity = cond
+            resolved_path = resolved_path.replace("{condition_id}", str(cond.id))
+        elif "{visit_id}" in resolved_path:
+            opener = make_user(db_session, test_settings, "ADMIN", f"adm_{uuid.uuid4().hex[:6]}")
+            visit = Visit(
+                patient_id=pat.id,
+                visit_date=app_clock.ist_today(),
+                status="OPEN",
+                opened_by_user_id=opener.id,
+            )
+            db_session.add(visit)
+            db_session.flush()
+            target_entity = visit
+            resolved_path = resolved_path.replace("{visit_id}", str(visit.id))
+
+    elif "/api/documents/{document_id}/" in row.path:
+        pat = Patient(
+            urn=f"KH-2026-{uuid.uuid4().hex[:4]}",
+            full_name="Matrix Document Patient",
+            guardian_name="Guardian",
+            gender="M",
+            age_years=30,
+            mobile="9876543210",
+            address="Ara",
+            district="Bhojpur",
+            state="Bihar",
+        )
+        db_session.add(pat)
+        db_session.flush()
+        uploader = make_user(
+            db_session, test_settings, "RECEPTION", f"mat_doc_up_{uuid.uuid4().hex[:6]}"
+        )
+        pdf_bytes = b"%PDF-1.4\n%matrix seeded non-clinical doc\n"
+        test_settings.documents_dir.mkdir(parents=True, exist_ok=True)
+        stored_name = f"{uuid.uuid4().hex}.pdf"
+        (test_settings.documents_dir / stored_name).write_bytes(pdf_bytes)
+        doc = PatientDocument(
+            patient_id=pat.id,
+            title="Matrix Seeded ID Proof",
+            category="ID_PROOF",
+            is_clinical=False,
+            original_filename="matrix_seeded.pdf",
+            stored_filename=stored_name,
+            mime_type="application/pdf",
+            file_size_bytes=len(pdf_bytes),
+            sha256_hex=hashlib.sha256(pdf_bytes).hexdigest(),
+            uploaded_by_user_id=uploader.id,
+            is_archived=False,
+        )
+        db_session.add(doc)
+        db_session.flush()
+        target_entity = doc
+        resolved_path = row.path.replace("{document_id}", str(doc.id))
 
     elif "/api/prescriptions" in row.path:
         doc_a_user = db_session.scalar(select(User).where(User.username.like("mat_doc_a%")))
@@ -365,6 +507,10 @@ def test_rbac_matrix_cell(
             )
             db_session.add(item)
             db_session.flush()
+            if row.path.endswith("/amend"):
+                rx.status = "AUTHORISED"
+                rx.authorised_at = datetime.now(UTC)
+                db_session.flush()
             target_entity = rx
             resolved_path = row.path.replace("{id}", str(rx.id))
         else:
@@ -494,6 +640,8 @@ def test_rbac_matrix_cell(
         target_entity = payment
         if "{id}" in row.path:
             resolved_path = row.path.replace("{id}", str(payment.id))
+        elif "{payment_id}" in row.path:
+            resolved_path = row.path.replace("{payment_id}", str(payment.id))
         else:
             target_entity = type("TargetPayment", (), {"patient_id": pat.id})()
 
@@ -611,8 +759,71 @@ def test_rbac_matrix_cell(
             resolved_path = row.path.replace("{id}", str(enc.id)).replace(
                 "{encounter_id}", str(enc.id)
             )
+            if "{diagnosis_id}" in resolved_path:
+                diag = EncounterDiagnosis(
+                    encounter_id=enc.id,
+                    patient_id=pat.id,
+                    doctor_id=doc_a_id,
+                    diagnosis_name="Matrix Seeded Diagnosis",
+                    icd10_code="M54.5",
+                    diagnosis_type="PRIMARY",
+                    status="ACTIVE",
+                )
+                db_session.add(diag)
+                db_session.flush()
+                target_entity = diag
+                resolved_path = resolved_path.replace("{diagnosis_id}", str(diag.id))
         else:
             target_entity = type("TargetEnc", (), {"patient_id": pat.id, "appointment_id": None})()
+
+    elif "/api/investigations" in row.path:
+        if identity == "doctor_a" and current_user and current_user.doctor_id:
+            doc_a_id = current_user.doctor_id
+        else:
+            doc = Doctor(name_en=f"Dr. Inv {uuid.uuid4().hex[:6]}")
+            db_session.add(doc)
+            db_session.flush()
+            doc_a_id = doc.id
+
+        pat = Patient(
+            urn=f"KH-2026-{uuid.uuid4().hex[:4]}",
+            full_name="Matrix Investigation Patient",
+            guardian_name="Guardian",
+            gender="M",
+            age_years=30,
+            mobile="9876543210",
+            address="Ara",
+            district="Bhojpur",
+            state="Bihar",
+        )
+        db_session.add(pat)
+        db_session.flush()
+
+        admin_u = make_user(db_session, test_settings, "ADMIN", f"adm_{uuid.uuid4().hex[:6]}")
+        enc = ClinicalEncounter(
+            patient_id=pat.id,
+            doctor_id=doc_a_id,
+            symptoms="Fever",
+            clinical_notes="Investigation matrix encounter",
+            diagnosis="Pyrexia",
+            created_by_user_id=admin_u.id,
+        )
+        db_session.add(enc)
+        db_session.flush()
+
+        order = InvestigationOrder(
+            encounter_id=enc.id,
+            patient_id=pat.id,
+            doctor_id=doc_a_id,
+            category="LAB",
+            test_name="Complete Blood Count",
+            priority="ROUTINE",
+            status="ORDERED",
+        )
+        db_session.add(order)
+        db_session.flush()
+        target_entity = order
+        resolved_path = row.path.replace("{order_id}", str(order.id))
 
     elif "/api/follow-ups" in row.path:
         doc_a_user = db_session.scalar(select(User).where(User.username.like("mat_doc_a%")))
@@ -689,6 +900,34 @@ def test_rbac_matrix_cell(
         )
         target_entity = None
 
+    elif "/api/quick-phrases" in row.path:
+        if identity == "doctor_a" and current_user and current_user.doctor_id:
+            doc_a_id = current_user.doctor_id
+        else:
+            doc_a_user = db_session.scalar(select(User).where(User.username.like("mat_doc_a%")))
+            doc_a_id = doc_a_user.doctor_id if doc_a_user else None
+            if not doc_a_id:
+                doc = Doctor(name_en=f"Dr. QP {uuid.uuid4().hex[:6]}")
+                db_session.add(doc)
+                db_session.flush()
+                doc_a_id = doc.id
+
+        if "{id}" in row.path:
+            phrase = ClinicalQuickPhrase(
+                scope="PERSONAL",
+                doctor_id=doc_a_id,
+                department_id=None,
+                department_code=None,
+                section="COMPLAINTS",
+                phrase_text=f"Matrix seeded phrase {uuid.uuid4().hex[:6]}",
+                sort_order=0,
+                is_active=True,
+            )
+            db_session.add(phrase)
+            db_session.flush()
+            target_entity = phrase
+            resolved_path = row.path.replace("{id}", str(phrase.id))
+
     elif "/api/admin/patients" in row.path:
         pat = Patient(
             urn=f"KH-2026-{uuid.uuid4().hex[:4]}",
@@ -704,10 +943,93 @@ def test_rbac_matrix_cell(
         db_session.add(pat)
         db_session.flush()
         target_entity = pat
+
+        if row.path.endswith("/unmerge"):
+            master_pat = Patient(
+                urn=f"KH-2026-{uuid.uuid4().hex[:4]}",
+                full_name="Matrix Master Patient",
+                guardian_name="Guardian",
+                gender="M",
+                age_years=32,
+                mobile="9876543210",
+                address="Ara",
+                district="Bhojpur",
+                state="Bihar",
+            )
+            db_session.add(master_pat)
+            db_session.flush()
+            pat.merged_into_id = master_pat.id
+            pat.merged_at = datetime.now(UTC)
+            pat.merge_reason = "Pre-merge setup"
+            pat.is_active = False
+            db_session.flush()
+        elif row.path.endswith("/unarchive"):
+            pat.is_archived = True
+            pat.archived_at = datetime.now(UTC)
+            pat.archive_reason = "Pre-archive setup"
+            db_session.flush()
+        elif row.path == "/api/admin/patients/merge":
+            master_pat = Patient(
+                urn=f"KH-2026-{uuid.uuid4().hex[:4]}",
+                full_name="Matrix Master Patient",
+                guardian_name="Guardian",
+                gender="M",
+                age_years=32,
+                mobile="9876543210",
+                address="Ara",
+                district="Bhojpur",
+                state="Bihar",
+            )
+            db_session.add(master_pat)
+            db_session.flush()
+            target_entity = type(
+                "TargetMerge", (), {"master_id": master_pat.id, "secondary_id": pat.id}
+            )()
+
         if "{id}" in row.path:
             resolved_path = row.path.replace("{id}", str(pat.id))
         elif "search" in row.path:
             resolved_path = "/api/admin/patients/search?q=Matrix"
+
+    elif "/api/opd-arrivals" in row.path:
+        from kalyan_api.models import PendingOpdArrival
+
+        admin_u = make_user(db_session, test_settings, "ADMIN", f"adm_{uuid.uuid4().hex[:6]}")
+        doc_a_user = db_session.scalar(select(User).where(User.username.like("mat_doc_a%")))
+        doc_a_id = doc_a_user.doctor_id if doc_a_user else None
+        if not doc_a_id:
+            doc = Doctor(name_en=f"Dr. OPD {uuid.uuid4().hex[:6]}")
+            db_session.add(doc)
+            db_session.flush()
+            doc_a_id = doc.id
+        doc_obj = db_session.get(Doctor, doc_a_id)
+        dept = doc_obj.departments[0] if doc_obj.departments else None
+        if not dept:
+            dept = db_session.scalar(select(Department).where(Department.is_active.is_(True)))
+            if not dept:
+                dept = Department(name_en="Physiotherapy / General OPD", is_active=True)
+                db_session.add(dept)
+                db_session.flush()
+            doc_obj.departments.append(dept)
+            db_session.flush()
+
+        arrival = PendingOpdArrival(
+            full_name="Matrix Pending OPD Arrival",
+            age_years=28,
+            mobile="9876543210",
+            doctor_id=doc_a_id,
+            department_id=dept.id,
+            appointment_date=app_clock.ist_today(),
+            token_number=99,
+            priority_level="NORMAL",
+            status="TO_ARRIVE",
+            created_by_user_id=admin_u.id,
+        )
+        db_session.add(arrival)
+        db_session.flush()
+        target_entity = arrival
+        if "{arrival_id}" in row.path:
+            resolved_path = row.path.replace("{arrival_id}", str(arrival.id))
 
     elif "{asset_id}" in row.path:
         from kalyan_api.models import HospitalAsset
@@ -741,7 +1063,7 @@ def test_rbac_matrix_cell(
             batch_id=str(uuid.uuid4()),
             filename="matrix_import.csv",
             total_rows=1,
-            status="STAGED",
+            status="VALIDATED" if row.path.endswith("/commit") else "STAGED",
             created_by_user_id=admin_u.id,
         )
         db_session.add(batch)
@@ -805,6 +1127,85 @@ def test_rbac_matrix_cell(
         target_entity = visit
         if "{id}" in row.path:
             resolved_path = row.path.replace("{id}", str(visit.id))
+
+    elif "/api/bill-items" in row.path:
+        if identity == "reception" and current_user:
+            rec_user = current_user
+        else:
+            rec_user = make_user(
+                db_session, test_settings, "RECEPTION", f"mat_rec_bi_{uuid.uuid4().hex[:6]}"
+            )
+        pat = Patient(
+            urn=f"KH-2026-BI{uuid.uuid4().hex[:4]}",
+            full_name="Matrix Bill Item Patient",
+            guardian_name="Guardian",
+            gender="M",
+            age_years=30,
+            mobile="9876543210",
+            address="Ara",
+            district="Bhojpur",
+            state="Bihar",
+        )
+        db_session.add(pat)
+        db_session.flush()
+        visit = Visit(
+            patient_id=pat.id,
+            visit_date=app_clock.ist_today(),
+            status="OPEN",
+            opened_by_user_id=rec_user.id,
+        )
+        db_session.add(visit)
+        db_session.flush()
+        doc = Doctor(name_en=f"Dr. Bill Item {uuid.uuid4().hex[:6]}")
+        db_session.add(doc)
+        db_session.flush()
+        appt = Appointment(
+            patient_id=pat.id,
+            doctor_id=doc.id,
+            appointment_date=app_clock.ist_today(),
+            token_number=1,
+            status="ARRIVED",
+            consultation_status="COMPLETED",
+            visit_id=visit.id,
+            created_by_user_id=rec_user.id,
+        )
+        db_session.add(appt)
+        db_session.flush()
+        db_session.add(
+            BillItem(
+                visit_id=visit.id,
+                patient_id=pat.id,
+                appointment_id=appt.id,
+                category=BillItemCategory.CONSULTATION.value,
+                source=BillItemSource.SYSTEM.value,
+                status=BillItemStatus.ACTIVE.value,
+                description="Consultation",
+                quantity=Decimal("1"),
+                rate_paise=30000,
+                original_amount_paise=30000,
+                amount_paise=30000,
+                created_by_user_id=rec_user.id,
+            )
+        )
+        line = BillItem(
+            visit_id=visit.id,
+            patient_id=pat.id,
+            category=BillItemCategory.MEDICINE.value,
+            source=BillItemSource.RECEPTION.value,
+            status=BillItemStatus.ACTIVE.value,
+            description="Paracetamol 500mg",
+            unit="strip",
+            quantity=Decimal("2"),
+            rate_paise=5000,
+            original_amount_paise=10000,
+            amount_paise=10000,
+            created_by_user_id=rec_user.id,
+        )
+        db_session.add(line)
+        db_session.flush()
+        target_entity = line
+        if "{id}" in row.path:
+            resolved_path = row.path.replace("{id}", str(line.id))
 
     elif row.path == "/api/users/bulk-delete":
         make_user(
@@ -889,6 +1290,17 @@ def test_rbac_matrix_cell(
             resolved_path,
             files={"file": ("test.csv", b"full_name,mobile\nA,9876543210\n", "text/csv")},
             data={"column_mapping": "{}"},
+        )
+    elif row.path == "/api/patients/{patient_id}/documents" and row.method == "POST":
+        resp = client.request(
+            row.method,
+            resolved_path,
+            files={"file": ("matrix_id_proof.pdf", b"%PDF-1.4\n%matrix\n", "application/pdf")},
+            data={
+                "title": "Matrix ID Proof",
+                "category": "ID_PROOF",
+                "is_clinical": "false",
+            },
         )
     else:
         resp = client.request(row.method, resolved_path, json=body)

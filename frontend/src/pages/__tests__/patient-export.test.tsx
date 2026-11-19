@@ -1,13 +1,18 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { MemoryRouter } from 'react-router'
-import { PatientExportPage } from '../admin/PatientExportPage'
 import { PatientExportDialog } from '../../components/admin/PatientExportDialog'
 
 vi.mock('../../api/queries', () => ({
   useMe: () => ({ data: { full_name: 'System Administrator', role: 'ADMIN' }, isLoading: false }),
   useLogout: () => ({ mutateAsync: vi.fn(), isPending: false }),
+  useDepartments: () => ({
+    data: [
+      { id: 1, name_en: 'Physiotherapy', name_hi: null, description: null, is_active: true, version_id: 1 },
+      { id: 2, name_en: 'Ophthalmology', name_hi: null, description: null, is_active: true, version_id: 1 },
+    ],
+    isPending: false,
+    isError: false,
+  }),
 }))
 
 vi.mock('../../api/branding', () => ({
@@ -19,15 +24,6 @@ vi.mock('../../api/branding', () => ({
     locationLine: 'Ara, Bhojpur, Bihar',
   }),
 }))
-
-function renderWithProviders(ui: React.ReactElement) {
-  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
-  return render(
-    <QueryClientProvider client={queryClient}>
-      <MemoryRouter>{ui}</MemoryRouter>
-    </QueryClientProvider>
-  )
-}
 
 describe('PatientExportPage and PatientExportDialog', () => {
   let originalFetch: typeof global.fetch
@@ -50,14 +46,8 @@ describe('PatientExportPage and PatientExportDialog', () => {
     vi.restoreAllMocks()
   })
 
-  it('renders PatientExportPage and opens export dialog on button click', async () => {
-    renderWithProviders(<PatientExportPage />)
-
-    expect(screen.getByRole('heading', { name: /export patients/i })).toBeInTheDocument()
-    const openBtn = screen.getByRole('button', { name: /export patient dataset/i })
-    expect(openBtn).toBeInTheDocument()
-
-    fireEvent.click(openBtn)
+  it('renders PatientExportDialog when open', async () => {
+    render(<PatientExportDialog open={true} onClose={vi.fn()} />)
 
     expect(await screen.findByRole('dialog')).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: /export patient dataset/i })).toBeInTheDocument()

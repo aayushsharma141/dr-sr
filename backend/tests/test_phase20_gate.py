@@ -38,6 +38,7 @@ import json
 import tarfile
 import uuid
 from datetime import UTC, datetime
+from decimal import Decimal
 from pathlib import Path
 from typing import Any
 from unittest.mock import patch
@@ -51,11 +52,16 @@ from kalyan_api.config import Settings
 from kalyan_api.models import (
     Appointment,
     AuditLog,
+    BillItem,
+    BillItemCategory,
+    BillItemSource,
+    BillItemStatus,
     HospitalAsset,
     Patient,
     PatientImportBatch,
     PrintDocumentType,
     User,
+    Visit,
 )
 from kalyan_api.services.audit_service import AuditAction
 from kalyan_api.services.backup_service import create_backup, verify_backup_bundle
@@ -232,6 +238,15 @@ def test_phase20_demographic_correction_and_snapshot_isolation(
         address=orig_address,
     )
 
+    visit = Visit(
+        patient_id=patient.id,
+        visit_date=datetime.now(UTC).date(),
+        status="OPEN",
+        opened_by_user_id=reception_user.id,
+    )
+    db_session.add(visit)
+    db_session.flush()
+
     appt = Appointment(
         patient_id=patient.id,
         doctor_id=doctor_a_user.doctor_id,
@@ -239,9 +254,27 @@ def test_phase20_demographic_correction_and_snapshot_isolation(
         token_number=1,
         status="ARRIVED",
         consultation_status="WAITING",
+        visit_id=visit.id,
         created_by_user_id=reception_user.id,
     )
     db_session.add(appt)
+    db_session.flush()
+
+    line = BillItem(
+        visit_id=visit.id,
+        patient_id=patient.id,
+        appointment_id=appt.id,
+        category=BillItemCategory.CONSULTATION.value,
+        source=BillItemSource.SYSTEM.value,
+        status=BillItemStatus.ACTIVE.value,
+        description="Consultation fee",
+        quantity=Decimal("1"),
+        rate_paise=45000,
+        original_amount_paise=45000,
+        amount_paise=45000,
+        created_by_user_id=reception_user.id,
+    )
+    db_session.add(line)
     db_session.flush()
 
     rec_c: TestClient = login_client(reception_user)

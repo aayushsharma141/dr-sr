@@ -140,6 +140,7 @@ describe('Patient Registration Screen', () => {
 
     await user.type(screen.getByLabelText(/Full Name \*/i), 'Aarav Kumar')
     await user.type(screen.getByLabelText(/Father \/ Guardian/i), 'Suresh Kumar')
+    await user.click(screen.getByLabelText(/Gender \*/i))
     await user.type(screen.getByLabelText(/Mobile Number \*/i), '9876543210')
     await user.type(screen.getByLabelText(/Age \(Years\)/i), '30')
     await user.type(screen.getByLabelText(/Address \(Village/i), 'Main Bazaar, Ara')
@@ -154,6 +155,137 @@ describe('Patient Registration Screen', () => {
     expect(screen.getAllByText('KH-2026-0001')[0]).toBeInTheDocument()
     expect((capturedBody as any)?.full_name).toBe('Aarav Kumar')
     expect((capturedBody as any)?.mobile).toBe('9876543210')
+  })
+
+  it('promotes a pending To Arrive entry once and shows the registration handoff notice', async () => {
+    const arrival = {
+      id: 77,
+      full_name: 'Nisha Kumari',
+      age_years: 32,
+      mobile: '9876500142',
+      doctor_id: 4,
+      doctor_name_en: 'Dr. Anil Kumar',
+      department_id: 1,
+      department_name: 'General Medicine',
+      appointment_date: '2026-11-16',
+      token_number: 4,
+      priority_level: 'NORMAL',
+      priority_reason: null,
+      status: 'TO_ARRIVE',
+      version_id: 1,
+      created_at: '2026-11-16T03:00:00Z',
+    }
+    const appointment = { id: 501, patient_id: 301, token_number: 4 }
+    const requests: { url: string; method: string; body?: Record<string, unknown> }[] = []
+    const json = (status: number, body: unknown) => ({
+      ok: status < 300,
+      status,
+      headers: new Headers({ 'content-type': 'application/json' }),
+      text: () => Promise.resolve(JSON.stringify(body)),
+    })
+    vi.stubGlobal('fetch', vi.fn().mockImplementation((url: string, init?: RequestInit) => {
+      const method = init?.method ?? 'GET'
+      if (method !== 'GET' && url.includes('/api/opd-arrivals/77/register')) {
+        requests.push({ url, method, body: init?.body ? JSON.parse(init.body as string) : undefined })
+      }
+      if (url.includes('/api/auth/me')) return Promise.resolve(json(200, mockMe))
+      if (url.includes('/api/appointments/501/check-in')) return Promise.resolve(json(200, { ...appointment, status: 'CHECKED_IN' }))
+      if (url.includes('/api/opd-arrivals/77/register')) return Promise.resolve(json(201, appointment))
+      if (url.includes('/api/opd-arrivals/77')) return Promise.resolve(json(200, arrival))
+      if (url.includes('/api/patients/check-duplicate')) return Promise.resolve(json(200, { has_duplicate: false, matching_patient: null }))
+      if (url.includes('/api/system/heartbeat')) return Promise.resolve(json(200, { ok: true }))
+      return Promise.reject(new Error(`Unhandled: ${url}`))
+    }))
+
+    function Destination() {
+      const location = useLocation()
+      const notice = (location.state as { notice?: string } | null)?.notice
+      return <p>{notice}</p>
+    }
+
+    const user = userEvent.setup()
+    render(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter initialEntries={['/reception/patients/new?arrival_id=77']}>
+          <Routes>
+            <Route path="/reception/patients/new" element={<PatientRegister />} />
+            <Route path="/reception/appointments" element={<Destination />} />
+          </Routes>
+        </MemoryRouter>
+      </QueryClientProvider>,
+    )
+
+    expect(await screen.findByDisplayValue('Nisha Kumari')).toHaveProperty('readOnly', true)
+    await user.type(screen.getByLabelText(/Father \/ Guardian/i), 'Suresh Kumar')
+    await user.click(screen.getByLabelText(/Gender \*/i))
+    await user.click(screen.getByRole('radio', { name: 'Female' }))
+    await user.type(screen.getByLabelText(/Address \(Village/i), 'Station Road, Ara')
+    await user.click(screen.getByRole('button', { name: /register patient/i }))
+
+    expect(await screen.findByText(/Patient registered and checked in \(Token #4\)/i)).toBeInTheDocument()
+    expect(requests).toHaveLength(1)
+    expect(requests[0].url).toContain('/api/opd-arrivals/77/register')
+    expect(requests[0].body).toMatchObject({
+      version_id: 1,
+      patient: {
+        full_name: 'Nisha Kumari',
+        age_years: 32,
+        mobile: '9876500142',
+        guardian_name: 'Suresh Kumar',
+        gender: 'F',
+      },
+    })
+  })
+
+  it('offers Male, Female and Other for a new patient and saves Other as O', async () => {
+    const captured: { body: { gender?: string } | null } = { body: null }
+    const json = (status: number, body: unknown) => ({
+      ok: status < 300,
+      status,
+      headers: new Headers({ 'content-type': 'application/json' }),
+      text: () => Promise.resolve(JSON.stringify(body)),
+    })
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockImplementation((url: string, init?: RequestInit) => {
+        if (url.includes('/api/auth/me')) return Promise.resolve(json(200, mockMe))
+        if (url.includes('/api/patients/check-duplicate'))
+          return Promise.resolve(json(200, { has_duplicate: false, matching_patient: null }))
+        if (url.includes('/api/patients') && init?.method === 'POST') {
+          captured.body = JSON.parse(init.body as string)
+          return Promise.resolve(json(201, { ...mockRegisteredPatient, gender: 'O' }))
+        }
+        return Promise.reject(new Error(`Unhandled: ${url}`))
+      }),
+    )
+
+    const user = userEvent.setup()
+    render(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter>
+          <PatientRegister />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    )
+
+    // The Male radio carries the group's label ("Gender *") for the canonical-field check.
+    expect(screen.getByLabelText(/Gender \*/i)).toHaveAttribute('value', 'M')
+    expect(screen.getByRole('radio', { name: 'Female' })).toBeInTheDocument()
+    const other = screen.getByRole('radio', { name: 'Other' })
+    await user.click(other)
+    expect(other).toBeChecked()
+
+    await user.type(screen.getByLabelText(/Full Name \*/i), 'Aarav Kumar')
+    await user.type(screen.getByLabelText(/Father \/ Guardian/i), 'Suresh Kumar')
+    await user.type(screen.getByLabelText(/Mobile Number \*/i), '9876543210')
+    await user.type(screen.getByLabelText(/Age \(Years\)/i), '30')
+    await user.type(screen.getByLabelText(/Address \(Village/i), 'Main Bazaar, Ara')
+    await user.click(screen.getByRole('button', { name: /register patient/i }))
+
+    await waitFor(() => {
+      expect(screen.getByText('Registration Successful!')).toBeInTheDocument()
+    })
+    expect(captured.body?.gender).toBe('O')
   })
 
   it('registers the patient only: no visit or token fields, no visit calls, and the Token Desk is a separate step', async () => {
@@ -205,6 +337,7 @@ describe('Patient Registration Screen', () => {
 
     await user.type(screen.getByLabelText(/Full Name \*/i), 'Aarav Kumar')
     await user.type(screen.getByLabelText(/Father \/ Guardian/i), 'Suresh Kumar')
+    await user.click(screen.getByLabelText(/Gender \*/i))
     await user.type(screen.getByLabelText(/Mobile Number \*/i), '9876543210')
     await user.type(screen.getByLabelText(/Age \(Years\)/i), '30')
     await user.type(screen.getByLabelText(/Address \(Village/i), 'Main Bazaar, Ara')
@@ -217,9 +350,10 @@ describe('Patient Registration Screen', () => {
     // Registration issues no queue token and touches no visit or appointment.
     expect(screen.queryByText(/Allocated Queue Token/i)).not.toBeInTheDocument()
     expect(requests.some((r) => /\/api\/(appointments|visits|encounters)/.test(r))).toBe(false)
-    expect(screen.getByRole('link', { name: /Issue Queue Token at Token Desk/i })).toHaveAttribute(
+    // The next step opens Appointments with this patient already chosen.
+    expect(screen.getByRole('link', { name: 'Check In & Issue Token' })).toHaveAttribute(
       'href',
-      '/reception/tokens',
+      expect.stringMatching(/^\/reception\/appointments\?patient_id=\d+$/),
     )
   })
 
@@ -335,6 +469,8 @@ describe('Registration desk: no second submit and no silent step failures (BR-00
 
   async function fillRequiredFields(user: ReturnType<typeof userEvent.setup>) {
     await user.type(screen.getByLabelText(/Full Name \*/i), 'Aarav Kumar')
+    await user.type(screen.getByLabelText(/Father \/ Guardian/i), 'Suresh Kumar')
+    await user.click(screen.getByLabelText(/Gender \*/i))
     await user.type(screen.getByLabelText(/Mobile Number \*/i), '9876543210')
     await user.type(screen.getByLabelText(/Age \(Years\)/i), '30')
     await user.type(screen.getByLabelText(/Address \(Village/i), 'Main Bazaar, Ara')
@@ -672,7 +808,7 @@ describe('Registration form in edit mode (/reception/patients/:id/edit)', () => 
       notes: '',
     })
     // Never a second registration, a duplicate check, or a visit booking
-    expect(requests.filter((r) => r.method === 'POST')).toHaveLength(0)
+    expect(requests.filter((r) => r.method === 'POST' && !r.url.includes('/api/system/heartbeat'))).toHaveLength(0)
     expect(requests.some((r) => r.url.includes('check-duplicate'))).toBe(false)
     expect(requests.some((r) => r.url.includes('appointments'))).toBe(false)
   })
@@ -702,7 +838,9 @@ describe('Registration form in edit mode (/reception/patients/:id/edit)', () => 
 
     const record = await screen.findByText(/Patient record page\./)
     expect(record).toHaveTextContent('Patient details updated successfully.')
-    const writes = requests.filter((r) => r.method !== 'GET').map((r) => `${r.method} ${r.url}`)
+    const writes = requests
+      .filter((r) => r.method !== 'GET' && !r.url.includes('/api/system/heartbeat'))
+      .map((r) => `${r.method} ${r.url}`)
     expect(writes).toEqual(['PATCH /api/patients/101', 'POST /api/patients/101/photo'])
   })
 
@@ -730,7 +868,7 @@ describe('Registration form in edit mode (/reception/patients/:id/edit)', () => 
     const record = await screen.findByText(/Patient record page\./)
     expect(record).toHaveTextContent('Patient details and photo updated successfully.')
     expect(patches).toHaveLength(1)
-    expect(requests.filter((r) => r.method === 'POST')).toHaveLength(2)
+    expect(requests.filter((r) => r.method === 'POST' && !r.url.includes('/api/system/heartbeat'))).toHaveLength(2)
   })
 
   it('Continue without photo returns to the record and says the photo was not saved', async () => {

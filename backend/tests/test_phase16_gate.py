@@ -158,10 +158,14 @@ def test_phase16_backup_restore_gate(tmp_path: Path) -> None:
         for extra_f in settings.assets_dir.glob("*"):
             if extra_f.is_file():
                 extra_f.unlink()
+    if settings.documents_dir.exists():
+        for extra_f in settings.documents_dir.glob("*"):
+            if extra_f.is_file():
+                extra_f.unlink()
 
     # 5. Integrity Engine Invariant Audit
     with session_scope(settings) as session:
         report = run_integrity_audit(session=session, settings=settings)
-        assert report.total_checks == 7
+        assert report.total_checks == 9
         assert report.is_healthy is True
         assert report.failed_checks == 0

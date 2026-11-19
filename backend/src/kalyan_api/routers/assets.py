@@ -31,10 +31,9 @@ from kalyan_api.services.audit_service import AuditAction
 
 router = APIRouter(tags=["assets"])
 
-_PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent.parent
+_PROJECT_ROOT = Path(__file__).resolve().parents[4]
 _FALLBACK_LOGO_CANDIDATES = [
     _PROJECT_ROOT / "frontend" / "public" / "assets" / "kalyan_hospital_logo.png",
-    _PROJECT_ROOT / "legacy" / "app" / "assets" / "kalyan_hospital_logo.png",
 ]
 
 
@@ -145,17 +144,26 @@ def deactivate_asset(
     principal: Principal = Depends(current_principal),
 ) -> AssetOut:
     """Deactivate an asset without physical file deletion."""
+    asset_to_check = session.get(HospitalAsset, asset_id)
+    if not asset_to_check:
+        raise ApiError(
+            status_code=404,
+            code="asset_not_found",
+            message=f"Hospital asset with ID {asset_id} not found.",
+        )
+    was_active = bool(asset_to_check.is_active)
     asset = asset_service.deactivate_asset(session, asset_id, user_id=principal.user_id)
-    ctx = build_audit_context(request, principal)
-    audit_service.record(
-        session,
-        ctx,
-        AuditAction.ASSET_DEACTIVATED,
-        "HOSPITAL_ASSET",
-        str(asset.id),
-        before={"is_active": True},
-        after={"is_active": False},
-    )
+    if was_active:
+        ctx = build_audit_context(request, principal)
+        audit_service.record(
+            session,
+            ctx,
+            AuditAction.ASSET_DEACTIVATED,
+            "HOSPITAL_ASSET",
+            str(asset.id),
+            before={"is_active": True},
+            after={"is_active": False},
+        )
     return _to_asset_out(asset)
 
 

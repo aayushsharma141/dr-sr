@@ -7,8 +7,9 @@ Guarantees:
 - In-transaction audit trail for all plan lifecycle transitions.
 """
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, Query, Request
 from sqlalchemy import select, true
+from sqlalchemy.orm import Session, selectinload
 
 from kalyan_api import clock
 from kalyan_api.core.errors import ApiError, require_version
@@ -28,19 +29,37 @@ from kalyan_api.core.scope import (
 from kalyan_api.db.session import SessionDep
 from kalyan_api.models import (
     ClinicalEncounter,
+    Department,
     Patient,
     TreatmentPlan,
     TreatmentPlanStatus,
+    doctor_departments,
 )
 from kalyan_api.schemas.treatment_plans import (
     TreatmentPlanCreate,
     TreatmentPlanOut,
     TreatmentPlanUpdate,
 )
-from kalyan_api.services import audit_service
+from kalyan_api.services import audit_service, billing_service, ledger_service
 from kalyan_api.services.audit_service import AuditAction
+from kalyan_api.services.code_sequence_service import effective_patient_ids
 
 router = APIRouter(tags=["treatment-plans"])
+
+
+def _require_physiotherapy_doctor(session: Session, principal: Principal) -> None:
+    """Ensure the doctor belongs to a Physiotherapy department before managing rehab packages."""
+    codes = session.scalars(
+        select(Department.code)
+        .join(doctor_departments, doctor_departments.c.department_id == Department.id)
+        .where(doctor_departments.c.doctor_id == principal.doctor_id)
+    ).all()
+    if not any("PHYSIO" in (code or "").strip().upper() for code in codes):
+        raise ApiError(
+            status_code=403,
+            code="specialty_required",
+            message="Only Physiotherapy doctors can manage physiotherapy treatment packages.",
+        )
 
 
 def _to_plan_out(plan: TreatmentPlan) -> TreatmentPlanOut:
@@ -86,11 +105,13 @@ def create_treatment_plan(
             code="doctor_only",
             message="Only authenticated doctors can create treatment plans.",
         )
+    _require_physiotherapy_doctor(session, principal)
 
     patient = session.get(Patient, payload.patient_id)
     if not patient or not patient.is_active:
         raise ApiError(status_code=404, code="patient_not_found", message="Patient not found.")
 
+    encounter: ClinicalEncounter | None = None
     if payload.encounter_id is not None:
         encounter = get_scoped_or_404(
             session,
@@ -100,16 +121,21 @@ def create_treatment_plan(
             family=ScopeFamily.CLINICAL_WRITE,
             doctor_id_col=ClinicalEncounter.doctor_id,
         )
-        # BR-001: the encounter must belong to the same patient as the plan.
-        if encounter.patient_id != payload.patient_id:
+        # BR-001: the encounter must belong to the same patient (or merged alias) as the plan.
+        if encounter.patient_id not in effective_patient_ids(session, payload.patient_id):
             raise ApiError(
                 status_code=404,
                 code="encounter_not_found",
                 message="Encounter not found for this patient.",
             )
 
+    plan_patient_id = (
+        encounter.patient_id
+        if (payload.encounter_id is not None and encounter is not None)
+        else payload.patient_id
+    )
     plan = TreatmentPlan(
-        patient_id=payload.patient_id,
+        patient_id=plan_patient_id,
         doctor_id=principal.doctor_id,
         encounter_id=payload.encounter_id,
         plan_name=payload.plan_name,
@@ -122,6 +148,13 @@ def create_treatment_plan(
     )
     session.add(plan)
     session.flush()
+    if plan.agreed_price_paise > 0:
+        ledger_service.record_package_charge(
+            session,
+            plan,
+            actor_user_id=principal.user_id,
+            occurred_at=plan.created_at,
+        )
 
     ctx = build_audit_context(request, principal)
     audit_service.record(
@@ -141,6 +174,60 @@ def create_treatment_plan(
     )
 
     return _to_plan_out(plan)
+
+
+@router.get(
+    "/treatment-plans",
+    response_model=list[TreatmentPlanOut],
+    dependencies=[Depends(require(Permission.PLAN_READ))],
+)
+def list_treatment_plans(
+    session: SessionDep,
+    status: str | None = Query(
+        "ACTIVE",
+        description="Filter by status (ACTIVE, COMPLETED, CANCELLED, or ALL)",
+    ),
+    limit: int = Query(50, ge=1, le=200),
+    principal: Principal = Depends(current_principal),
+) -> list[TreatmentPlanOut]:
+    """List treatment plans scoped to the logged-in doctor's roster."""
+    valid_statuses = {s.value for s in TreatmentPlanStatus}
+    status_filter: str | None = None
+    if status is not None:
+        normalized = status.strip().upper()
+        if normalized != "ALL":
+            if normalized not in valid_statuses:
+                raise ApiError(
+                    status_code=422,
+                    code="invalid_plan_status",
+                    message=(
+                        f"Invalid status '{status}'. Must be one of: "
+                        f"{', '.join(sorted(valid_statuses))}, or ALL."
+                    ),
+                )
+            status_filter = normalized
+
+    filters = []
+    if principal.role == Role.DOCTOR:
+        if principal.doctor_id is None:
+            return []
+        filters.append(TreatmentPlan.doctor_id == principal.doctor_id)
+
+    if status_filter is not None:
+        filters.append(TreatmentPlan.status == status_filter)
+
+    stmt = (
+        select(TreatmentPlan)
+        .options(
+            selectinload(TreatmentPlan.patient),
+            selectinload(TreatmentPlan.doctor),
+        )
+        .where(*filters)
+        .order_by(TreatmentPlan.updated_at.desc(), TreatmentPlan.id.desc())
+        .limit(limit)
+    )
+    plans = session.execute(stmt).scalars().all()
+    return [_to_plan_out(p) for p in plans]
 
 
 @router.get(
@@ -191,9 +278,10 @@ def list_patient_treatment_plans(
         if principal.role in (Role.ADMIN, Role.RECEPTION)
         else row_scope(principal, ScopeFamily.CLINICAL_READ, TreatmentPlan.doctor_id)
     )
+    patient_ids = effective_patient_ids(session, patient_id)
     stmt = (
         select(TreatmentPlan)
-        .where(TreatmentPlan.patient_id == patient_id, scope_expr)
+        .where(TreatmentPlan.patient_id.in_(patient_ids), scope_expr)
         .order_by(TreatmentPlan.created_at.desc())
     )
 
@@ -250,12 +338,27 @@ def update_treatment_plan(
             message="Cancelled treatment plans cannot be modified.",
         )
 
+    old_agreed_price = plan.agreed_price_paise
     before_state = {
         "plan_name": plan.plan_name,
         "total_sessions": plan.total_sessions,
         "status": plan.status,
         "version_id": plan.version_id,
     }
+
+    if payload.total_sessions is not None and payload.total_sessions < plan.completed_sessions:
+        raise ApiError(
+            status_code=422,
+            code="total_sessions_less_than_completed",
+            message=(
+                f"Total sessions ({payload.total_sessions}) cannot be less than "
+                f"already completed sessions ({plan.completed_sessions})."
+            ),
+        )
+
+    effective_total = (
+        payload.total_sessions if payload.total_sessions is not None else plan.total_sessions
+    )
 
     is_cancellation = False
     if payload.status == TreatmentPlanStatus.CANCELLED:
@@ -268,6 +371,17 @@ def update_treatment_plan(
         plan.status = TreatmentPlanStatus.CANCELLED.value
         plan.cancellation_reason = payload.cancellation_reason.strip()
         is_cancellation = True
+    elif payload.status == TreatmentPlanStatus.COMPLETED:
+        if plan.completed_sessions < effective_total:
+            raise ApiError(
+                status_code=422,
+                code="sessions_incomplete",
+                message=(
+                    f"Cannot mark plan as completed: "
+                    f"{plan.completed_sessions}/{effective_total} sessions completed."
+                ),
+            )
+        plan.status = TreatmentPlanStatus.COMPLETED.value
     elif payload.status is not None:
         plan.status = payload.status.value
 
@@ -278,22 +392,41 @@ def update_treatment_plan(
     if payload.referred_by is not None:
         plan.referred_by = payload.referred_by
     if payload.total_sessions is not None:
-        if payload.total_sessions < plan.completed_sessions:
-            raise ApiError(
-                status_code=422,
-                code="total_sessions_less_than_completed",
-                message=(
-                    f"Total sessions ({payload.total_sessions}) cannot be less than "
-                    f"already completed sessions ({plan.completed_sessions})."
-                ),
-            )
         plan.total_sessions = payload.total_sessions
         if plan.completed_sessions >= plan.total_sessions:
             plan.status = TreatmentPlanStatus.COMPLETED.value
 
+    if getattr(payload, "agreed_price_paise", None) is not None:
+        plan.agreed_price_paise = payload.agreed_price_paise
+
     plan.version_id += 1
     plan.updated_at = clock.utcnow()
     session.flush()
+
+    if plan.agreed_price_paise != old_agreed_price:
+        ledger_service.record_package_adjustment(
+            session,
+            plan,
+            delta_paise=plan.agreed_price_paise - old_agreed_price,
+            actor_user_id=principal.user_id,
+            occurred_at=plan.updated_at,
+        )
+
+    if is_cancellation and plan.agreed_price_paise > 0:
+        net_paid = billing_service.package_net_paid_paise(session, plan.id)
+        uncollected = max(0, plan.agreed_price_paise - net_paid)
+        if uncollected > 0:
+            reason_suffix = (
+                f" ({plan.cancellation_reason})" if plan.cancellation_reason else ""
+            )
+            ledger_service.record_package_adjustment(
+                session,
+                plan,
+                delta_paise=-uncollected,
+                description=f"Package Cancelled: {plan.plan_name}{reason_suffix}",
+                actor_user_id=principal.user_id,
+                occurred_at=plan.updated_at,
+            )
 
     ctx = build_audit_context(request, principal)
     audit_service.record(

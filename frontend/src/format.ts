@@ -25,13 +25,15 @@ export function formatToken(
 ): string {
   if (tokenNumber == null) return '—'
   const code = cabinCode?.trim()
-  return code ? `${code}-${String(tokenNumber).padStart(2, '0')}` : `#${tokenNumber}`
+  return code ? `${code}-${tokenNumber}` : `#${tokenNumber}`
 }
 
-/** Paise as rupees with two decimals and Indian digit grouping: 4000050 -> "₹40,000.50". */
+/** Paise as rupees with two decimals and Indian digit grouping: 4000050 -> "₹40,000.50", -5050 -> "-₹50.50". */
 export function formatPaise(paise: number): string {
-  const rupees = Math.floor(paise / 100).toLocaleString('en-IN')
-  return `₹${rupees}.${String(paise % 100).padStart(2, '0')}`
+  const sign = paise < 0 ? '-' : ''
+  const abs = Math.abs(paise)
+  const rupees = Math.floor(abs / 100).toLocaleString('en-IN')
+  return `${sign}₹${rupees}.${String(abs % 100).padStart(2, '0')}`
 }
 
 /** A timestamp in IST for receipts and ledgers: "14 Nov 2026, 10:30 am". */

@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import type { PaymentOut } from '../api/types'
 import { useReversePayment } from '../api/queries'
 import { Modal } from './Modal'
@@ -18,6 +18,11 @@ export const PaymentReversalModal: React.FC<PaymentReversalModalProps> = ({
 }) => {
   const [reason, setReason] = useState<string>('')
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
+
+  useEffect(() => {
+    setReason('')
+    setErrorMessage(null)
+  }, [isOpen, payment?.id])
 
   const reversePayment = useReversePayment()
 
@@ -76,7 +81,7 @@ export const PaymentReversalModal: React.FC<PaymentReversalModalProps> = ({
 
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
-          <label htmlFor="reversal-reason" className="block text-xs font-semibold uppercase tracking-wider text-slate-700">
+          <label htmlFor="reversal-reason" className="block text-xs font-semibold text-slate-700">
             Mandatory Reversal Justification *
           </label>
           <textarea

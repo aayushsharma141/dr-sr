@@ -51,14 +51,50 @@ const DOCTORS = [
   },
 ]
 
+export interface LetterheadAuthoringDoctor {
+  name: string
+  qualification?: string | null
+  registrationNumber?: string | null
+}
+
+const HARDCODED_PHYSIO_DOCTOR_PATTERNS = [
+  /madan\s+mohan\s+dwivedi/i,
+  /chandan\s+kr\.?\s+dwivedi/i,
+  /chandan\s+kumar\s+dwivedi/i,
+]
+
+export function isPhysiotherapyDepartment(departmentName?: string | null): boolean {
+  return Boolean(departmentName && /physio/i.test(departmentName))
+}
+
+export function isHardcodedPhysioDoctor(doctorName?: string | null): boolean {
+  if (!doctorName) return false
+  return HARDCODED_PHYSIO_DOCTOR_PATTERNS.some((re) => re.test(doctorName))
+}
+
 export function LetterheadBanner({
   clinicName,
   clinicNameHi,
+  departmentName,
+  authoringDoctor,
+  useAuthoringDoctorHeader,
 }: {
   clinicName: string
   /** Hindi hospital name from settings; printed under the English name when set. */
   clinicNameHi?: string | null
+  /** Department subtitle; falls back to Physiotherapy Department when omitted for RegistrationCard compatibility. */
+  departmentName?: string | null
+  /** Authoring doctor block; when present without departmentName, prevents defaulting to Physiotherapy Department */
+  authoringDoctor?: LetterheadAuthoringDoctor | null
+  /** Explicit flag indicating whether an authoring doctor header is active */
+  useAuthoringDoctorHeader?: boolean
 }) {
+  const isAuthoringActive = Boolean(authoringDoctor || useAuthoringDoctorHeader)
+  const departmentSubtitle = departmentName?.trim()
+    ? departmentName.trim()
+    : isAuthoringActive
+      ? ''
+      : 'Physiotherapy Department'
   return (
     <div
       data-testid="letterhead-banner"
@@ -82,16 +118,51 @@ export function LetterheadBanner({
             {clinicNameHi}
           </p>
         )}
-        <p className="mt-1.5 font-serif text-[13px] font-bold uppercase tracking-[0.32em]">
-          Physiotherapy Department
-        </p>
+        {departmentSubtitle ? (
+          <p
+            data-testid="letterhead-department"
+            className="mt-1.5 font-serif text-[13px] font-bold uppercase tracking-[0.32em]"
+          >
+            {departmentSubtitle}
+          </p>
+        ) : null}
       </div>
       <span />
     </div>
   )
 }
 
-export function LetterheadDoctors() {
+export function LetterheadDoctors({
+  authoringDoctor,
+}: {
+  authoringDoctor?: LetterheadAuthoringDoctor | null
+} = {}) {
+  if (authoringDoctor) {
+    return (
+      <div
+        data-testid="letterhead-authoring-doctor"
+        className="mt-2 flex flex-col items-center justify-center gap-0.5 text-center"
+      >
+        <p
+          className="font-serif text-[17px] font-bold italic leading-tight"
+          style={{ color: PRINT_CRIMSON }}
+        >
+          {authoringDoctor.name}
+        </p>
+        {authoringDoctor.qualification && (
+          <p className="text-[11px] font-medium leading-[1.3] text-black">
+            {authoringDoctor.qualification}
+          </p>
+        )}
+        {authoringDoctor.registrationNumber && (
+          <p className="text-[11px] leading-[1.3] text-slate-700">
+            Reg. No.: {authoringDoctor.registrationNumber}
+          </p>
+        )}
+      </div>
+    )
+  }
+
   return (
     <div className="mt-2 grid grid-cols-[1fr_40mm_1fr] items-start gap-2 text-center">
       {[DOCTORS[0], null, DOCTORS[1]].map((doctor, index) =>

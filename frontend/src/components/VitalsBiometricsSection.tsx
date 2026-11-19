@@ -67,7 +67,7 @@ export function VitalsBiometricsSection({
           >
             <span>BMI: {displayBmi} kg/m²</span>
             {bmiInfo.category && (
-              <span className="px-1.5 py-0.5 rounded text-xs font-bold uppercase tracking-wider bg-white/60">
+              <span className="px-1.5 py-0.5 rounded text-xs font-bold bg-white/60">
                 {bmiInfo.category}
               </span>
             )}
@@ -80,7 +80,7 @@ export function VitalsBiometricsSection({
         <div>
           <label
             htmlFor={`${uid}-height`}
-            className="block text-xs font-semibold text-neutral-700 uppercase tracking-wider mb-1"
+            className="block text-xs font-semibold text-neutral-700 mb-1"
           >
             Height (cm)
           </label>
@@ -103,7 +103,7 @@ export function VitalsBiometricsSection({
         <div>
           <label
             htmlFor={`${uid}-weight`}
-            className="block text-xs font-semibold text-neutral-700 uppercase tracking-wider mb-1"
+            className="block text-xs font-semibold text-neutral-700 mb-1"
           >
             Weight (kg)
           </label>
@@ -126,7 +126,7 @@ export function VitalsBiometricsSection({
         <div>
           <label
             htmlFor={`${uid}-sys-bp`}
-            className="block text-xs font-semibold text-neutral-700 uppercase tracking-wider mb-1"
+            className="block text-xs font-semibold text-neutral-700 mb-1"
           >
             Systolic BP (mmHg)
           </label>
@@ -148,7 +148,7 @@ export function VitalsBiometricsSection({
         <div>
           <label
             htmlFor={`${uid}-dia-bp`}
-            className="block text-xs font-semibold text-neutral-700 uppercase tracking-wider mb-1"
+            className="block text-xs font-semibold text-neutral-700 mb-1"
           >
             Diastolic BP (mmHg)
           </label>
@@ -170,7 +170,7 @@ export function VitalsBiometricsSection({
         <div>
           <label
             htmlFor={`${uid}-pulse`}
-            className="block text-xs font-semibold text-neutral-700 uppercase tracking-wider mb-1"
+            className="block text-xs font-semibold text-neutral-700 mb-1"
           >
             Pulse (bpm)
           </label>
@@ -192,7 +192,7 @@ export function VitalsBiometricsSection({
         <div>
           <label
             htmlFor={`${uid}-temp`}
-            className="block text-xs font-semibold text-neutral-700 uppercase tracking-wider mb-1"
+            className="block text-xs font-semibold text-neutral-700 mb-1"
           >
             Temperature (°F)
           </label>
@@ -215,7 +215,7 @@ export function VitalsBiometricsSection({
         <div>
           <label
             htmlFor={`${uid}-rr`}
-            className="block text-xs font-semibold text-neutral-700 uppercase tracking-wider mb-1"
+            className="block text-xs font-semibold text-neutral-700 mb-1"
           >
             Resp Rate (/min)
           </label>
@@ -237,7 +237,7 @@ export function VitalsBiometricsSection({
         <div>
           <label
             htmlFor={`${uid}-spo2`}
-            className="block text-xs font-semibold text-neutral-700 uppercase tracking-wider mb-1"
+            className="block text-xs font-semibold text-neutral-700 mb-1"
           >
             SpO2 (%)
           </label>

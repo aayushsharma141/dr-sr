@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router'
 import { useChangePassword, useLogout, useMe } from '../api/queries'
 import { ApiError } from '../api/client'
 import { ROLE_HOME } from '../auth/roles'
+import { toast } from '../components/ToastHost'
 
 export function ChangePassword() {
   const navigate = useNavigate()
@@ -17,8 +18,6 @@ export function ChangePassword() {
   const [currentPasswordError, setCurrentPasswordError] = useState<string | null>(null)
   const [newPasswordError, setNewPasswordError] = useState<string | null>(null)
   const [confirmPasswordError, setConfirmPasswordError] = useState<string | null>(null)
-  const [generalError, setGeneralError] = useState<string | null>(null)
-  const [successMessage, setSuccessMessage] = useState<string | null>(null)
 
   const handleSignOut = async () => {
     try {
@@ -33,7 +32,6 @@ export function ChangePassword() {
     setCurrentPasswordError(null)
     setNewPasswordError(null)
     setConfirmPasswordError(null)
-    setGeneralError(null)
 
     // Client-side mismatch validation
     if (newPassword !== confirmPassword) {
@@ -51,7 +49,7 @@ export function ChangePassword() {
         current_password: currentPassword,
         new_password: newPassword,
       })
-      setSuccessMessage('Password changed successfully.')
+      toast.success('Password changed successfully.')
 
       // Refresh 'me' to clear must_change_password flag
       const updatedMeResult = await refetchMe()
@@ -68,10 +66,10 @@ export function ChangePassword() {
         } else if (err.code === 'password_policy') {
           setNewPasswordError(err.message)
         } else {
-          setGeneralError(err.message)
+          toast.error(err.message)
         }
       } else {
-        setGeneralError('Failed to change password. Please check your connection.')
+        toast.error('Failed to change password. Please check your connection.')
       }
     }
   }
@@ -99,18 +97,6 @@ export function ChangePassword() {
             Sign out
           </button>
         </div>
-
-        {generalError && (
-          <div role="alert" className="p-3 bg-red-50 border border-red-200 rounded text-sm text-red-900">
-            {generalError}
-          </div>
-        )}
-
-        {successMessage && (
-          <div role="status" className="p-3 bg-green-50 border border-green-200 rounded text-sm text-green-900">
-            {successMessage}
-          </div>
-        )}
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>

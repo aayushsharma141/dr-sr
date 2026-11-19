@@ -319,7 +319,8 @@ def test_from_phone_booking_to_patient_out(
     assert booking["token_number"] is None
 
     arrived = reception.post(
-        f"/api/appointments/{booking['id']}/check-in", json={"version_id": booking["version_id"]}
+        f"/api/appointments/{booking['id']}/check-in",
+        json={"version_id": booking["version_id"], "referral_source": "SELF"},
     ).json()
     assert (arrived["token_number"], arrived["consultation_status"]) == (1, "WAITING")
 

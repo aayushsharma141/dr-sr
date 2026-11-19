@@ -14,6 +14,8 @@ import { TableSkeleton } from '../components/AdminSkeleton'
 import { ConflictBanner } from '../components/ConflictBanner'
 import { InlineAlert } from '../components/InlineAlert'
 import { Modal } from '../components/Modal'
+import { toast } from '../components/ToastHost'
+import { formatPaise } from '../format'
 import type { DoctorOut, DoctorCreate, DoctorUpdate, FeeOut } from '../api/types'
 
 interface DoctorForm {
@@ -84,7 +86,7 @@ function rupeesToPaise(value: string): number | null {
 }
 
 function formatRupees(paise: number): string {
-  return `₹${(paise / 100).toFixed(2)}`
+  return formatPaise(paise)
 }
 
 /** Readable messages from an error, including the per-field messages of a 422 validation_error. */
@@ -104,18 +106,18 @@ function errorMessages(err: unknown, fallback: string): string[] {
 }
 
 const INPUT_CLASS =
-  'w-full px-3 py-2 border border-neutral-300 rounded min-h-11 text-neutral-900 bg-white focus-visible:outline-2 focus-visible:outline-[#8E1C3D]'
+  'min-h-[38px] w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 transition-colors duration-150 focus:border-[#8E1C3D] focus:outline-none focus:ring-2 focus:ring-[#8E1C3D]/15'
 const PRIMARY_BUTTON =
-  'px-4 py-2 text-sm font-semibold text-white bg-[#8E1C3D] hover:bg-[#5D0B26] rounded min-h-11 min-w-11 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#8E1C3D] disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed'
+  'inline-flex min-h-[38px] items-center justify-center rounded-lg bg-[#8E1C3D] px-3.5 py-2 text-sm font-medium text-white transition-colors duration-150 hover:bg-[#5D0B26] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#8E1C3D] disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed'
 const SECONDARY_BUTTON =
-  'px-4 py-2 text-sm font-medium text-neutral-800 bg-white border border-neutral-300 hover:bg-neutral-100 rounded min-h-11 min-w-11 focus-visible:outline-2 focus-visible:outline-[#8E1C3D] disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed'
+  'inline-flex min-h-[38px] items-center justify-center rounded-lg border border-slate-300 bg-white px-3.5 py-2 text-sm font-medium text-slate-700 transition-colors duration-150 hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#8E1C3D] disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed shadow-2xs'
 const ROW_BUTTON =
-  'px-3 py-2 text-sm font-medium text-neutral-800 bg-neutral-100 hover:bg-neutral-200 rounded min-h-11 min-w-11 focus-visible:outline-2 focus-visible:outline-[#8E1C3D] disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed'
+  'inline-flex min-h-[34px] items-center justify-center rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 transition-colors duration-150 hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#8E1C3D] disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed shadow-2xs'
 
 function StatusBadge({ active }: { active: boolean }) {
   return (
     <span
-      className={`inline-block px-2 py-0.5 text-sm font-semibold rounded-full ${
+      className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${
         active ? 'bg-green-100 text-green-900' : 'bg-neutral-200 text-neutral-800'
       }`}
     >
@@ -128,9 +130,21 @@ type DiscardTarget = 'doctor' | 'fee'
 
 export function Doctors() {
   const { data: me } = useMe()
-  const { data: doctors, isPending: doctorsLoading, refetch: refetchDoctors } = useDoctors()
+  const {
+    data: doctors,
+    isPending: doctorsLoading,
+    isError: doctorsIsError,
+    error: doctorsError,
+    refetch: refetchDoctors,
+  } = useDoctors()
   // All fees (active and inactive); "Show inactive" only filters what is displayed.
-  const { data: fees, isPending: feesLoading, refetch: refetchFees } = useFees()
+  const {
+    data: fees,
+    isPending: feesLoading,
+    isError: feesIsError,
+    error: feesError,
+    refetch: refetchFees,
+  } = useFees()
 
   const createDoctorMutation = useCreateDoctor()
   const updateDoctorMutation = useUpdateDoctor()
@@ -160,8 +174,6 @@ export function Doctors() {
   const [reactivatingFeeId, setReactivatingFeeId] = useState<number | null>(null)
   const [feeListConflict, setFeeListConflict] = useState(false)
   const [feeListReloading, setFeeListReloading] = useState(false)
-  const [feeListError, setFeeListError] = useState<string | null>(null)
-  const [feeListSuccess, setFeeListSuccess] = useState<string | null>(null)
 
   const [discardTarget, setDiscardTarget] = useState<DiscardTarget | null>(null)
 
@@ -253,6 +265,7 @@ export function Doctors() {
 
       try {
         await updateDoctorMutation.mutateAsync({ id: editingDoctor.id, body })
+        toast.success(`Updated doctor profile: ${docForm.name_en.trim()}.`)
         closeDoctorModal()
       } catch (err) {
         if (err instanceof ApiError && err.status === 409) {
@@ -277,6 +290,7 @@ export function Doctors() {
 
       try {
         await createDoctorMutation.mutateAsync(body)
+        toast.success(`Added doctor profile: ${docForm.name_en.trim()}.`)
         closeDoctorModal()
       } catch (err) {
         if (err instanceof ApiError && err.status === 409 && err.code === 'cabin_code_taken') {
@@ -362,6 +376,7 @@ export function Doctors() {
             version_id: editingFee.version_id,
           },
         })
+        toast.success(`Updated fee rate "${feeForm.name.trim()}".`)
         closeFeeModal()
       } catch (err) {
         if (err instanceof ApiError && err.status === 409) {
@@ -373,6 +388,7 @@ export function Doctors() {
     } else {
       try {
         await createFeeMutation.mutateAsync({ name: feeForm.name.trim(), fee_paise: feePaise })
+        toast.success(`Added fee rate "${feeForm.name.trim()}".`)
         closeFeeModal()
       } catch (err) {
         setFeeErrors(errorMessages(err, 'Failed to create fee schedule'))
@@ -381,8 +397,6 @@ export function Doctors() {
   }
 
   const handleReactivateFee = async (fee: FeeOut) => {
-    setFeeListError(null)
-    setFeeListSuccess(null)
     setReactivatingFeeId(fee.id)
     try {
       await updateFeeMutation.mutateAsync({
@@ -390,12 +404,12 @@ export function Doctors() {
         body: { name: fee.name, fee_paise: fee.fee_paise, is_active: true, version_id: fee.version_id },
       })
       setFeeListConflict(false)
-      setFeeListSuccess(`Fee rate "${fee.name}" is active again.`)
+      toast.success(`Fee rate "${fee.name}" is active again.`)
     } catch (err) {
       if (err instanceof ApiError && err.status === 409) {
         setFeeListConflict(true)
       } else {
-        setFeeListError(errorMessages(err, 'Failed to reactivate fee rate').join(' '))
+        toast.error(errorMessages(err, 'Failed to reactivate fee rate').join(' '))
       }
     } finally {
       setReactivatingFeeId(null)
@@ -419,16 +433,24 @@ export function Doctors() {
 
   return (
     <AppShell name={me?.full_name ?? 'Admin'} role={me?.role ?? 'ADMIN'}>
-      <div className="mx-auto w-full max-w-[1600px] space-y-6">
+      <div className="mx-auto w-full max-w-[1600px] space-y-5">
+        <h1 className="text-xl sm:text-2xl font-semibold tracking-tight leading-tight text-slate-900">
+          Doctors &amp; Fees
+        </h1>
+
         {/* Doctors Section */}
-        <h1 className="text-xl font-bold tracking-tight text-slate-900">Doctors &amp; Fees</h1>
-        <section aria-labelledby="doctors-heading" className="space-y-4">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <h2 id="doctors-heading" className="text-lg font-semibold text-neutral-900">
+        <section
+          aria-labelledby="doctors-heading"
+          className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-2xs"
+        >
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 px-5 py-4">
+            <div className="min-w-0">
+              <h2 id="doctors-heading" className="text-base font-semibold tracking-tight text-slate-900">
                 Doctor Profiles
               </h2>
-              <p className="text-sm text-neutral-600">Manage doctor credentials, qualifications, and default fees</p>
+              <p className="mt-0.5 text-xs text-slate-600">
+                Credentials, qualifications and default fees
+              </p>
             </div>
             <button type="button" onClick={openCreateDoctor} className={PRIMARY_BUTTON}>
               Add Doctor
@@ -436,40 +458,69 @@ export function Doctors() {
           </div>
 
           {doctorsLoading ? (
-            <TableSkeleton label="Loading doctors..." rows={4} columns={7} />
+            <div className="p-4">
+              <TableSkeleton label="Loading doctors..." rows={4} columns={8} />
+            </div>
+          ) : doctorsIsError ? (
+            <div className="p-4">
+              <InlineAlert
+                tone="error"
+                action={
+                  <button type="button" onClick={() => void refetchDoctors()} className={SECONDARY_BUTTON}>
+                    Retry
+                  </button>
+                }
+              >
+                Failed to load doctor profiles: {doctorsError instanceof Error ? doctorsError.message : 'Unable to reach server.'}
+              </InlineAlert>
+            </div>
           ) : (
-            <div className="bg-white rounded-lg border border-neutral-200 overflow-x-auto shadow-xs">
-              <table className="w-full text-left text-sm text-neutral-800">
-                <thead className="bg-neutral-50 border-b border-neutral-200 text-xs font-semibold text-neutral-700 uppercase tracking-wider">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-sm text-slate-800">
+                <thead className="border-b border-slate-200 bg-slate-50 text-xs font-semibold text-slate-600">
                   <tr>
-                    <th scope="col" className="px-4 py-3">Doctor Name</th>
-                    <th scope="col" className="px-4 py-3">Hindi Name</th>
-                    <th scope="col" className="px-4 py-3">Qualification</th>
-                    <th scope="col" className="px-4 py-3">Registration No</th>
-                    <th scope="col" className="px-4 py-3">Cabin</th>
-                    <th scope="col" className="px-4 py-3 text-right">Default Fee</th>
-                    <th scope="col" className="px-4 py-3">Status</th>
-                    <th scope="col" className="px-4 py-3 text-right">Actions</th>
+                    <th scope="col" className="whitespace-nowrap px-4 py-3">Doctor Name</th>
+                    <th scope="col" className="whitespace-nowrap px-4 py-3">Hindi Name</th>
+                    <th scope="col" className="whitespace-nowrap px-4 py-3">Qualification</th>
+                    <th scope="col" className="whitespace-nowrap px-4 py-3">Registration No</th>
+                    <th scope="col" className="whitespace-nowrap px-4 py-3">Cabin</th>
+                    <th scope="col" className="whitespace-nowrap px-4 py-3 text-right">Default Fee</th>
+                    <th scope="col" className="whitespace-nowrap px-4 py-3">Status</th>
+                    <th scope="col" className="whitespace-nowrap px-4 py-3 text-right">Actions</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-neutral-200">
+                <tbody className="divide-y divide-slate-100">
                   {doctors && doctors.length > 0 ? (
-                    doctors.map((doc, index) => (
-                      <tr key={doc.id} className="hover:bg-neutral-50 transition-colors" style={{ transitionDelay: `${index * 50}ms` }}>
-                        <td className="px-4 py-3 font-medium text-neutral-900">{doc.name_en}</td>
-                        <td className="px-4 py-3 text-neutral-700" lang={doc.name_hi ? 'hi' : undefined}>
-                          {doc.name_hi || '-'}
+                    doctors.map((doc) => (
+                      <tr key={doc.id} className="transition-colors duration-150 hover:bg-slate-50/80">
+                        <td className="max-w-[220px] px-4 py-3">
+                          <div className="min-w-0 truncate font-medium text-slate-900" title={doc.name_en}>
+                            {doc.name_en}
+                          </div>
                         </td>
-                        <td className="px-4 py-3 text-neutral-700">{doc.qualification || '-'}</td>
-                        <td className="px-4 py-3 font-mono text-neutral-700">{doc.registration_number || '-'}</td>
-                        <td className="px-4 py-3 font-mono font-semibold text-neutral-800">{doc.cabin_code || '-'}</td>
-                        <td className="px-4 py-3 text-right font-medium tabular-nums text-neutral-900">
+                        <td className="max-w-[200px] px-4 py-3 text-slate-700" lang={doc.name_hi ? 'hi' : undefined}>
+                          <div className="min-w-0 truncate" title={doc.name_hi || undefined}>
+                            {doc.name_hi || '-'}
+                          </div>
+                        </td>
+                        <td className="max-w-[220px] px-4 py-3 text-slate-700">
+                          <div className="min-w-0 truncate" title={doc.qualification || undefined}>
+                            {doc.qualification || '-'}
+                          </div>
+                        </td>
+                        <td className="whitespace-nowrap px-4 py-3 font-mono text-xs tabular-nums text-slate-700">
+                          {doc.registration_number || '-'}
+                        </td>
+                        <td className="whitespace-nowrap px-4 py-3 font-mono text-xs font-semibold tabular-nums text-slate-800">
+                          {doc.cabin_code || '-'}
+                        </td>
+                        <td className="whitespace-nowrap px-4 py-3 text-right font-mono text-sm font-semibold tabular-nums text-slate-900">
                           {formatRupees(doc.default_fee_paise)}
                         </td>
-                        <td className="px-4 py-3">
+                        <td className="whitespace-nowrap px-4 py-3">
                           <StatusBadge active={doc.is_active} />
                         </td>
-                        <td className="px-4 py-3 text-right">
+                        <td className="whitespace-nowrap px-4 py-3 text-right">
                           <button
                             type="button"
                             onClick={() => openEditDoctor(doc)}
@@ -483,8 +534,11 @@ export function Doctors() {
                     ))
                   ) : (
                     <tr>
-                      <td colSpan={7} className="px-4 py-6 text-center text-neutral-600">
-                        No doctors registered yet.
+                      <td colSpan={8} className="px-6 py-10 text-center">
+                        <p className="text-sm font-medium text-slate-700">No doctors registered yet.</p>
+                        <p className="mt-1 text-xs text-slate-600">
+                          Use Add Doctor to configure practitioner profiles, cabins, and consultation fees.
+                        </p>
                       </td>
                     </tr>
                   )}
@@ -495,25 +549,30 @@ export function Doctors() {
         </section>
 
         {/* Consultation Fees Section */}
-        <section aria-labelledby="fees-heading" className="space-y-4 pt-6 border-t border-neutral-200">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <h2 id="fees-heading" className="text-lg font-semibold text-neutral-900">
+        <section
+          aria-labelledby="fees-heading"
+          className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-2xs"
+        >
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 px-5 py-4">
+            <div className="min-w-0">
+              <h2 id="fees-heading" className="text-base font-semibold tracking-tight text-slate-900">
                 Consultation Fee Schedules
               </h2>
-              <p className="text-sm text-neutral-600">Configure standard fee rates used across departments and billing</p>
+              <p className="mt-0.5 text-xs text-slate-600">
+                Configure standard fee rates used across departments and billing
+              </p>
             </div>
-            <div className="flex flex-wrap items-center gap-3">
+            <div className="flex flex-wrap items-center gap-2.5 sm:gap-3">
               <label
                 htmlFor="fees-show-inactive"
-                className="inline-flex min-h-11 cursor-pointer items-center gap-2 text-sm font-medium text-neutral-800"
+                className="inline-flex min-h-[38px] cursor-pointer items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 text-xs font-medium tabular-nums text-slate-700 transition-colors duration-150 hover:bg-slate-100"
               >
                 <input
                   id="fees-show-inactive"
                   type="checkbox"
                   checked={showInactiveFees}
                   onChange={(e) => setShowInactiveFees(e.target.checked)}
-                  className="h-5 w-5 rounded border-neutral-400 accent-[#8E1C3D]"
+                  className="h-4 w-4 rounded border-slate-400 accent-[#8E1C3D]"
                 />
                 Show inactive ({inactiveFeeCount})
               </label>
@@ -523,43 +582,59 @@ export function Doctors() {
             </div>
           </div>
 
-          {feeListConflict && <ConflictBanner onReload={handleReloadFeeList} isReloading={feeListReloading} />}
-          {feeListError && (
-            <InlineAlert tone="error" onDismiss={() => setFeeListError(null)}>
-              {feeListError}
-            </InlineAlert>
-          )}
-          {feeListSuccess && (
-            <InlineAlert tone="success" onDismiss={() => setFeeListSuccess(null)}>
-              {feeListSuccess}
-            </InlineAlert>
+          {feeListConflict && (
+            <div className="space-y-3 border-b border-slate-100 px-5 py-3.5">
+              <ConflictBanner onReload={handleReloadFeeList} isReloading={feeListReloading} />
+            </div>
           )}
 
           {feesLoading ? (
-            <TableSkeleton label="Loading fees..." rows={3} columns={4} />
+            <div className="p-4">
+              <TableSkeleton label="Loading fees..." rows={3} columns={4} />
+            </div>
+          ) : feesIsError ? (
+            <div className="p-4">
+              <InlineAlert
+                tone="error"
+                action={
+                  <button type="button" onClick={() => void refetchFees()} className={SECONDARY_BUTTON}>
+                    Retry
+                  </button>
+                }
+              >
+                Failed to load consultation fee schedules: {feesError instanceof Error ? feesError.message : 'Unable to reach server.'}
+              </InlineAlert>
+            </div>
           ) : (
-            <div className="bg-white rounded-lg border border-neutral-200 overflow-x-auto shadow-xs">
-              <table className="w-full text-left text-sm text-neutral-800">
-                <thead className="bg-neutral-50 border-b border-neutral-200 text-xs font-semibold text-neutral-700 uppercase tracking-wider">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-sm text-slate-800">
+                <thead className="border-b border-slate-200 bg-slate-50 text-xs font-semibold text-slate-600">
                   <tr>
-                    <th scope="col" className="px-4 py-3">Schedule Name</th>
-                    <th scope="col" className="px-4 py-3 text-right">Rate (INR)</th>
-                    <th scope="col" className="px-4 py-3">Status</th>
-                    <th scope="col" className="px-4 py-3 text-right">Actions</th>
+                    <th scope="col" className="whitespace-nowrap px-4 py-3">Schedule Name</th>
+                    <th scope="col" className="whitespace-nowrap px-4 py-3 text-right">Rate (INR)</th>
+                    <th scope="col" className="whitespace-nowrap px-4 py-3">Status</th>
+                    <th scope="col" className="whitespace-nowrap px-4 py-3 text-right">Actions</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-neutral-200">
+                <tbody className="divide-y divide-slate-100">
                   {visibleFees.length > 0 ? (
-                    visibleFees.map((fee, index) => (
-                      <tr key={fee.id} className={`transition-colors ${fee.is_active ? 'hover:bg-neutral-50' : 'bg-neutral-50'}`} style={{ transitionDelay: `${index * 50}ms` }}>
-                        <td className="px-4 py-3 font-medium text-neutral-900">{fee.name}</td>
-                        <td className="px-4 py-3 text-right font-semibold tabular-nums text-neutral-900">
+                    visibleFees.map((fee) => (
+                      <tr
+                        key={fee.id}
+                        className={`transition-colors duration-150 ${fee.is_active ? 'hover:bg-slate-50/80' : 'bg-slate-50/60'}`}
+                      >
+                        <td className="max-w-[320px] px-4 py-3">
+                          <div className="min-w-0 truncate font-medium text-slate-900" title={fee.name}>
+                            {fee.name}
+                          </div>
+                        </td>
+                        <td className="whitespace-nowrap px-4 py-3 text-right font-mono text-sm font-semibold tabular-nums text-slate-900">
                           {formatRupees(fee.fee_paise)}
                         </td>
-                        <td className="px-4 py-3">
+                        <td className="whitespace-nowrap px-4 py-3">
                           <StatusBadge active={fee.is_active} />
                         </td>
-                        <td className="px-4 py-3">
+                        <td className="whitespace-nowrap px-4 py-3">
                           <div className="flex justify-end gap-2">
                             {!fee.is_active && (
                               <button
@@ -586,7 +661,7 @@ export function Doctors() {
                     ))
                   ) : (
                     <tr>
-                      <td colSpan={4} className="px-4 py-6 text-center text-neutral-600">
+                      <td colSpan={4} className="px-6 py-10 text-center text-sm text-slate-600">
                         {allFees.length === 0
                           ? 'No fee schedules configured yet.'
                           : 'No active fee schedules. Tick "Show inactive" to see deactivated rates.'}
@@ -622,7 +697,7 @@ export function Doctors() {
 
               <form onSubmit={handleDoctorSubmit} className="space-y-4">
                 <div>
-                  <label htmlFor="doc-name-en" className="block text-sm font-medium text-neutral-800 mb-1">
+                  <label htmlFor="doc-name-en" className="mb-1.5 block text-xs font-semibold text-slate-700">
                     English Name
                   </label>
                   <input
@@ -638,7 +713,7 @@ export function Doctors() {
                 </div>
 
                 <div>
-                  <label htmlFor="doc-name-hi" className="block text-sm font-medium text-neutral-800 mb-1">
+                  <label htmlFor="doc-name-hi" className="mb-1.5 block text-xs font-semibold text-slate-700">
                     Hindi Name (Optional)
                   </label>
                   <input
@@ -651,80 +726,84 @@ export function Doctors() {
                   />
                 </div>
 
-                <div>
-                  <label htmlFor="doc-qualification" className="block text-sm font-medium text-neutral-800 mb-1">
-                    Qualification (e.g., MBBS, MS Ortho)
-                  </label>
-                  <input
-                    id="doc-qualification"
-                    type="text"
-                    value={docForm.qualification}
-                    onChange={(e) => setDocField('qualification', e.target.value)}
-                    className={INPUT_CLASS}
-                  />
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  <div>
+                    <label htmlFor="doc-qualification" className="mb-1.5 block text-xs font-semibold text-slate-700">
+                      Qualification (e.g., MBBS, MS Ortho)
+                    </label>
+                    <input
+                      id="doc-qualification"
+                      type="text"
+                      value={docForm.qualification}
+                      onChange={(e) => setDocField('qualification', e.target.value)}
+                      className={INPUT_CLASS}
+                    />
+                  </div>
+
+                  <div>
+                    <label htmlFor="doc-reg-no" className="mb-1.5 block text-xs font-semibold text-slate-700">
+                      Registration Number (Optional)
+                    </label>
+                    <input
+                      id="doc-reg-no"
+                      type="text"
+                      value={docForm.registration_number}
+                      onChange={(e) => setDocField('registration_number', e.target.value)}
+                      className={`${INPUT_CLASS} font-mono tabular-nums`}
+                    />
+                  </div>
                 </div>
 
-                <div>
-                  <label htmlFor="doc-reg-no" className="block text-sm font-medium text-neutral-800 mb-1">
-                    Registration Number (Optional)
-                  </label>
-                  <input
-                    id="doc-reg-no"
-                    type="text"
-                    value={docForm.registration_number}
-                    onChange={(e) => setDocField('registration_number', e.target.value)}
-                    className={INPUT_CLASS}
-                  />
-                </div>
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  <div>
+                    <label htmlFor="doc-cabin-code" className="mb-1.5 block text-xs font-semibold text-slate-700">
+                      Cabin Code (Optional, A–Z)
+                    </label>
+                    <input
+                      id="doc-cabin-code"
+                      type="text"
+                      maxLength={1}
+                      value={docForm.cabin_code}
+                      onChange={(e) => setDocField('cabin_code', e.target.value.toUpperCase())}
+                      placeholder="e.g. A"
+                      className={`${INPUT_CLASS} font-mono tabular-nums`}
+                    />
+                  </div>
 
-                <div>
-                  <label htmlFor="doc-cabin-code" className="block text-sm font-medium text-neutral-800 mb-1">
-                    Cabin Code (Optional, A–Z)
-                  </label>
-                  <input
-                    id="doc-cabin-code"
-                    type="text"
-                    maxLength={1}
-                    value={docForm.cabin_code}
-                    onChange={(e) => setDocField('cabin_code', e.target.value.toUpperCase())}
-                    placeholder="e.g. A"
-                    className={INPUT_CLASS}
-                  />
-                </div>
-
-                <div>
-                  <label htmlFor="doc-default-fee" className="block text-sm font-medium text-neutral-800 mb-1">
-                    Default Consultation Fee (₹ INR)
-                  </label>
-                  <input
-                    id="doc-default-fee"
-                    type="number"
-                    inputMode="decimal"
-                    required
-                    min={0}
-                    step="0.01"
-                    value={docForm.fee_rupees}
-                    onChange={(e) => setDocField('fee_rupees', e.target.value)}
-                    className={INPUT_CLASS}
-                  />
+                  <div>
+                    <label htmlFor="doc-default-fee" className="mb-1.5 block text-xs font-semibold text-slate-700">
+                      Default Consultation Fee (₹ INR)
+                    </label>
+                    <input
+                      id="doc-default-fee"
+                      type="number"
+                      inputMode="decimal"
+                      required
+                      min={0}
+                      step="0.01"
+                      value={docForm.fee_rupees}
+                      onChange={(e) => setDocField('fee_rupees', e.target.value)}
+                      className={`${INPUT_CLASS} font-mono tabular-nums`}
+                    />
+                  </div>
                 </div>
 
                 {editingDoctor && (
-                  <div className="flex min-h-11 items-center gap-2">
+                  <div className="flex min-h-9 items-center gap-2">
                     <input
                       id="doc-active"
                       type="checkbox"
                       checked={docForm.is_active}
                       onChange={(e) => setDocField('is_active', e.target.checked)}
-                      className="h-5 w-5 rounded border-neutral-400 accent-[#8E1C3D]"
+                      className="h-4 w-4 rounded border-slate-400 accent-[#8E1C3D]"
                     />
-                    <label htmlFor="doc-active" className="text-sm font-medium text-neutral-800">
+                    <label htmlFor="doc-active" className="text-sm font-medium text-slate-800 cursor-pointer">
                       Active doctor profile
                     </label>
                   </div>
                 )}
 
-                <div className="flex justify-end gap-3 pt-4 border-t border-neutral-200">
+                <div className="flex justify-end gap-2.5 border-t border-slate-200 pt-4">
                   <button type="button" onClick={requestCloseDoctorModal} disabled={docSaving} className={SECONDARY_BUTTON}>
                     Cancel
                   </button>
@@ -760,7 +839,7 @@ export function Doctors() {
 
               <form onSubmit={handleFeeSubmit} className="space-y-4">
                 <div>
-                  <label htmlFor="fee-name" className="block text-sm font-medium text-neutral-800 mb-1">
+                  <label htmlFor="fee-name" className="mb-1.5 block text-xs font-semibold text-slate-700">
                     Schedule Name
                   </label>
                   <input
@@ -776,7 +855,7 @@ export function Doctors() {
                 </div>
 
                 <div>
-                  <label htmlFor="fee-amount" className="block text-sm font-medium text-neutral-800 mb-1">
+                  <label htmlFor="fee-amount" className="mb-1.5 block text-xs font-semibold text-slate-700">
                     Fee Rate (₹ INR)
                   </label>
                   <input
@@ -788,26 +867,26 @@ export function Doctors() {
                     step="0.01"
                     value={feeForm.fee_rupees}
                     onChange={(e) => setFeeField('fee_rupees', e.target.value)}
-                    className={INPUT_CLASS}
+                    className={`${INPUT_CLASS} font-mono tabular-nums`}
                   />
                 </div>
 
                 {editingFee && (
-                  <div className="flex min-h-11 items-center gap-2">
+                  <div className="flex min-h-9 items-center gap-2">
                     <input
                       id="fee-active"
                       type="checkbox"
                       checked={feeForm.is_active}
                       onChange={(e) => setFeeField('is_active', e.target.checked)}
-                      className="h-5 w-5 rounded border-neutral-400 accent-[#8E1C3D]"
+                      className="h-4 w-4 rounded border-slate-400 accent-[#8E1C3D]"
                     />
-                    <label htmlFor="fee-active" className="text-sm font-medium text-neutral-800">
+                    <label htmlFor="fee-active" className="text-sm font-medium text-slate-800 cursor-pointer">
                       Active rate
                     </label>
                   </div>
                 )}
 
-                <div className="flex justify-end gap-3 pt-4 border-t border-neutral-200">
+                <div className="flex justify-end gap-2.5 border-t border-slate-200 pt-4">
                   <button type="button" onClick={requestCloseFeeModal} disabled={feeSaving} className={SECONDARY_BUTTON}>
                     Cancel
                   </button>
@@ -833,14 +912,14 @@ export function Doctors() {
           }
           className="max-w-md"
         >
-          <div className="flex justify-end gap-3 pt-2">
+          <div className="flex justify-end gap-2.5 pt-2">
             <button type="button" data-autofocus onClick={() => setDiscardTarget(null)} className={SECONDARY_BUTTON}>
               Keep editing
             </button>
             <button
               type="button"
               onClick={confirmDiscard}
-              className="px-4 py-2 text-sm font-semibold text-white bg-red-800 hover:bg-red-900 rounded min-h-11 min-w-11 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-800 cursor-pointer"
+              className="inline-flex min-h-[38px] items-center justify-center rounded-lg bg-red-800 px-3.5 py-2 text-sm font-medium text-white transition-colors duration-150 hover:bg-red-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-800 cursor-pointer"
             >
               Discard changes
             </button>

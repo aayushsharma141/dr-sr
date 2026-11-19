@@ -412,13 +412,13 @@ def normalize_gender(raw_gender: str) -> str | None:
     return None
 
 
-def parse_age_and_dob(raw_age: str, raw_dob: str) -> tuple[int | None, date | None]:
+def parse_age_and_dob(raw_age: Any, raw_dob: Any) -> tuple[int | None, date | None]:
     """Parse age (0-150) and/or dob; infer age from dob if age missing."""
     parsed_age: int | None = None
     parsed_dob: date | None = None
 
-    if raw_dob:
-        dob_str = raw_dob.strip()
+    dob_str = str(raw_dob).strip() if raw_dob is not None else ""
+    if dob_str:
         for fmt in ("%Y-%m-%d", "%d/%m/%Y", "%d-%m-%Y", "%Y/%m/%d"):
             try:
                 # Date of birth only: no time of day, so no time zone applies.
@@ -427,9 +427,10 @@ def parse_age_and_dob(raw_age: str, raw_dob: str) -> tuple[int | None, date | No
             except ValueError:
                 continue
 
-    if raw_age:
+    age_str = str(raw_age).strip() if raw_age is not None else ""
+    if age_str:
         try:
-            val = int(float(raw_age.strip()))
+            val = int(float(age_str))
             if 0 <= val <= 150:
                 parsed_age = val
         except ValueError:
@@ -470,21 +471,21 @@ def validate_batch(session: Session, batch_id: str) -> dict[str, Any]:
     invalid_count = 0
 
     for row in rows:
-        mapped = row.mapped_data or {}
+        mapped = dict(row.mapped_data or {})
         errors: dict[str, str] = {}
 
         # 1. Full Name (Required, min 2)
-        full_name = mapped.get("full_name", "").strip()
+        full_name = str(mapped.get("full_name") or "").strip()
         if not full_name or len(full_name) < 2:
             errors["full_name"] = "Full name must be at least 2 characters."
 
         # 2. Guardian Name (Required, min 2) (D-20-10)
-        guardian_name = mapped.get("guardian_name", "").strip()
+        guardian_name = str(mapped.get("guardian_name") or "").strip()
         if not guardian_name or len(guardian_name) < 2:
             errors["guardian_name"] = "Guardian name must be at least 2 characters."
 
         # 3. Gender ('M', 'F', 'O')
-        raw_gender = mapped.get("gender", "").strip()
+        raw_gender = str(mapped.get("gender") or "").strip()
         norm_gender = normalize_gender(raw_gender)
         if not norm_gender:
             errors["gender"] = "Gender must be 'M', 'F', or 'O'."
@@ -492,8 +493,8 @@ def validate_batch(session: Session, batch_id: str) -> dict[str, Any]:
             mapped["gender"] = norm_gender
 
         # 4. Age / DOB
-        raw_age = mapped.get("age_years", "")
-        raw_dob = mapped.get("dob", "")
+        raw_age = mapped.get("age_years")
+        raw_dob = mapped.get("dob")
         parsed_age, parsed_dob = parse_age_and_dob(raw_age, raw_dob)
         if parsed_age is None:
             errors["age_years"] = "Valid age (0-150) or date of birth is required."
@@ -503,7 +504,7 @@ def validate_batch(session: Session, batch_id: str) -> dict[str, Any]:
                 mapped["dob"] = parsed_dob.isoformat()
 
         # 5. Mobile (Required, 10 digits)
-        raw_mobile = mapped.get("mobile", "")
+        raw_mobile = str(mapped.get("mobile") or "")
         clean_mobile = clean_mobile_number(raw_mobile)
         if len(clean_mobile) != 10:
             errors["mobile"] = "Mobile number must be exactly 10 digits."
@@ -511,17 +512,17 @@ def validate_batch(session: Session, batch_id: str) -> dict[str, Any]:
             mapped["mobile"] = clean_mobile
 
         # 6. Address (Required, min 3 chars)
-        address = mapped.get("address", "").strip()
+        address = str(mapped.get("address") or "").strip()
         if not address or len(address) < 3:
             errors["address"] = "Address must be at least 3 characters."
 
         # 7. Defaults
-        mapped["district"] = mapped.get("district", "").strip() or "Bhojpur"
-        mapped["state"] = mapped.get("state", "").strip() or "Bihar"
+        mapped["district"] = str(mapped.get("district") or "").strip() or "Bhojpur"
+        mapped["state"] = str(mapped.get("state") or "").strip() or "Bihar"
         if mapped.get("emergency_contact"):
-            mapped["emergency_contact"] = mapped["emergency_contact"].strip()
+            mapped["emergency_contact"] = str(mapped["emergency_contact"]).strip()
         if mapped.get("legacy_urn"):
-            mapped["legacy_urn"] = mapped["legacy_urn"].strip()
+            mapped["legacy_urn"] = str(mapped["legacy_urn"]).strip()
 
         row.mapped_data = mapped
 
@@ -608,6 +609,12 @@ def resolve_duplicate(
     if resolution not in ("SKIP", "IMPORT_AS_NEW"):
         raise ValueError("Resolution must be 'SKIP' or 'IMPORT_AS_NEW'")
 
+    batch = session.scalar(
+        select(PatientImportBatch).where(PatientImportBatch.batch_id == batch_id)
+    )
+    if batch and batch.status == "COMMITTED":
+        raise BatchStateError(f"Import batch {batch_id} has already been committed")
+
     row = session.scalar(
         select(PatientImportRow).where(
             PatientImportRow.id == row_id,
@@ -623,27 +630,6 @@ def resolve_duplicate(
     row.duplicate_resolution = resolution
     session.flush()
     return row
-
-
-def bulk_resolve_duplicates(
-    session: Session,
-    batch_id: str,
-    resolution: str = "SKIP",
-) -> int:
-    """Bulk update all duplicate rows in a batch to resolution (default 'SKIP')."""
-    if resolution not in ("SKIP", "IMPORT_AS_NEW"):
-        raise ValueError("Resolution must be 'SKIP' or 'IMPORT_AS_NEW'")
-
-    rows = session.scalars(
-        select(PatientImportRow).where(
-            PatientImportRow.batch_id == batch_id,
-            PatientImportRow.validation_status == "DUPLICATE",
-        )
-    ).all()
-    for r in rows:
-        r.duplicate_resolution = resolution
-    session.flush()
-    return len(rows)
 
 
 def commit_batch(
@@ -664,6 +650,11 @@ def commit_batch(
 
     if batch.status == "COMMITTED":
         raise BatchStateError(f"Import batch {batch_id} has already been committed")
+    if batch.status != "VALIDATED":
+        raise BatchStateError(
+            f"Import batch {batch_id} must be validated before committing "
+            f"(current status: {batch.status})"
+        )
 
     # Step 1: Pre-commit safety backup gate (D-20-12)
     # If backup fails, abort commit immediately without modifying patients!

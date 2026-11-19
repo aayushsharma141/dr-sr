@@ -69,13 +69,20 @@ CLINICAL_FIELD_KEYS = frozenset(
 )
 
 
+def _escape_like(term: str) -> str:
+    return term.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+
+
 def sanitize_cell(val: Any) -> Any:
     """Neutralize spreadsheet formula injection (T-20-16).
 
-    If the string begins with '=', '+', '-', or '@', prepend a single quote (').
+    If the string begins with '=', '+', '-', '@', '\t', '\r', or has them after leading whitespace,
+    prepend a single quote (') to neutralize formula execution in Microsoft Excel and LibreOffice.
     """
-    if isinstance(val, str) and len(val) > 0 and val[0] in ("=", "+", "-", "@"):
-        return "'" + val
+    if isinstance(val, str):
+        stripped = val.lstrip()
+        if len(stripped) > 0 and stripped[0] in ("=", "+", "-", "@", "\t", "\r"):
+            return "'" + val
     return val
 
 
@@ -163,16 +170,17 @@ def query_export_rows(
     # Search query filtering
     if scope.search_query and scope.search_query.strip():
         sq = scope.search_query.strip()
+        sq_escaped = _escape_like(sq)
         search_conds = [
-            Patient.full_name.ilike(f"%{sq}%"),
-            Patient.urn.ilike(f"%{sq}%"),
-            Patient.address.ilike(f"%{sq}%"),
+            Patient.full_name.ilike(f"%{sq_escaped}%"),
+            Patient.urn.ilike(f"%{sq_escaped}%"),
+            Patient.address.ilike(f"%{sq_escaped}%"),
         ]
         if hasattr(Patient, "legacy_urn"):
-            search_conds.append(Patient.legacy_urn.ilike(f"%{sq}%"))
+            search_conds.append(Patient.legacy_urn.ilike(f"%{sq_escaped}%"))
         digits = "".join(c for c in sq if c.isdigit())
         if digits and len(digits) >= 3:
-            search_conds.append(Patient.mobile.like(f"%{digits}%"))
+            search_conds.append(Patient.mobile.like(f"%{_escape_like(digits)}%"))
         query = query.where(or_(*search_conds))
 
     query = query.order_by(Patient.id.asc())
@@ -200,9 +208,16 @@ def query_export_rows(
 
     encounters_by_patient: dict[int, list[ClinicalEncounter]] = {pid: [] for pid in patient_ids}
     if needs_encounters:
+        enc_conds = [ClinicalEncounter.patient_id.in_(patient_ids)]
+        if scope.department_id is not None:
+            enc_conds.append(ClinicalEncounter.department_id == scope.department_id)
+        if scope.start_date:
+            enc_conds.append(func.date(ClinicalEncounter.encounter_date) >= scope.start_date)
+        if scope.end_date:
+            enc_conds.append(func.date(ClinicalEncounter.encounter_date) <= scope.end_date)
         enc_query = (
             select(ClinicalEncounter)
-            .where(ClinicalEncounter.patient_id.in_(patient_ids))
+            .where(*enc_conds)
             .options(
                 selectinload(ClinicalEncounter.addenda),
                 selectinload(ClinicalEncounter.template_response),
@@ -215,9 +230,14 @@ def query_export_rows(
 
     prescriptions_by_patient: dict[int, list[Prescription]] = {pid: [] for pid in patient_ids}
     if needs_prescriptions:
+        rx_conds = [Prescription.patient_id.in_(patient_ids)]
+        if scope.start_date:
+            rx_conds.append(func.date(Prescription.created_at) >= scope.start_date)
+        if scope.end_date:
+            rx_conds.append(func.date(Prescription.created_at) <= scope.end_date)
         rx_query = (
             select(Prescription)
-            .where(Prescription.patient_id.in_(patient_ids))
+            .where(*rx_conds)
             .options(selectinload(Prescription.items))
             .order_by(Prescription.created_at.asc())
         )
@@ -226,9 +246,14 @@ def query_export_rows(
 
     plans_by_patient: dict[int, list[TreatmentPlan]] = {pid: [] for pid in patient_ids}
     if needs_plans:
+        plan_conds = [TreatmentPlan.patient_id.in_(patient_ids)]
+        if scope.start_date:
+            plan_conds.append(func.date(TreatmentPlan.created_at) >= scope.start_date)
+        if scope.end_date:
+            plan_conds.append(func.date(TreatmentPlan.created_at) <= scope.end_date)
         plan_query = (
             select(TreatmentPlan)
-            .where(TreatmentPlan.patient_id.in_(patient_ids))
+            .where(*plan_conds)
             .options(selectinload(TreatmentPlan.sessions))
             .order_by(TreatmentPlan.created_at.asc())
         )

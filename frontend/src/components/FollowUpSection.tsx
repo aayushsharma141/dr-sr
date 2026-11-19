@@ -1,5 +1,6 @@
 import type { DoctorOut } from '../api/types'
 import { istToday } from '../format'
+import { IconCalendarTime } from './icons'
 
 export interface FollowUpSectionProps {
   recommendedDate: string
@@ -12,6 +13,10 @@ export interface FollowUpSectionProps {
   onBookNow?: () => void
   onBlur?: () => void
   readOnly?: boolean
+  dateError?: string | null
+  retryError?: string | null
+  onRetrySend?: () => Promise<void> | void
+  isSendingFollowUp?: boolean
 }
 
 export function FollowUpSection({
@@ -25,6 +30,10 @@ export function FollowUpSection({
   onBookNow,
   onBlur,
   readOnly = false,
+  dateError = null,
+  retryError = null,
+  onRetrySend,
+  isSendingFollowUp = false,
 }: FollowUpSectionProps) {
   const todayStr = istToday()
 
@@ -38,26 +47,51 @@ export function FollowUpSection({
           <button
             type="button"
             onClick={onBookNow}
-            className="px-3.5 py-1.5 border border-[#8E1C3D] text-[#8E1C3D] rounded text-xs font-semibold hover:bg-[#8E1C3D]/5 flex items-center gap-1.5 transition-colors"
+            className="px-3.5 py-1.5 border border-[#8E1C3D] text-[#8E1C3D] rounded-lg text-xs font-semibold hover:bg-[#8E1C3D]/5 flex items-center gap-1.5 transition-colors"
           >
-            <span>📅</span>
+            <IconCalendarTime size={15} aria-hidden="true" />
             Book Follow-up Appointment
           </button>
         )}
       </div>
 
+      {retryError && onRetrySend && (
+        <div
+          role="alert"
+          data-testid="followup-retry-banner"
+          className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-amber-300 bg-amber-50 p-3.5 text-xs text-amber-950"
+        >
+          <div className="space-y-0.5">
+            <p className="font-semibold">
+              Consultation finalised, but the follow-up recommendation could not be sent to reception.
+            </p>
+            <p className="text-amber-900">{retryError}</p>
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              void onRetrySend()
+            }}
+            disabled={isSendingFollowUp}
+            className="inline-flex min-h-[36px] shrink-0 cursor-pointer items-center rounded-lg bg-[#8E1C3D] px-3.5 py-1.5 text-xs font-semibold text-white shadow-2xs transition-colors hover:bg-[#721631] disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {isSendingFollowUp ? 'Sending Follow-up...' : 'Retry Sending Follow-up Recommendation'}
+          </button>
+        </div>
+      )}
+
       {!recommendedDate && !clinicalReason ? (
         <div className="p-4 bg-neutral-50 rounded-lg border border-neutral-200 text-xs text-neutral-600 space-y-1">
           <h4 className="font-semibold text-neutral-800">No Follow-up Scheduled</h4>
           <p>
-            No follow-up review date has been recorded. Select a recommended follow-up date and doctor if a review visit is clinically indicated.
+            No follow-up review date has been recorded. Select a recommended follow-up date and doctor if a review visit is clinically indicated; recommendations flow to Reception upon finalisation.
           </p>
         </div>
       ) : null}
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div>
-          <label htmlFor="followup-date" className="block text-xs font-semibold text-neutral-700 uppercase tracking-wider mb-1">
+          <label htmlFor="followup-date" className="block text-xs font-semibold text-neutral-700 mb-1">
             Recommended Review Date
           </label>
           <input
@@ -68,12 +102,22 @@ export function FollowUpSection({
             disabled={readOnly}
             onChange={(e) => onDateChange(e.target.value)}
             onBlur={onBlur}
-            className="w-full px-3 py-2 border border-neutral-300 rounded text-sm focus:ring-1 focus:ring-[#8E1C3D] disabled:bg-neutral-100"
+            aria-invalid={dateError ? true : undefined}
+            className={`w-full px-3 py-2 border rounded text-sm focus:ring-1 disabled:bg-neutral-100 ${
+              dateError
+                ? 'border-red-400 focus:border-red-600 focus:ring-red-600/20'
+                : 'border-neutral-300 focus:ring-[#8E1C3D]'
+            }`}
           />
+          {dateError && (
+            <p role="alert" data-testid="followup-date-error" className="mt-1 text-xs font-medium text-red-700">
+              {dateError}
+            </p>
+          )}
         </div>
 
         <div>
-          <label htmlFor="followup-doctor" className="block text-xs font-semibold text-neutral-700 uppercase tracking-wider mb-1">
+          <label htmlFor="followup-doctor" className="block text-xs font-semibold text-neutral-700 mb-1">
             Recommended Doctor
           </label>
           <select
@@ -98,7 +142,7 @@ export function FollowUpSection({
       </div>
 
       <div>
-        <label htmlFor="followup-clinical-reason" className="block text-xs font-semibold text-neutral-700 uppercase tracking-wider mb-1">
+        <label htmlFor="followup-clinical-reason" className="block text-xs font-semibold text-neutral-700 mb-1">
           Clinical Justification Notes (Doctor Only)
         </label>
         <textarea
@@ -112,7 +156,7 @@ export function FollowUpSection({
           className="w-full px-3 py-2 border border-neutral-300 rounded text-xs focus:ring-1 focus:ring-[#8E1C3D] disabled:bg-neutral-100"
         />
         <p className="text-xs text-neutral-500 mt-1">
-          Note: This rationale is internal to doctors and is omitted from reception booking queues.
+          Follow-up recommendations flow to Reception upon finalisation. Internal clinical justification notes are doctor-only and omitted from reception booking queues.
         </p>
       </div>
     </div>

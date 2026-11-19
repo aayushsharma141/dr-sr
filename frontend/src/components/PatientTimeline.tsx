@@ -95,7 +95,7 @@ export const PatientTimeline: React.FC<PatientTimelineProps> = ({
                       {item.title}
                     </span>
                     {item.badge && (
-                      <span className={`rounded-full px-2 py-0.5 text-xs font-bold uppercase tracking-wider ${badgeClass}`}>
+                      <span className={`rounded-full px-2 py-0.5 text-xs font-bold ${badgeClass}`}>
                         {item.badge}
                       </span>
                     )}

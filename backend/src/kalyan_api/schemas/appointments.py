@@ -2,9 +2,55 @@
 
 from datetime import date, datetime, time
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-from kalyan_api.models import AppointmentSource, AppointmentStatus
+from kalyan_api.models import (
+    REFERRAL_SOURCES_NEEDING_NAME,
+    AppointmentSource,
+    AppointmentStatus,
+    PriorityLevel,
+    ReferralSource,
+    VisitKind,
+)
+from kalyan_api.schemas.patients import PatientCreate
+
+
+class CheckInDetailsIn(BaseModel):
+    """What reception confirms at check-in (phase 22, OD-22-05/06/16).
+
+    Referred By is required on every check-in and the desk pre-fills it with SELF. The visit
+    type is recorded only and never sets the fee. PRIORITY and EMERGENCY need a reason.
+    """
+
+    referral_source: ReferralSource = Field(..., description="Who referred the patient (OD-22-16)")
+    referrer_name: str | None = Field(
+        default=None,
+        max_length=120,
+        description="Referring doctor, person or organisation; required for those sources",
+    )
+    visit_kind: VisitKind | None = Field(
+        default=None, description="NEW or FOLLOW_UP; recorded only, never sets the fee"
+    )
+    priority_level: PriorityLevel = Field(
+        default=PriorityLevel.NORMAL, description="Queue classification; the token never changes"
+    )
+    priority_reason: str | None = Field(
+        default=None, max_length=500, description="Required for PRIORITY and EMERGENCY"
+    )
+
+    @model_validator(mode="after")
+    def _check_reason_and_referrer(self) -> "CheckInDetailsIn":
+        if (
+            self.priority_level != PriorityLevel.NORMAL
+            and len((self.priority_reason or "").strip()) < 3
+        ):
+            raise ValueError("Enter a reason for marking the patient Priority or Emergency.")
+        if (
+            self.referral_source.value in REFERRAL_SOURCES_NEEDING_NAME
+            and len((self.referrer_name or "").strip()) < 2
+        ):
+            raise ValueError("Enter the name of the referring doctor, person or organisation.")
+        return self
 
 
 class AppointmentCreate(BaseModel):
@@ -30,9 +76,36 @@ class AppointmentCreate(BaseModel):
             "(BR-006)"
         ),
     )
+    issue_token: bool = Field(
+        default=False,
+        description="When true, allocates token atomically for doctor queue (TO_ARRIVE)",
+    )
+    priority_level: PriorityLevel = Field(
+        default=PriorityLevel.NORMAL, description="Initial priority for a tokenized arrival"
+    )
+    priority_reason: str | None = Field(
+        default=None,
+        max_length=500,
+        description="Required when initial priority is High or Emergency",
+    )
+
+    @model_validator(mode="after")
+    def _check_priority_reason(self) -> "AppointmentCreate":
+        if self.priority_level != PriorityLevel.NORMAL and not self.issue_token:
+            raise ValueError("Priority can be set when a doctor-queue token is created.")
+        if (
+            self.priority_level != PriorityLevel.NORMAL
+            and len((self.priority_reason or "").strip()) < 3
+        ):
+            raise ValueError("Enter a reason for marking the patient Priority or Emergency.")
+        if self.priority_level == PriorityLevel.NORMAL and (self.priority_reason or "").strip():
+            raise ValueError(
+                "A priority reason can only be supplied for High or Emergency priority."
+            )
+        return self
 
 
-class WalkInCreate(BaseModel):
+class WalkInCreate(CheckInDetailsIn):
     """Payload to register a walk-in: a booking for today that is checked in at once (RF-12)."""
 
     patient_id: int = Field(..., gt=0, description="Target patient ID")
@@ -46,8 +119,82 @@ class WalkInCreate(BaseModel):
     )
 
 
-class CheckInRequest(BaseModel):
+class CheckInRequest(CheckInDetailsIn):
     """Payload to check a booked patient in on arrival (RF-12)."""
+
+    version_id: int = Field(..., gt=0, description="Optimistic locking version ID")
+    patient_id: int | None = Field(
+        default=None,
+        gt=0,
+        description="Optional patient ID verified against the appointment on check-in",
+    )
+
+
+class NewPatientCheckIn(CheckInDetailsIn):
+    """Register a first-time patient and check them in, in one transaction (OD-22-03).
+
+    The patient receives a permanent URN, today's visit is opened and the consultation joins
+    the doctor's waiting list with its token. A first visit is always a NEW consultation.
+    """
+
+    patient: PatientCreate
+    doctor_id: int = Field(..., gt=0, description="Consulting doctor ID")
+    department_id: int = Field(..., gt=0, description="Configured department/specialty ID")
+    notes: str | None = Field(default=None, max_length=1000, description="Reception notes")
+    to_arrive: bool = Field(
+        default=False,
+        description="When true, issues token and places in TO_ARRIVE status pending registration",
+    )
+
+    @model_validator(mode="after")
+    def _first_visit_is_new(self) -> "NewPatientCheckIn":
+        if self.visit_kind == VisitKind.FOLLOW_UP:
+            raise ValueError("A first visit cannot be a follow-up.")
+        self.visit_kind = VisitKind.NEW
+        return self
+
+
+class PriorityUpdate(BaseModel):
+    """Change a checked-in patient's classification (OD-22-06). The token never changes."""
+
+    priority_level: PriorityLevel
+    priority_reason: str | None = Field(
+        default=None, max_length=500, description="Required for PRIORITY and EMERGENCY"
+    )
+    version_id: int = Field(..., gt=0, description="Optimistic locking version ID")
+
+    @model_validator(mode="after")
+    def _check_reason(self) -> "PriorityUpdate":
+        if (
+            self.priority_level != PriorityLevel.NORMAL
+            and len((self.priority_reason or "").strip()) < 3
+        ):
+            raise ValueError("Enter a reason for marking the patient Priority or Emergency.")
+        return self
+
+
+class ReassignRequest(BaseModel):
+    """Move a waiting patient to another doctor on the same visit (design §5, QUE-10).
+
+    The old consultation is cancelled with this reason and a new WAITING consultation is
+    created for the new doctor, with a token from that doctor's sequence.
+    """
+
+    version_id: int = Field(..., gt=0, description="Optimistic locking version ID")
+    new_doctor_id: int = Field(..., gt=0, description="Doctor to move the patient to")
+    new_department_id: int | None = Field(
+        default=None,
+        gt=0,
+        description=(
+            "Required when the new doctor is not in the current department; must be one of the "
+            "new doctor's departments (owner decision Q19)"
+        ),
+    )
+    reason: str = Field(..., min_length=3, max_length=500, description="Why it was moved")
+
+
+class AcknowledgeAlertRequest(BaseModel):
+    """Doctor acknowledges an emergency alert on their own consultation (OD-22-09)."""
 
     version_id: int = Field(..., gt=0, description="Optimistic locking version ID")
 
@@ -81,12 +228,14 @@ class AppointmentRead(BaseModel):
     patient_urn: str
     patient_name: str
     patient_mobile: str
+    patient_age: int | None = None
     doctor_id: int
     department_id: int | None = None
+    department_name: str | None = None
     doctor_name_en: str
     doctor_name_hi: str | None = None
     appointment_date: date
-    # Issued at check-in (RF-12); empty while the booking has not been checked in.
+    # Empty on an ordinary booking; tokenized TO_ARRIVE entries already have their token.
     token_number: int | None = None
     status: str
     status_updated_at: datetime
@@ -98,9 +247,31 @@ class AppointmentRead(BaseModel):
     visit_id: int | None = None
     consultation_status: str | None = None
     rescheduled_from_id: int | None = None
+    # Phase 22: visit type and classification of this consultation.
+    visit_kind: str | None = None
+    priority_level: str = "NORMAL"
+    priority_reason: str | None = None
+    priority_updated_at: datetime | None = None
+    emergency_alerted_at: datetime | None = None
+    alert_acknowledged_at: datetime | None = None
+    # The visit's Referred By; filled on check-in responses only.
+    referral_source: str | None = None
+    referrer_name: str | None = None
     version_id: int
     created_at: datetime
     updated_at: datetime
+
+
+class AppointmentBucketCounts(BaseModel):
+    """Server-computed counts across canonical operational status buckets."""
+
+    active: int = 0
+    to_arrive: int = 0
+    checked_in: int = 0
+    completed: int = 0
+    no_show: int = 0
+    cancelled: int = 0
+    all: int = 0
 
 
 class AppointmentListResponse(BaseModel):
@@ -108,6 +279,9 @@ class AppointmentListResponse(BaseModel):
 
     total: int
     appointments: list[AppointmentRead]
+    limit: int | None = None
+    offset: int = 0
+    bucket_counts: AppointmentBucketCounts | None = None
 
 
 class DoctorQueueItem(BaseModel):
@@ -126,6 +300,14 @@ class DoctorQueueItem(BaseModel):
     consultation_status: str | None = None
     status_updated_at: datetime
     notes: str | None = None
+    # Phase 22: classification and visit type, for badges and the suggested order.
+    visit_kind: str | None = None
+    priority_level: str = "NORMAL"
+    priority_reason: str | None = None
+    emergency_alerted_at: datetime | None = None
+    alert_acknowledged_at: datetime | None = None
+    priority_updated_at: datetime | None = None
+    check_in_at: datetime | None = None
     version_id: int
 
 

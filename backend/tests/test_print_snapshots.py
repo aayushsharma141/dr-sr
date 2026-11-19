@@ -9,6 +9,7 @@ Requirements:
 
 import uuid
 from datetime import UTC, datetime
+from decimal import Decimal
 from typing import Any
 
 from fastapi.testclient import TestClient
@@ -16,9 +17,14 @@ from sqlalchemy.orm import Session
 
 from kalyan_api.models import (
     Appointment,
+    BillItem,
+    BillItemCategory,
+    BillItemSource,
+    BillItemStatus,
     Patient,
     Payment,
     User,
+    Visit,
 )
 
 
@@ -27,6 +33,7 @@ def _setup_patient_and_appointment(
     reception_user: User,
     doctor_user: User,
     suffix: str = "01",
+    fee_paise: int = 30000,
 ) -> tuple[Patient, Appointment]:
     num_suffix = "".join(c for c in suffix if c.isdigit()) or "1234"
     mobile_digits = f"98765{num_suffix[-5:].ljust(5, '0')}"
@@ -44,6 +51,15 @@ def _setup_patient_and_appointment(
     session.add(patient)
     session.flush()
 
+    visit = Visit(
+        patient_id=patient.id,
+        visit_date=datetime.now(UTC).date(),
+        status="OPEN",
+        opened_by_user_id=reception_user.id,
+    )
+    session.add(visit)
+    session.flush()
+
     appt = Appointment(
         patient_id=patient.id,
         doctor_id=doctor_user.doctor_id,
@@ -51,9 +67,27 @@ def _setup_patient_and_appointment(
         token_number=1,
         status="ARRIVED",
         consultation_status="WAITING",
+        visit_id=visit.id,
         created_by_user_id=reception_user.id,
     )
     session.add(appt)
+    session.flush()
+
+    line = BillItem(
+        visit_id=visit.id,
+        patient_id=patient.id,
+        appointment_id=appt.id,
+        category=BillItemCategory.CONSULTATION.value,
+        source=BillItemSource.SYSTEM.value,
+        status=BillItemStatus.ACTIVE.value,
+        description="Consultation fee",
+        quantity=Decimal("1"),
+        rate_paise=fee_paise,
+        original_amount_paise=fee_paise,
+        amount_paise=fee_paise,
+        created_by_user_id=reception_user.id,
+    )
+    session.add(line)
     session.flush()
 
     return patient, appt
@@ -69,7 +103,9 @@ def test_issuance_captures_snapshots_and_retains_after_correction(
     """Documents store snapshot patient details at creation; subsequent patient correction does not
     alter them."""
     uid = uuid.uuid4().hex[:4]
-    patient, appt = _setup_patient_and_appointment(db_session, reception_user, doctor_a_user, uid)
+    patient, appt = _setup_patient_and_appointment(
+        db_session, reception_user, doctor_a_user, uid, fee_paise=30000
+    )
 
     rec_c: TestClient = login_client(reception_user)
     doc_c: TestClient = login_client(doctor_a_user)
@@ -219,7 +255,9 @@ def test_payment_snapshot_tamper_protection(
 ) -> None:
     """Payment reversal allows updating reversal metadata but strictly protects snapshot columns."""
     uid = uuid.uuid4().hex[:4]
-    patient, appt = _setup_patient_and_appointment(db_session, reception_user, doctor_a_user, uid)
+    patient, appt = _setup_patient_and_appointment(
+        db_session, reception_user, doctor_a_user, uid, fee_paise=50000
+    )
     rec_c: TestClient = login_client(reception_user)
     admin_c: TestClient = login_client(admin_user)
     doc_c: TestClient = login_client(doctor_a_user)

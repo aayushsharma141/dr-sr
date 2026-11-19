@@ -1,11 +1,14 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { sendHeartbeat } from '../api/admin-data-ops'
 import { useClinicBranding } from '../api/branding'
 import { useMyDepartments, type SpecialtyCode } from '../api/specialty'
+import { useMyUnfinishedConsultations, useMyWaitingQueueCount } from '../api/consultations'
 import { Link, useLocation, useNavigate } from 'react-router'
 import { useLatestIntegrityRun } from '../api/integrity'
 import { useLogout } from '../api/queries'
-import { useServerLink, type ServerLink } from '../api/serverStatus'
+import { EmergencyAlertBanner } from './EmergencyAlertBanner'
 import { GlobalSearchBar } from './GlobalSearchBar'
+import { LANStatusPill } from './LANStatusPill'
 import { countBySeverity, groupFindings } from '../admin/integrity'
 import type { Role } from '../api/types'
 import {
@@ -14,14 +17,21 @@ import {
   findAdminModuleForPath,
 } from '../admin/modules'
 import {
+  IconArchive,
+  IconBuildingHospital,
   IconChevronDown,
+  IconDashboard,
   IconDatabase,
+  IconDeviceDesktop,
+  IconGitMerge,
   IconHistory,
   IconKey,
   IconLayoutSidebarLeftCollapse,
   IconLayoutSidebarLeftExpand,
   IconPrinter,
   IconReceipt,
+  IconReportAnalytics,
+  IconReportMedical,
   IconServer,
   IconSettings,
   IconShieldCheck,
@@ -36,10 +46,16 @@ type SidebarIcon = typeof IconSettings
 
 /** One icon per admin module so the collapsed (icon-only) rail stays readable. */
 const ADMIN_MODULE_ICONS: Record<string, SidebarIcon> = {
+  overview: IconDashboard,
   'hospital-settings': IconSettings,
   'print-templates': IconPrinter,
   'doctors-fees': IconStethoscope,
+  departments: IconBuildingHospital,
+  'patient-records': IconReportMedical,
   'patient-correct': IconUserEdit,
+  'referral-report': IconReportAnalytics,
+  'patient-duplicates': IconGitMerge,
+  'patient-archive': IconArchive,
   'billing-reversals': IconReceipt,
   'pending-dues': IconWallet,
   'user-accounts': IconUsers,
@@ -48,41 +64,8 @@ const ADMIN_MODULE_ICONS: Record<string, SidebarIcon> = {
   'audit-trail': IconHistory,
   'backups-restore': IconDatabase,
   'data-integrity': IconShieldCheck,
+  workstations: IconDeviceDesktop,
   'system-health': IconServer,
-}
-
-/** How each server-link state reads in the sidebar (label), phone header (short) and tooltip (detail). */
-const SERVER_LINK_VIEW: Record<ServerLink, { label: string; short: string; detail: string; tone: 'ok' | 'pending' | 'problem' }> = {
-  connected: {
-    label: 'LAN connected',
-    short: 'LAN',
-    detail: 'Central server and database answering',
-    tone: 'ok',
-  },
-  checking: {
-    label: 'Checking server…',
-    short: 'Checking',
-    detail: 'Contacting the central hospital server',
-    tone: 'pending',
-  },
-  'database-down': {
-    label: 'Database unavailable',
-    short: 'DB down',
-    detail: 'The central server answered but could not reach its database. Saving will fail until it is back.',
-    tone: 'problem',
-  },
-  'server-unreachable': {
-    label: 'Server unreachable',
-    short: 'No server',
-    detail: 'This workstation cannot reach the central hospital server. Check the LAN cable or the server PC.',
-    tone: 'problem',
-  },
-  offline: {
-    label: 'Offline',
-    short: 'Offline',
-    detail: 'This workstation has no network connection.',
-    tone: 'problem',
-  },
 }
 
 const SIDEBAR_COLLAPSED_KEY = 'kh.sidebar.collapsed'
@@ -114,6 +97,8 @@ interface AppShellProps {
 
 type NavigationIcon =
   | 'dashboard'
+  | 'home'
+  | 'queue'
   | 'user-plus'
   | 'ticket'
   | 'folder'
@@ -121,187 +106,117 @@ type NavigationIcon =
   | 'calendar'
   | 'calendar-check'
   | 'rupee'
-  | 'chart'
-  | 'database'
-  | 'users'
-  | 'backup'
+  | 'consultation'
   | 'settings'
-  | 'audit'
-  | 'shield'
-  | 'server'
+  | 'receipt'
+  | 'report'
 
 interface NavigationItem {
   key: string
   label: string
   description: string
-  /** Shown to a doctor only when they belong to this department; shown to all while unknown. */
+  /** Shown to a doctor only when they belong to this department; fail closed until departments load. */
   specialty?: SpecialtyCode
   path: string
   icon: NavigationIcon
-  roles: Role[]
-  activePaths?: string[]
-  sectionStart?: string
 }
 
-const ALL_ROLES: Role[] = ['ADMIN', 'RECEPTION', 'DOCTOR']
-const ADMIN_RECEPTION: Role[] = ['ADMIN', 'RECEPTION']
-const ADMIN_ONLY: Role[] = ['ADMIN']
-const DOCTOR_ONLY: Role[] = ['DOCTOR']
-
-const NAVIGATION: NavigationItem[] = [
+/*
+ * One menu per role, in the order of the working day. Each job has exactly one tab, and each
+ * tab's label is the title of the page it opens. The Administrator's menu is the module
+ * registry in admin/modules.ts, rendered by renderAdminSidebar.
+ */
+// Reception order: Dashboard -> Appointments -> Waiting Room -> Billing & Checkout -> Patient Records.
+// The full registration form opens from Appointments and Patient Records.
+const RECEPTION_NAVIGATION: NavigationItem[] = [
   {
     key: 'dashboard',
     label: 'Dashboard',
-    description: 'Role-specific clinic overview',
-    path: '',
+    description: "Today's overview: the queue, doctor workload and what needs attention",
+    path: '/reception',
     icon: 'dashboard',
-    roles: ALL_ROLES,
-  },
-  // Patient & Clinical Workflow
-  {
-    key: 'patient-registration',
-    label: 'Patient Registration',
-    description: 'Register a new patient and issue a URN',
-    path: '/reception/patients/new',
-    icon: 'user-plus',
-    roles: ['RECEPTION'],
-    sectionStart: 'PATIENT & CLINICAL WORKFLOW',
-  },
-  {
-    key: 'token-generation',
-    label: 'Token Desk',
-    description: 'Register visit and issue queue token',
-    path: '/reception/tokens',
-    icon: 'ticket',
-    roles: ['RECEPTION', 'ADMIN'],
-  },
-  {
-    key: 'patient-records',
-    label: 'Patient Records',
-    description: 'Search and inspect patient records',
-    path: '/reception/patients',
-    icon: 'folder',
-    roles: ALL_ROLES,
-    sectionStart: 'PATIENT & CLINICAL WORKFLOW',
-  },
-  {
-    key: 'physiotherapy',
-    label: 'Physiotherapy Treatment',
-    description: 'Treatment plans and session records',
-    path: '/doctor/treatment-plans',
-    icon: 'activity',
-    roles: DOCTOR_ONLY,
-    specialty: 'PHYSIOTHERAPY',
   },
   {
     key: 'appointments',
     label: 'Appointments',
-    description: "Daily token schedule and waiting hall queue",
-    path: '/reception/appointments?tab=today',
-    icon: 'ticket',
-    roles: ALL_ROLES,
+    description: 'Check in patients, issue OPD tokens, and manage bookings by date and doctor',
+    path: '/reception/appointments',
+    icon: 'calendar',
+  },
+  {
+    key: 'waiting-room',
+    label: 'Waiting Room',
+    description: 'Today’s queue by doctor: order the waiting patients, reassign or cancel a waiting consultation',
+    path: '/reception/waiting',
+    icon: 'activity',
+  },
+  {
+    key: 'billing',
+    label: 'Billing & Checkout',
+    description: 'Counter checkout, visit payments, receipts desk, pending dues and daily closing report',
+    path: '/reception/billing',
+    icon: 'rupee',
+  },
+  {
+    key: 'patient-records',
+    label: 'Patient Records',
+    description: 'Search, view, edit and print patient records; full registration form',
+    path: '/reception/patients',
+    icon: 'folder',
+  },
+]
+
+const DOCTOR_NAVIGATION: NavigationItem[] = [
+  {
+    key: 'dashboard',
+    label: 'Dashboard',
+    description: "Operational overview, daily workload, and treatment plans",
+    path: '/doctor',
+    icon: 'home',
+  },
+  {
+    key: 'my-queue',
+    label: 'My Queue',
+    description: 'Your patients for today: call the next one and start the consultation',
+    path: '/doctor/queue',
+    icon: 'queue',
+  },
+  {
+    // Shown only while a consultation is open or one is left unfinished; see visibleItems.
+    key: 'consultation',
+    label: 'Continue Consultation',
+    description: 'Return to the consultation you have open or left unfinished',
+    path: '/doctor/encounters',
+    icon: 'consultation',
   },
   {
     key: 'followups',
-    label: 'Follow-up & Visits',
-    description: 'Prescription-directed clinical follow-ups',
+    label: 'Follow-ups',
+    description: 'Return dates recorded on your prescriptions',
     path: '/reception/appointments?tab=followup',
     icon: 'calendar-check',
-    roles: DOCTOR_ONLY,
+  },
+  {
+    key: 'physiotherapy',
+    label: 'Physiotherapy Treatment',
+    description: 'Treatment packages and session records',
+    path: '/doctor/treatment-plans',
+    icon: 'activity',
+    specialty: 'PHYSIOTHERAPY',
+  },
+  {
+    key: 'patient-records',
+    label: 'Patient Records',
+    description: 'Search and view patient records',
+    path: '/reception/patients',
+    icon: 'folder',
   },
   {
     key: 'doctor-settings',
     label: 'My Settings',
-    description: 'Personal consultation fee and preferences',
+    description: 'Consultation fee, pace, and prescription letterhead',
     path: '/doctor/settings',
     icon: 'settings',
-    roles: DOCTOR_ONLY,
-  },
-  {
-
-    key: 'billing',
-    label: 'Billing & Payments',
-    description: 'Patient checkout, collections, receipts and dues',
-    path: '/reception/dues',
-    icon: 'rupee',
-    roles: ADMIN_RECEPTION,
-    activePaths: ['/reception/dues', '/reception/billing'],
-  },
-  // Hospital Administration
-  {
-    key: 'hospital-configuration',
-    label: 'Hospital Configuration',
-    description: 'Clinic identity, address, contact details and consultation validity',
-    path: '/admin/settings',
-    icon: 'settings',
-    roles: ADMIN_ONLY,
-    activePaths: ['/admin/settings'],
-    sectionStart: 'HOSPITAL ADMINISTRATION',
-  },
-  {
-    key: 'doctor-clinical',
-    label: 'Doctor & Clinical Configuration',
-    description: 'Doctor records, registration details and fee schedules',
-    path: '/admin/doctors',
-    icon: 'database',
-    roles: ADMIN_ONLY,
-    activePaths: ['/admin/doctors', '/admin/departments'],
-  },
-  {
-    key: 'billing-financial',
-    label: 'Billing & Financial',
-    description: 'Receipt numbering cycle, fee schedules and payment reversals',
-    path: '/admin/billing',
-    icon: 'rupee',
-    roles: ADMIN_ONLY,
-    activePaths: ['/admin/billing'],
-  },
-  // System Administration
-  {
-    key: 'user-authority',
-    label: 'User & Authority',
-    description: 'Staff accounts, roles and permission matrix',
-    path: '/admin/users',
-    icon: 'users',
-    roles: ADMIN_ONLY,
-    activePaths: ['/admin/users', '/admin/roles'],
-    sectionStart: 'SYSTEM ADMINISTRATION',
-  },
-  {
-    key: 'security-access',
-    label: 'Security & Access',
-    description: 'Active sessions and security policy',
-    path: '/admin/security',
-    icon: 'shield',
-    roles: ADMIN_ONLY,
-    activePaths: ['/admin/security'],
-  },
-  {
-    key: 'audit-compliance',
-    label: 'Audit & Compliance',
-    description: 'Search immutable event audit trail',
-    path: '/admin/audit',
-    icon: 'audit',
-    roles: ADMIN_ONLY,
-    activePaths: ['/admin/audit'],
-  },
-  {
-    key: 'backup-data',
-    label: 'Backup, Restore & Data',
-    description: 'Backup archives, recovery and integrity checks',
-    path: '/admin/backups',
-    icon: 'backup',
-    roles: ADMIN_ONLY,
-    activePaths: ['/admin/backups', '/admin/integrity'],
-  },
-  {
-    key: 'system-health',
-    label: 'System Health & Maintenance',
-    description: 'Server revision, uptime and storage',
-    path: '/admin/system',
-    icon: 'server',
-    roles: ADMIN_ONLY,
-    activePaths: ['/admin/system'],
   },
 ]
 
@@ -311,43 +226,44 @@ function dashboardPath(role: Role) {
   return '/reception'
 }
 
-function navigationHref(item: NavigationItem, role: Role) {
-  return item.key === 'dashboard' ? dashboardPath(role) : item.path
+/** True when the page at `pathname` belongs to this sidebar item. */
+function isNavigationItemActive(item: NavigationItem, pathname: string) {
+  switch (item.key) {
+    case 'dashboard':
+      return pathname === item.path
+    case 'my-queue':
+      // A prescription is written from a patient in the queue.
+      return pathname === item.path || pathname.startsWith('/doctor/prescriptions/')
+    case 'patient-records':
+      // The full registration form opens from Patient Records (and from Appointments).
+      // The role-neutral Visit Workspace (/patients/:id/visits/:visitId) also belongs here.
+      return (
+        pathname === '/reception/patients' ||
+        pathname === '/reception/patients/new' ||
+        /^\/reception\/patients\/\d+(?:\/print|\/edit)?$/.test(pathname) ||
+        /^\/patients\/\d+\/visits\/\d+$/.test(pathname)
+      )
+    case 'appointments':
+    case 'followups':
+      // Reception uses Appointments as the unified check-in & booking workspace; a doctor sees Follow-ups.
+      return pathname === '/reception/appointments'
+    case 'billing':
+      // Reception financial desk includes checkout, receipts and daily reports.
+      return (
+        pathname === '/reception/billing' ||
+        pathname === '/reception/receipts' ||
+        pathname === '/reception/reports'
+      )
+    default: {
+      const base = item.path.split('?')[0]
+      return pathname === base || pathname.startsWith(`${base}/`)
+    }
+  }
 }
 
-function isNavigationItemActive(
-  item: NavigationItem,
-  pathname: string,
-  search: string,
-  role: Role,
-) {
-  if (item.key === 'dashboard') return pathname === dashboardPath(role)
-
-  if (item.key === 'appointments' || item.key === 'followups') {
-    if (pathname !== '/reception/appointments') return false
-    const tab = new URLSearchParams(search).get('tab') || 'today'
-    if (item.key === 'followups') return role === 'DOCTOR' && tab === 'followup'
-    return tab !== 'followup' || role !== 'DOCTOR'
-  }
-
-  if (item.key === 'patient-registration') {
-    return pathname === '/reception/patients/new'
-  }
-
-  if (item.key === 'patient-records') {
-    return (
-      pathname === '/reception/patients' ||
-      /^\/reception\/patients\/\d+(?:\/print|\/edit)?$/.test(pathname)
-    )
-  }
-
-  const paths = item.activePaths ?? [item.path]
-  return paths.some((p) => pathname === p || pathname.startsWith(`${p}/`))
-}
-
-function NavIcon({ name }: { name: NavigationIcon }) {
+function NavIcon({ name, active = false }: { name: NavigationIcon; active?: boolean }) {
   const shared = {
-    className: 'h-5 w-5 shrink-0',
+    className: `h-5 w-5 shrink-0 ${active ? 'text-white' : 'text-white/75 group-hover:text-white'}`.trim(),
     viewBox: '0 0 24 24',
     fill: 'none',
     stroke: 'currentColor',
@@ -358,6 +274,22 @@ function NavIcon({ name }: { name: NavigationIcon }) {
   }
 
   switch (name) {
+    case 'home':
+      return (
+        <svg {...shared}>
+          <path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+          <polyline points="9 22 9 12 15 12 15 22" />
+        </svg>
+      )
+    case 'queue':
+      return (
+        <svg {...shared}>
+          <circle cx="7" cy="7" r="2.5" />
+          <circle cx="17" cy="7" r="2.5" />
+          <circle cx="7" cy="17" r="2.5" />
+          <circle cx="17" cy="17" r="2.5" />
+        </svg>
+      )
     case 'dashboard':
       return (
         <svg {...shared}>
@@ -422,40 +354,25 @@ function NavIcon({ name }: { name: NavigationIcon }) {
           <path d="M6 3h12M6 8h12M6 13l8.5 8M6 13h3a4 4 0 0 0 0-8" />
         </svg>
       )
-    case 'chart':
+    case 'consultation':
       return (
         <svg {...shared}>
-          <line x1="18" y1="20" x2="18" y2="10" />
-          <line x1="12" y1="20" x2="12" y2="4" />
-          <line x1="6" y1="20" x2="6" y2="14" />
+          <path d="M9 4H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2h-2" />
+          <rect x="9" y="2" width="6" height="4" rx="1" />
+          <line x1="9" y1="12" x2="15" y2="12" />
+          <line x1="9" y1="16" x2="13" y2="16" />
         </svg>
       )
-    case 'database':
+    case 'receipt':
       return (
         <svg {...shared}>
-          <ellipse cx="12" cy="5" rx="9" ry="3" />
-          <path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3" />
-          <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5" />
+          <path d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1Z" />
+          <path d="M14 8H8" />
+          <path d="M16 12H8" />
+          <path d="M13 16H8" />
         </svg>
       )
-    case 'users':
-      return (
-        <svg {...shared}>
-          <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
-          <circle cx="9" cy="7" r="4" />
-          <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
-          <path d="M16 3.13a4 4 0 0 1 0 7.75" />
-        </svg>
-      )
-    case 'backup':
-      return (
-        <svg {...shared}>
-          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-          <polyline points="17 8 12 3 7 8" />
-          <line x1="12" y1="3" x2="12" y2="15" />
-        </svg>
-      )
-    case 'audit':
+    case 'report':
       return (
         <svg {...shared}>
           <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
@@ -463,21 +380,6 @@ function NavIcon({ name }: { name: NavigationIcon }) {
           <line x1="16" y1="13" x2="8" y2="13" />
           <line x1="16" y1="17" x2="8" y2="17" />
           <polyline points="10 9 9 9 8 9" />
-        </svg>
-      )
-    case 'shield':
-      return (
-        <svg {...shared}>
-          <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
-        </svg>
-      )
-    case 'server':
-      return (
-        <svg {...shared}>
-          <rect x="2" y="2" width="20" height="8" rx="2" ry="2" />
-          <rect x="2" y="14" width="20" height="8" rx="2" ry="2" />
-          <line x1="6" y1="6" x2="6.01" y2="6" />
-          <line x1="6" y1="18" x2="6.01" y2="18" />
         </svg>
       )
     case 'settings':
@@ -508,13 +410,11 @@ type Crumb = { label: string; href?: string }
  * The path to the current page, in the same words as the sidebar and the page title.
  * The last crumb also names the browser tab, so every page is told apart in the tab bar.
  */
-function breadcrumbsFor(pathname: string, role: Role): Crumb[] {
+function breadcrumbsFor(pathname: string, search: string, role: Role): Crumb[] {
   const crumbs: Crumb[] = [{ label: 'Dashboard', href: dashboardPath(role) }]
 
   if (pathname === '/reception/patients/new') {
     crumbs.push({ label: 'Patient Registration' })
-  } else if (pathname === '/reception/tokens') {
-    crumbs.push({ label: 'Token Desk' })
   } else if (pathname === '/reception/patients') {
     crumbs.push({ label: 'Patient Records' })
   } else if (/^\/reception\/patients\/\d+$/.test(pathname)) {
@@ -526,15 +426,29 @@ function breadcrumbsFor(pathname: string, role: Role): Crumb[] {
   } else if (/^\/reception\/patients\/\d+\/edit$/.test(pathname)) {
     crumbs.push({ label: 'Patient Records', href: '/reception/patients' })
     crumbs.push({ label: 'Edit Patient' })
+  } else if (/^\/patients\/\d+\/visits\/\d+$/.test(pathname)) {
+    const patientId = pathname.split('/')[2]
+    crumbs.push({ label: 'Patient Records', href: '/reception/patients' })
+    crumbs.push({ label: 'Patient Profile', href: `/reception/patients/${patientId}` })
+    crumbs.push({ label: 'Visit Workspace' })
   } else if (pathname === '/reception/appointments') {
-    crumbs.push({ label: 'Appointments' })
+    // Same tab rule as the page: a doctor sees Follow-ups unless they chose Schedule.
+    const tab = new URLSearchParams(search).get('tab')
+    crumbs.push({ label: role === 'DOCTOR' ? (tab === 'today' ? 'Schedule' : 'Follow-ups') : 'Appointments' })
+  } else if (pathname === '/reception/waiting') {
+    crumbs.push({ label: 'Waiting Room' })
   } else if (pathname === '/reception/billing') {
-    crumbs.push({ label: 'Billing & Payments' })
-  } else if (pathname === '/reception/dues') {
-    crumbs.push({ label: 'Billing & Payments', href: '/reception/billing' })
-    crumbs.push({ label: 'Pending Dues' })
-  } else if (pathname === '/doctor/treatment-plans') {
-    crumbs.push({ label: 'Treatment Plans' })
+    crumbs.push({ label: 'Billing & Checkout' })
+  } else if (pathname === '/reception/receipts') {
+    crumbs.push({ label: 'Billing & Checkout', href: '/reception/billing' })
+    crumbs.push({ label: 'Receipts Desk' })
+  } else if (pathname === '/reception/reports') {
+    crumbs.push({ label: 'Billing & Checkout', href: '/reception/billing' })
+    crumbs.push({ label: 'Daily Report' })
+  } else if (pathname === '/doctor/queue') {
+    crumbs.push({ label: 'My Queue' })
+  } else if (pathname === '/doctor/treatment-plans' || /^\/doctor\/treatment-plans\/\d+$/.test(pathname)) {
+    crumbs.push({ label: 'Physiotherapy Treatment' })
   } else if (pathname === '/doctor/encounters/new') {
     crumbs.push({ label: 'New Consultation' })
   } else if (/^\/doctor\/encounters\/\d+$/.test(pathname)) {
@@ -579,9 +493,6 @@ export function AppShell({ name, role, children }: AppShellProps) {
     return Array.isArray(stored) ? stored.filter((g): g is string => typeof g === 'string') : []
   })
   const [now, setNow] = useState(() => new Date())
-  // Green only when the central server answers and confirms its database (GET /api/health).
-  const serverLink = useServerLink()
-  const link = SERVER_LINK_VIEW[serverLink]
   const mobileMenuButtonRef = useRef<HTMLButtonElement>(null)
   const drawerRef = useRef<HTMLDivElement>(null)
 
@@ -635,20 +546,61 @@ export function AppShell({ name, role, children }: AppShellProps) {
   const roleLabel = role === 'ADMIN' ? 'Administrator' : role === 'RECEPTION' ? 'Reception' : 'Doctor'
 
   useEffect(() => {
-    const crumbs = breadcrumbsFor(location.pathname, role)
+    const crumbs = breadcrumbsFor(location.pathname, location.search, role)
     const page = crumbs[crumbs.length - 1].label
     document.title = `${page} – Kalyan Hospital`
-  }, [location.pathname, role])
+  }, [location.pathname, location.search, role])
+
+  // Phase 23: Periodic 30s LAN workstation heartbeat
+  useEffect(() => {
+    if (typeof window === 'undefined' || import.meta.env.MODE === 'test') return
+
+    const sendPing = () => {
+      let wsId = ''
+      try {
+        wsId = localStorage.getItem('kalyan_workstation_id') || ''
+        if (!wsId) {
+          wsId = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID().slice(0, 8) : Math.random().toString(36).slice(2, 10)
+          localStorage.setItem('kalyan_workstation_id', wsId)
+        }
+      } catch {
+        wsId = 'term'
+      }
+
+      sendHeartbeat({
+        hostname: `ws-${wsId}-${role.toLowerCase()}`,
+        terminal_name: `${roleLabel} (${wsId})`,
+        app_version: '3.0.0',
+      }).catch(() => {
+        // Non-blocking in offline / network disconnected conditions
+      })
+    }
+
+    sendPing()
+    const timer = setInterval(sendPing, 30000)
+    return () => clearInterval(timer)
+  }, [role, roleLabel])
+
+  // A doctor's open consultation, or the newest one left unfinished, gets its own sidebar link.
+  const unfinishedConsultations = useMyUnfinishedConsultations(role === 'DOCTOR')
+  const waitingCount = useMyWaitingQueueCount(role === 'DOCTOR')
+  const onConsultationPage = location.pathname.startsWith('/doctor/encounters/')
 
   const visibleItems = useMemo(() => {
     const codes = new Set(myDepartments.map((d) => d.code))
-    return NAVIGATION.filter(
-      (item) =>
-        item.roles.includes(role) &&
-        // Until the doctor's departments are known, keep every item rather than hide work.
-        (!item.specialty || role !== 'DOCTOR' || codes.size === 0 || codes.has(item.specialty)),
-    )
-  }, [role, myDepartments])
+    const menu = role === 'DOCTOR' ? DOCTOR_NAVIGATION : RECEPTION_NAVIGATION
+    return menu.filter((item) => {
+      if (item.key === 'consultation') return onConsultationPage || unfinishedConsultations.length > 0
+      // Fail closed: specialty items appear only when the doctor's department assignment confirms them.
+      return !item.specialty || codes.has(item.specialty)
+    })
+  }, [role, myDepartments, onConsultationPage, unfinishedConsultations.length])
+
+  const navigationHref = (item: NavigationItem) => {
+    if (item.key !== 'consultation') return item.path
+    if (onConsultationPage) return `${location.pathname}${location.search}`
+    return `/doctor/encounters/${unfinishedConsultations[0].id}`
+  }
 
   const handleSignOut = async () => {
     try {
@@ -661,7 +613,7 @@ export function AppShell({ name, role, children }: AppShellProps) {
   /** Class sets for sidebar labels: the drawer always shows labels; the desktop rail hides them when collapsed. */
   const sidebarClasses = (isDrawer: boolean) => ({
     width: isDrawer ? 'w-72 max-w-[85vw] shadow-2xl' : sidebarCollapsed ? 'w-16 shrink-0' : 'w-16 lg:w-64 shrink-0',
-    inline: isDrawer ? 'inline' : sidebarCollapsed ? 'hidden' : 'hidden lg:inline',
+    inline: isDrawer ? 'inline' : sidebarCollapsed ? 'sr-only' : 'sr-only lg:not-sr-only lg:inline',
     block: isDrawer ? 'block' : sidebarCollapsed ? 'hidden' : 'hidden lg:block',
     justify: isDrawer ? 'justify-start' : sidebarCollapsed ? 'justify-center' : 'justify-center lg:justify-start',
     brand: isDrawer
@@ -695,7 +647,7 @@ export function AppShell({ name, role, children }: AppShellProps) {
         aria-label={label}
         aria-expanded={!sidebarCollapsed}
         title={label}
-        className={`hidden h-9 w-9 shrink-0 items-center justify-center rounded-lg text-rose-100 transition-colors hover:bg-white/10 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-white lg:inline-flex ${sidebarCollapsed ? '' : 'ml-auto'}`}
+        className={`hidden h-9 w-9 shrink-0 items-center justify-center rounded-lg text-white/85 transition-colors hover:bg-white/10 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-gold-400 lg:inline-flex ${sidebarCollapsed ? '' : 'ml-auto'}`}
       >
         {sidebarCollapsed ? (
           <IconLayoutSidebarLeftExpand size={20} aria-hidden="true" />
@@ -706,58 +658,29 @@ export function AppShell({ name, role, children }: AppShellProps) {
     )
   }
 
-  /** Central server status pinned to the foot of the sidebar; problems are announced to screen readers. */
-  const renderConnectionStatus = (isDrawer: boolean) => {
-    const iconOnly = !isDrawer && sidebarCollapsed
-    const tone = link.tone === 'ok' ? 'bg-white/10 text-rose-50' : link.tone === 'pending' ? 'bg-white/10 text-rose-100' : 'bg-amber-100 text-amber-950'
-    const dot = link.tone === 'ok' ? 'bg-emerald-400 animate-pulse' : link.tone === 'pending' ? 'bg-slate-300' : 'bg-amber-600'
-    return (
-      <div className="flex h-14 shrink-0 items-center border-t border-white/15 px-3">
-        <div
-          role={link.tone === 'problem' ? 'status' : undefined}
-          aria-live={link.tone === 'problem' ? 'polite' : undefined}
-          title={link.detail}
-          className={`flex min-h-9 w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-xs font-semibold ${iconOnly ? 'justify-center' : ''} ${tone}`}
-        >
-          <span className={`h-2 w-2 shrink-0 rounded-full ${dot}`} aria-hidden="true" />
-          <span className={iconOnly ? 'sr-only' : 'truncate'}>{link.label}</span>
-        </div>
-      </div>
-    )
-  }
-
   const renderSidebarFooter = (isDrawer: boolean) => {
     const iconOnly = !isDrawer && sidebarCollapsed
     const isAccountActive = location.pathname === '/account'
     return (
-      <div className="shrink-0 border-t border-white/15">
-        <div className="px-2 pt-2">
+      <div className="shrink-0 border-t border-white/10 bg-black/15">
+        <div className="p-2">
           <Link
             to="/account"
             onClick={() => isDrawer && setMobileOpen(false)}
             aria-current={isAccountActive ? 'page' : undefined}
             title="My account · Profile, password, sessions"
-            className={`group relative flex min-h-10 items-center gap-3 rounded-lg px-3 py-2 text-xs font-semibold transition-colors ${
-              iconOnly ? 'justify-center' : ''
-            } ${
-              isAccountActive
-                ? 'bg-white text-[#5D0B26] font-bold shadow-xs'
-                : 'text-rose-100 hover:bg-white/10 hover:text-white'
-            }`}
+            className={`group relative flex min-h-10 items-center gap-3 rounded-lg px-3 py-2 text-xs font-semibold leading-snug tracking-[0.01em] transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-gold-400 ${iconOnly ? 'justify-center' : ''
+              } ${isAccountActive
+                ? 'bg-white/15 text-white border-l-[3px] border-gold-400 font-semibold'
+                : 'text-white/85 hover:bg-white/10 hover:text-white'
+              }`}
           >
-            <svg className="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <svg className={`h-4 w-4 shrink-0 ${isAccountActive ? 'text-white' : 'text-white/75 group-hover:text-white'}`.trim()} fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
             </svg>
             <span className={iconOnly ? 'sr-only' : 'truncate'}>My account</span>
-            {isAccountActive && (
-              <span
-                aria-hidden="true"
-                className="absolute left-0 top-1.5 bottom-1.5 w-1 rounded-r bg-[#C39A35]"
-              />
-            )}
           </Link>
         </div>
-        {renderConnectionStatus(isDrawer)}
       </div>
     )
   }
@@ -765,20 +688,26 @@ export function AppShell({ name, role, children }: AppShellProps) {
   const renderAdminSidebar = (isDrawer = false) => {
     const cls = sidebarClasses(isDrawer)
     const iconOnly = !isDrawer && sidebarCollapsed
-    const moduleActive = (path: string | undefined) =>
-      path === '/admin'
-        ? location.pathname === '/admin'
-        : Boolean(path && (location.pathname === path || location.pathname.startsWith(`${path}/`)))
+    // A module path may carry a tab (Dues opens /reception/billing?tab=dues); the page decides the match.
+    const moduleActive = (path: string | undefined) => {
+      if (!path) return false
+      const base = path.split('?')[0]
+      if (base === '/admin') return location.pathname === '/admin'
+      if (base === '/reception/patients' && /^\/patients\/\d+\/visits\/\d+$/.test(location.pathname)) {
+        return true
+      }
+      return location.pathname === base || location.pathname.startsWith(`${base}/`)
+    }
     return (
       <aside
-        aria-label="Primary navigation"
-        className={`flex h-full flex-col bg-[#5D0B26] text-white transition-all duration-200 ${cls.width}`}
+        aria-label="Administrative navigation"
+        className={`flex h-full flex-col bg-brand-900 border-r border-brand-900 text-white transition-all duration-200 ${cls.width}`}
       >
         {/* Sidebar Brand Header */}
-        <div className={`flex min-h-[60px] sm:min-h-[64px] shrink-0 items-center border-b border-white/15 ${cls.brand}`}>
+        <div className={`flex min-h-[60px] sm:min-h-[64px] shrink-0 items-center border-b border-white/10 ${cls.brand}`}>
           <div className="flex items-center gap-2.5 min-w-0">
             <div
-              className={`h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white/10 text-amber-300 border border-white/15 shadow-2xs ${!isDrawer && sidebarCollapsed ? 'hidden' : 'flex'}`}
+              className={`h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white/10 text-gold-400 border border-white/15 shadow-2xs ${!isDrawer && sidebarCollapsed ? 'hidden' : 'flex'}`}
               title="Administration Panel"
               aria-hidden="true"
             >
@@ -788,10 +717,10 @@ export function AppShell({ name, role, children }: AppShellProps) {
               </svg>
             </div>
             <div className={`min-w-0 ${cls.block}`}>
-              <p className="truncate text-xs font-bold uppercase tracking-wide text-amber-200">
+              <p className="truncate text-xs font-medium leading-tight tracking-wide text-white/80">
                 Control Console
               </p>
-              <p className="truncate text-xs font-bold text-white">
+              <p className="truncate text-sm font-bold leading-tight tracking-tight text-white">
                 Administration Panel
               </p>
             </div>
@@ -802,7 +731,7 @@ export function AppShell({ name, role, children }: AppShellProps) {
               type="button"
               onClick={() => setMobileOpen(false)}
               aria-label="Close navigation menu"
-              className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-white/20 text-white hover:bg-white/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-white"
+              className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-white/20 text-sm leading-none text-white/85 hover:bg-white/10 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-gold-400"
             >
               ✕
             </button>
@@ -812,7 +741,7 @@ export function AppShell({ name, role, children }: AppShellProps) {
         {/* Scrollable Navigation Items */}
         <nav
           aria-label="Primary navigation"
-          className={`flex-1 overflow-y-auto py-4 custom-scrollbar-dark ${iconOnly ? 'space-y-2 px-2' : 'space-y-3 px-3'}`}
+          className={`custom-scrollbar-dark flex-1 overflow-y-auto py-4 ${iconOnly ? 'space-y-2 px-2' : 'space-y-4 px-3'}`}
         >
           {/* Dashboard (Home) */}
           <Link
@@ -820,18 +749,15 @@ export function AppShell({ name, role, children }: AppShellProps) {
             onClick={() => isDrawer && setMobileOpen(false)}
             aria-current={location.pathname === '/admin' ? 'page' : undefined}
             title="Management Overview"
-            className={`group relative flex min-h-11 items-center gap-3 rounded-lg px-3 py-2 text-xs font-semibold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-white ${cls.justify} ${location.pathname === '/admin'
-                ? 'bg-white text-[#5D0B26] font-bold shadow-sm'
-                : 'text-rose-100 hover:bg-white/10 hover:text-white'
+            className={`group relative flex min-h-10 items-center gap-3 rounded-lg px-3 py-2 text-xs font-semibold leading-snug tracking-[0.01em] transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-gold-400 ${cls.justify} ${location.pathname === '/admin'
+              ? 'bg-white/15 text-white border-l-[3px] border-gold-400 font-semibold'
+              : 'text-white/80 hover:bg-white/10 hover:text-white'
               }`}
           >
-            <svg className="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+            <svg className={`h-4 w-4 shrink-0 ${location.pathname === '/admin' ? 'text-white' : 'text-white/75 group-hover:text-white'}`.trim()} fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
             </svg>
             <span className={cls.inline}>Overview</span>
-            {location.pathname === '/admin' && (
-              <span aria-hidden="true" className="absolute left-0 top-2 bottom-2 w-1.5 rounded-r bg-[#C39A35]" />
-            )}
           </Link>
 
           {/* Five Canonical Admin Sections — each heading folds its group open or closed */}
@@ -854,9 +780,9 @@ export function AppShell({ name, role, children }: AppShellProps) {
                       aria-controls={listId}
                       disabled={isDrawer || holdsActive}
                       title={holdsActive ? `${group.label} (contains the current page)` : open ? `Collapse ${group.label}` : `Expand ${group.label}`}
-                      className="flex min-h-9 w-full items-center justify-between gap-2 rounded-md px-3 py-2 text-left text-xs font-semibold text-rose-200 transition-colors hover:bg-white/10 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-white disabled:cursor-default disabled:hover:bg-transparent disabled:hover:text-rose-200"
+                      className="flex min-h-9 w-full items-center justify-between gap-2 rounded-md px-3 py-1.5 text-left text-xs font-semibold uppercase tracking-wider text-white/75 transition-colors hover:bg-white/10 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-gold-400 disabled:cursor-default disabled:hover:bg-transparent disabled:hover:text-white/75"
                     >
-                      <span>{group.navLabel}</span>
+                      <span className="truncate">{group.navLabel}</span>
                       {!isDrawer && (
                         <IconChevronDown
                           size={16}
@@ -878,25 +804,22 @@ export function AppShell({ name, role, children }: AppShellProps) {
                         onClick={() => isDrawer && setMobileOpen(false)}
                         aria-current={active ? 'page' : undefined}
                         title={mod.title}
-                        className={`group relative flex min-h-11 items-center gap-2.5 rounded-lg px-3 py-2 text-xs font-medium transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-white ${cls.justify} ${active
-                            ? 'bg-white text-[#5D0B26] font-bold shadow-sm'
-                            : 'text-rose-100 hover:bg-white/10 hover:text-white'
+                        className={`group relative flex min-h-10 items-center gap-2.5 rounded-lg px-3 py-2 text-xs font-medium leading-snug tracking-[0.01em] transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-gold-400 ${cls.justify} ${active
+                          ? 'bg-white/15 text-white border-l-[3px] border-gold-400 font-semibold'
+                          : 'text-white/80 hover:bg-white/10 hover:text-white'
                           }`}
                       >
-                        <ModIcon size={18} className="shrink-0" aria-hidden="true" />
+                        <ModIcon size={18} className={`shrink-0 ${active ? 'text-white' : 'text-white/75 group-hover:text-white'}`.trim()} aria-hidden="true" />
                         <span className={`truncate ${cls.inline}`}>{mod.navLabel ?? mod.title}</span>
                         {mod.id === 'data-integrity' && integrityProblems > 0 && (
                           <span
-                            className={`shrink-0 rounded-full bg-red-700 px-1.5 py-0.5 text-xs font-bold tabular-nums text-white ${iconOnly ? 'absolute right-0.5 top-0.5' : `ml-auto ${cls.inline}`}`}
+                            className={`inline-flex min-w-[20px] shrink-0 items-center justify-center rounded-full bg-red-100 ring-1 ring-red-300/80 px-1.5 py-0.5 text-xs font-bold leading-none tabular-nums text-red-900 ${iconOnly ? 'absolute right-0.5 top-0.5' : `ml-auto ${cls.inline}`}`}
                           >
                             <span aria-hidden="true">{integrityProblems}</span>
                             <span className="sr-only">
                               , {integrityProblems} {integrityProblems === 1 ? 'problem' : 'problems'}
                             </span>
                           </span>
-                        )}
-                        {active && (
-                          <span aria-hidden="true" className="absolute left-0 top-2 bottom-2 w-1.5 rounded-r bg-[#C39A35]" />
                         )}
                       </Link>
                     )
@@ -920,16 +843,16 @@ export function AppShell({ name, role, children }: AppShellProps) {
     return (
       <aside
         aria-label="Hospital workspace navigation"
-        className={`flex h-full flex-col bg-[#5D0B26] text-white transition-all duration-200 ${cls.width}`}
+        className={`flex h-full flex-col bg-brand-900 border-r border-brand-900 text-white transition-all duration-200 ${cls.width}`}
       >
         {/* Sidebar Brand Header */}
         <div
-          className={`flex min-h-[60px] sm:min-h-[64px] shrink-0 items-center border-b border-white/15 ${cls.brand}`}
+          className={`flex min-h-[60px] sm:min-h-[64px] shrink-0 items-center border-b border-white/10 ${cls.brand}`}
         >
           <div className="flex items-center gap-2.5 min-w-0">
             <div
-              className={`h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white/10 text-amber-300 border border-white/15 shadow-2xs ${!isDrawer && sidebarCollapsed ? 'hidden' : 'flex'}`}
-              title={role === 'RECEPTION' ? 'Reception & Registration' : (myDepartmentLabel || 'Clinical Consultation')}
+              className={`h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white/10 text-gold-400 border border-white/15 shadow-2xs ${!isDrawer && sidebarCollapsed ? 'hidden' : 'flex'}`}
+              title={role === 'RECEPTION' ? 'Reception Desk' : (myDepartmentLabel || 'Clinical Consultation')}
               aria-hidden="true"
             >
               {role === 'RECEPTION' ? (
@@ -943,12 +866,14 @@ export function AppShell({ name, role, children }: AppShellProps) {
               )}
             </div>
             <div className={`min-w-0 ${cls.block}`}>
-              <p className="truncate text-xs font-bold uppercase tracking-wide text-amber-200">
-                Workspace
-              </p>
-              <p className="truncate text-xs font-bold text-white">
+              {role !== 'RECEPTION' && (
+                <p className="truncate text-xs font-medium leading-tight tracking-wide text-white/80">
+                  Workspace
+                </p>
+              )}
+              <p className="truncate text-sm font-bold leading-tight tracking-tight text-white">
                 {role === 'RECEPTION'
-                  ? 'Reception & Registration'
+                  ? 'Reception Desk'
                   : myDepartmentLabel || 'Clinical Consultation'}
               </p>
             </div>
@@ -959,7 +884,7 @@ export function AppShell({ name, role, children }: AppShellProps) {
               type="button"
               onClick={() => setMobileOpen(false)}
               aria-label="Close navigation menu"
-              className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-white/20 text-white hover:bg-white/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-white"
+              className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-white/20 text-sm leading-none text-white/85 hover:bg-white/10 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-gold-400"
             >
               ✕
             </button>
@@ -969,32 +894,28 @@ export function AppShell({ name, role, children }: AppShellProps) {
         {/* Scrollable Navigation Items */}
         <nav
           aria-label="Primary navigation"
-          className="flex-1 space-y-1 overflow-y-auto px-2 py-4 custom-scrollbar-dark"
+          className="custom-scrollbar-dark flex-1 space-y-1 overflow-y-auto px-2.5 py-4"
         >
           {visibleItems.map((item, index) => {
-            const href = navigationHref(item, role)
-            const active = isNavigationItemActive(item, location.pathname, location.search, role)
-
+            const href = navigationHref(item)
+            const active = isNavigationItemActive(item, location.pathname)
+            // Reception's header already says "Reception Desk", so items start cleanly at the top.
+            // A doctor's first item is home; the rest follow the day's work under one heading.
             const sectionLabel =
-              index === 1
-                ? role === 'RECEPTION'
-                  ? 'RECEPTION DESK'
-                  : 'PATIENT & CLINICAL WORKFLOW'
-                : item.sectionStart && item.sectionStart !== 'PATIENT & CLINICAL WORKFLOW'
-                  ? item.sectionStart
+              role === 'RECEPTION'
+                ? null
+                : index === 1
+                  ? 'Clinical workflow'
                   : null
-
-            const isSectionDivider =
-              item.sectionStart && index > 1 && item.sectionStart !== visibleItems[index - 1]?.sectionStart
+            const draftCount = item.key === 'consultation' ? unfinishedConsultations.length : 0
+            const queueCount = item.key === 'my-queue' ? waitingCount : 0
+            const iconOnly = !isDrawer && sidebarCollapsed
 
             return (
               <div key={item.key}>
-                {isSectionDivider && (
-                  <div className={`mx-2 mb-2 mt-3 border-t border-white/15 ${cls.block}`} />
-                )}
                 {sectionLabel && (
                   <div
-                    className={`pb-1.5 pt-2.5 text-xs font-bold uppercase tracking-wider text-rose-200 ${cls.block} px-3`}
+                    className={`pb-1.5 pt-3 text-xs font-semibold uppercase tracking-wider text-white/75 ${cls.block} px-3`}
                   >
                     {sectionLabel}
                   </div>
@@ -1004,20 +925,32 @@ export function AppShell({ name, role, children }: AppShellProps) {
                   onClick={() => isDrawer && setMobileOpen(false)}
                   aria-current={active ? 'page' : undefined}
                   title={item.description}
-                  className={`group relative flex min-h-11 items-center gap-3 rounded-lg px-3 py-2 text-sm font-semibold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-white ${cls.justify} ${active
-                      ? 'bg-white text-[#5D0B26] shadow-sm font-bold'
-                      : 'text-rose-100 hover:bg-white/10 hover:text-white'
+                  className={`group relative flex min-h-11 items-center gap-3 rounded-lg px-3 py-2 text-sm font-semibold leading-snug tracking-[0.01em] transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-gold-400 ${cls.justify} ${active
+                    ? 'bg-white/15 text-white border-l-[3px] border-gold-400 font-semibold'
+                    : 'text-white/80 hover:bg-white/10 hover:text-white'
                     }`}
                 >
-                  <NavIcon name={item.icon} />
+                  <NavIcon name={item.icon} active={active} />
                   <span className={`truncate ${cls.inline}`}>
                     {item.label}
                   </span>
-                  {active && (
+                  {queueCount > 0 && (
                     <span
-                      aria-hidden="true"
-                      className="absolute left-0 top-2 bottom-2 w-1.5 rounded-r bg-[#C39A35]"
-                    />
+                      title={`${queueCount} patients waiting in queue`}
+                      className={`inline-flex min-w-[20px] shrink-0 items-center justify-center rounded-full bg-amber-100 ring-1 ring-amber-300/80 px-1.5 py-0.5 text-xs font-bold leading-none tabular-nums text-amber-950 ${iconOnly ? 'absolute right-0.5 top-0.5' : `ml-auto ${cls.inline}`}`}
+                    >
+                      <span aria-hidden="true">{queueCount}</span>
+                      <span className="sr-only">, {queueCount} waiting</span>
+                    </span>
+                  )}
+                  {draftCount > 1 && (
+                    <span
+                      title={`${draftCount} unfinished consultations; this opens the newest. All of them are listed on My Queue.`}
+                      className={`inline-flex min-w-[20px] shrink-0 items-center justify-center rounded-full bg-amber-100 ring-1 ring-amber-300/80 px-1.5 py-0.5 text-xs font-bold leading-none tabular-nums text-amber-950 ${iconOnly ? 'absolute right-0.5 top-0.5' : `ml-auto ${cls.inline}`}`}
+                    >
+                      <span aria-hidden="true">{draftCount}</span>
+                      <span className="sr-only">, {draftCount} unfinished</span>
+                    </span>
                   )}
                 </Link>
               </div>
@@ -1031,15 +964,12 @@ export function AppShell({ name, role, children }: AppShellProps) {
   }
 
   return (
-    <div className="flex h-full w-full overflow-hidden print:h-auto print:overflow-visible flex-col bg-[#F5F7FA] text-slate-900">
+    <div className="flex h-full w-full overflow-hidden print:h-auto print:overflow-visible flex-col bg-[#F4F6F9] text-slate-900">
       {/* Top Banner Header */}
-      <header className="relative z-20 shrink-0 print:hidden border-b border-slate-200 bg-white shadow-2xs">
-        {/* Bottom-left crimson accent line matching mockup */}
-        <div className="absolute bottom-0 left-0 w-36 sm:w-44 h-[2.5px] bg-[#8E1C3D]" aria-hidden="true" />
-
-        <div className="flex min-h-[50px] sm:min-h-[54px] items-center justify-between gap-3 px-4 py-2 sm:px-6">
+      <header className="relative z-20 shrink-0 print:hidden border-t-2 border-t-brand-700 border-b border-b-slate-200/80 bg-white/85 backdrop-blur-md">
+        <div className="flex min-h-[54px] sm:min-h-[58px] items-center justify-between gap-2.5 px-3 py-2 sm:gap-4 sm:px-6">
           {/* Left section: Crest | कल्याण हॉस्पिटल | श्री वशिष्ठ कल्याण ट्रस्ट */}
-          <div className="flex min-w-0 items-center gap-2.5 sm:gap-3">
+          <div className="flex min-w-0 items-center gap-2 sm:gap-3">
             <button
               ref={mobileMenuButtonRef}
               type="button"
@@ -1047,7 +977,7 @@ export function AppShell({ name, role, children }: AppShellProps) {
               aria-label="Open navigation menu"
               aria-expanded={mobileOpen}
               aria-controls="mobile-hospital-navigation"
-              className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-slate-200 text-[#5D0B26] hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#8E1C3D] md:hidden"
+              className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-slate-200 text-slate-700 hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-700 md:hidden"
             >
               <svg
                 viewBox="0 0 24 24"
@@ -1063,23 +993,23 @@ export function AppShell({ name, role, children }: AppShellProps) {
             <img
               src="/api/assets/active-logo"
               alt="Kalyan Hospital crest"
-              className="h-8 w-8 sm:h-9 sm:w-9 shrink-0 rounded-full border border-[#C39A35] bg-white object-contain shadow-2xs p-0.5"
+              className="h-7 w-7 sm:h-9 sm:w-9 shrink-0 rounded-full border border-slate-200 bg-white object-contain shadow-2xs p-0.5"
               width={36}
               height={36}
               onError={(e) => {
-                ;(e.target as HTMLImageElement).src = '/kalyan-hospital-crest.webp'
+                ; (e.target as HTMLImageElement).src = '/kalyan-hospital-crest.webp'
               }}
             />
-            <div className="h-4 w-px bg-slate-300 shrink-0" aria-hidden="true" />
+            <div className="hidden sm:block h-4 w-px bg-slate-300 shrink-0" aria-hidden="true" />
             <span
-              className="truncate text-base sm:text-lg font-bold tracking-wide text-[#8E1C3D]"
+              className="truncate text-sm sm:text-lg font-bold leading-tight tracking-tight text-brand-800"
               lang="hi"
             >
               {branding.hospitalNameHi || 'कल्याण हॉस्पिटल'}
             </span>
             <div className="hidden sm:block h-4 w-px bg-slate-300 shrink-0" aria-hidden="true" />
             <span
-              className="hidden sm:inline truncate text-xs sm:text-sm font-semibold text-slate-800"
+              className="hidden sm:inline truncate text-xs sm:text-sm font-semibold leading-tight text-slate-800"
               lang="hi"
             >
               {branding.trustNameHi || 'श्री वशिष्ठ कल्याण ट्रस्ट'}
@@ -1098,7 +1028,7 @@ export function AppShell({ name, role, children }: AppShellProps) {
               className="hidden xl:flex items-center gap-1.5 text-xs font-medium text-slate-600"
               title={branding.address || undefined}
             >
-              <svg className="h-3.5 w-3.5 text-rose-700 shrink-0" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+              <svg className="h-3.5 w-3.5 text-brand-700 shrink-0" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
                 <path fillRule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clipRule="evenodd" />
               </svg>
               <span className="truncate max-w-56">{branding.locationLine || branding.address}</span>
@@ -1106,50 +1036,35 @@ export function AppShell({ name, role, children }: AppShellProps) {
 
             <div className="hidden xl:block h-4 w-px bg-slate-200 shrink-0" aria-hidden="true" />
 
-            {/* Clock, icon in the same rose as the location pin */}
+            {/* Clock, icon in the same maroon as the location pin */}
             <div className="hidden lg:flex items-center gap-1.5 text-xs font-medium text-slate-700">
-              <svg className="h-3.5 w-3.5 text-rose-700 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+              <svg className="h-3.5 w-3.5 text-brand-700 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
-              <span>{clock}</span>
+              <span className="tabular-nums whitespace-nowrap">{clock}</span>
             </div>
 
-            {/* LAN badge: phones only; from md up the sidebar shows connection status at its foot. */}
-            <span
-              className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-sm text-xs font-semibold border md:hidden ${
-                link.tone === 'ok'
-                  ? 'text-emerald-700 bg-emerald-50 border-emerald-300'
-                  : link.tone === 'pending'
-                    ? 'text-slate-700 bg-slate-50 border-slate-300'
-                    : 'text-amber-900 bg-amber-50 border-amber-300'
-              }`}
-              role={link.tone === 'problem' ? 'status' : undefined}
-              aria-live={link.tone === 'problem' ? 'polite' : undefined}
-              title={link.detail}
-            >
-              <span
-                className={`h-1.5 w-1.5 rounded-full ${link.tone === 'ok' ? 'bg-emerald-500 animate-pulse' : link.tone === 'pending' ? 'bg-slate-400' : 'bg-amber-500'}`}
-                aria-hidden="true"
-              />
-              {link.short}
-            </span>
+            <div className="hidden sm:block h-4 w-px bg-slate-200 shrink-0" aria-hidden="true" />
+
+            {/* LAN status pill visible across all screens (OD-F option-b) */}
+            <LANStatusPill />
 
             <div className="hidden sm:block h-4 w-px bg-slate-200 shrink-0" aria-hidden="true" />
 
             {/* Signed-in staff identity: links to My account */}
             <Link
               to="/account"
-              className="hidden sm:flex items-center gap-2 text-xs hover:bg-slate-50 p-1.5 rounded-lg transition"
+              className="hidden sm:flex min-h-9 items-center gap-2 rounded-lg px-2 py-1 text-xs transition-colors hover:bg-slate-50"
               title={`My account · Signed in as ${name}`}
             >
-              <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-rose-50 text-rose-700 font-bold" aria-hidden="true">
-                <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-brand-50 text-brand-700 border border-brand-200 font-bold" aria-hidden="true">
+                <svg className="h-3.5 w-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                 </svg>
               </span>
-              <span className="leading-tight">
+              <span className="leading-snug">
                 <span className="block text-slate-600">Signed in · {roleLabel}</span>
-                <span className="block max-w-44 truncate font-semibold text-slate-900">{name}</span>
+                <span className="block max-w-44 truncate font-semibold tracking-tight text-slate-900">{name}</span>
               </span>
             </Link>
 
@@ -1160,7 +1075,7 @@ export function AppShell({ name, role, children }: AppShellProps) {
               disabled={logout.isPending}
               aria-label="Sign out"
               title="Sign out of hospital workspace"
-              className="inline-flex min-h-11 min-w-11 items-center justify-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:border-[#8E1C3D] hover:text-[#5D0B26] hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#8E1C3D] disabled:cursor-not-allowed disabled:opacity-50 transition-colors shadow-2xs"
+              className="inline-flex min-h-11 min-w-11 items-center justify-center gap-1.5 whitespace-nowrap rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:border-brand-700 hover:text-brand-800 hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-700 disabled:cursor-not-allowed disabled:opacity-50 transition-colors shadow-2xs"
             >
               <svg
                 viewBox="0 0 24 24"
@@ -1193,12 +1108,13 @@ export function AppShell({ name, role, children }: AppShellProps) {
         <div className="flex min-w-0 flex-1 flex-col print:block">
           <main className="min-h-0 flex-1 overflow-y-auto print:overflow-visible px-4 pt-4 pb-6 sm:px-6 xl:px-8">
             <div className="mx-auto w-full max-w-[1720px] space-y-5">
+              {role === 'DOCTOR' && <EmergencyAlertBanner />}
               {children}
             </div>
           </main>
           <footer className="flex h-14 shrink-0 items-center border-t border-slate-200 bg-white px-4 text-xs font-medium text-slate-600 sm:px-6 xl:px-8">
             <div className="mx-auto flex w-full max-w-[1720px] items-center justify-between gap-2">
-              <span className="truncate">Kalyan Hospital · Local clinical workspace</span>
+              <span className="truncate"><span className="font-semibold text-brand-800">Kalyan Hospital</span> · Local clinical workspace</span>
               <span className="hidden truncate sm:inline">Patient information is available according to your role permissions.</span>
             </div>
           </footer>
@@ -1217,7 +1133,7 @@ export function AppShell({ name, role, children }: AppShellProps) {
         >
           <button
             type="button"
-            className="absolute inset-0 bg-slate-950/60 transition-opacity duration-200"
+            className="absolute inset-0 bg-slate-900/40 backdrop-blur-[3px] transition-opacity duration-200"
             aria-label="Close navigation menu"
             onClick={() => {
               setMobileOpen(false)

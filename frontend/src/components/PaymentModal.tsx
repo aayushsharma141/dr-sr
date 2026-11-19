@@ -4,6 +4,7 @@ import { apiFetch } from '../api/client'
 import { useRecordPayment } from '../api/queries'
 import { Modal } from './Modal'
 import { PAYMENT_RECORDED_EVENT } from './ReceiptHost'
+import { toast } from './ToastHost'
 
 interface PaymentModalProps {
   isOpen: boolean
@@ -113,6 +114,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
       if (onSuccess) {
         onSuccess(payment)
       }
+      toast.success(`Receipt ${payment.receipt_number} recorded for ${patientName}.`)
       window.dispatchEvent(new CustomEvent(PAYMENT_RECORDED_EVENT, { detail: payment }))
       onClose()
     } catch (err: unknown) {
@@ -157,7 +159,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
 
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
-          <label htmlFor="amount-input" className="block text-xs font-semibold uppercase tracking-wider text-slate-700">
+          <label htmlFor="amount-input" className="block text-xs font-semibold text-slate-700">
             Amount (₹) *
           </label>
           <div className="relative mt-1">
@@ -178,7 +180,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
         </div>
 
         <div>
-          <span id="payment-method-label" className="block text-xs font-semibold uppercase tracking-wider text-slate-700">
+          <span id="payment-method-label" className="block text-xs font-semibold text-slate-700">
             Payment Method *
           </span>
           <div role="group" aria-labelledby="payment-method-label" className="mt-2 grid grid-cols-3 gap-2">
@@ -201,7 +203,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
         </div>
 
         <div>
-          <label htmlFor="notes-input" className="block text-xs font-semibold uppercase tracking-wider text-slate-700">
+          <label htmlFor="notes-input" className="block text-xs font-semibold text-slate-700">
             Transaction Notes / Ref
           </label>
           <input

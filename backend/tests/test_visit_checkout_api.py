@@ -8,11 +8,15 @@ later does not reopen the visit.
 
 import itertools
 from datetime import UTC, date, datetime, timedelta
+from decimal import Decimal
 
 import pytest
 
 from kalyan_api.models import (
     Appointment,
+    BillItem,
+    BillItemCategory,
+    BillItemSource,
     ConsultationStatus,
     Patient,
     Payment,
@@ -66,6 +70,22 @@ def _consultation(db_session, visit, patient, doctor_user, user, status: str) ->
         created_by_user_id=user.id,
     )
     db_session.add(appt)
+    db_session.flush()
+    fee = doctor_user.doctor.default_fee_paise if doctor_user.doctor.default_fee_paise is not None else FEE
+    line = BillItem(
+        visit_id=visit.id,
+        patient_id=patient.id,
+        appointment_id=appt.id,
+        category=BillItemCategory.CONSULTATION.value,
+        source=BillItemSource.SYSTEM.value,
+        description="Consultation fee",
+        quantity=Decimal("1"),
+        rate_paise=fee,
+        original_amount_paise=fee,
+        amount_paise=fee,
+        created_by_user_id=user.id,
+    )
+    db_session.add(line)
     db_session.flush()
     return appt
 
@@ -283,13 +303,12 @@ def test_a_visit_closed_with_a_balance_stays_listed_until_it_is_paid(
     assert dues == [
         {
             "visit_id": visit.id,
-            "appointment_id": appt.id,
             "patient_id": patient.id,
             "patient_urn": patient.urn,
             "patient_name": patient.full_name,
-            "doctor_name_en": doctor_a_user.doctor.name_en,
+            "doctor_names": [doctor_a_user.doctor.name_en],
             "visit_date": TODAY.isoformat(),
-            "fee_paise": FEE,
+            "bill_total_paise": FEE,
             "paid_paise": 0,
             "balance_paise": FEE,
             "close_reason": "Pays with the next instalment",

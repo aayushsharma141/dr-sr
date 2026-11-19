@@ -66,9 +66,20 @@ export function UnsavedChangesGuard({ dirty, bypassRef }: UnsavedChangesGuardPro
   )
 }
 
-const NO_ALLERGY_VALUES = new Set(['', 'none reported'])
+const NO_ALLERGY_VALUES = new Set([
+  '',
+  '-',
+  'none',
+  'none reported',
+  'nil',
+  'no',
+  'nkda',
+  'nka',
+  'no known allergies',
+  'no known drug allergies',
+])
 
-/** True when the patient record carries a reported allergy (anything other than the "None reported" default). */
+/** True when the patient record carries a reported allergy (anything other than empty or standard no-allergy defaults). */
 export function hasReportedAllergies(allergies: string | null | undefined): allergies is string {
-  return !NO_ALLERGY_VALUES.has((allergies ?? '').trim().toLowerCase())
+  return !NO_ALLERGY_VALUES.has((allergies ?? '').trim().toLowerCase().replace(/\.$/, ''))
 }

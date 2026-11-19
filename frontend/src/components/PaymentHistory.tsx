@@ -43,7 +43,7 @@ export function PaymentHistory({ patientId }: PaymentHistoryProps) {
         <div className="mt-3 overflow-x-auto">
           <table className="w-full text-left text-sm text-neutral-800">
             <thead>
-              <tr className="border-b border-neutral-200 text-xs uppercase tracking-wide text-neutral-700">
+              <tr className="border-b border-neutral-200 text-xs text-neutral-700">
                 <th scope="col" className="py-2 pr-3">Receipt</th>
                 <th scope="col" className="py-2 pr-3">Date</th>
                 <th scope="col" className="py-2 pr-3">Amount</th>

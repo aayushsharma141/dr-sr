@@ -12,7 +12,7 @@ from sqlalchemy import func, select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
-from kalyan_api.models import Appointment, DailyTokenSequence
+from kalyan_api.models import Appointment, DailyTokenSequence, PendingOpdArrival
 
 
 def generate_next_daily_token(
@@ -40,12 +40,13 @@ def generate_next_daily_token(
     )
     seq = session.execute(stmt_lock).scalar_one()
 
-    # The counter is the source of truth, but an appointment written without it (an import, a
-    # restore, direct SQL, a dev seed) can hold a token at or above it. Issuing that number again
-    # would break uq_appointments_doctor_date_token and turn a check-in into a server error, so
-    # never go below the highest token already in use. Tokens are never reused, even when the
+    # The counter is the source of truth, but an appointment or pending OPD arrival written without
+    # it (an import, a restore, direct SQL, a dev seed) can hold a token at or above it. Issuing
+    # that number again would break uq_appointments_doctor_date_token or
+    # uq_pending_opd_arrival_token and turn a check-in into a server error, so never go below the
+    # highest token already in use across both tables. Tokens are never reused, even when the
     # holder was cancelled. The counter row is locked, so racing check-ins still queue up here.
-    highest_used = (
+    highest_appointment = (
         session.scalar(
             select(func.max(Appointment.token_number)).where(
                 Appointment.doctor_id == doctor_id,
@@ -54,6 +55,16 @@ def generate_next_daily_token(
         )
         or 0
     )
+    highest_arrival = (
+        session.scalar(
+            select(func.max(PendingOpdArrival.token_number)).where(
+                PendingOpdArrival.doctor_id == doctor_id,
+                PendingOpdArrival.appointment_date == appointment_date,
+            )
+        )
+        or 0
+    )
+    highest_used = max(highest_appointment, highest_arrival)
 
     # Increment token
     next_token = max(seq.last_token, highest_used) + 1

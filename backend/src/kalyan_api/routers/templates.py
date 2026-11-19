@@ -271,7 +271,11 @@ def update_print_template(
 ) -> PrintTemplateRead:
     """Update print template header/footer text with optimistic concurrency check."""
     ensure_print_templates_seeded(session, principal.user_id)
-    template = session.scalar(select(PrintTemplate).where(PrintTemplate.document_type == doc_type))
+    template = session.scalar(
+        select(PrintTemplate)
+        .where(PrintTemplate.document_type == doc_type)
+        .with_for_update(of=PrintTemplate)
+    )
     if not template:
         raise ApiError(
             status_code=404,

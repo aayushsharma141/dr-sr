@@ -24,23 +24,34 @@ from kalyan_api.routers.areas import router as areas_router
 from kalyan_api.routers.assets import router as assets_router
 from kalyan_api.routers.audit import router as audit_router
 from kalyan_api.routers.auth import router as auth_router
+from kalyan_api.routers.bill_items import router as bill_items_router
 from kalyan_api.routers.billing import router as billing_router
+from kalyan_api.routers.clinical_diagnoses import router as clinical_diagnoses_router
 from kalyan_api.routers.departments import router as departments_router
 from kalyan_api.routers.doctors import router as doctors_router
+from kalyan_api.routers.documents import router as documents_router
 from kalyan_api.routers.encounters import router as encounters_router
 from kalyan_api.routers.exports import router as exports_router
+from kalyan_api.routers.fee_adjustments import router as fee_adjustments_router
 from kalyan_api.routers.follow_up import router as follow_up_router
 from kalyan_api.routers.health import router as health_router
 from kalyan_api.routers.imports import router as imports_router
+from kalyan_api.routers.investigations import router as investigations_router
+from kalyan_api.routers.ledger import router as ledger_router
+from kalyan_api.routers.opd_arrivals import router as opd_arrivals_router
 from kalyan_api.routers.operations import router as operations_router
+from kalyan_api.routers.patient_workspace import router as patient_workspace_router
 from kalyan_api.routers.patients import router as patients_router
 from kalyan_api.routers.prescriptions import router as prescriptions_router
+from kalyan_api.routers.quick_phrases import router as quick_phrases_router
+from kalyan_api.routers.reports import router as reports_router
 from kalyan_api.routers.roles import router as roles_router
 from kalyan_api.routers.security import router as security_router
 from kalyan_api.routers.sessions import router as sessions_router
 from kalyan_api.routers.settings import router as settings_router
 from kalyan_api.routers.setup import router as setup_router
 from kalyan_api.routers.system import router as system_router
+from kalyan_api.routers.system import workstations_router as admin_workstations_router
 from kalyan_api.routers.templates import admin_router as admin_templates_router
 from kalyan_api.routers.templates import router as templates_router
 from kalyan_api.routers.timeline import router as timeline_router
@@ -95,6 +106,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     settings: Settings = app.state.settings
     settings.photos_dir.mkdir(parents=True, exist_ok=True)
     settings.assets_dir.mkdir(parents=True, exist_ok=True)
+    settings.documents_dir.mkdir(parents=True, exist_ok=True)
     engine = build_engine(settings, owner=False)
     SessionLocal.configure(bind=engine)
     app.state.engine = engine
@@ -164,21 +176,30 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(doctors_router, prefix="/api")
     app.include_router(departments_router, prefix="/api")
     app.include_router(patients_router, prefix="/api")
+    app.include_router(patient_workspace_router, prefix="/api")
+    app.include_router(documents_router, prefix="/api")
     app.include_router(admin_patients_router, prefix="/api")
     app.include_router(imports_router, prefix="/api")
     app.include_router(exports_router, prefix="/api")
     app.include_router(appointments_router, prefix="/api")
+    app.include_router(opd_arrivals_router, prefix="/api")
     app.include_router(doctor_router, prefix="/api")
     app.include_router(visits_router, prefix="/api")
     app.include_router(encounters_router, prefix="/api")
+    app.include_router(clinical_diagnoses_router, prefix="/api")
+    app.include_router(investigations_router, prefix="/api")
     app.include_router(templates_router, prefix="/api")
     app.include_router(admin_templates_router, prefix="/api")
+    app.include_router(quick_phrases_router, prefix="/api")
     app.include_router(vitals_router, prefix="/api")
     app.include_router(follow_up_router, prefix="/api")
     app.include_router(prescriptions_router, prefix="/api")
     app.include_router(treatment_plans_router, prefix="/api")
     app.include_router(treatment_sessions_router, prefix="/api")
     app.include_router(billing_router, prefix="/api")
+    app.include_router(ledger_router, prefix="/api")
+    app.include_router(fee_adjustments_router, prefix="/api")
+    app.include_router(bill_items_router, prefix="/api")
     app.include_router(timeline_router, prefix="/api")
     app.include_router(audit_router, prefix="/api")
     app.include_router(operations_router, prefix="/api")
@@ -186,6 +207,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(sessions_router, prefix="/api")
     app.include_router(security_router, prefix="/api")
     app.include_router(system_router, prefix="/api")
+    app.include_router(admin_workstations_router, prefix="/api")
+    app.include_router(reports_router, prefix="/api")
 
     # SPA frontend distribution serving (app.frontend)
     dist_dir = resolved_settings.frontend_dist

@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react'
+import React, { useEffect, useState, useRef, type DragEvent } from 'react'
 import { apiFetch, ApiError } from '../../api/client'
 import { InlineAlert } from '../InlineAlert'
 import { Modal } from '../Modal'
@@ -75,9 +75,14 @@ interface CommitResult {
   urn_range_end?: string | null
 }
 
-export function ImportWizard() {
+export interface ImportWizardProps {
+  onBusyChange?: (busy: boolean) => void
+}
+
+export function ImportWizard({ onBusyChange }: ImportWizardProps = {}) {
   const [currentStage, setCurrentStage] = useState<ImportStage>('upload')
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
+  const [isDragging, setIsDragging] = useState(false)
   const [inspectData, setInspectData] = useState<InspectResponse | null>(null)
   const [columnMapping, setColumnMapping] = useState<Record<string, string>>({})
   const [batchSummary, setBatchSummary] = useState<BatchSummary | null>(null)
@@ -94,21 +99,47 @@ export function ImportWizard() {
 
   const fileInputRef = useRef<HTMLInputElement>(null)
 
+  useEffect(() => {
+    onBusyChange?.(isLoading || isCommitting)
+    return () => onBusyChange?.(false)
+  }, [isLoading, isCommitting, onBusyChange])
+
   const stageIndex = STAGES.findIndex((s) => s.id === currentStage)
 
   // --- Stage 1: Upload & Inspect Trigger ---
+  const selectFile = (file: File) => {
+    if (file.size > 10 * 1024 * 1024) {
+      setErrorMessage({
+        title: 'File Too Large',
+        body: 'File size exceeds maximum allowed 10 MB limit. Please select a smaller file.',
+      })
+      return
+    }
+    setSelectedFile(file)
+    setErrorMessage(null)
+  }
+
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
-      const file = e.target.files[0]
-      if (file.size > 10 * 1024 * 1024) {
-        setErrorMessage({
-          title: 'File Too Large',
-          body: 'File size exceeds maximum allowed 10 MB limit. Please select a smaller file.',
-        })
-        return
-      }
-      setSelectedFile(file)
-      setErrorMessage(null)
+      selectFile(e.target.files[0])
+    }
+  }
+
+  const handleDragOver = (e: DragEvent<HTMLButtonElement>) => {
+    e.preventDefault()
+    setIsDragging(true)
+  }
+
+  const handleDragLeave = (e: DragEvent<HTMLButtonElement>) => {
+    e.preventDefault()
+    setIsDragging(false)
+  }
+
+  const handleDrop = (e: DragEvent<HTMLButtonElement>) => {
+    e.preventDefault()
+    setIsDragging(false)
+    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+      selectFile(e.dataTransfer.files[0])
     }
   }
 
@@ -279,16 +310,20 @@ export function ImportWizard() {
     try {
       const result = await apiFetch<CommitResult>(`/admin/imports/${batchSummary.batch_id}/commit`, {
         method: 'POST',
+        timeoutMs: 300_000,
       })
       setCommitResult(result)
       setCurrentStage('reconcile')
     } catch (err) {
       const apiErr = err instanceof ApiError ? err : null
+      const isBackupError = apiErr?.message?.toLowerCase().includes('backup') || (apiErr?.status === 500 && String((apiErr?.body as any)?.detail || '').toLowerCase().includes('backup'))
       setErrorMessage({
-        title: 'Import commit aborted because pre-import safety backup failed.',
+        title: isBackupError
+          ? 'Import commit aborted because pre-import safety backup failed.'
+          : 'Import commit failed.',
         body:
           apiErr?.message ||
-          'The automated database backup encountered a disk or permission error. Check server storage space in System Health, verify backup configuration, and retry "Commit Import Batch".',
+          'The import commit encountered an unexpected error. Please verify server logs and retry.',
       })
     } finally {
       setIsCommitting(false)
@@ -394,35 +429,46 @@ export function ImportWizard() {
             Select a CSV or Microsoft Excel (.xlsx) file containing patient demographics. Files up to 10 MB are supported.
           </p>
 
-          <div
+          <button
+            type="button"
             onClick={() => fileInputRef.current?.click()}
-            className="mt-6 flex flex-col items-center justify-center rounded-xl border-2 border-dashed border-slate-300 bg-slate-50 p-8 text-center cursor-pointer transition-colors hover:border-slate-400 hover:bg-slate-100"
+            onDragOver={handleDragOver}
+            onDragLeave={handleDragLeave}
+            onDrop={handleDrop}
+            className={`mt-6 flex w-full flex-col items-center justify-center rounded-xl border-2 border-dashed p-8 text-center cursor-pointer transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#8E1C3D] ${
+              isDragging
+                ? 'border-[#8E1C3D] bg-rose-50/50'
+                : 'border-slate-300 bg-slate-50 hover:border-slate-400 hover:bg-slate-100'
+            }`}
           >
-            <svg className="h-12 w-12 text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <svg className="h-12 w-12 text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
             </svg>
-            <p className="mt-3 text-sm font-semibold text-slate-800">
+            <span className="mt-3 block text-sm font-semibold text-slate-800">
               {selectedFile ? selectedFile.name : 'Drag and drop spreadsheet here, or click to browse'}
-            </p>
-            <p className="mt-1 text-xs text-slate-600">
+            </span>
+            <span className="mt-1 block text-xs text-slate-600">
               Supports .csv (UTF-8, UTF-8-BOM, Windows-1252) and .xlsx
-            </p>
-            <input
-              ref={fileInputRef}
-              type="file"
-              aria-label="Upload spreadsheet file"
-              accept=".csv,.xlsx,.xls,.tsv"
-              onChange={handleFileChange}
-              className="hidden"
-            />
-          </div>
+            </span>
+          </button>
+          <input
+            ref={fileInputRef}
+            type="file"
+            aria-label="Upload spreadsheet file"
+            accept=".csv,.xlsx,.xls,.tsv"
+            onChange={handleFileChange}
+            className="hidden"
+          />
 
           {selectedFile && (
             <div className="mt-4 flex items-center justify-between rounded-lg bg-slate-100 p-3 text-xs text-slate-700">
               <span>Selected: <strong className="font-semibold">{selectedFile.name}</strong> ({(selectedFile.size / 1024).toFixed(1)} KB)</span>
               <button
                 type="button"
-                onClick={() => setSelectedFile(null)}
+                onClick={() => {
+                  setSelectedFile(null)
+                  if (fileInputRef.current) fileInputRef.current.value = ''
+                }}
                 className="cursor-pointer text-red-600 hover:underline"
               >
                 Clear
@@ -705,10 +751,11 @@ export function ImportWizard() {
             </button>
             <button
               type="button"
+              disabled={isLoading}
               onClick={handleSaveResolutionsAndPreview}
-              className="min-h-[44px] cursor-pointer rounded-lg bg-[#8E1C3D] px-6 py-2 text-sm font-semibold text-white shadow-xs hover:bg-[#721630]"
+              className="min-h-[44px] cursor-pointer rounded-lg bg-[#8E1C3D] px-6 py-2 text-sm font-semibold text-white shadow-xs hover:bg-[#721630] disabled:cursor-not-allowed disabled:opacity-50"
             >
-              Resolve Duplicate Records
+              {isLoading ? 'Resolving...' : 'Resolve Duplicate Records'}
             </button>
           </div>
         </div>

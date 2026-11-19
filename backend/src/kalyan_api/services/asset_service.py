@@ -96,12 +96,30 @@ def save_asset(
         )
 
     ext, mime_type = validate_asset_bytes(file_bytes)
+    if asset_type == AssetType.LOGO.value:
+        if ext == ".pdf" or mime_type == "application/pdf":
+            raise ApiError(
+                status_code=422,
+                code="invalid_logo_format",
+                message="PDF files cannot be used as hospital logos. Use PNG, JPEG, WebP, or SVG.",
+            )
+        if ext == ".svg" and b"<script" in file_bytes.lower():
+            raise ApiError(
+                status_code=422,
+                code="unsafe_svg_content",
+                message="SVG files containing executable scripts are not permitted.",
+            )
+
     target_dir = assets_dir or get_settings().assets_dir
     target_dir.mkdir(parents=True, exist_ok=True)
 
     if asset_type == AssetType.LOGO.value:
-        max_ver_stmt = select(func.coalesce(func.max(HospitalAsset.version), 0)).where(
-            HospitalAsset.asset_type == AssetType.LOGO.value
+        max_ver_stmt = (
+            select(HospitalAsset.version)
+            .where(HospitalAsset.asset_type == AssetType.LOGO.value)
+            .order_by(HospitalAsset.version.desc())
+            .limit(1)
+            .with_for_update()
         )
         current_max = session.scalar(max_ver_stmt) or 0
         new_version = current_max + 1
@@ -135,7 +153,11 @@ def save_asset(
         uploaded_by_user_id=user_id,
     )
     session.add(asset)
-    session.flush()
+    try:
+        session.flush()
+    except Exception:
+        file_path.unlink(missing_ok=True)
+        raise
     return asset
 
 

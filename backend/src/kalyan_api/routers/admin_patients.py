@@ -15,9 +15,17 @@ from kalyan_api.db.session import SessionDep
 from kalyan_api.models import Patient
 from kalyan_api.schemas.patients import (
     AdminPatientDemographicCorrection,
+    ArchivalCandidateItem,
+    BulkArchiveRequest,
+    BulkArchiveResult,
+    DuplicateCandidatePair,
+    PatientMergeRequest,
+    PatientMergeResult,
     PatientOut,
+    PatientUnarchiveRequest,
+    PatientUnmergeRequest,
 )
-from kalyan_api.services import audit_service
+from kalyan_api.services import audit_service, patient_archive_service, patient_merge_service
 from kalyan_api.services.audit_service import AuditAction
 
 router = APIRouter(prefix="/admin/patients", tags=["admin-patients"])
@@ -36,6 +44,10 @@ DEMOGRAPHIC_FIELDS = (
 )
 
 
+def _escape_like(term: str) -> str:
+    return term.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+
+
 @router.get(
     "/search",
     dependencies=[Depends(require(Permission.PATIENT_CORRECT))],
@@ -48,15 +60,16 @@ def search_patients_for_correction(
 ) -> list[PatientOut]:
     """Server-side patient search matching URN, legacy URN, full name, or mobile for correction."""
     q_clean = q.strip()
+    q_escaped = _escape_like(q_clean)
     digits = "".join(c for c in q_clean if c.isdigit())
 
     conditions = [
-        Patient.urn.ilike(f"%{q_clean}%"),
-        Patient.full_name.ilike(f"%{q_clean}%"),
-        Patient.legacy_urn.ilike(f"%{q_clean}%"),
+        Patient.urn.ilike(f"%{q_escaped}%"),
+        Patient.full_name.ilike(f"%{q_escaped}%"),
+        Patient.legacy_urn.ilike(f"%{q_escaped}%"),
     ]
     if digits and len(digits) >= 3:
-        conditions.append(Patient.mobile.like(f"%{digits}%"))
+        conditions.append(Patient.mobile.like(f"%{_escape_like(digits)}%"))
 
     stmt = (
         select(Patient)
@@ -131,3 +144,104 @@ def correct_patient_demographics(
     )
 
     return PatientOut.model_validate(patient)
+
+
+@router.get(
+    "/duplicates",
+    dependencies=[Depends(require(Permission.PATIENT_MERGE))],
+    response_model=list[DuplicateCandidatePair],
+)
+def get_duplicate_candidates(
+    session: SessionDep,
+    limit: int = Query(50, ge=1, le=100),
+) -> list[DuplicateCandidatePair]:
+    """Retrieve list of suspected duplicate patient pairs matching mobile and similar names."""
+    return patient_merge_service.find_duplicate_candidates(session, limit=limit)
+
+
+@router.post(
+    "/merge",
+    dependencies=[Depends(require(Permission.PATIENT_MERGE))],
+    response_model=PatientMergeResult,
+)
+def merge_patients_endpoint(
+    request: Request,
+    payload: PatientMergeRequest,
+    session: SessionDep,
+    principal: Principal = Depends(current_principal),
+) -> PatientMergeResult:
+    """Administratively merge duplicate secondary patient into master patient."""
+    return patient_merge_service.merge_patients(session, principal, request, payload)
+
+
+@router.post(
+    "/{id}/unmerge",
+    dependencies=[Depends(require(Permission.PATIENT_MERGE))],
+    response_model=PatientOut,
+)
+def unmerge_patient_endpoint(
+    id: int,
+    request: Request,
+    payload: PatientUnmergeRequest,
+    session: SessionDep,
+    principal: Principal = Depends(current_principal),
+) -> PatientOut:
+    """Reverse a prior patient merge, reactivating the secondary record."""
+    return patient_merge_service.unmerge_patient(
+        session, principal, request, patient_id=id, reason=payload.reason
+    )
+
+
+@router.get(
+    "/archival-candidates",
+    dependencies=[Depends(require(Permission.PATIENT_ARCHIVE))],
+    response_model=list[ArchivalCandidateItem],
+)
+def get_archival_candidates_endpoint(
+    session: SessionDep,
+    inactivity_years: int = Query(3, ge=1, le=20),
+    district: str | None = Query(None),
+    zero_visits_only: bool = Query(False),
+    limit: int = Query(50, ge=1, le=200),
+) -> list[ArchivalCandidateItem]:
+    """Retrieve candidate inactive patient records eligible for archival."""
+    return patient_archive_service.find_archival_candidates(
+        session,
+        inactivity_years=inactivity_years,
+        district=district,
+        zero_visits_only=zero_visits_only,
+        limit=limit,
+    )
+
+
+@router.post(
+    "/bulk-archive",
+    dependencies=[Depends(require(Permission.PATIENT_ARCHIVE))],
+    response_model=BulkArchiveResult,
+)
+def bulk_archive_endpoint(
+    request: Request,
+    payload: BulkArchiveRequest,
+    session: SessionDep,
+    principal: Principal = Depends(current_principal),
+) -> BulkArchiveResult:
+    """Administratively bulk-archive patient records with hard financial dues enforcement."""
+    return patient_archive_service.bulk_archive_patients(session, principal, request, payload)
+
+
+@router.post(
+    "/{id}/unarchive",
+    dependencies=[Depends(require(Permission.PATIENT_ARCHIVE))],
+    response_model=PatientOut,
+)
+def unarchive_patient_endpoint(
+    id: int,
+    request: Request,
+    payload: PatientUnarchiveRequest,
+    session: SessionDep,
+    principal: Principal = Depends(current_principal),
+) -> PatientOut:
+    """Restore an archived patient record to active status."""
+    return patient_archive_service.unarchive_patient(
+        session, principal, request, patient_id=id, reason=payload.reason
+    )

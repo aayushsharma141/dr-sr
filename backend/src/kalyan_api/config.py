@@ -67,6 +67,9 @@ class Settings(BaseSettings):
     # Hospital assets storage location (SET-01, D-20-01)
     assets_dir: Path = Field(default=BACKEND_DIR / "var" / "assets")
 
+    # Patient documents storage location (Milestone 4, outside public web roots)
+    documents_dir: Path = BACKEND_DIR / "var" / "documents"
+
     # Backup storage location (BAK-01)
     backup_dir: Path = BACKEND_DIR / "var" / "backups"
 

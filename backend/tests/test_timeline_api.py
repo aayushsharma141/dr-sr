@@ -99,6 +99,7 @@ def _seed_patient_activity(
         dietary_advice="Avoid heavy lifting",
         general_advice="Postural correction",
         follow_up_date="2026-03-15",
+        status="DRAFT",
     )
     db_session.add(rx1)
     db_session.flush()
@@ -112,6 +113,9 @@ def _seed_patient_activity(
             duration_days=5,
         )
     )
+    db_session.flush()
+    rx1.status = "AUTHORISED"
+    db_session.flush()
 
     # 5. Treatment Plan
     plan = TreatmentPlan(

@@ -1,32 +1,31 @@
-import { useState, type FormEvent } from 'react'
+import { useRef, useState, type FormEvent } from 'react'
+import { Link } from 'react-router'
+import type { PreviousDueOut } from '../../api/bill'
 import {
+  useAppointments,
   useCloseVisit,
+  usePendingDues,
   useRecordPayment,
   useVisit,
   useVisitDues,
   useVisits,
 } from '../../api/queries'
 import type {
-  ConsultationStatus,
   PaymentMethod,
   PaymentOut,
   VisitConsultation,
   VisitDetail,
   VisitDueOut,
-  VisitPayment,
+  VisitSummary,
 } from '../../api/types'
-import { formatIst, formatPaise, paiseToRupees, rupeesToPaise } from '../../format'
-import { IconCheck, IconPrinter, IconRupee, IconStethoscope, IconUser } from '../icons'
+import { formatIst, formatPaise, formatToken, istToday, paiseToRupees, rupeesToPaise } from '../../format'
+import { IconArrowLeft, IconCheck, IconPrinter, IconRupee, IconUser } from '../icons'
+import { InlineAlert } from '../InlineAlert'
 import { PAYMENT_RECORDED_EVENT } from '../ReceiptHost'
+import { toast } from '../ToastHost'
+import { BillPanel } from './BillPanel'
 
 const PAYMENT_METHODS: PaymentMethod[] = ['CASH', 'UPI', 'CARD']
-
-const CONSULTATION_LABEL: Record<ConsultationStatus, string> = {
-  WAITING: 'Waiting',
-  IN_CONSULTATION: 'With doctor',
-  COMPLETED: 'Completed',
-  CANCELLED: 'Cancelled',
-}
 
 function isActiveConsultation(c: VisitConsultation): boolean {
   return c.consultation_status === 'WAITING' || c.consultation_status === 'IN_CONSULTATION'
@@ -50,7 +49,7 @@ function MethodPicker({
 }) {
   return (
     <div>
-      <span className="mb-1.5 block text-xs font-bold uppercase tracking-wider text-slate-700">
+      <span className="mb-1.5 block text-xs font-bold text-slate-700">
         Payment Mode *
       </span>
       <div className="grid grid-cols-3 gap-2">
@@ -84,157 +83,57 @@ function StatusBadge({ status }: { status: VisitDetail['status'] }) {
   return <span className={`rounded px-2 py-0.5 text-xs font-bold ${style}`}>{label}</span>
 }
 
-function ConsultationTable({ consultations }: { consultations: VisitConsultation[] }) {
-  return (
-    <div className="overflow-x-auto">
-      <table className="w-full text-left text-xs">
-        <thead className="border-b border-slate-200 bg-slate-50 font-bold uppercase tracking-wider text-slate-600">
-          <tr>
-            <th className="px-3 py-2">Doctor</th>
-            <th className="px-3 py-2">Token</th>
-            <th className="px-3 py-2">Consultation</th>
-            <th className="px-3 py-2 text-right">Fee</th>
-            <th className="px-3 py-2 text-right">Paid</th>
-            <th className="px-3 py-2 text-right">Balance</th>
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-slate-100 font-medium">
-          {consultations.map((c) => (
-            <tr key={c.appointment_id}>
-              <td className="px-3 py-2 font-bold text-slate-900">{c.doctor_name_en}</td>
-              <td className="px-3 py-2 font-mono text-slate-700">
-                {c.token_number == null ? '—' : `#${c.token_number}`}
-              </td>
-              <td className="px-3 py-2 text-slate-700">
-                {c.consultation_status ? CONSULTATION_LABEL[c.consultation_status] : '—'}
-                {isActiveConsultation(c) && (
-                  <span className="block text-xs text-amber-700">Fee after the doctor completes it</span>
-                )}
-              </td>
-              <td className="px-3 py-2 text-right font-mono">{formatPaise(c.fee_paise)}</td>
-              <td className="px-3 py-2 text-right font-mono font-bold text-emerald-800">
-                {formatPaise(c.paid_paise)}
-              </td>
-              <td className="px-3 py-2 text-right font-mono font-black text-red-700">
-                {formatPaise(c.balance_paise)}
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  )
-}
-
-function PaymentsTable({
-  payments,
-  onReprint,
-}: {
-  payments: VisitPayment[]
-  onReprint: (paymentId: number) => void
-}) {
-  if (payments.length === 0) {
-    return <p className="text-xs text-slate-500">No payments recorded on this visit yet.</p>
-  }
-  return (
-    <div className="overflow-x-auto">
-      <table className="w-full text-left text-xs">
-        <thead className="border-b border-slate-200 bg-slate-50 font-bold uppercase tracking-wider text-slate-600">
-          <tr>
-            <th className="px-3 py-2">Receipt #</th>
-            <th className="px-3 py-2">Time (IST)</th>
-            <th className="px-3 py-2 text-center">Mode</th>
-            <th className="px-3 py-2 text-right">Amount</th>
-            <th className="px-3 py-2 text-center">Status</th>
-            <th className="px-3 py-2 text-right">Receipt</th>
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-slate-100 font-medium">
-          {payments.map((p) => (
-            <tr key={p.id}>
-              <td className="px-3 py-2 font-mono font-bold text-slate-900">{p.receipt_number}</td>
-              <td className="px-3 py-2 text-slate-600">{formatIst(p.created_at)}</td>
-              <td className="px-3 py-2 text-center">
-                <span className="rounded bg-slate-100 px-2 py-0.5 font-bold text-slate-700">
-                  {p.payment_method}
-                </span>
-              </td>
-              <td className="px-3 py-2 text-right font-mono font-bold text-emerald-900">
-                {formatPaise(p.amount_paise)}
-              </td>
-              <td className="px-3 py-2 text-center">
-                {p.is_reversed ? (
-                  <span className="rounded bg-red-100 px-2 py-0.5 font-bold text-red-800">Reversed</span>
-                ) : (
-                  <span className="rounded bg-emerald-100 px-2 py-0.5 font-bold text-emerald-800">Active</span>
-                )}
-              </td>
-              <td className="px-3 py-2 text-right">
-                <button
-                  type="button"
-                  onClick={() => onReprint(p.id)}
-                  className="inline-flex cursor-pointer items-center gap-1 rounded-lg border border-slate-300 bg-white px-2.5 py-1 text-xs font-semibold text-slate-700 shadow-2xs hover:bg-slate-50"
-                >
-                  <IconPrinter className="h-3.5 w-3.5 text-slate-500" />
-                  Print
-                </button>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  )
-}
-
 function PaymentForm({
   visit,
+  amount,
+  amountPaise,
+  onAmountChange,
   onPaid,
 }: {
   visit: VisitDetail
+  amount: string
+  amountPaise: number
+  onAmountChange: (value: string | null) => void
   onPaid: (payment: PaymentOut) => void
 }) {
-  const payable = visit.consultations.filter((c) => c.collectable && c.balance_paise > 0)
-  const [picked, setPicked] = useState<number | null>(null)
-  const selected = payable.find((c) => c.appointment_id === picked) ?? payable[0] ?? null
-  // The amount follows the balance of the chosen consultation until reception types over it.
-  const [amountOverride, setAmountOverride] = useState<string | null>(null)
+  const hasCompleted = visit.consultations.some((c) => c.consultation_status === 'COMPLETED')
+  const canPay = visit.status === 'OPEN' && hasCompleted && visit.outstanding_paise > 0
   const [method, setMethod] = useState<PaymentMethod>('CASH')
   const [remarks, setRemarks] = useState('')
   const [error, setError] = useState<string | null>(null)
+  const submittingRef = useRef(false)
   const recordPayment = useRecordPayment()
-
-  const amount =
-    amountOverride ?? (selected ? paiseToRupees(selected.balance_paise) : '')
-  const amountPaise = rupeesToPaise(amount) ?? 0
 
   const submit = async (e: FormEvent) => {
     e.preventDefault()
+    if (submittingRef.current || recordPayment.isPending) return
     setError(null)
-    if (!selected) return
     const paise = rupeesToPaise(amount)
     if (paise === null) {
       setError('Enter the amount in rupees, for example 350 or 350.50.')
       return
     }
-    if (paise > selected.balance_paise) {
-      setError(`Only ${formatPaise(selected.balance_paise)} is due on this consultation.`)
+    if (paise > visit.outstanding_paise) {
+      setError(`Only ${formatPaise(visit.outstanding_paise)} is due on this visit.`)
       return
     }
+    submittingRef.current = true
     try {
       const payment = await recordPayment.mutateAsync({
         patient_id: visit.patient_id,
-        appointment_id: selected.appointment_id,
+        visit_id: visit.id,
         amount_paise: paise,
         payment_method: method,
-        notes: remarks.trim() || `Consultation - ${selected.doctor_name_en}`,
+        notes: remarks.trim() || `Visit ${visit.visit_date}`,
       })
-      setAmountOverride(null)
+      onAmountChange(null)
       setRemarks('')
       onPaid(payment)
       announcePayment(payment)
     } catch (err) {
       setError(errorText(err, 'Failed to record the payment.'))
+    } finally {
+      submittingRef.current = false
     }
   }
 
@@ -245,7 +144,7 @@ function PaymentForm({
         <h3 className="text-sm font-bold text-slate-900">Take payment</h3>
       </div>
 
-      {payable.length === 0 ? (
+      {!canPay ? (
         <p className="text-xs text-slate-600">
           {visit.consultations.some(isActiveConsultation)
             ? 'Fees are collected after the consultation. The doctor has not completed it yet.'
@@ -258,31 +157,9 @@ function PaymentForm({
               {error}
             </div>
           )}
-          {payable.length > 1 && (
-            <div>
-              <label htmlFor="visit-payment-consultation" className="mb-1 block text-xs font-bold uppercase tracking-wider text-slate-700">
-                Consultation
-              </label>
-              <select
-                id="visit-payment-consultation"
-                value={selected?.appointment_id ?? ''}
-                onChange={(e) => {
-                  setPicked(Number(e.target.value))
-                  setAmountOverride(null)
-                }}
-                className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-medium text-slate-900"
-              >
-                {payable.map((c) => (
-                  <option key={c.appointment_id} value={c.appointment_id}>
-                    {c.doctor_name_en} - due {formatPaise(c.balance_paise)}
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
 
           <div>
-            <label htmlFor="visit-payment-amount" className="mb-1 block text-xs font-bold uppercase tracking-wider text-slate-700">
+            <label htmlFor="visit-payment-amount" className="mb-1 block text-xs font-bold text-slate-700">
               Amount (₹) *
             </label>
             <input
@@ -291,19 +168,19 @@ function PaymentForm({
               step="0.01"
               min="1"
               value={amount}
-              onChange={(e) => setAmountOverride(e.target.value)}
+              onChange={(e) => onAmountChange(e.target.value)}
               aria-describedby="visit-payment-hint"
               className="w-full max-w-xs rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-base font-black text-slate-900 shadow-2xs focus:border-emerald-700 focus:outline-none min-h-[44px]"
             />
             <p id="visit-payment-hint" className="mt-1 text-xs text-slate-600">
-              Up to {selected ? formatPaise(selected.balance_paise) : '₹0.00'} on this consultation. Part payments are recorded as they come.
+              Up to {formatPaise(visit.outstanding_paise)} on this visit. Part payments are recorded as they come.
             </p>
           </div>
 
           <MethodPicker value={method} onChange={setMethod} />
 
           <div>
-            <label htmlFor="visit-payment-remarks" className="mb-1 block text-xs font-bold uppercase tracking-wider text-slate-700">
+            <label htmlFor="visit-payment-remarks" className="mb-1 block text-xs font-bold text-slate-700">
               Remarks (optional)
             </label>
             <input
@@ -311,14 +188,14 @@ function PaymentForm({
               type="text"
               value={remarks}
               onChange={(e) => setRemarks(e.target.value)}
-              placeholder="UPI reference, counter, or note"
+              placeholder={`Visit ${visit.visit_date}`}
               className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-medium text-slate-900"
             />
           </div>
 
           <button
             type="submit"
-            disabled={recordPayment.isPending || !selected}
+            disabled={recordPayment.isPending}
             className="inline-flex min-h-11 w-full cursor-pointer items-center justify-center gap-2 rounded-xl bg-[#124832] px-6 text-sm font-bold text-white shadow-xs hover:bg-[#0D3822] disabled:opacity-50"
           >
             {recordPayment.isPending
@@ -369,7 +246,7 @@ function CloseForm({
 
   return (
     <section className="space-y-3 rounded-2xl border border-slate-200 bg-white p-5 shadow-xs">
-      <h3 className="text-sm font-bold text-slate-900">Close visit (Patient Out)</h3>
+      <h3 className="text-sm font-bold text-slate-900">Close Visit / Patient Out</h3>
       {error && (
         <div role="alert" className="rounded-xl border border-red-300 bg-red-50 p-3 text-xs font-semibold text-red-900">
           {error}
@@ -378,9 +255,14 @@ function CloseForm({
       <form onSubmit={submit} className="space-y-3">
         {owes && (
           <div>
-            <label htmlFor="visit-close-reason" className="mb-1 block text-xs font-bold uppercase tracking-wider text-amber-900">
-              Reason for closing with {formatPaise(visit.outstanding_paise)} unpaid *
-            </label>
+            <div className="mb-1 flex items-center justify-between">
+              <label htmlFor="visit-close-reason" className="block text-xs font-bold text-amber-900">
+                Reason for closing with {formatPaise(visit.outstanding_paise)} unpaid *
+              </label>
+              <span className="text-xs text-slate-500">
+                {reason.length}/500
+              </span>
+            </div>
             <textarea
               id="visit-close-reason"
               rows={2}
@@ -402,7 +284,7 @@ function CloseForm({
           className="inline-flex min-h-11 w-full cursor-pointer items-center justify-center gap-2 rounded-xl border border-slate-900 bg-slate-900 px-6 text-sm font-bold text-white shadow-xs hover:bg-slate-800 disabled:opacity-50"
         >
           <IconCheck className="h-4 w-4" />
-          {closeVisit.isPending ? 'Closing...' : 'Close Visit / Patient Out'}
+          {closeVisit.isPending ? 'Closing...' : 'Patient Out'}
         </button>
       </form>
     </section>
@@ -424,6 +306,12 @@ function VisitDetailPanel({
 }) {
   const isOpen = visit.status === 'OPEN'
   const [lastPayment, setLastPayment] = useState<PaymentOut | null>(null)
+  const [amountOverride, setAmountOverride] = useState<string | null>(null)
+  const [collectingDue, setCollectingDue] = useState<PreviousDueOut | null>(null)
+
+  const defaultRupees = visit.outstanding_paise > 0 ? paiseToRupees(visit.outstanding_paise) : ''
+  const amount = amountOverride ?? defaultRupees
+  const amountPaise = rupeesToPaise(amount) ?? 0
 
   return (
     <div className="space-y-5">
@@ -442,23 +330,37 @@ function VisitDetailPanel({
         <StatusBadge status={visit.status} />
       </header>
 
-      <div className="space-y-2">
-        <div className="flex items-center gap-2">
-          <IconStethoscope className="h-4 w-4 text-emerald-800" />
-          <h4 className="text-xs font-bold uppercase tracking-wider text-slate-700">Charges</h4>
-        </div>
-        <ConsultationTable consultations={visit.consultations} />
-        <div className="flex flex-wrap justify-end gap-6 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-xs">
-          <span>
-            Total paid{' '}
-            <strong className="font-mono text-emerald-800">{formatPaise(visit.total_paid_paise)}</strong>
-          </span>
-          <span>
-            Outstanding{' '}
-            <strong className="font-mono text-red-700">{formatPaise(visit.outstanding_paise)}</strong>
-          </span>
-        </div>
-      </div>
+      {/* Bill panel from GET /api/visits/{id}/bill with totals, previous dues and packages */}
+      <BillPanel
+        visitId={visit.id}
+        payingNowPaise={amountPaise}
+        canCollect={canCollect}
+        onCollectDue={(due) => setCollectingDue(due)}
+        onReprint={onReprint}
+      />
+
+      {/* Previous dues collection form if triggered from previous dues card */}
+      {collectingDue && canCollect && (
+        <DueCollectForm
+          due={{
+            visit_id: collectingDue.visit_id,
+            patient_id: visit.patient_id,
+            patient_urn: visit.patient_urn ?? '',
+            patient_name: visit.patient_name ?? '',
+            doctor_names: collectingDue.doctor_names,
+            visit_date: collectingDue.visit_date,
+            bill_total_paise: collectingDue.balance_paise,
+            paid_paise: 0,
+            balance_paise: collectingDue.balance_paise,
+            close_reason: null,
+          }}
+          onCancel={() => setCollectingDue(null)}
+          onCollected={(payment) => {
+            setCollectingDue(null)
+            setLastPayment(payment)
+          }}
+        />
+      )}
 
       {isOpen && canCollect && (
         <>
@@ -478,14 +380,15 @@ function VisitDetailPanel({
               </button>
             </div>
           )}
-          <PaymentForm visit={visit} onPaid={setLastPayment} />
+          <PaymentForm
+            visit={visit}
+            amount={amount}
+            amountPaise={amountPaise}
+            onAmountChange={setAmountOverride}
+            onPaid={setLastPayment}
+          />
         </>
       )}
-
-      <div className="space-y-2">
-        <h4 className="text-xs font-bold uppercase tracking-wider text-slate-700">Payments on this visit</h4>
-        <PaymentsTable payments={visit.payments} onReprint={onReprint} />
-      </div>
 
       {isOpen && canClose && <CloseForm visit={visit} onClosed={onClosed} />}
 
@@ -502,6 +405,72 @@ function VisitDetailPanel({
   )
 }
 
+function VisitQueueCard({
+  visit,
+  selected,
+  onSelect,
+}: {
+  visit: VisitSummary
+  selected: boolean
+  onSelect: () => void
+}) {
+  const tokens =
+    visit.token_numbers && visit.token_numbers.length > 0
+      ? visit.token_numbers.map((t) => formatToken(t)).join(', ')
+      : formatToken(null)
+
+  return (
+    <button
+      type="button"
+      aria-pressed={selected}
+      onClick={onSelect}
+      className={`w-full cursor-pointer rounded-xl border p-3 text-left text-xs transition-colors ${
+        selected
+          ? 'border-emerald-700 bg-emerald-50'
+          : 'border-slate-200 bg-white hover:bg-slate-50'
+      }`}
+    >
+      <div className="font-bold text-slate-900">{visit.patient_name}</div>
+      <div className="font-mono text-slate-600">
+        {visit.patient_urn} &bull; Token {tokens}
+      </div>
+      <div className="text-slate-600">{visit.doctors.join(', ')}</div>
+      {visit.last_completed_at && (
+        <div className="text-xs text-slate-500">
+          Completed {formatIst(visit.last_completed_at)}
+        </div>
+      )}
+      <div
+        className={`mt-1 font-mono font-bold ${
+          visit.outstanding_paise > 0 ? 'text-red-700' : 'text-emerald-800'
+        }`}
+      >
+        {visit.outstanding_paise > 0 ? `${formatPaise(visit.outstanding_paise)} due` : 'Paid in full'}
+      </div>
+    </button>
+  )
+}
+
+function DirectPaymentButton({
+  onClick,
+  fullWidth = false,
+}: {
+  onClick: () => void
+  fullWidth?: boolean
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`inline-flex min-h-9 cursor-pointer items-center justify-center rounded-lg border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-50 ${
+        fullWidth ? 'w-full' : ''
+      }`}
+    >
+      Direct payment (no visit)
+    </button>
+  )
+}
+
 export interface VisitCheckoutProps {
   /** payment:create (Reception). */
   canCollect: boolean
@@ -510,71 +479,274 @@ export interface VisitCheckoutProps {
   /** Visit opened from a dashboard link, if any. */
   initialVisitId: number | null
   onReprint: (paymentId: number) => void
+  /** Opens standalone non-visit billing mode when reception has payment:create. */
+  onDirectPayment?: () => void
+  /** True while an ?appointment_id= deep link is still resolving its visit_id. */
+  resolvingInitialVisit?: boolean
+  /** Clears URL deep-link params when returning to queue or closing a visit. */
+  onClearInitialVisit?: () => void
+  /** Error message when an ?appointment_id= deep link fails or has no open visit. */
+  initialVisitError?: string | null
 }
 
-/** Checkout at the desk: visits waiting for payment, their charges, payments and Patient Out. */
-export function VisitCheckout({ canCollect, canClose, initialVisitId, onReprint }: VisitCheckoutProps) {
-  // undefined = nothing picked yet, so the dashboard's visit is shown; null = cleared after a close.
+/** Checkout at the desk: adaptive 3-state queue, charges, payments and Patient Out. */
+export function VisitCheckout({
+  canCollect,
+  canClose,
+  initialVisitId,
+  onReprint,
+  onDirectPayment,
+  resolvingInitialVisit = false,
+  onClearInitialVisit,
+  initialVisitError = null,
+}: VisitCheckoutProps) {
+  // undefined = nothing picked yet, so the dashboard's visit is shown; null = cleared after a close or back.
   const [picked, setPicked] = useState<number | null | undefined>(undefined)
-  const [notice, setNotice] = useState<string | null>(null)
-  const selectedId = picked === undefined ? initialVisitId : picked
+  const rawSelectedId = picked === undefined ? initialVisitId : picked
+  const validSelectedId =
+    typeof rawSelectedId === 'number' && Number.isInteger(rawSelectedId) && rawSelectedId > 0
+      ? rawSelectedId
+      : null
 
-  const { data: ready, isPending: readyPending } = useVisits({ readyForCheckout: true })
-  const { data: visit, isPending: visitPending } = useVisit(selectedId)
+  const {
+    data: ready,
+    isPending: readyPending,
+    isError: readyError,
+    error: readyErr,
+  } = useVisits({ readyForCheckout: true }, { refetchInterval: 10_000 })
+  const { data: visit, isPending: visitPending } = useVisit(validSelectedId, {
+    refetchInterval: (q) => (!q.state.data || q.state.data.status === 'OPEN' ? 10_000 : false),
+  })
 
+  const readyVisits = ready?.visits ?? []
+  const isEmptyState =
+    !resolvingInitialVisit &&
+    !readyPending &&
+    !readyError &&
+    readyVisits.length === 0 &&
+    validSelectedId == null
+
+  const today = istToday()
+  const {
+    data: todayApptsData,
+    isPending: apptsPending,
+    isError: apptsError,
+  } = useAppointments(
+    { appointment_date: today },
+    { enabled: isEmptyState, refetchInterval: false },
+  )
+  const completedTodayCount =
+    apptsPending || apptsError || !todayApptsData
+      ? '—'
+      : todayApptsData.appointments.filter(
+          (a) =>
+            a.status !== 'CANCELLED' &&
+            a.consultation_status !== 'CANCELLED' &&
+            (a.status === 'DONE' || a.status === 'COMPLETED' || a.consultation_status === 'COMPLETED'),
+        ).length
+
+  const {
+    data: pendingDues,
+    isPending: pendingDuesPending,
+    isError: pendingDuesError,
+  } = usePendingDues({ enabled: isEmptyState })
+  const {
+    data: visitDues,
+    isPending: visitDuesPending,
+    isError: visitDuesError,
+  } = useVisitDues({ enabled: isEmptyState })
+  const duesPending = pendingDuesPending || visitDuesPending
+  const duesError = pendingDuesError || visitDuesError
+  const pendingDuesCount = (pendingDues?.length ?? 0) + (visitDues?.length ?? 0)
+  const pendingDuesTotalPaise = Math.max(
+    0,
+    (pendingDues ?? []).reduce((acc, d) => acc + d.balance_paise, 0) +
+      (visitDues ?? []).reduce((acc, d) => acc + d.balance_paise, 0),
+  )
+
+  const showDirectPayment = canCollect && Boolean(onDirectPayment)
+  const initialErrorBanner =
+    initialVisitError && validSelectedId == null ? (
+      <InlineAlert tone="error">{initialVisitError}</InlineAlert>
+    ) : null
+
+  // Loading state: compact single-column card while resolving deep link or initial queue
+  if ((resolvingInitialVisit || readyPending) && validSelectedId == null) {
+    return (
+      <section className="max-w-2xl space-y-3 rounded-2xl border border-slate-200 bg-white p-6 shadow-xs">
+        {initialErrorBanner}
+        <p className="py-4 text-center text-xs text-slate-600">Loading visits...</p>
+      </section>
+    )
+  }
+
+  // Queue fetch error state: never misreport a network/server error as an empty queue
+  if (readyError && validSelectedId == null) {
+    return (
+      <section className="max-w-2xl space-y-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-xs">
+        {initialErrorBanner}
+        <InlineAlert tone="error">
+          {errorText(readyErr, 'Could not load visits awaiting checkout. Try refreshing.')}
+        </InlineAlert>
+        {showDirectPayment && onDirectPayment && (
+          <div>
+            <DirectPaymentButton onClick={onDirectPayment} />
+          </div>
+        )}
+      </section>
+    )
+  }
+
+  // State 1 — Empty: compact summary card with daily completed count, pending dues, and quick actions
+  if (isEmptyState) {
+    return (
+      <section
+        data-testid="checkout-empty-state"
+        className="max-w-2xl space-y-5 rounded-2xl border border-slate-200 bg-white p-6 shadow-xs"
+      >
+        {initialErrorBanner}
+        <div>
+          <h2 className="text-base font-bold text-slate-900">No visits awaiting checkout</h2>
+          <p className="mt-1 text-xs text-slate-600">
+            Patients appear here when their doctor completes a consultation.
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-4">
+            <div className="text-xs font-semibold text-slate-600">Completed consultations today</div>
+            <div className="mt-1 font-mono text-xl font-black text-slate-900">
+              {completedTodayCount}
+            </div>
+          </div>
+
+          <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-4">
+            <div className="text-xs font-semibold text-slate-600">Pending dues</div>
+            <div className="mt-1 font-mono text-xl font-black text-slate-900">
+              {duesPending || duesError ? '—' : pendingDuesCount}
+            </div>
+            {!duesPending && !duesError && (
+              <div
+                className={`mt-0.5 font-mono text-xs font-semibold ${
+                  pendingDuesTotalPaise > 0 ? 'text-amber-800' : 'text-slate-600'
+                }`}
+              >
+                {formatPaise(pendingDuesTotalPaise)} outstanding
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-3 pt-1">
+          <Link
+            to="/reception/billing?tab=dues"
+            className="inline-flex min-h-9 items-center justify-center rounded-lg bg-[#124832] px-4 text-xs font-bold text-white shadow-xs transition-colors hover:bg-[#0D3822]"
+          >
+            View Pending Dues →
+          </Link>
+          {showDirectPayment && onDirectPayment && (
+            <DirectPaymentButton onClick={onDirectPayment} />
+          )}
+        </div>
+      </section>
+    )
+  }
+
+  // State 2 — Visits Ready, None Selected: focused single-column queue card
+  if (readyVisits.length > 0 && validSelectedId == null) {
+    return (
+      <section
+        data-testid="checkout-queue-unselected"
+        className="max-w-3xl space-y-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-xs"
+      >
+        {initialErrorBanner}
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h2 className="text-sm font-bold text-slate-900">
+              Ready for checkout ({readyVisits.length})
+            </h2>
+            <p className="mt-0.5 text-xs text-slate-600">
+              Select a patient to review charges, collect payment, and close the visit.
+            </p>
+          </div>
+          {showDirectPayment && onDirectPayment && (
+            <DirectPaymentButton onClick={onDirectPayment} />
+          )}
+        </div>
+
+        <ul className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
+          {readyVisits.map((v) => (
+            <li key={v.id}>
+              <VisitQueueCard
+                visit={v}
+                selected={false}
+                onSelect={() => setPicked(v.id)}
+              />
+            </li>
+          ))}
+        </ul>
+      </section>
+    )
+  }
+
+  // State 3 — Visit Selected: expanded 2-column checkout workspace
   return (
-    <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-12">
+    <div
+      data-testid="checkout-split-workspace"
+      className="grid grid-cols-1 items-start gap-5 lg:grid-cols-12"
+    >
       <section className="space-y-3 rounded-2xl border border-slate-200 bg-white p-5 shadow-xs lg:col-span-4">
         <div>
           <h2 className="text-sm font-bold text-slate-900">Ready for checkout</h2>
-          <p className="text-xs text-slate-500">The doctor has completed the consultation. Collect, then close the visit.</p>
+          <p className="text-xs text-slate-500">
+            The doctor has completed the consultation. Collect, then close the visit.
+          </p>
         </div>
         {readyPending ? (
           <p className="p-4 text-center text-xs text-slate-500">Loading visits...</p>
-        ) : !ready || ready.visits.length === 0 ? (
-          <p className="rounded-xl border border-dashed border-slate-200 p-4 text-center text-xs text-slate-500">
-            No visit is waiting for checkout.
+        ) : readyError ? (
+          <InlineAlert tone="error" className="text-xs">
+            {errorText(readyErr, 'Could not load visits awaiting checkout.')}
+          </InlineAlert>
+        ) : readyVisits.length === 0 ? (
+          <p className="rounded-xl border border-dashed border-slate-200 p-4 text-center text-xs text-slate-600">
+            No other visits awaiting checkout.
           </p>
         ) : (
           <ul className="space-y-2">
-            {ready.visits.map((v) => (
+            {readyVisits.map((v) => (
               <li key={v.id}>
-                <button
-                  type="button"
-                  aria-pressed={v.id === selectedId}
-                  onClick={() => {
-                    setNotice(null)
-                    setPicked(v.id)
-                  }}
-                  className={`w-full cursor-pointer rounded-xl border p-3 text-left text-xs transition-colors ${v.id === selectedId
-                      ? 'border-emerald-700 bg-emerald-50'
-                      : 'border-slate-200 bg-white hover:bg-slate-50'
-                    }`}
-                >
-                  <div className="font-bold text-slate-900">{v.patient_name}</div>
-                  <div className="font-mono text-slate-600">{v.patient_urn} &bull; {v.visit_date}</div>
-                  <div className="text-slate-600">{v.doctors.join(', ')}</div>
-                  <div className="mt-1 font-mono font-bold text-red-700">
-                    {v.outstanding_paise > 0 ? `${formatPaise(v.outstanding_paise)} due` : 'Paid in full'}
-                  </div>
-                </button>
+                <VisitQueueCard
+                  visit={v}
+                  selected={v.id === validSelectedId}
+                  onSelect={() => setPicked(v.id)}
+                />
               </li>
             ))}
           </ul>
         )}
+        {showDirectPayment && onDirectPayment && (
+          <div className="border-t border-slate-100 pt-3">
+            <DirectPaymentButton onClick={onDirectPayment} fullWidth />
+          </div>
+        )}
       </section>
 
       <section className="space-y-5 rounded-2xl border border-slate-200 bg-white p-5 shadow-xs lg:col-span-8">
-        {notice && (
-          <div role="status" className="rounded-xl border border-emerald-300 bg-emerald-50 p-3 text-xs font-semibold text-emerald-900">
-            {notice}
-          </div>
-        )}
-        {selectedId == null ? (
-          <p className="p-8 text-center text-xs text-slate-500">
-            Select a visit to see its charges, take payment, or close it.
-          </p>
-        ) : visitPending ? (
+        <div>
+          <button
+            type="button"
+            onClick={() => {
+              setPicked(null)
+              onClearInitialVisit?.()
+            }}
+            className="inline-flex min-h-8 cursor-pointer items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-50"
+          >
+            <IconArrowLeft className="h-3.5 w-3.5 text-slate-600" />
+            Back to queue
+          </button>
+        </div>
+        {visitPending ? (
           <p className="p-8 text-center text-xs text-slate-500">Loading visit...</p>
         ) : !visit ? (
           <p className="p-8 text-center text-xs text-red-700">This visit could not be loaded.</p>
@@ -586,12 +758,13 @@ export function VisitCheckout({ canCollect, canClose, initialVisitId, onReprint 
             canClose={canClose}
             onReprint={onReprint}
             onClosed={(closed) => {
-              setNotice(
+              toast.success(
                 closed.outstanding_paise > 0
                   ? `${closed.patient_name}'s visit is closed. ${formatPaise(closed.outstanding_paise)} stays under Pending Dues.`
                   : `${closed.patient_name}'s visit is closed.`,
               )
               setPicked(null)
+              onClearInitialVisit?.()
             }}
           />
         )}
@@ -602,9 +775,8 @@ export function VisitCheckout({ canCollect, canClose, initialVisitId, onReprint 
 
 /** Fees still owed on visits closed with a balance. Collected at the desk like any other payment. */
 export function VisitDuesSection({ canCollect }: { canCollect: boolean }) {
-  const { data: dues, isPending } = useVisitDues()
+  const { data: dues, isPending, isError, error, refetch } = useVisitDues()
   const [collecting, setCollecting] = useState<VisitDueOut | null>(null)
-  const [notice, setNotice] = useState<string | null>(null)
   const total = (dues ?? []).reduce((acc, d) => acc + d.balance_paise, 0)
 
   return (
@@ -617,16 +789,12 @@ export function VisitDuesSection({ canCollect }: { canCollect: boolean }) {
           </p>
         </div>
         <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-2">
-          <span className="block text-xs font-bold uppercase tracking-wider text-amber-800">Total outstanding</span>
-          <span className="font-mono text-base font-black text-amber-950">{formatPaise(total)}</span>
+          <span className="block text-xs font-bold text-amber-800">Total outstanding</span>
+          <span className="font-mono text-base font-black text-amber-950">
+            {isError ? '—' : formatPaise(total)}
+          </span>
         </div>
       </div>
-
-      {notice && (
-        <div role="status" className="rounded-xl border border-emerald-300 bg-emerald-50 p-3 text-xs font-semibold text-emerald-900">
-          {notice}
-        </div>
-      )}
 
       {collecting && canCollect && (
         <DueCollectForm
@@ -634,24 +802,37 @@ export function VisitDuesSection({ canCollect }: { canCollect: boolean }) {
           onCancel={() => setCollecting(null)}
           onCollected={(payment) => {
             setCollecting(null)
-            setNotice(`Receipt ${payment.receipt_number} issued for ${payment.patient_name}.`)
+            toast.success(`Receipt ${payment.receipt_number} issued for ${payment.patient_name}.`)
           }}
         />
       )}
 
       {isPending ? (
         <p className="p-6 text-center text-xs text-slate-500">Loading visit balances...</p>
+      ) : isError ? (
+        <div className="space-y-3">
+          <InlineAlert tone="error">
+            {errorText(error, 'Could not load visit balances. Please try again.')}
+          </InlineAlert>
+          <button
+            type="button"
+            onClick={() => refetch()}
+            className="inline-flex min-h-9 cursor-pointer items-center rounded-lg border border-slate-300 bg-white px-3.5 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+          >
+            Retry
+          </button>
+        </div>
       ) : !dues || dues.length === 0 ? (
         <p className="p-6 text-center text-xs text-slate-500">No closed visit has a balance.</p>
       ) : (
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs">
-            <thead className="border-b border-slate-200 bg-slate-50 font-bold uppercase tracking-wider text-slate-600">
+            <thead className="border-b border-slate-200 bg-slate-50 font-bold text-slate-600">
               <tr>
                 <th className="px-3 py-2">Patient</th>
                 <th className="px-3 py-2">Visit</th>
                 <th className="px-3 py-2">Doctor</th>
-                <th className="px-3 py-2 text-right">Fee</th>
+                <th className="px-3 py-2 text-right">Bill total</th>
                 <th className="px-3 py-2 text-right">Paid</th>
                 <th className="px-3 py-2 text-right">Balance</th>
                 <th className="px-3 py-2">Closed with reason</th>
@@ -660,14 +841,14 @@ export function VisitDuesSection({ canCollect }: { canCollect: boolean }) {
             </thead>
             <tbody className="divide-y divide-slate-100 font-medium">
               {dues.map((d) => (
-                <tr key={d.appointment_id}>
+                <tr key={d.visit_id}>
                   <td className="px-3 py-2">
                     <div className="font-bold text-slate-900">{d.patient_name}</div>
                     <div className="font-mono text-slate-500">{d.patient_urn}</div>
                   </td>
                   <td className="px-3 py-2 font-mono text-slate-700">{d.visit_date}</td>
-                  <td className="px-3 py-2 text-slate-700">{d.doctor_name_en}</td>
-                  <td className="px-3 py-2 text-right font-mono">{formatPaise(d.fee_paise)}</td>
+                  <td className="px-3 py-2 text-slate-700">{d.doctor_names.join(', ')}</td>
+                  <td className="px-3 py-2 text-right font-mono">{formatPaise(d.bill_total_paise)}</td>
                   <td className="px-3 py-2 text-right font-mono font-bold text-emerald-800">{formatPaise(d.paid_paise)}</td>
                   <td className="px-3 py-2 text-right font-mono font-black text-red-700">{formatPaise(d.balance_paise)}</td>
                   <td className="px-3 py-2 text-slate-600">{d.close_reason ?? '—'}</td>
@@ -705,11 +886,13 @@ function DueCollectForm({
   const [amountOverride, setAmountOverride] = useState<string | null>(null)
   const [method, setMethod] = useState<PaymentMethod>('CASH')
   const [error, setError] = useState<string | null>(null)
+  const submittingRef = useRef(false)
   const recordPayment = useRecordPayment()
   const amount = amountOverride ?? paiseToRupees(due.balance_paise)
 
   const submit = async (e: FormEvent) => {
     e.preventDefault()
+    if (submittingRef.current || recordPayment.isPending) return
     setError(null)
     const paise = rupeesToPaise(amount)
     if (paise === null) {
@@ -720,18 +903,21 @@ function DueCollectForm({
       setError(`Only ${formatPaise(due.balance_paise)} is owed on this visit.`)
       return
     }
+    submittingRef.current = true
     try {
       const payment = await recordPayment.mutateAsync({
         patient_id: due.patient_id,
-        appointment_id: due.appointment_id,
+        visit_id: due.visit_id,
         amount_paise: paise,
         payment_method: method,
-        notes: `Balance from visit ${due.visit_date} - ${due.doctor_name_en}`,
+        notes: `Balance from visit ${due.visit_date}`,
       })
       announcePayment(payment)
       onCollected(payment)
     } catch (err) {
       setError(errorText(err, 'Failed to record the payment.'))
+    } finally {
+      submittingRef.current = false
     }
   }
 
@@ -752,7 +938,7 @@ function DueCollectForm({
       )}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div>
-          <label htmlFor="due-collect-amount" className="mb-1 block text-xs font-bold uppercase tracking-wider text-slate-700">
+          <label htmlFor="due-collect-amount" className="mb-1 block text-xs font-bold text-slate-700">
             Amount (₹) *
           </label>
           <input

@@ -33,6 +33,10 @@ def list_audit_actions(session: SessionDep) -> list[str]:
     return list(session.scalars(stmt).all())
 
 
+def _escape_like(term: str) -> str:
+    return term.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+
+
 @router.get(
     "/audit-logs",
     response_model=AuditLogListResponse,
@@ -56,7 +60,7 @@ def list_audit_logs(
     stmt = select(AuditLog)
 
     if actor_username:
-        stmt = stmt.where(AuditLog.actor_username.ilike(f"%{actor_username.strip()}%"))
+        stmt = stmt.where(AuditLog.actor_username.ilike(f"%{_escape_like(actor_username.strip())}%"))
     if action:
         stmt = stmt.where(AuditLog.action == action.strip())
     if entity_type:

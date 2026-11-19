@@ -79,7 +79,7 @@ def test_operations_admin_lifecycle(
     assert run_res.status_code == 201
     run_data = run_res.json()
     assert "is_healthy" in run_data
-    assert run_data["total_checks"] == 7
+    assert run_data["total_checks"] == 9
     assert run_data["run_by_username"] == admin_user.username
     assert {c["code"] for c in run_data["checks"]} == {
         "package_payments",
@@ -89,6 +89,8 @@ def test_operations_admin_lifecycle(
         "session_counts",
         "photo_files",
         "asset_files",
+        "ledger_reconciliation",
+        "document_storage",
     }
     latest = admin_c.get("/api/operations/integrity")
     assert latest.status_code == 200

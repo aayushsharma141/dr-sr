@@ -1,4 +1,4 @@
-import { createBrowserRouter, Navigate, useOutletContext, useSearchParams } from 'react-router'
+import { createBrowserRouter, Navigate, useLocation, useOutletContext, useSearchParams } from 'react-router'
 import { RequireAuth, RequireRole } from './auth/guards'
 import { ROLE_HOME } from './auth/roles'
 import { Login } from './pages/Login'
@@ -11,6 +11,17 @@ import type { Me } from './api/types'
 function RootRedirect() {
   const me = useOutletContext<Me>()
   return <Navigate to={ROLE_HOME[me.role]} replace />
+}
+
+function TokensRedirect() {
+  const location = useLocation()
+  return (
+    <Navigate
+      to={{ pathname: '/reception/appointments', search: location.search }}
+      state={location.state}
+      replace
+    />
+  )
 }
 
 export function LoginRoute() {
@@ -205,6 +216,42 @@ export const router = createBrowserRouter([
             },
           },
           {
+            path: '/admin/reports/referrals',
+            lazy: async () => {
+              const { ReferralReportPage } = await import('./pages/admin/ReferralReportPage')
+              return {
+                Component: ReferralReportPage,
+              }
+            },
+          },
+          {
+            path: '/admin/duplicates',
+            lazy: async () => {
+              const { DuplicateMergePage } = await import('./pages/admin/DuplicateMergePage')
+              return {
+                Component: DuplicateMergePage,
+              }
+            },
+          },
+          {
+            path: '/admin/patients/archive',
+            lazy: async () => {
+              const { BulkArchivePage } = await import('./pages/admin/BulkArchivePage')
+              return {
+                Component: BulkArchivePage,
+              }
+            },
+          },
+          {
+            path: '/admin/workstations',
+            lazy: async () => {
+              const { WorkstationMonitorPage } = await import('./pages/admin/WorkstationMonitorPage')
+              return {
+                Component: WorkstationMonitorPage,
+              }
+            },
+          },
+          {
             // Patient Import Centre merged into Backup & Restore module; keep old links working.
             path: '/admin/imports',
             element: <Navigate to="/admin/backups?action=import" replace />,
@@ -225,6 +272,15 @@ export const router = createBrowserRouter([
               const { ReceptionBillingPage } = await import('./pages/ReceptionBillingPage')
               return {
                 Component: ReceptionBillingPage,
+              }
+            },
+          },
+          {
+            path: '/reception/receipts',
+            lazy: async () => {
+              const { ReceiptsPage } = await import('./pages/ReceiptsPage')
+              return {
+                Component: ReceiptsPage,
               }
             },
           },
@@ -258,11 +314,26 @@ export const router = createBrowserRouter([
             },
           },
           {
+            // Check-in & Token merged into Appointments; preserve query params and state for old links.
             path: '/reception/tokens',
+            element: <TokensRedirect />,
+          },
+          {
+            // Waiting Room (Phase 22, Wave 2): reception's queue-management workspace.
+            path: '/reception/waiting',
             lazy: async () => {
-              const { TokenGenerationPage } = await import('./pages/TokenGenerationPage')
+              const { WaitingRoom } = await import('./pages/WaitingRoom')
               return {
-                Component: TokenGenerationPage,
+                Component: WaitingRoom,
+              }
+            },
+          },
+          {
+            path: '/reception/reports',
+            lazy: async () => {
+              const { ReceptionReportsPage } = await import('./pages/ReceptionReportsPage')
+              return {
+                Component: ReceptionReportsPage,
               }
             },
           },
@@ -307,6 +378,15 @@ export const router = createBrowserRouter([
               }
             },
           },
+          {
+            path: '/patients/:id/visits/:visitId',
+            lazy: async () => {
+              const { VisitWorkspacePage } = await import('./pages/VisitWorkspacePage')
+              return {
+                Component: VisitWorkspacePage,
+              }
+            },
+          },
         ],
       },
       {
@@ -331,11 +411,24 @@ export const router = createBrowserRouter([
           {
             path: '/doctor',
             lazy: async () => {
+              const { DoctorDashboardPage } = await import('./pages/DoctorDashboardPage')
+              return {
+                Component: DoctorDashboardPage,
+              }
+            },
+          },
+          {
+            path: '/doctor/queue',
+            lazy: async () => {
               const { DoctorDashboard } = await import('./pages/DoctorDashboard')
               return {
                 Component: DoctorDashboard,
               }
             },
+          },
+          {
+            path: '/doctor/dashboard',
+            element: <Navigate to="/doctor" replace />,
           },
           {
             path: '/doctor/encounters/new',

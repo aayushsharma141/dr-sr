@@ -8,14 +8,15 @@ Protected by granular DASHBOARD_* permissions:
 
 from datetime import date, datetime, time, timedelta
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 from pydantic import BaseModel, ConfigDict
-from sqlalchemy import func, select
+from sqlalchemy import case, func, or_, select
 from sqlalchemy.orm import Session
 
 from kalyan_api import clock
 from kalyan_api.config import Settings, get_settings
-from kalyan_api.core.permissions import Permission
+from kalyan_api.core.errors import ApiError
+from kalyan_api.core.permissions import Permission, Role
 from kalyan_api.core.policy import require
 from kalyan_api.core.principal import Principal, current_principal
 from kalyan_api.db.session import SessionDep
@@ -23,12 +24,20 @@ from kalyan_api.models import (
     Appointment,
     AppointmentStatus,
     AuditLog,
+    ClinicalEncounter,
+    ConsultationStatus,
     Department,
     Doctor,
     Patient,
     Payment,
     PaymentMethod,
+    PendingOpdArrival,
+    PriorityLevel,
+    Refund,
     User,
+    Visit,
+    VisitStatus,
+    doctor_departments,
 )
 from kalyan_api.routers.system import measure_volume
 from kalyan_api.services import billing_service
@@ -62,7 +71,8 @@ class DoctorTodayOut(BaseModel):
     in_consultation: int
     done: int
     arrived_waiting: int = 0
-    department: str = "Physiotherapy"
+    pending_arrivals: int = 0
+    department: str = "OPD"
     next_token: int | None = None
 
 
@@ -235,14 +245,31 @@ def _ist_day_bounds(day: date) -> tuple[datetime, datetime]:
 
 
 def _appointments_today(session: Session, today: date) -> dict[str, int]:
-    counts: dict[str, int] = {s.value: 0 for s in AppointmentStatus}
+    canonical_statuses = (
+        AppointmentStatus.BOOKED.value,
+        AppointmentStatus.ARRIVED.value,
+        AppointmentStatus.IN_CONSULTATION.value,
+        AppointmentStatus.DONE.value,
+        AppointmentStatus.CANCELLED.value,
+        AppointmentStatus.NO_SHOW.value,
+        AppointmentStatus.RESCHEDULED.value,
+    )
+    counts: dict[str, int] = {s: 0 for s in canonical_statuses}
     rows = session.execute(
         select(Appointment.status, func.count(Appointment.id))
         .where(Appointment.appointment_date == today)
         .group_by(Appointment.status)
     ).all()
     for status_value, cnt in rows:
-        counts[str(status_value)] = int(cnt)
+        val = str(status_value)
+        if val in ("CHECKED_IN", "WAITING"):
+            counts[AppointmentStatus.ARRIVED.value] += int(cnt)
+        elif val == "COMPLETED":
+            counts[AppointmentStatus.DONE.value] += int(cnt)
+        elif val in ("TO_ARRIVE", "REGISTERED"):
+            counts[AppointmentStatus.BOOKED.value] += int(cnt)
+        elif val in counts:
+            counts[val] += int(cnt)
     return counts
 
 
@@ -261,30 +288,96 @@ def _doctors_today(session: Session, today: date) -> list[DoctorTodayOut]:
     for doctor_id, status_value, cnt in rows:
         per_doctor.setdefault(int(doctor_id), {})[str(status_value)] = int(cnt)
 
+    pending_arrival_rows = session.execute(
+        select(PendingOpdArrival.doctor_id, func.count(PendingOpdArrival.id))
+        .where(
+            PendingOpdArrival.appointment_date == today,
+            PendingOpdArrival.status == "TO_ARRIVE",
+        )
+        .group_by(PendingOpdArrival.doctor_id)
+    ).all()
+    pending_arrivals_by_doctor: dict[int, int] = {
+        int(doc_id): int(cnt) for doc_id, cnt in pending_arrival_rows
+    }
+
+    dept_rows = session.execute(
+        select(doctor_departments.c.doctor_id, Department.name_en)
+        .join(Department, Department.id == doctor_departments.c.department_id)
+        .where(Department.is_active.is_(True))
+        .order_by(Department.name_en.asc(), Department.id.asc())
+    ).all()
+    primary_department: dict[int, str] = {}
+    for doc_id, dept_name in dept_rows:
+        primary_department.setdefault(int(doc_id), dept_name)
+
+    priority_rank = case(
+        (Appointment.priority_level == PriorityLevel.EMERGENCY.value, 0),
+        (Appointment.priority_level == PriorityLevel.PRIORITY.value, 1),
+        else_=2,
+    )
+    emergency_order_at = case(
+        (
+            Appointment.priority_level == PriorityLevel.EMERGENCY.value,
+            func.coalesce(Appointment.priority_updated_at, Appointment.status_updated_at),
+        ),
+        else_=None,
+    )
+
+    active_tokens_stmt = (
+        select(Appointment.doctor_id, Appointment.token_number)
+        .where(
+            Appointment.doctor_id.in_([int(d[0]) for d in doctors]),
+            Appointment.appointment_date == today,
+            Appointment.token_number.is_not(None),
+            Appointment.status.in_(
+                [
+                    AppointmentStatus.ARRIVED.value,
+                    AppointmentStatus.CHECKED_IN.value,
+                    AppointmentStatus.WAITING.value,
+                ]
+            ),
+            or_(
+                Appointment.consultation_status == ConsultationStatus.WAITING.value,
+                Appointment.consultation_status.is_(None),
+            ),
+        )
+        .order_by(
+            Appointment.doctor_id,
+            priority_rank.asc(),
+            emergency_order_at.asc().nulls_last(),
+            Appointment.token_number.asc(),
+        )
+    )
+    next_tok_by_doc: dict[int, int] = {}
+    for doc_id, tok in session.execute(active_tokens_stmt).all():
+        if doc_id not in next_tok_by_doc:
+            next_tok_by_doc[doc_id] = tok
+
     result: list[DoctorTodayOut] = []
     for doctor_id, name_en, qualification in doctors:
         status_counts = per_doctor.get(int(doctor_id), {})
-        next_tok = session.scalar(
-            select(Appointment.token_number)
-            .where(
-                Appointment.doctor_id == doctor_id,
-                Appointment.appointment_date == today,
-                Appointment.status == AppointmentStatus.ARRIVED.value,
-            )
-            .order_by(Appointment.token_number.asc())
-            .limit(1)
-        )
+        next_tok = next_tok_by_doc.get(int(doctor_id))
         result.append(
             DoctorTodayOut(
                 doctor_id=int(doctor_id),
                 name=name_en,
                 appointments_today=sum(status_counts.values()),
                 waiting=status_counts.get(AppointmentStatus.BOOKED.value, 0)
-                + status_counts.get(AppointmentStatus.ARRIVED.value, 0),
-                arrived_waiting=status_counts.get(AppointmentStatus.ARRIVED.value, 0),
+                + status_counts.get(AppointmentStatus.TO_ARRIVE.value, 0)
+                + status_counts.get(AppointmentStatus.REGISTERED.value, 0)
+                + status_counts.get(AppointmentStatus.ARRIVED.value, 0)
+                + status_counts.get(AppointmentStatus.CHECKED_IN.value, 0)
+                + status_counts.get(AppointmentStatus.WAITING.value, 0),
+                arrived_waiting=status_counts.get(AppointmentStatus.ARRIVED.value, 0)
+                + status_counts.get(AppointmentStatus.CHECKED_IN.value, 0)
+                + status_counts.get(AppointmentStatus.WAITING.value, 0),
+                pending_arrivals=pending_arrivals_by_doctor.get(int(doctor_id), 0),
                 in_consultation=status_counts.get(AppointmentStatus.IN_CONSULTATION.value, 0),
-                done=status_counts.get(AppointmentStatus.DONE.value, 0),
-                department=qualification or "Physiotherapy",
+                done=status_counts.get(AppointmentStatus.DONE.value, 0)
+                + status_counts.get(AppointmentStatus.COMPLETED.value, 0),
+                department=primary_department.get(int(doctor_id))
+                or (qualification or "").strip()
+                or "OPD",
                 next_token=next_tok,
             )
         )
@@ -432,12 +525,40 @@ class DoctorOverviewResponse(BaseModel):
     doctor_name_en: str
 
 
+class DoctorDashboardTodayGlance(BaseModel):
+    """Reconciled operational glance metrics for the doctor's day."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    total: int = 0
+    completed: int = 0
+    in_progress: int = 0
+    pending: int = 0
+
+
+class DoctorDashboardSummary(BaseModel):
+    """Doctor dashboard summary metrics and workload counts."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    doctor_id: int
+    doctor_name_en: str
+    specialty_name: str
+    waiting_count: int = 0
+    in_consultation_count: int = 0
+    scheduled_count: int = 0
+    completed_count: int = 0
+    pending_drafts_count: int = 0
+    today_glance: DoctorDashboardTodayGlance
+
+
 @router.get(
     "/admin/overview",
     response_model=AdminOverviewResponse,
     dependencies=[Depends(require(Permission.DASHBOARD_ADMIN))],
 )
 def get_admin_overview(
+    request: Request,
     session: SessionDep,
     principal: Principal = Depends(current_principal),
 ) -> AdminOverviewResponse:
@@ -477,10 +598,18 @@ def get_admin_overview(
         or 0
     )
 
-    # Reuse the pending-dues ledger computation (BIL-03) instead of duplicating the math.
-    outstanding_dues_paise = sum(
+    # Treatment package pending dues + closed-visit outstanding dues (BIL-03)
+    package_dues = sum(
         due.balance_paise for due in billing_service.compute_pending_dues(session)
     )
+    closed_visit_ids = session.scalars(
+        select(Visit.id).where(Visit.status == VisitStatus.CLOSED.value)
+    ).all()
+    visit_dues = 0
+    if closed_visit_ids:
+        totals = billing_service.visit_totals(session, closed_visit_ids)
+        visit_dues = sum(max(0, vt.bill_total_paise - vt.paid_paise) for vt in totals.values())
+    outstanding_dues_paise = package_dues + visit_dues
 
     locked_accounts: int = (
         session.scalar(
@@ -607,37 +736,57 @@ def get_management_overview(
     next_start = _month_start(today.year, today.month + 1)
     bounds = [_ist_midnight(d) for d in starts] + [_ist_midnight(next_start)]
 
-    def collected(start: datetime, end: datetime) -> int:
-        return int(
-            session.scalar(
-                select(func.coalesce(func.sum(Payment.amount_paise), 0)).where(
-                    Payment.is_reversed.is_(False),
-                    Payment.created_at >= start,
-                    Payment.created_at < end,
-                )
-            )
-            or 0
+    # Preload payment, refund, and registration timestamps across 6-month window in 3 queries
+    pay_rows = session.execute(
+        select(Payment.created_at, Payment.amount_paise).where(
+            Payment.is_reversed.is_(False),
+            Payment.created_at >= bounds[0],
+            Payment.created_at < bounds[6],
         )
-
-    def registered(start: datetime, end: datetime) -> int:
-        return int(
-            session.scalar(
-                select(func.count(Patient.id)).where(
-                    Patient.created_at >= start, Patient.created_at < end
-                )
-            )
-            or 0
+    ).all()
+    ref_rows = session.execute(
+        select(Refund.created_at, Refund.amount_paise).where(
+            Refund.created_at >= bounds[0],
+            Refund.created_at < bounds[6],
         )
+    ).all()
+    pat_rows = session.scalars(
+        select(Patient.created_at).where(
+            Patient.created_at >= bounds[0],
+            Patient.created_at < bounds[6],
+        )
+    ).all()
 
-    trend_paise = [collected(bounds[i], bounds[i + 1]) for i in range(6)]
-    trend_patients = [registered(bounds[i], bounds[i + 1]) for i in range(6)]
+    trend_paise = [0] * 6
+    for created_at, amt in pay_rows:
+        if created_at:
+            for i in range(6):
+                if bounds[i] <= created_at < bounds[i + 1]:
+                    trend_paise[i] += int(amt or 0)
+                    break
+    for created_at, amt in ref_rows:
+        if created_at:
+            for i in range(6):
+                if bounds[i] <= created_at < bounds[i + 1]:
+                    trend_paise[i] = max(0, trend_paise[i] - int(amt or 0))
+                    break
+
+    trend_patients = [0] * 6
+    for created_at in pat_rows:
+        if created_at:
+            for i in range(6):
+                if bounds[i] <= created_at < bounds[i + 1]:
+                    trend_patients[i] += 1
+                    break
+
     cur_start, cur_end = bounds[5], bounds[6]
 
     reversed_row = session.execute(
         select(func.count(Payment.id), func.coalesce(func.sum(Payment.amount_paise), 0)).where(
             Payment.is_reversed.is_(True),
-            Payment.created_at >= cur_start,
-            Payment.created_at < cur_end,
+            Payment.reversed_at.is_not(None),
+            Payment.reversed_at >= cur_start,
+            Payment.reversed_at < cur_end,
         )
     ).one()
 
@@ -754,7 +903,13 @@ def _reception_alerts(session: Session, today: date, now_utc: datetime) -> list[
         session.scalar(
             select(func.count(Appointment.id)).where(
                 Appointment.appointment_date == today,
-                Appointment.status == AppointmentStatus.ARRIVED.value,
+                Appointment.status.in_(
+                    [
+                        AppointmentStatus.ARRIVED.value,
+                        AppointmentStatus.CHECKED_IN.value,
+                        AppointmentStatus.WAITING.value,
+                    ]
+                ),
                 Appointment.status_updated_at <= thirty_mins_ago,
             )
         )
@@ -773,7 +928,13 @@ def _reception_alerts(session: Session, today: date, now_utc: datetime) -> list[
         session.scalar(
             select(func.count(Appointment.id)).where(
                 Appointment.appointment_date == today,
-                Appointment.status == AppointmentStatus.BOOKED.value,
+                Appointment.status.in_(
+                    [
+                        AppointmentStatus.BOOKED.value,
+                        AppointmentStatus.TO_ARRIVE.value,
+                        AppointmentStatus.REGISTERED.value,
+                    ]
+                ),
             )
         )
         or 0
@@ -790,16 +951,20 @@ def _reception_alerts(session: Session, today: date, now_utc: datetime) -> list[
             )
         )
 
-    pending_dues = [
+    pending_package_dues = [
         due for due in billing_service.compute_pending_dues(session) if due.balance_paise > 0
     ]
-    if len(pending_dues) > 0:
+    pending_visit_dues = [
+        due for due in billing_service.compute_visit_dues(session) if due.balance_paise > 0
+    ]
+    pending_dues_count = len(pending_package_dues) + len(pending_visit_dues)
+    if pending_dues_count > 0:
         alerts.append(
             OverviewAlertOut(
                 code="pending_dues",
                 severity="warning",
                 message=(
-                    f"{len(pending_dues)} visit(s) have outstanding balances requiring payment "
+                    f"{pending_dues_count} visit(s) have outstanding balances requiring payment "
                     "follow-up."
                 ),
             )
@@ -835,7 +1000,13 @@ def get_reception_overview(
     )
 
     outstanding_dues_paise = sum(
-        due.balance_paise for due in billing_service.compute_pending_dues(session)
+        due.balance_paise
+        for due in billing_service.compute_pending_dues(session)
+        if due.balance_paise > 0
+    ) + sum(
+        due.balance_paise
+        for due in billing_service.compute_visit_dues(session)
+        if due.balance_paise > 0
     )
 
     return ReceptionOverviewResponse(
@@ -879,4 +1050,115 @@ def get_doctor_overview(
         role=principal.role.value if hasattr(principal.role, "value") else str(principal.role),
         doctor_id=doctor_id,
         doctor_name_en=doctor_name,
+    )
+
+
+@router.get(
+    "/doctor/dashboard/summary",
+    response_model=DoctorDashboardSummary,
+    dependencies=[Depends(require(Permission.DASHBOARD_DOCTOR))],
+)
+def get_doctor_dashboard_summary(
+    session: SessionDep,
+    principal: Principal = Depends(current_principal),
+) -> DoctorDashboardSummary:
+    """Return doctor workspace dashboard summary metrics and workload counts."""
+    if principal.role != Role.DOCTOR or principal.doctor_id is None:
+        raise ApiError(status_code=403, code="doctor_only", message="Doctor access required.")
+
+    doctor = session.get(Doctor, principal.doctor_id)
+    if not doctor:
+        raise ApiError(status_code=404, code="doctor_not_found", message="Doctor not found.")
+
+    dept_stmt = (
+        select(Department.name_en)
+        .join(doctor_departments, doctor_departments.c.department_id == Department.id)
+        .where(
+            doctor_departments.c.doctor_id == doctor.id,
+            Department.is_active.is_(True),
+        )
+        .order_by(Department.name_en.asc(), Department.id.asc())
+    )
+    specialty_name = session.scalar(dept_stmt) or doctor.qualification or "General Medicine"
+
+    today = clock.ist_today()
+
+    appt_stmt = select(
+        Appointment.id,
+        Appointment.status,
+        Appointment.consultation_status,
+    ).where(
+        Appointment.doctor_id == principal.doctor_id,
+        Appointment.appointment_date == today,
+    )
+    appointments = session.execute(appt_stmt).all()
+
+    waiting_count = 0
+    in_consultation_count = 0
+    scheduled_count = 0
+    completed_count = 0
+    in_consultation_appt_ids: list[int] = []
+
+    for appt_id, status, consultation_status in appointments:
+        status_val = status.value if hasattr(status, "value") else str(status) if status else ""
+        c_status_val = (
+            consultation_status.value
+            if hasattr(consultation_status, "value")
+            else str(consultation_status)
+            if consultation_status
+            else ""
+        )
+        if status_val == AppointmentStatus.RESCHEDULED.value:
+            continue
+        if c_status_val == ConsultationStatus.IN_CONSULTATION.value:
+            in_consultation_count += 1
+            in_consultation_appt_ids.append(appt_id)
+        elif c_status_val == ConsultationStatus.WAITING.value or status_val in (
+            AppointmentStatus.ARRIVED.value,
+            AppointmentStatus.CHECKED_IN.value,
+            AppointmentStatus.WAITING.value,
+        ):
+            waiting_count += 1
+        elif status_val in (
+            AppointmentStatus.BOOKED.value,
+            AppointmentStatus.TO_ARRIVE.value,
+            AppointmentStatus.REGISTERED.value,
+        ):
+            scheduled_count += 1
+        elif (
+            status_val in (AppointmentStatus.DONE.value, AppointmentStatus.COMPLETED.value)
+            or c_status_val == ConsultationStatus.COMPLETED.value
+        ):
+            completed_count += 1
+
+    draft_stmt = select(func.count(ClinicalEncounter.id)).where(
+        ClinicalEncounter.doctor_id == principal.doctor_id,
+        ClinicalEncounter.is_finalised.is_(False),
+    )
+    if in_consultation_appt_ids:
+        draft_stmt = draft_stmt.where(
+            or_(
+                ClinicalEncounter.appointment_id.is_(None),
+                ClinicalEncounter.appointment_id.not_in(in_consultation_appt_ids),
+            )
+        )
+    pending_drafts_count = int(session.scalar(draft_stmt) or 0)
+
+    total_glance = completed_count + in_consultation_count + pending_drafts_count
+
+    return DoctorDashboardSummary(
+        doctor_id=doctor.id,
+        doctor_name_en=doctor.name_en,
+        specialty_name=specialty_name,
+        waiting_count=waiting_count,
+        in_consultation_count=in_consultation_count,
+        scheduled_count=scheduled_count,
+        completed_count=completed_count,
+        pending_drafts_count=pending_drafts_count,
+        today_glance=DoctorDashboardTodayGlance(
+            total=total_glance,
+            completed=completed_count,
+            in_progress=in_consultation_count,
+            pending=pending_drafts_count,
+        ),
     )

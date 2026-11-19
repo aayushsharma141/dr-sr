@@ -1,5 +1,6 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { Modal } from './Modal'
+import { PrescriptionPrint } from './PrescriptionPrint'
 import type { PrescriptionItemCreate, PrescriptionOut } from '../api/types'
 
 export interface PrescriptionFormSectionProps {
@@ -22,7 +23,7 @@ export interface PrescriptionFormSectionProps {
 export function PrescriptionFormSection({
   prescription,
   items,
-  diagnosis: _diagnosis,
+  diagnosis,
   dietaryAdvice,
   generalAdvice,
   onItemsChange,
@@ -39,6 +40,8 @@ export function PrescriptionFormSection({
   const [cancelReason, setCancelReason] = useState('')
   const [cancelError, setCancelError] = useState<string | null>(null)
   const [validationError, setValidationError] = useState<string | null>(null)
+  const [showPrint, setShowPrint] = useState(false)
+  const authorisingRef = useRef(false)
 
   const status = prescription?.status || 'DRAFT'
   const isLocked = status === 'AUTHORISED' || status === 'CANCELLED' || readOnly
@@ -82,7 +85,12 @@ export function PrescriptionFormSection({
   }
 
   const handleAuthoriseClick = async () => {
+    if (isAuthorising || authorisingRef.current || isLocked) return
     setValidationError(null)
+    if (!diagnosis.trim() || diagnosis.trim().length < 2) {
+      setValidationError('Diagnosis is required (minimum 2 characters) before authorising a prescription.')
+      return
+    }
     if (items.length === 0) {
       setValidationError('At least one medication item is required to authorise a prescription.')
       return
@@ -106,6 +114,7 @@ export function PrescriptionFormSection({
         return
       }
     }
+    authorisingRef.current = true
     try {
       await onAuthorise()
     } catch (err: unknown) {
@@ -114,6 +123,8 @@ export function PrescriptionFormSection({
       } else {
         setValidationError('Failed to authorise prescription.')
       }
+    } finally {
+      authorisingRef.current = false
     }
   }
 
@@ -176,17 +187,17 @@ export function PrescriptionFormSection({
           {status === 'AUTHORISED' && (
             <>
               {prescription?.id && (
-                <a
-                  href={`/doctor/prescriptions/${prescription.id}/print`}
-                  target="_blank"
-                  rel="noopener noreferrer"
+                // Opens the A4 slip in place; there is no separate print page to open.
+                <button
+                  type="button"
+                  onClick={() => setShowPrint(true)}
                   className="px-3 py-1.5 border border-neutral-300 rounded text-xs font-semibold text-neutral-700 hover:bg-neutral-50 flex items-center gap-1.5"
                 >
                   <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
                   </svg>
                   Print Prescription Slip
-                </a>
+                </button>
               )}
               {!readOnly && (
                 <button
@@ -211,7 +222,7 @@ export function PrescriptionFormSection({
       {/* Cancellation note banner if cancelled */}
       {status === 'CANCELLED' && prescription?.cancellation_reason && (
         <div className="p-3 bg-red-50/60 border border-red-200 rounded-lg text-xs text-red-800 space-y-1">
-          <div className="font-semibold uppercase tracking-wider">Prescription Cancelled</div>
+          <div className="font-semibold">Prescription Cancelled</div>
           <p>Reason: {prescription.cancellation_reason}</p>
         </div>
       )}
@@ -237,7 +248,7 @@ export function PrescriptionFormSection({
         <div className="space-y-3">
           <div className="overflow-x-auto border border-neutral-200 rounded-lg">
             <table className="min-w-full divide-y divide-neutral-200 text-left text-xs">
-              <thead className="bg-[#F1F5F9] font-semibold text-neutral-700 uppercase tracking-wider">
+              <thead className="bg-[#F1F5F9] font-semibold text-neutral-700">
                 <tr>
                   <th className="px-2.5 py-2 w-10">#</th>
                   <th className="px-2.5 py-2">Medicine Name</th>
@@ -391,7 +402,7 @@ export function PrescriptionFormSection({
       {/* Advice notes */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
         <div>
-          <label htmlFor="rx-dietary-advice" className="block text-xs font-semibold text-neutral-700 uppercase tracking-wider mb-1">
+          <label htmlFor="rx-dietary-advice" className="block text-xs font-semibold text-neutral-700 mb-1">
             Dietary Advice
           </label>
           <textarea
@@ -407,7 +418,7 @@ export function PrescriptionFormSection({
         </div>
 
         <div>
-          <label htmlFor="rx-general-advice" className="block text-xs font-semibold text-neutral-700 uppercase tracking-wider mb-1">
+          <label htmlFor="rx-general-advice" className="block text-xs font-semibold text-neutral-700 mb-1">
             General Clinical Advice
           </label>
           <textarea
@@ -424,6 +435,10 @@ export function PrescriptionFormSection({
       </div>
 
       {/* Cancel Prescription Confirmation Modal */}
+      {showPrint && prescription && (
+        <PrescriptionPrint prescription={prescription} onClose={() => setShowPrint(false)} />
+      )}
+
       {showCancelModal && (
         <Modal
           open
@@ -443,7 +458,7 @@ export function PrescriptionFormSection({
             </p>
 
             <div>
-              <label htmlFor="cancel-reason-input" className="block text-xs font-semibold text-neutral-700 uppercase tracking-wider mb-1">
+              <label htmlFor="cancel-reason-input" className="block text-xs font-semibold text-neutral-700 mb-1">
                 Cancellation Reason <span className="text-red-600">*</span>
               </label>
               <textarea

@@ -49,7 +49,7 @@ def test_encounter_takes_the_department_booked_on_the_appointment(
     # The doctor can only open the consultation once reception has checked the patient in.
     checked_in = reception.post(
         f"/api/appointments/{booked.json()['id']}/check-in",
-        json={"version_id": booked.json()["version_id"]},
+        json={"version_id": booked.json()["version_id"], "referral_source": "SELF"},
     )
     assert checked_in.status_code == 200, checked_in.text
 

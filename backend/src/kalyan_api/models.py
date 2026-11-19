@@ -11,15 +11,18 @@ Locked decisions:
 import re
 import uuid
 from datetime import date, datetime, time
+from decimal import Decimal
 from enum import StrEnum
 
 from sqlalchemy import (
+    CHAR,
     BigInteger,
     Boolean,
     CheckConstraint,
     Column,
     Date,
     DateTime,
+    FetchedValue,
     ForeignKey,
     ForeignKeyConstraint,
     Identity,
@@ -331,6 +334,10 @@ class ClinicSettings(Base):
             "receipt_sequence_cycle IN ('FINANCIAL_YEAR', 'CALENDAR_YEAR')",
             name="clinic_settings_receipt_cycle_valid",
         ),
+        CheckConstraint(
+            "token_reset_policy IN ('DAILY')",
+            name="token_reset_policy_valid",
+        ),
     )
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True, default=1)
@@ -366,6 +373,9 @@ class ClinicSettings(Base):
     print_footer_hi: Mapped[str | None] = mapped_column(Text, nullable=True)
     consultation_validity_days: Mapped[int] = mapped_column(
         Integer, default=7, server_default="7", nullable=False
+    )
+    token_reset_policy: Mapped[str] = mapped_column(
+        String(24), default="DAILY", server_default=text("'DAILY'"), nullable=False
     )
     version_id: Mapped[int] = mapped_column(Integer, default=1, server_default="1", nullable=False)
     created_at: Mapped[datetime] = mapped_column(
@@ -524,10 +534,17 @@ class Patient(Base):
     __table_args__ = (
         CheckConstraint("gender IN ('M', 'F', 'O')", name="patients_gender_valid"),
         CheckConstraint("age_years >= 0 AND age_years <= 150", name="patients_age_valid"),
+        CheckConstraint(
+            "blood_group IS NULL OR blood_group IN"
+            " ('A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-')",
+            name="blood_group_valid",
+        ),
         Index("ix_patients_urn", "urn"),
         Index("ix_patients_mobile", "mobile"),
         Index("ix_patients_full_name", "full_name"),
         Index("ix_patients_legacy_urn", "legacy_urn"),
+        Index("ix_patients_merged_into_id", "merged_into_id"),
+        Index("ix_patients_is_archived", "is_archived"),
     )
 
     id: Mapped[int] = mapped_column(BigInteger, Identity(always=False), primary_key=True)
@@ -547,6 +564,12 @@ class Patient(Base):
         String(64), default="Bihar", server_default="Bihar", nullable=False
     )
     emergency_contact: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    alternate_mobile: Mapped[str | None] = mapped_column(String(15), nullable=True)
+    email: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    blood_group: Mapped[str | None] = mapped_column(String(8), nullable=True)
+    pin_code: Mapped[str | None] = mapped_column(String(10), nullable=True)
+    guardian_relationship: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    medical_history_notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     allergies: Mapped[str] = mapped_column(
         Text, default="None reported", server_default="None reported", nullable=False
     )
@@ -555,6 +578,24 @@ class Patient(Base):
     is_active: Mapped[bool] = mapped_column(
         Boolean, default=True, server_default=text("true"), nullable=False
     )
+    # Phase 23: Alias-pointer duplicate merge and filtered soft-archival
+    merged_into_id: Mapped[int | None] = mapped_column(
+        BigInteger, ForeignKey("patients.id", ondelete="RESTRICT"), nullable=True
+    )
+    merged_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    merged_by_user_id: Mapped[int | None] = mapped_column(
+        BigInteger, ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    merge_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+    is_archived: Mapped[bool] = mapped_column(
+        Boolean, default=False, server_default=text("false"), nullable=False
+    )
+    archived_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    archived_by_user_id: Mapped[int | None] = mapped_column(
+        BigInteger, ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    archive_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+
     version_id: Mapped[int] = mapped_column(Integer, default=1, server_default="1", nullable=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
@@ -569,6 +610,175 @@ class Patient(Base):
     __mapper_args__ = {"version_id_col": version_id}
 
 
+class AllergyCategory(StrEnum):
+    """Structured allergy category (Level 1 Patient Master)."""
+
+    DRUG = "DRUG"
+    FOOD = "FOOD"
+    ENVIRONMENTAL = "ENVIRONMENTAL"
+    OTHER = "OTHER"
+
+
+class AllergySeverity(StrEnum):
+    """Structured clinical allergy severity."""
+
+    MILD = "MILD"
+    MODERATE = "MODERATE"
+    SEVERE = "SEVERE"
+    LIFE_THREATENING = "LIFE_THREATENING"
+
+
+class AllergyStatus(StrEnum):
+    """Lifecycle status of a structured patient allergy record."""
+
+    ACTIVE = "ACTIVE"
+    INACTIVE = "INACTIVE"
+    RESOLVED = "RESOLVED"
+
+
+class PatientAllergy(Base):
+    """Structured clinical allergy record owned by doctors (D-04 clinical privacy)."""
+
+    __tablename__ = "patient_allergies"
+    __table_args__ = (
+        CheckConstraint(
+            "category IN ('DRUG', 'FOOD', 'ENVIRONMENTAL', 'OTHER')",
+            name="category_valid",
+        ),
+        CheckConstraint(
+            "severity IN ('MILD', 'MODERATE', 'SEVERE', 'LIFE_THREATENING')",
+            name="severity_valid",
+        ),
+        CheckConstraint(
+            "status IN ('ACTIVE', 'INACTIVE', 'RESOLVED')",
+            name="status_valid",
+        ),
+        Index("ix_patient_allergies_patient_status", "patient_id", "status"),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, Identity(always=False), primary_key=True)
+    patient_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("patients.id", ondelete="RESTRICT"), nullable=False
+    )
+    substance: Mapped[str] = mapped_column(String(160), nullable=False)
+    category: Mapped[str] = mapped_column(
+        String(24),
+        default=AllergyCategory.DRUG.value,
+        server_default=text(f"'{AllergyCategory.DRUG.value}'"),
+        nullable=False,
+    )
+    severity: Mapped[str] = mapped_column(
+        String(24),
+        default=AllergySeverity.MODERATE.value,
+        server_default=text(f"'{AllergySeverity.MODERATE.value}'"),
+        nullable=False,
+    )
+    reaction: Mapped[str | None] = mapped_column(Text, nullable=True)
+    clinical_notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    status: Mapped[str] = mapped_column(
+        String(16),
+        default=AllergyStatus.ACTIVE.value,
+        server_default=text(f"'{AllergyStatus.ACTIVE.value}'"),
+        nullable=False,
+    )
+    doctor_id: Mapped[int | None] = mapped_column(
+        BigInteger, ForeignKey("doctors.id", ondelete="RESTRICT"), nullable=True
+    )
+    recorded_by_user_id: Mapped[int | None] = mapped_column(
+        BigInteger, ForeignKey("users.id", ondelete="RESTRICT"), nullable=True
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
+    version_id: Mapped[int] = mapped_column(Integer, default=1, server_default="1", nullable=False)
+
+    __mapper_args__ = {"version_id_col": version_id}
+
+    patient = relationship("Patient", foreign_keys=[patient_id], lazy="select")
+    doctor = relationship("Doctor", foreign_keys=[doctor_id], lazy="select")
+    recorded_by_user = relationship("User", foreign_keys=[recorded_by_user_id], lazy="joined")
+
+
+class ConditionStatus(StrEnum):
+    """Lifecycle status of a longitudinal patient condition (Level 1 Problem List)."""
+
+    ACTIVE = "ACTIVE"
+    RESOLVED = "RESOLVED"
+    INACTIVE = "INACTIVE"
+
+
+class PatientCondition(Base):
+    """Longitudinal patient problem-list condition owned by doctors (D-04 clinical privacy)."""
+
+    __tablename__ = "patient_conditions"
+    __table_args__ = (
+        UniqueConstraint("id", "patient_id", name="uq_patient_conditions_id_patient"),
+        CheckConstraint(
+            "status IN ('ACTIVE', 'RESOLVED', 'INACTIVE')",
+            name="status_valid",
+        ),
+        Index("ix_patient_conditions_patient_status", "patient_id", "status"),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, Identity(always=False), primary_key=True)
+    patient_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("patients.id", ondelete="RESTRICT"), nullable=False
+    )
+    doctor_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("doctors.id", ondelete="RESTRICT"), nullable=False
+    )
+    condition_name: Mapped[str] = mapped_column(String(200), nullable=False)
+    icd10_code: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    status: Mapped[str] = mapped_column(
+        String(16),
+        default=ConditionStatus.ACTIVE.value,
+        server_default=text(f"'{ConditionStatus.ACTIVE.value}'"),
+        nullable=False,
+    )
+    onset_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    resolved_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
+    version_id: Mapped[int] = mapped_column(Integer, default=1, server_default="1", nullable=False)
+
+    __mapper_args__ = {"version_id_col": version_id}
+
+    patient = relationship("Patient", foreign_keys=[patient_id], lazy="select")
+    doctor = relationship("Doctor", foreign_keys=[doctor_id], lazy="select")
+
+
+class VisitSequence(Base):
+    """Year-scoped atomic counter for human-readable visit codes (VIS-YY-NNNNNN)."""
+
+    __tablename__ = "visit_sequences"
+
+    year: Mapped[int] = mapped_column(Integer, primary_key=True)
+    last_number: Mapped[int] = mapped_column(Integer, default=0, server_default="0", nullable=False)
+
+
+class EncounterSequence(Base):
+    """Year-scoped atomic counter for human-readable encounter codes (ENC-YY-NNNNNN)."""
+
+    __tablename__ = "encounter_sequences"
+
+    year: Mapped[int] = mapped_column(Integer, primary_key=True)
+    last_number: Mapped[int] = mapped_column(Integer, default=0, server_default="0", nullable=False)
+
+
 class AppointmentStatus(StrEnum):
     """Appointment workflow status (APT-02)."""
 
@@ -580,6 +790,13 @@ class AppointmentStatus(StrEnum):
     NO_SHOW = "NO_SHOW"
     # Replaced by a new linked appointment (RF-11); the old row keeps its history.
     RESCHEDULED = "RESCHEDULED"
+    # Explicit OPD lifecycle statuses:
+    # TO_ARRIVE -> REGISTERED -> CHECKED_IN -> WAITING -> IN_CONSULTATION -> COMPLETED
+    TO_ARRIVE = "TO_ARRIVE"
+    REGISTERED = "REGISTERED"
+    CHECKED_IN = "CHECKED_IN"
+    WAITING = "WAITING"
+    COMPLETED = "COMPLETED"
 
 
 class ConsultationStatus(StrEnum):
@@ -606,6 +823,37 @@ class VisitStatus(StrEnum):
     CANCELLED = "CANCELLED"
 
 
+class VisitKind(StrEnum):
+    """Visit type of one consultation (OD-22-05). Recorded only; it never sets the fee."""
+
+    NEW = "NEW"
+    FOLLOW_UP = "FOLLOW_UP"
+
+
+class PriorityLevel(StrEnum):
+    """Queue classification set by reception (OD-22-06). It never changes the token."""
+
+    NORMAL = "NORMAL"
+    PRIORITY = "PRIORITY"
+    EMERGENCY = "EMERGENCY"
+
+
+class ReferralSource(StrEnum):
+    """Who referred the patient for this visit (OD-22-16)."""
+
+    SELF = "SELF"
+    DOCTOR = "DOCTOR"
+    PERSONAL = "PERSONAL"
+    ORGANIZATION = "ORGANIZATION"
+    OTHER = "OTHER"
+
+
+# Referral sources that must name the referrer (OD-22-16).
+REFERRAL_SOURCES_NEEDING_NAME = frozenset(
+    {ReferralSource.DOCTOR.value, ReferralSource.PERSONAL.value, ReferralSource.ORGANIZATION.value}
+)
+
+
 class DailyTokenSequence(Base):
     """Per-doctor daily sequential token counter for gap-free appointment allocation (APT-01)."""
 
@@ -627,6 +875,78 @@ class DailyTokenSequence(Base):
     )
 
 
+class PendingOpdArrival(Base):
+    """Token reservation for a first-time patient before canonical registration (OD-OPD-01).
+
+    This row holds only intake facts supplied at reception. It becomes a permanent Patient and
+    linked Appointment atomically when the full registration form is submitted. Token numbers
+    are reserved through DailyTokenSequence and retained on the resulting appointment.
+    """
+
+    __tablename__ = "pending_opd_arrivals"
+    __table_args__ = (
+        CheckConstraint("age_years >= 0 AND age_years <= 150", name="age_valid"),
+        CheckConstraint(
+            "priority_level IN ('NORMAL', 'PRIORITY', 'EMERGENCY')", name="priority_valid"
+        ),
+        CheckConstraint(
+            "priority_level = 'NORMAL' OR (priority_reason IS NOT NULL"
+            " AND length(trim(priority_reason)) >= 3)",
+            name="priority_reason_present",
+        ),
+        CheckConstraint("status IN ('TO_ARRIVE', 'REGISTERED', 'CANCELLED')", name="status_valid"),
+        UniqueConstraint(
+            "doctor_id", "appointment_date", "token_number", name="uq_pending_opd_arrival_token"
+        ),
+        Index("ix_pending_opd_arrivals_date_status", "appointment_date", "status"),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, Identity(always=False), primary_key=True)
+    full_name: Mapped[str] = mapped_column(String(120), nullable=False)
+    age_years: Mapped[int] = mapped_column(Integer, nullable=False)
+    mobile: Mapped[str] = mapped_column(String(15), nullable=False)
+    doctor_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("doctors.id", ondelete="RESTRICT"), nullable=False, index=True
+    )
+    department_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("departments.id", ondelete="RESTRICT"), nullable=False, index=True
+    )
+    appointment_date: Mapped[date] = mapped_column(Date, nullable=False)
+    token_number: Mapped[int] = mapped_column(Integer, nullable=False)
+    priority_level: Mapped[str] = mapped_column(
+        String(16), default=PriorityLevel.NORMAL.value, server_default="NORMAL", nullable=False
+    )
+    priority_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+    cancellation_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+    status: Mapped[str] = mapped_column(
+        String(16), default="TO_ARRIVE", server_default="TO_ARRIVE", nullable=False
+    )
+    patient_id: Mapped[int | None] = mapped_column(
+        BigInteger, ForeignKey("patients.id", ondelete="RESTRICT"), nullable=True, unique=True
+    )
+    appointment_id: Mapped[int | None] = mapped_column(
+        BigInteger, ForeignKey("appointments.id", ondelete="RESTRICT"), nullable=True, unique=True
+    )
+    created_by_user_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("users.id", ondelete="RESTRICT"), nullable=False
+    )
+    status_updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    version_id: Mapped[int] = mapped_column(Integer, default=1, server_default="1", nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
+    )
+
+    doctor: Mapped["Doctor"] = relationship("Doctor", lazy="joined")
+    department: Mapped["Department"] = relationship("Department", lazy="joined")
+
+    __mapper_args__ = {"version_id_col": version_id}
+
+
 class Visit(Base):
     """A patient's visit at reception on one day, opened at check-in (RF-10)."""
 
@@ -642,8 +962,20 @@ class Visit(Base):
             " AND cancelled_by_user_id IS NOT NULL AND cancel_reason IS NOT NULL)",
             name="cancelled_fields_present",
         ),
+        CheckConstraint(
+            "referral_source IS NULL OR referral_source IN"
+            " ('SELF', 'DOCTOR', 'PERSONAL', 'ORGANIZATION', 'OTHER')",
+            name="referral_source_valid",
+        ),
+        CheckConstraint(
+            "referral_source IS NULL OR referral_source NOT IN"
+            " ('DOCTOR', 'PERSONAL', 'ORGANIZATION')"
+            " OR (referrer_name IS NOT NULL AND length(trim(referrer_name)) >= 2)",
+            name="referrer_name_present",
+        ),
         # Target of fk_appointments_visit_patient (same-patient rule, as SEC-03).
         UniqueConstraint("id", "patient_id", name="uq_visits_id_patient"),
+        UniqueConstraint("visit_code", name="uq_visits_visit_code"),
         # At most one OPEN visit per patient at any time.
         Index(
             "ix_visits_one_open_per_patient",
@@ -655,6 +987,9 @@ class Visit(Base):
     )
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    visit_code: Mapped[str] = mapped_column(
+        String(16), nullable=False, server_default=FetchedValue()
+    )
     patient_id: Mapped[int] = mapped_column(
         BigInteger, ForeignKey("patients.id", ondelete="RESTRICT"), nullable=False
     )
@@ -681,6 +1016,16 @@ class Visit(Base):
     )
     cancelled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     cancel_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Referred By, recorded by the check-in that opened the visit (OD-22-16). Empty only on
+    # visits opened before phase 22.
+    referral_source: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    referrer_name: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    referral_recorded_by_user_id: Mapped[int | None] = mapped_column(
+        BigInteger, ForeignKey("users.id", ondelete="RESTRICT"), nullable=True
+    )
+    referral_recorded_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
     version_id: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
@@ -717,11 +1062,28 @@ class Appointment(Base):
             name="fk_appointments_visit_patient",
             ondelete="RESTRICT",
         ),
+        CheckConstraint(
+            "status IN ('BOOKED', 'ARRIVED', 'IN_CONSULTATION', 'DONE', 'CANCELLED', "
+            "'NO_SHOW', 'RESCHEDULED', 'TO_ARRIVE', 'REGISTERED', 'CHECKED_IN', "
+            "'WAITING', 'COMPLETED')",
+            name="status_valid",
+        ),
         CheckConstraint("source IS NULL OR source IN ('PHONE', 'WALK_IN')", name="source_valid"),
         CheckConstraint(
             "consultation_status IS NULL OR consultation_status IN"
             " ('WAITING', 'IN_CONSULTATION', 'COMPLETED', 'CANCELLED')",
             name="consultation_status_valid",
+        ),
+        CheckConstraint(
+            "visit_kind IS NULL OR visit_kind IN ('NEW', 'FOLLOW_UP')", name="visit_kind_valid"
+        ),
+        CheckConstraint(
+            "priority_level IN ('NORMAL', 'PRIORITY', 'EMERGENCY')", name="priority_level_valid"
+        ),
+        CheckConstraint(
+            "priority_level = 'NORMAL'"
+            " OR (priority_reason IS NOT NULL AND length(trim(priority_reason)) >= 3)",
+            name="priority_reason_present",
         ),
     )
 
@@ -759,6 +1121,32 @@ class Appointment(Base):
     consultation_status: Mapped[str | None] = mapped_column(String(16), nullable=True)
     cancellation_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Visit type (OD-22-05); empty on consultations recorded before phase 22.
+    visit_kind: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    # Classification (OD-22-06/07/09). The token never changes with it; history lives in
+    # consultation_priority_events.
+    priority_level: Mapped[str] = mapped_column(
+        String(16),
+        default=PriorityLevel.NORMAL.value,
+        server_default=text(f"'{PriorityLevel.NORMAL.value}'"),
+        nullable=False,
+    )
+    priority_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+    priority_updated_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    priority_updated_by_user_id: Mapped[int | None] = mapped_column(
+        BigInteger, ForeignKey("users.id", ondelete="RESTRICT"), nullable=True
+    )
+    emergency_alerted_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    alert_acknowledged_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    alert_acknowledged_by_user_id: Mapped[int | None] = mapped_column(
+        BigInteger, ForeignKey("users.id", ondelete="RESTRICT"), nullable=True
+    )
     created_by_user_id: Mapped[int] = mapped_column(
         BigInteger, ForeignKey("users.id", ondelete="RESTRICT"), nullable=False
     )
@@ -778,7 +1166,245 @@ class Appointment(Base):
     patient = relationship("Patient", lazy="joined")
     doctor = relationship("Doctor", lazy="joined")
     department = relationship("Department", lazy="joined")
-    created_by_user = relationship("User", lazy="joined")
+    created_by_user = relationship("User", foreign_keys=[created_by_user_id], lazy="joined")
+
+
+class PriorityEventType(StrEnum):
+    """What a classification history row records (OD-22-06/09)."""
+
+    CLASSIFIED = "CLASSIFIED"
+    ACKNOWLEDGED = "ACKNOWLEDGED"
+
+
+class ConsultationPriorityEvent(Base):
+    """Append-only history of classification changes and emergency acknowledgements.
+
+    The runtime role holds SELECT and INSERT only (migration 0026), so rows cannot be edited.
+    """
+
+    __tablename__ = "consultation_priority_events"
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["appointment_id", "patient_id"],
+            ["appointments.id", "appointments.patient_id"],
+            name="fk_consultation_priority_events_appointment_patient",
+            ondelete="RESTRICT",
+        ),
+        CheckConstraint("event IN ('CLASSIFIED', 'ACKNOWLEDGED')", name="event_valid"),
+        CheckConstraint(
+            "to_level IN ('NORMAL', 'PRIORITY', 'EMERGENCY')"
+            " AND (from_level IS NULL OR from_level IN ('NORMAL', 'PRIORITY', 'EMERGENCY'))",
+            name="levels_valid",
+        ),
+        Index("ix_consultation_priority_events_appointment", "appointment_id", "created_at"),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    appointment_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    visit_id: Mapped[int | None] = mapped_column(
+        BigInteger, ForeignKey("visits.id", ondelete="RESTRICT"), nullable=True
+    )
+    patient_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    doctor_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("doctors.id", ondelete="RESTRICT"), nullable=False
+    )
+    event: Mapped[str] = mapped_column(String(16), nullable=False)
+    from_level: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    to_level: Mapped[str] = mapped_column(String(16), nullable=False)
+    reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+    actor_user_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("users.id", ondelete="RESTRICT"), nullable=False
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+class BillItemCategory(StrEnum):
+    """Bill categories (OD-22-14, migration 0027/0029)."""
+
+    CONSULTATION = "CONSULTATION"
+    PROCEDURE = "PROCEDURE"
+    PACKAGE = "PACKAGE"
+    MEDICINE = "MEDICINE"
+    ADDITIONAL = "ADDITIONAL"
+
+
+class BillItemStatus(StrEnum):
+    """Status of a bill line (ACTIVE or VOIDED)."""
+
+    ACTIVE = "ACTIVE"
+    VOIDED = "VOIDED"
+
+
+class BillItemSource(StrEnum):
+    """Who created a bill line: the doctor, reception, or the system (the check-in snapshot)."""
+
+    DOCTOR = "DOCTOR"
+    RECEPTION = "RECEPTION"
+    SYSTEM = "SYSTEM"
+
+
+class BillItem(Base):
+    """One charge line on a visit's bill (Phase 22, design §4, OD-22-10).
+
+    A consultation's line stores the doctor's fee at check-in. Later fee changes never alter it,
+    so an existing bill cannot change when a doctor's default fee is edited (K-63, FEE-07).
+    Rows are append-only except the amount/status moves written with a history row in the same
+    transaction (migration 0027, 0028, 0029).
+    Amounts are integer paise.
+    """
+
+    __tablename__ = "bill_items"
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["visit_id", "patient_id"],
+            ["visits.id", "visits.patient_id"],
+            name="fk_bill_items_visit_patient",
+            ondelete="RESTRICT",
+        ),
+        ForeignKeyConstraint(
+            ["appointment_id", "patient_id"],
+            ["appointments.id", "appointments.patient_id"],
+            name="fk_bill_items_appointment_patient",
+            ondelete="RESTRICT",
+        ),
+        ForeignKeyConstraint(
+            ["treatment_plan_id", "patient_id"],
+            ["treatment_plans.id", "treatment_plans.patient_id"],
+            name="fk_bill_items_treatment_plan_patient",
+            ondelete="RESTRICT",
+        ),
+        CheckConstraint(
+            "category IN ('CONSULTATION', 'PROCEDURE', 'PACKAGE', 'MEDICINE', 'ADDITIONAL')",
+            name="category_valid",
+        ),
+        CheckConstraint("source IN ('DOCTOR', 'RECEPTION', 'SYSTEM')", name="source_valid"),
+        CheckConstraint("status IN ('ACTIVE', 'VOIDED')", name="status_valid"),
+        CheckConstraint(
+            "(status = 'ACTIVE' AND void_reason IS NULL AND voided_by_user_id IS NULL"
+            " AND voided_at IS NULL) "
+            "OR (status = 'VOIDED' AND void_reason IS NOT NULL"
+            " AND length(trim(void_reason)) >= 3 "
+            "AND voided_by_user_id IS NOT NULL AND voided_at IS NOT NULL)",
+            name="void_integrity",
+        ),
+        CheckConstraint("quantity > 0", name="quantity_positive"),
+        CheckConstraint("rate_paise >= 0 AND amount_paise >= 0", name="amounts_nonnegative"),
+        CheckConstraint(
+            "category <> 'CONSULTATION' OR appointment_id IS NOT NULL",
+            name="consultation_has_appointment",
+        ),
+        CheckConstraint(
+            "category <> 'PACKAGE' OR (treatment_plan_id IS NOT NULL AND rate_paise = 0"
+            " AND amount_paise = 0)",
+            name="package_reference",
+        ),
+        CheckConstraint(
+            "category = 'MEDICINE' OR prescription_item_id IS NULL",
+            name="prescription_link_medicine_only",
+        ),
+        Index("ix_bill_items_visit", "visit_id"),
+        Index("ix_bill_items_appointment", "appointment_id"),
+        # One consultation line per appointment: the snapshot is written once.
+        Index(
+            "uq_bill_items_consultation_appointment",
+            "appointment_id",
+            unique=True,
+            postgresql_where=text("category = 'CONSULTATION'"),
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    visit_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    patient_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    appointment_id: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    treatment_plan_id: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    prescription_item_id: Mapped[int | None] = mapped_column(
+        BigInteger, ForeignKey("prescription_items.id", ondelete="SET NULL"), nullable=True
+    )
+    category: Mapped[str] = mapped_column(String(16), nullable=False)
+    source: Mapped[str] = mapped_column(String(16), nullable=False)
+    status: Mapped[str] = mapped_column(
+        String(16),
+        default=BillItemStatus.ACTIVE.value,
+        server_default=text(f"'{BillItemStatus.ACTIVE.value}'"),
+        nullable=False,
+    )
+    description: Mapped[str] = mapped_column(Text, nullable=False)
+    unit: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    quantity: Mapped[Decimal] = mapped_column(
+        Numeric(10, 2), nullable=False, server_default=text("1")
+    )
+    rate_paise: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    # The amount as first billed (design §4). amount_paise moves only through a logged adjustment.
+    original_amount_paise: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    amount_paise: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    void_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+    voided_by_user_id: Mapped[int | None] = mapped_column(
+        BigInteger, ForeignKey("users.id", ondelete="RESTRICT"), nullable=True
+    )
+    voided_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_by_user_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("users.id", ondelete="RESTRICT"), nullable=False
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+class BillItemAdjustmentKind(StrEnum):
+    """Why a bill line changed: discount, waiver, correction, or void (OD-22-11, OD-22-15)."""
+
+    DISCOUNT = "DISCOUNT"
+    WAIVER = "WAIVER"
+    CORRECTION = "CORRECTION"
+    VOID = "VOID"
+
+
+class BillItemAdjustment(Base):
+    """Append-only history of bill line changes (design §4, OD-22-11, OD-22-15).
+
+    The line keeps its current amount; every change writes one row with the value it replaced,
+    the reason, the staff member and the time. Rows cannot be updated or deleted by the app.
+    """
+
+    __tablename__ = "bill_item_adjustments"
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["bill_item_id"],
+            ["bill_items.id"],
+            name="fk_bill_item_adjustments_bill_item",
+            ondelete="RESTRICT",
+        ),
+        CheckConstraint(
+            "kind IN ('DISCOUNT', 'WAIVER', 'CORRECTION', 'VOID')",
+            name="kind_valid",
+        ),
+        CheckConstraint("length(trim(reason)) >= 3", name="reason_present"),
+        CheckConstraint(
+            "old_amount_paise >= 0 AND new_amount_paise >= 0",
+            name="amounts_nonnegative",
+        ),
+        Index("ix_bill_item_adjustments_bill_item", "bill_item_id"),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    bill_item_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    old_quantity: Mapped[Decimal] = mapped_column(Numeric(10, 2), nullable=False)
+    new_quantity: Mapped[Decimal] = mapped_column(Numeric(10, 2), nullable=False)
+    old_rate_paise: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    new_rate_paise: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    old_amount_paise: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    new_amount_paise: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    kind: Mapped[str] = mapped_column(String(16), nullable=False)
+    reason: Mapped[str] = mapped_column(Text, nullable=False)
+    actor_user_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("users.id", ondelete="RESTRICT"), nullable=False
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
 
 
 class ClinicalEncounter(Base):
@@ -790,12 +1416,14 @@ class ClinicalEncounter(Base):
         Index("ix_encounters_doctor_id", "doctor_id"),
         Index("ix_encounters_encounter_date", "encounter_date"),
         Index("ix_encounters_appointment_id", "appointment_id"),
+        Index("ix_clinical_encounters_visit_id", "visit_id"),
         Index(
             "uq_clinical_encounters_appointment_id",
             "appointment_id",
             unique=True,
             postgresql_where=text("appointment_id IS NOT NULL"),
         ),
+        UniqueConstraint("encounter_code", name="uq_clinical_encounters_encounter_code"),
         # Target of the prescription and treatment-plan patient-link constraints (SEC-03).
         UniqueConstraint("id", "patient_id", name="uq_clinical_encounters_id_patient"),
         # BR-001, SEC-03: a linked appointment must belong to the same patient. Deleting the
@@ -806,9 +1434,20 @@ class ClinicalEncounter(Base):
             name="fk_clinical_encounters_appointment_patient",
             ondelete="SET NULL (appointment_id)",
         ),
+        # Same-patient rule for visit link; PG15 ON DELETE SET NULL (visit_id) enforced in 0034.
+        ForeignKeyConstraint(
+            ["visit_id", "patient_id"],
+            ["visits.id", "visits.patient_id"],
+            name="fk_clinical_encounters_visit_patient",
+            ondelete="SET NULL (visit_id)",
+        ),
     )
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    encounter_code: Mapped[str] = mapped_column(
+        String(16), nullable=False, server_default=FetchedValue()
+    )
+    visit_id: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
     appointment_id: Mapped[int | None] = mapped_column(
         BigInteger, ForeignKey("appointments.id", ondelete="SET NULL"), nullable=True
     )
@@ -913,6 +1552,345 @@ class ClinicalAddendum(Base):
     encounter = relationship("ClinicalEncounter", back_populates="addenda")
     doctor = relationship("Doctor", lazy="joined")
     created_by_user = relationship("User", lazy="joined")
+
+
+class DiagnosisType(StrEnum):
+    """Clinical classification of a structured encounter diagnosis."""
+
+    PRIMARY = "PRIMARY"
+    SECONDARY = "SECONDARY"
+    PROVISIONAL = "PROVISIONAL"
+
+
+class DiagnosisStatus(StrEnum):
+    """Clinical status of a structured encounter diagnosis."""
+
+    ACTIVE = "ACTIVE"
+    RESOLVED = "RESOLVED"
+    INACTIVE = "INACTIVE"
+
+
+class EncounterDiagnosis(Base):
+    """Structured per-encounter diagnosis locked once the parent encounter is finalised."""
+
+    __tablename__ = "encounter_diagnoses"
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["encounter_id", "patient_id"],
+            ["clinical_encounters.id", "clinical_encounters.patient_id"],
+            name="fk_encounter_diagnoses_encounter_patient",
+            ondelete="RESTRICT",
+        ),
+        # Same-patient rule for condition link; PG15 ON DELETE SET NULL (patient_condition_id)
+        # enforced in migration 0035.
+        ForeignKeyConstraint(
+            ["patient_condition_id", "patient_id"],
+            ["patient_conditions.id", "patient_conditions.patient_id"],
+            name="fk_encounter_diagnoses_condition_patient",
+            ondelete="SET NULL (patient_condition_id)",
+        ),
+        CheckConstraint(
+            "diagnosis_type IN ('PRIMARY', 'SECONDARY', 'PROVISIONAL')",
+            name="type_valid",
+        ),
+        CheckConstraint(
+            "status IN ('ACTIVE', 'RESOLVED', 'INACTIVE')",
+            name="status_valid",
+        ),
+        Index("ix_encounter_diagnoses_encounter_id", "encounter_id"),
+        Index("ix_encounter_diagnoses_patient_id", "patient_id"),
+        Index("ix_encounter_diagnoses_condition_id", "patient_condition_id"),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, Identity(always=False), primary_key=True)
+    encounter_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    patient_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    doctor_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("doctors.id", ondelete="RESTRICT"), nullable=False
+    )
+    diagnosis_name: Mapped[str] = mapped_column(String(200), nullable=False)
+    icd10_code: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    diagnosis_type: Mapped[str] = mapped_column(
+        String(16),
+        default=DiagnosisType.PRIMARY.value,
+        server_default=text(f"'{DiagnosisType.PRIMARY.value}'"),
+        nullable=False,
+    )
+    status: Mapped[str] = mapped_column(
+        String(16),
+        default=DiagnosisStatus.ACTIVE.value,
+        server_default=text(f"'{DiagnosisStatus.ACTIVE.value}'"),
+        nullable=False,
+    )
+    onset_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    patient_condition_id: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
+
+    doctor = relationship("Doctor", foreign_keys=[doctor_id], lazy="select")
+    patient_condition = relationship(
+        "PatientCondition",
+        foreign_keys=[patient_condition_id, patient_id],
+        primaryjoin=(
+            "and_(EncounterDiagnosis.patient_condition_id == PatientCondition.id, "
+            "EncounterDiagnosis.patient_id == PatientCondition.patient_id)"
+        ),
+        viewonly=True,
+        lazy="select",
+    )
+
+
+class InvestigationCategory(StrEnum):
+    """Clinical investigation order category."""
+
+    LAB = "LAB"
+    IMAGING = "IMAGING"
+    PATHOLOGY = "PATHOLOGY"
+    DIAGNOSTIC = "DIAGNOSTIC"
+    OTHER = "OTHER"
+
+
+class InvestigationPriority(StrEnum):
+    """Clinical urgency of an investigation order."""
+
+    ROUTINE = "ROUTINE"
+    URGENT = "URGENT"
+
+
+class InvestigationStatus(StrEnum):
+    """Lifecycle status of an investigation order."""
+
+    ORDERED = "ORDERED"
+    SAMPLE_COLLECTED = "SAMPLE_COLLECTED"
+    COMPLETED = "COMPLETED"
+    CANCELLED = "CANCELLED"
+
+
+class InvestigationOrder(Base):
+    """Doctor-ordered clinical investigation linked to an encounter and patient."""
+
+    __tablename__ = "investigation_orders"
+    __table_args__ = (
+        UniqueConstraint("id", "patient_id", name="uq_investigation_orders_id_patient"),
+        ForeignKeyConstraint(
+            ["encounter_id", "patient_id"],
+            ["clinical_encounters.id", "clinical_encounters.patient_id"],
+            name="fk_investigation_orders_encounter_patient",
+            ondelete="RESTRICT",
+        ),
+        CheckConstraint(
+            "category IN ('LAB', 'IMAGING', 'PATHOLOGY', 'DIAGNOSTIC', 'OTHER')",
+            name="category_valid",
+        ),
+        CheckConstraint(
+            "priority IN ('ROUTINE', 'URGENT')",
+            name="priority_valid",
+        ),
+        CheckConstraint(
+            "status IN ('ORDERED', 'SAMPLE_COLLECTED', 'COMPLETED', 'CANCELLED')",
+            name="status_valid",
+        ),
+        CheckConstraint(
+            "(status = 'CANCELLED' AND length(trim(coalesce(cancelled_reason, ''))) >= 3) "
+            "OR status <> 'CANCELLED'",
+            name="cancel_reason_required",
+        ),
+        Index("ix_investigation_orders_encounter_id", "encounter_id"),
+        Index("ix_investigation_orders_patient_status", "patient_id", "status"),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, Identity(always=False), primary_key=True)
+    encounter_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    patient_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    doctor_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("doctors.id", ondelete="RESTRICT"), nullable=False
+    )
+    category: Mapped[str] = mapped_column(String(24), nullable=False)
+    test_name: Mapped[str] = mapped_column(String(200), nullable=False)
+    instructions: Mapped[str | None] = mapped_column(Text, nullable=True)
+    priority: Mapped[str] = mapped_column(
+        String(16),
+        default=InvestigationPriority.ROUTINE.value,
+        server_default=text(f"'{InvestigationPriority.ROUTINE.value}'"),
+        nullable=False,
+    )
+    status: Mapped[str] = mapped_column(
+        String(24),
+        default=InvestigationStatus.ORDERED.value,
+        server_default=text(f"'{InvestigationStatus.ORDERED.value}'"),
+        nullable=False,
+    )
+    cancelled_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+    ordered_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
+    version_id: Mapped[int] = mapped_column(Integer, default=1, server_default="1", nullable=False)
+
+    __mapper_args__ = {"version_id_col": version_id}
+
+    doctor = relationship("Doctor", foreign_keys=[doctor_id], lazy="select")
+    results: Mapped[list["InvestigationResult"]] = relationship(
+        "InvestigationResult",
+        back_populates="order",
+        order_by="desc(InvestigationResult.reported_at), desc(InvestigationResult.id)",
+        lazy="select",
+    )
+
+
+class InvestigationResult(Base):
+    """Append-only investigation result recorded against an investigation order."""
+
+    __tablename__ = "investigation_results"
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["order_id", "patient_id"],
+            ["investigation_orders.id", "investigation_orders.patient_id"],
+            name="fk_investigation_results_order_patient",
+            ondelete="RESTRICT",
+        ),
+        Index("ix_investigation_results_order_id", "order_id"),
+        Index("ix_investigation_results_patient_id", "patient_id"),
+        Index("ix_investigation_results_document_id", "document_id"),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, Identity(always=False), primary_key=True)
+    order_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    patient_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    document_id: Mapped[int | None] = mapped_column(
+        BigInteger, ForeignKey("patient_documents.id", ondelete="SET NULL"), nullable=True
+    )
+    summary_text: Mapped[str] = mapped_column(Text, nullable=False)
+    result_value: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    unit: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    reference_range: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    is_abnormal: Mapped[bool] = mapped_column(
+        Boolean, default=False, server_default=text("false"), nullable=False
+    )
+    reported_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    recorded_by_user_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("users.id", ondelete="RESTRICT"), nullable=False
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    order = relationship("InvestigationOrder", back_populates="results", lazy="select")
+    document = relationship("PatientDocument", foreign_keys=[document_id], lazy="select")
+    recorded_by_user = relationship("User", foreign_keys=[recorded_by_user_id], lazy="joined")
+
+
+class DocumentCategory(StrEnum):
+    """Document categories for patient attachments (Milestone 4, migration 0037)."""
+
+    LAB_REPORT = "LAB_REPORT"
+    IMAGING = "IMAGING"
+    PRESCRIPTION_SCAN = "PRESCRIPTION_SCAN"
+    REFERRAL = "REFERRAL"
+    ID_PROOF = "ID_PROOF"
+    INSURANCE = "INSURANCE"
+    DISCHARGE_SUMMARY = "DISCHARGE_SUMMARY"
+    OTHER = "OTHER"
+
+
+class PatientDocument(Base):
+    """Patient-attached clinical or administrative document stored locally (Milestone 4)."""
+
+    __tablename__ = "patient_documents"
+    __table_args__ = (
+        UniqueConstraint("stored_filename", name="uq_patient_documents_stored_filename"),
+        # Same-patient composite FKs; PG15 ON DELETE SET NULL (visit_id / encounter_id)
+        # enforced in migration 0037.
+        ForeignKeyConstraint(
+            ["visit_id", "patient_id"],
+            ["visits.id", "visits.patient_id"],
+            name="fk_patient_documents_visit_patient",
+            ondelete="SET NULL (visit_id)",
+        ),
+        ForeignKeyConstraint(
+            ["encounter_id", "patient_id"],
+            ["clinical_encounters.id", "clinical_encounters.patient_id"],
+            name="fk_patient_documents_encounter_patient",
+            ondelete="SET NULL (encounter_id)",
+        ),
+        CheckConstraint(
+            "category IN ("
+            "'LAB_REPORT', 'IMAGING', 'PRESCRIPTION_SCAN', 'REFERRAL', "
+            "'ID_PROOF', 'INSURANCE', 'DISCHARGE_SUMMARY', 'OTHER')",
+            name="category_valid",
+        ),
+        CheckConstraint(
+            "category NOT IN ('LAB_REPORT', 'IMAGING', 'PRESCRIPTION_SCAN', 'DISCHARGE_SUMMARY') "
+            "OR is_clinical = TRUE",
+            name="clinical_category",
+        ),
+        CheckConstraint(
+            "mime_type IN ('application/pdf', 'image/jpeg', 'image/png')",
+            name="mime_type_valid",
+        ),
+        CheckConstraint(
+            "file_size_bytes > 0 AND file_size_bytes <= 10485760",
+            name="file_size_valid",
+        ),
+        Index(
+            "ix_patient_documents_patient_active",
+            "patient_id",
+            "is_archived",
+            text("created_at DESC"),
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, Identity(always=False), primary_key=True)
+    patient_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("patients.id", ondelete="RESTRICT"), nullable=False
+    )
+    visit_id: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    encounter_id: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    title: Mapped[str] = mapped_column(String(160), nullable=False)
+    category: Mapped[str] = mapped_column(String(32), nullable=False)
+    is_clinical: Mapped[bool] = mapped_column(Boolean, nullable=False)
+    original_filename: Mapped[str] = mapped_column(String(255), nullable=False)
+    stored_filename: Mapped[str] = mapped_column(String(128), nullable=False)
+    mime_type: Mapped[str] = mapped_column(String(100), nullable=False)
+    file_size_bytes: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    sha256_hex: Mapped[str] = mapped_column(CHAR(64), nullable=False)
+    notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    uploaded_by_user_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("users.id", ondelete="RESTRICT"), nullable=False
+    )
+    doctor_id: Mapped[int | None] = mapped_column(
+        BigInteger, ForeignKey("doctors.id", ondelete="RESTRICT"), nullable=True
+    )
+    is_archived: Mapped[bool] = mapped_column(
+        Boolean, default=False, server_default=text("false"), nullable=False
+    )
+    archived_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    archived_by_user_id: Mapped[int | None] = mapped_column(
+        BigInteger, ForeignKey("users.id", ondelete="RESTRICT"), nullable=True
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    patient = relationship("Patient", foreign_keys=[patient_id], lazy="select")
+    doctor = relationship("Doctor", foreign_keys=[doctor_id], lazy="select")
+    uploaded_by_user = relationship("User", foreign_keys=[uploaded_by_user_id], lazy="select")
+    archived_by_user = relationship("User", foreign_keys=[archived_by_user_id], lazy="select")
 
 
 class TreatmentPlanStatus(StrEnum):
@@ -1102,6 +2080,7 @@ class PrescriptionStatus(StrEnum):
 
     DRAFT = "DRAFT"
     AUTHORISED = "AUTHORISED"
+    SUPERSEDED = "SUPERSEDED"
     CANCELLED = "CANCELLED"
 
 
@@ -1122,8 +2101,10 @@ class Prescription(Base):
         ),
         CheckConstraint("length(trim(diagnosis)) >= 2", name="ck_prescriptions_diagnosis"),
         CheckConstraint(
-            "status IN ('DRAFT', 'AUTHORISED', 'CANCELLED')", name="ck_prescriptions_status"
+            "status IN ('DRAFT', 'AUTHORISED', 'SUPERSEDED', 'CANCELLED')",
+            name="status",
         ),
+        CheckConstraint("revision_number >= 1", name="revision_positive"),
         CheckConstraint(
             "(status != 'CANCELLED' AND cancelled_at IS NULL AND cancellation_reason IS NULL AND "
             "cancelled_by_user_id IS NULL) "
@@ -1136,6 +2117,12 @@ class Prescription(Base):
             "encounter_id",
             unique=True,
             postgresql_where=text("encounter_id IS NOT NULL AND status IN ('DRAFT', 'AUTHORISED')"),
+        ),
+        Index(
+            "uq_prescriptions_supersedes",
+            "supersedes_prescription_id",
+            unique=True,
+            postgresql_where=text("supersedes_prescription_id IS NOT NULL"),
         ),
     )
 
@@ -1163,6 +2150,13 @@ class Prescription(Base):
         server_default=text("'AUTHORISED'"),
         nullable=False,
     )
+    revision_number: Mapped[int] = mapped_column(
+        Integer, default=1, server_default=text("1"), nullable=False
+    )
+    supersedes_prescription_id: Mapped[int | None] = mapped_column(
+        BigInteger, ForeignKey("prescriptions.id", ondelete="RESTRICT"), nullable=True
+    )
+    amendment_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
     authorised_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     cancelled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     cancelled_by_user_id: Mapped[int | None] = mapped_column(
@@ -1253,10 +2247,12 @@ class Payment(Base):
 
     __tablename__ = "payments"
     __table_args__ = (
+        UniqueConstraint("id", "patient_id", name="uq_payments_id_patient"),
         Index("ix_payments_receipt_number", "receipt_number"),
         Index("ix_payments_patient_id", "patient_id"),
         Index("ix_payments_treatment_plan_id", "treatment_plan_id"),
         Index("ix_payments_appointment_id", "appointment_id"),
+        Index("ix_payments_visit_id", "visit_id"),
         Index("ix_payments_is_reversed", "is_reversed"),
         CheckConstraint("amount_paise > 0", name="ck_payments_amount_positive"),
         CheckConstraint(
@@ -1271,6 +2267,10 @@ class Payment(Base):
             "reversed_by_user_id IS NOT NULL AND reversed_at IS NOT NULL)",
             name="ck_payments_reversal_integrity",
         ),
+        CheckConstraint(
+            "visit_id IS NULL OR (treatment_plan_id IS NULL AND appointment_id IS NULL)",
+            name="single_target",
+        ),
         # FB-04 / SEC-03: payments must belong to the treatment plan / appointment's patient
         ForeignKeyConstraint(
             ["treatment_plan_id", "patient_id"],
@@ -1283,6 +2283,12 @@ class Payment(Base):
             ["appointments.id", "appointments.patient_id"],
             name="fk_payments_appointment_patient",
             ondelete="SET NULL (appointment_id)",
+        ),
+        ForeignKeyConstraint(
+            ["visit_id", "patient_id"],
+            ["visits.id", "visits.patient_id"],
+            name="fk_payments_visit_patient",
+            ondelete="RESTRICT",
         ),
     )
 
@@ -1301,7 +2307,8 @@ class Payment(Base):
     appointment_id: Mapped[int | None] = mapped_column(
         BigInteger, ForeignKey("appointments.id", ondelete="SET NULL"), nullable=True
     )
-    amount_paise: Mapped[int] = mapped_column(Integer, nullable=False)
+    visit_id: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    amount_paise: Mapped[int] = mapped_column(BigInteger, nullable=False)
     payment_method: Mapped[str] = mapped_column(String(16), nullable=False)
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     is_reversed: Mapped[bool] = mapped_column(
@@ -1324,6 +2331,170 @@ class Payment(Base):
     appointment = relationship("Appointment", foreign_keys=[appointment_id], lazy="select")
     created_by_user = relationship("User", foreign_keys=[created_by_user_id], lazy="joined")
     reversed_by_user = relationship("User", foreign_keys=[reversed_by_user_id], lazy="joined")
+
+
+class LedgerEntryType(StrEnum):
+    """Event types recorded in the immutable financial ledger (migration 0036)."""
+
+    CHARGE = "CHARGE"
+    CHARGE_ADJUSTMENT = "CHARGE_ADJUSTMENT"
+    CHARGE_VOID = "CHARGE_VOID"
+    PACKAGE_CHARGE = "PACKAGE_CHARGE"
+    PACKAGE_ADJUSTMENT = "PACKAGE_ADJUSTMENT"
+    LEGACY_CHARGE = "LEGACY_CHARGE"
+    PAYMENT = "PAYMENT"
+    PAYMENT_REVERSAL = "PAYMENT_REVERSAL"
+    REFUND = "REFUND"
+
+
+class LedgerDirection(StrEnum):
+    """Signed direction of a financial ledger entry (DEBIT = +payable, CREDIT = -payable)."""
+
+    DEBIT = "DEBIT"
+    CREDIT = "CREDIT"
+
+
+class LedgerReferenceType(StrEnum):
+    """Source entity type referenced by a financial ledger entry."""
+
+    BILL_ITEM = "BILL_ITEM"
+    BILL_ITEM_ADJUSTMENT = "BILL_ITEM_ADJUSTMENT"
+    TREATMENT_PLAN = "TREATMENT_PLAN"
+    APPOINTMENT = "APPOINTMENT"
+    PAYMENT = "PAYMENT"
+    REFUND = "REFUND"
+
+
+class RefundSequence(Base):
+    """Financial-year scoped atomic sequence counter for refund numbers (RFN-FY-NNNNNN)."""
+
+    __tablename__ = "refund_sequences"
+
+    cycle_key: Mapped[str] = mapped_column(String(16), primary_key=True)
+    last_number: Mapped[int] = mapped_column(Integer, default=0, server_default="0", nullable=False)
+
+
+class Refund(Base):
+    """Immutable Admin-only partial or full refund against a posted payment (D-06)."""
+
+    __tablename__ = "refunds"
+    __table_args__ = (
+        UniqueConstraint("refund_number", name="uq_refunds_refund_number"),
+        ForeignKeyConstraint(
+            ["payment_id", "patient_id"],
+            ["payments.id", "payments.patient_id"],
+            name="fk_refunds_payment_patient",
+            ondelete="RESTRICT",
+        ),
+        ForeignKeyConstraint(
+            ["visit_id", "patient_id"],
+            ["visits.id", "visits.patient_id"],
+            name="fk_refunds_visit_patient",
+            ondelete="RESTRICT",
+        ),
+        CheckConstraint("amount_paise > 0", name="amount_positive"),
+        CheckConstraint("refund_method IN ('CASH', 'UPI', 'CARD')", name="method_valid"),
+        CheckConstraint("length(trim(reason)) >= 5", name="reason_min_len"),
+        Index("ix_refunds_payment_id", "payment_id"),
+        Index("ix_refunds_patient_id", "patient_id"),
+        Index("ix_refunds_visit_id", "visit_id"),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, Identity(always=False), primary_key=True)
+    refund_number: Mapped[str] = mapped_column(String(32), nullable=False)
+    payment_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    patient_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    visit_id: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    amount_paise: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    refund_method: Mapped[str] = mapped_column(String(16), nullable=False)
+    reason: Mapped[str] = mapped_column(Text, nullable=False)
+    refunded_by_user_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("users.id", ondelete="RESTRICT"), nullable=False
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    payment = relationship(
+        "Payment",
+        primaryjoin="Refund.payment_id == Payment.id",
+        foreign_keys=[payment_id],
+        viewonly=True,
+        lazy="select",
+    )
+    refunded_by_user = relationship("User", foreign_keys=[refunded_by_user_id], lazy="joined")
+
+
+class LedgerEntry(Base):
+    """Append-only financial ledger entry tracking charges, payments, reversals, and refunds."""
+
+    __tablename__ = "ledger_entries"
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["visit_id", "patient_id"],
+            ["visits.id", "visits.patient_id"],
+            name="fk_ledger_entries_visit_patient",
+            ondelete="RESTRICT",
+        ),
+        CheckConstraint(
+            "entry_type IN ("
+            "'CHARGE', 'CHARGE_ADJUSTMENT', 'CHARGE_VOID', "
+            "'PACKAGE_CHARGE', 'PACKAGE_ADJUSTMENT', 'LEGACY_CHARGE', "
+            "'PAYMENT', 'PAYMENT_REVERSAL', 'REFUND')",
+            name="entry_type_valid",
+        ),
+        CheckConstraint("direction IN ('DEBIT', 'CREDIT')", name="direction_valid"),
+        CheckConstraint("amount_paise > 0", name="amount_positive"),
+        CheckConstraint(
+            "(direction = 'DEBIT' AND signed_amount_paise = amount_paise) OR "
+            "(direction = 'CREDIT' AND signed_amount_paise = -amount_paise)",
+            name="signed_matches_direction",
+        ),
+        CheckConstraint(
+            "reference_type IN ("
+            "'BILL_ITEM', 'BILL_ITEM_ADJUSTMENT', 'TREATMENT_PLAN', "
+            "'APPOINTMENT', 'PAYMENT', 'REFUND')",
+            name="reference_type_valid",
+        ),
+        Index(
+            "uq_ledger_ref_event",
+            "reference_type",
+            "reference_id",
+            "entry_type",
+            unique=True,
+            postgresql_where=text("entry_type <> 'PACKAGE_ADJUSTMENT'"),
+        ),
+        Index(
+            "ix_ledger_entries_patient_occurred",
+            "patient_id",
+            text("occurred_at DESC"),
+            text("id DESC"),
+        ),
+        Index("ix_ledger_entries_visit", "visit_id"),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, Identity(always=False), primary_key=True)
+    patient_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("patients.id", ondelete="RESTRICT"), nullable=False
+    )
+    visit_id: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    entry_type: Mapped[str] = mapped_column(String(24), nullable=False)
+    direction: Mapped[str] = mapped_column(String(8), nullable=False)
+    amount_paise: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    signed_amount_paise: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    reference_type: Mapped[str] = mapped_column(String(32), nullable=False)
+    reference_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    description: Mapped[str] = mapped_column(Text, nullable=False)
+    actor_user_id: Mapped[int | None] = mapped_column(
+        BigInteger, ForeignKey("users.id", ondelete="RESTRICT"), nullable=True
+    )
+    occurred_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    patient = relationship("Patient", foreign_keys=[patient_id], lazy="select")
+    actor_user = relationship("User", foreign_keys=[actor_user_id], lazy="select")
 
 
 class ClinicalTemplate(Base):
@@ -1793,3 +2964,159 @@ class IntegrityRun(Base):
     checks: Mapped[list] = mapped_column(JSONB, nullable=False)
 
     __table_args__ = (Index("ix_integrity_runs_generated_at", "generated_at"),)
+
+
+class Workstation(Base):
+    """LAN terminal workstation registry and heartbeat status (Phase 23)."""
+
+    __tablename__ = "workstations"
+    __table_args__ = (
+        Index("ix_workstations_hostname", "hostname"),
+        Index("ix_workstations_last_seen_at", "last_seen_at"),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, Identity(always=False), primary_key=True)
+    hostname: Mapped[str] = mapped_column(String(120), unique=True, nullable=False)
+    ip_address: Mapped[str] = mapped_column(String(64), nullable=False)
+    terminal_name: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    app_version: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    last_seen_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    last_user_id: Mapped[int | None] = mapped_column(
+        BigInteger, ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    last_username: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
+
+
+class IdempotencyKey(Base):
+    """Short-lived (24h TTL) request idempotency cache for reception mutation endpoints."""
+
+    __tablename__ = "idempotency_keys"
+    __table_args__ = (
+        UniqueConstraint(
+            "actor_user_id",
+            "endpoint_key",
+            "idempotency_key",
+            name="uq_idempotency_keys_scope",
+        ),
+        Index("ix_idempotency_keys_expires_at", "expires_at"),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, Identity(always=False), primary_key=True)
+    actor_user_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    endpoint_key: Mapped[str] = mapped_column(String(128), nullable=False)
+    idempotency_key: Mapped[str] = mapped_column(String(128), nullable=False)
+    request_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    response_status: Mapped[int] = mapped_column(SmallInteger, nullable=False)
+    response_body: Mapped[dict] = mapped_column(JSONB(astext_type=Text()), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=text("now()"), nullable=False
+    )
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+
+class QuickPhraseScope(StrEnum):
+    """Ownership scope for clinical quick phrases."""
+
+    PERSONAL = "PERSONAL"
+    HOSPITAL_DEFAULT = "HOSPITAL_DEFAULT"
+
+
+class QuickPhraseSection(StrEnum):
+    """Clinical encounter section where a quick phrase appears."""
+
+    COMPLAINTS = "COMPLAINTS"
+    EXAMINATION = "EXAMINATION"
+    DIAGNOSIS = "DIAGNOSIS"
+    ADVICE = "ADVICE"
+
+
+class ClinicalQuickPhrase(Base):
+    """Persistent clinical quick phrases (hospital defaults + per-doctor personal phrases)."""
+
+    __tablename__ = "clinical_quick_phrases"
+    __table_args__ = (
+        CheckConstraint(
+            "scope IN ('PERSONAL', 'HOSPITAL_DEFAULT')",
+            name="scope_valid",
+        ),
+        CheckConstraint(
+            "section IN ('COMPLAINTS', 'EXAMINATION', 'DIAGNOSIS', 'ADVICE')",
+            name="section_valid",
+        ),
+        CheckConstraint(
+            "(scope = 'PERSONAL' AND doctor_id IS NOT NULL) "
+            "OR (scope = 'HOSPITAL_DEFAULT' AND doctor_id IS NULL)",
+            name="scope_doctor_consistency",
+        ),
+        CheckConstraint(
+            "length(trim(phrase_text)) >= 2",
+            name="phrase_text_nonblank",
+        ),
+        Index(
+            "ix_clinical_quick_phrases_personal",
+            "scope",
+            "doctor_id",
+            "section",
+            "is_active",
+        ),
+        Index(
+            "ix_clinical_quick_phrases_default",
+            "scope",
+            "department_code",
+            "section",
+            "is_active",
+        ),
+        Index(
+            "ix_quick_phrases_default_dept",
+            "department_code",
+            "section",
+            "phrase_text",
+            unique=True,
+            postgresql_where=text("scope = 'HOSPITAL_DEFAULT' AND department_code IS NOT NULL"),
+        ),
+        Index(
+            "ix_quick_phrases_default_global",
+            "section",
+            "phrase_text",
+            unique=True,
+            postgresql_where=text("scope = 'HOSPITAL_DEFAULT' AND department_code IS NULL"),
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, Identity(always=False), primary_key=True)
+    scope: Mapped[str] = mapped_column(String(24), nullable=False)
+    doctor_id: Mapped[int | None] = mapped_column(
+        BigInteger, ForeignKey("doctors.id", ondelete="CASCADE"), nullable=True
+    )
+    department_id: Mapped[int | None] = mapped_column(
+        BigInteger, ForeignKey("departments.id", ondelete="SET NULL"), nullable=True
+    )
+    department_code: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    section: Mapped[str] = mapped_column(String(24), nullable=False)
+    phrase_text: Mapped[str] = mapped_column(String(240), nullable=False)
+    sort_order: Mapped[int] = mapped_column(
+        Integer, default=0, server_default=text("0"), nullable=False
+    )
+    is_active: Mapped[bool] = mapped_column(
+        Boolean, default=True, server_default=text("true"), nullable=False
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=text("now()"), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=text("now()"),
+        onupdate=func.now(),
+        nullable=False,
+    )

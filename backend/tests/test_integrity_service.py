@@ -22,8 +22,12 @@ def test_integrity_audit_clean_database(db_session):
         for f in settings.assets_dir.glob("*"):
             if f.is_file() and not f.name.startswith("test_"):
                 f.unlink()
+    if settings.documents_dir.exists():
+        for f in settings.documents_dir.glob("*"):
+            if f.is_file() and not f.name.startswith("test_"):
+                f.unlink()
     report = run_integrity_audit(db_session, settings)
-    assert report.total_checks == 7
+    assert report.total_checks == 9
     assert report.is_healthy is True
     assert report.failed_checks == 0
     assert all(c.passed for c in report.checks)
@@ -102,10 +106,14 @@ def test_cleanup_only_findings_leave_the_report_healthy(db_session, tmp_path: Pa
     """Clutter is counted separately and does not make the report unhealthy."""
     photos = tmp_path / "photos"
     assets = tmp_path / "assets"
+    documents = tmp_path / "documents"
     photos.mkdir()
     assets.mkdir()
+    documents.mkdir(exist_ok=True)
     (photos / "stray.jpg").write_bytes(b"x")
-    settings = get_settings().model_copy(update={"photos_dir": photos, "assets_dir": assets})
+    settings = get_settings().model_copy(
+        update={"photos_dir": photos, "assets_dir": assets, "documents_dir": documents}
+    )
 
     report = run_integrity_audit(db_session, settings)
     assert report.cleanup_checks == 1

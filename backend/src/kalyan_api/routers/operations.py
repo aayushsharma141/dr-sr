@@ -60,6 +60,7 @@ from kalyan_api.services.backup_service import (
     InvalidBackupLabelError,
     InvalidDestinationDirError,
     create_backup,
+    read_manifest,
     resolve_archive_in_dir,
     restore_backup,
     validate_destination_dir,
@@ -225,15 +226,43 @@ def trigger_backup(
     is_valid, _, manifest = verify_backup_bundle(archive_path)
     stat = archive_path.stat()
 
+    if not is_valid:
+        session.add(
+            BackupRun(
+                trigger="MANUAL",
+                outcome="FAILURE",
+                started_at=started_at,
+                finished_at=clock.utcnow(),
+                filename=archive_path.name,
+                size_bytes=stat.st_size,
+                error_type="BackupCorruptedError",
+            )
+        )
+        audit_service.record(
+            session,
+            ctx,
+            action=AuditAction.BACKUP_FAILED,
+            entity_type="backup",
+            entity_id=archive_path.name,
+            after={"filename": archive_path.name, "error": "Verification failed post-generation"},
+            outcome=Outcome.FAILURE,
+        )
+        session.flush()
+        raise ApiError(
+            status_code=500,
+            code="backup_verification_failed",
+            message="Created backup archive failed cryptographic verification.",
+        )
+
     session.add(
         BackupRun(
             trigger="MANUAL",
-            outcome="SUCCESS" if is_valid else "FAILURE",
+            outcome="SUCCESS",
             started_at=started_at,
             finished_at=clock.utcnow(),
             filename=archive_path.name,
             size_bytes=stat.st_size,
-            error_type=None if is_valid else "BackupCorruptedError",
+            error_type=None,
         )
     )
     audit_service.record(
@@ -247,7 +276,7 @@ def trigger_backup(
             "size_bytes": stat.st_size,
             "label": payload.label,
             "destination_dir": str(target_dir),
-            "is_valid": is_valid,
+            "is_valid": True,
         },
     )
 
@@ -397,8 +426,9 @@ def list_backups() -> BackupArchiveListResponse:
     for file_path in backup_dir.glob(ARCHIVE_GLOB):
         if file_path.is_file():
             stat = file_path.stat()
-            # Fast inspection of manifest
-            is_valid, _, manifest = verify_backup_bundle(file_path)
+            # Fast head-only manifest inspection (full hashing runs via POST /verify)
+            manifest = read_manifest(file_path)
+            is_valid = manifest is not None
             label = manifest.get("label") if manifest else None
 
             archives.append(

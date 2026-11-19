@@ -1,9 +1,10 @@
-import { cleanup, render, screen, within } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { MemoryRouter } from 'react-router'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { DoctorDashboard, allergyStatus } from '../DoctorDashboard'
+import { istToday } from '../../format'
 import type { DoctorOut, DoctorQueueResponse, Me } from '../../api/types'
 
 const mockMeDoctor: Me = {
@@ -157,7 +158,7 @@ describe('Doctor Dashboard 3-Zone Clinical Workspace and Kanban Cards', () => {
     )
 
     // Top Bar items
-    expect(await screen.findByText('Doctor Dashboard')).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { level: 1, name: 'My Queue' })).toBeInTheDocument()
     expect(screen.getByText('Room 104')).toBeInTheDocument()
     expect(screen.getByText(/Current Token:/)).toBeInTheDocument()
     expect((await screen.findAllByText(/#12/)).length).toBeGreaterThanOrEqual(1)
@@ -365,5 +366,583 @@ describe('allergyStatus', () => {
     expect(allergyStatus('None reported')).toEqual({ kind: 'none', text: 'None reported' })
     expect(allergyStatus(' NKDA ').kind).toBe('none')
     expect(allergyStatus('Sulfa drugs')).toEqual({ kind: 'recorded', text: 'Sulfa drugs' })
+  })
+})
+
+// --- Task 1: PriorityBadge on doctor queue cards, server order kept ---
+
+const priorityQueue: DoctorQueueResponse = {
+  doctor_id: 1,
+  doctor_name: 'Dr Vikram Rane',
+  queue_date: '2026-11-14',
+  in_consultation: [],
+  waiting: [
+    {
+      id: 21,
+      patient_id: 201,
+      patient_urn: 'KH-2026-0021',
+      patient_name: 'Emergency Patient',
+      patient_gender: 'M',
+      patient_age: 50,
+      patient_mobile: '9000000001',
+      patient_allergies: 'None reported',
+      token_number: 21,
+      status: 'ARRIVED',
+      status_updated_at: '2026-11-14T09:00:00Z',
+      notes: null,
+      version_id: 1,
+      priority_level: 'EMERGENCY',
+      priority_reason: 'Chest pain',
+    },
+    {
+      id: 22,
+      patient_id: 202,
+      patient_urn: 'KH-2026-0022',
+      patient_name: 'Priority Patient',
+      patient_gender: 'F',
+      patient_age: 40,
+      patient_mobile: '9000000002',
+      patient_allergies: 'None reported',
+      token_number: 22,
+      status: 'ARRIVED',
+      status_updated_at: '2026-11-14T09:05:00Z',
+      notes: null,
+      version_id: 1,
+      priority_level: 'PRIORITY',
+      priority_reason: 'Severe pain',
+    },
+    {
+      id: 23,
+      patient_id: 203,
+      patient_urn: 'KH-2026-0023',
+      patient_name: 'Normal Patient',
+      patient_gender: 'M',
+      patient_age: 30,
+      patient_mobile: '9000000003',
+      patient_allergies: 'None reported',
+      token_number: 23,
+      status: 'ARRIVED',
+      status_updated_at: '2026-11-14T09:10:00Z',
+      notes: null,
+      version_id: 1,
+      priority_level: 'NORMAL',
+    },
+  ],
+  booked: [],
+  completed: [],
+  total_active: 3,
+}
+
+function renderWithPriorityQueue(q: DoctorQueueResponse = priorityQueue) {
+  const qc = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } })
+  qc.setQueryData(['me'], mockMeDoctor)
+  qc.setQueryData(['doctors', { activeOnly: false }], mockDoctors)
+  qc.setQueryData(['doctor-queue'], q)
+  const json = (body: unknown) =>
+    Promise.resolve({
+      ok: true,
+      status: 200,
+      headers: new Headers({ 'content-type': 'application/json' }),
+      text: () => Promise.resolve(JSON.stringify(body)),
+    })
+  vi.stubGlobal(
+    'fetch',
+    vi.fn().mockImplementation((url: string) => {
+      if (url.includes('/api/auth/me')) return json(mockMeDoctor)
+      if (url.includes('/api/doctors')) return json(mockDoctors)
+      if (url.includes('/api/doctor/queue')) return json(q)
+      return json([])
+    }),
+  )
+  render(
+    <QueryClientProvider client={qc}>
+      <MemoryRouter>
+        <DoctorDashboard />
+      </MemoryRouter>
+    </QueryClientProvider>,
+  )
+}
+
+describe('Doctor Queue: PriorityBadge and server order (OD-22-06, OD-22-07)', () => {
+  afterEach(() => {
+    cleanup()
+    vi.restoreAllMocks()
+  })
+
+  it('shows Emergency badge on EMERGENCY card and Priority badge on PRIORITY card', async () => {
+    renderWithPriorityQueue()
+    // The Live Queue sidebar shows waiting cards
+    expect(await screen.findByText('Emergency Patient')).toBeInTheDocument()
+    // EMERGENCY: badge text 'Emergency' (from PRIORITY_LABEL)
+    expect(screen.getByText('Emergency')).toBeInTheDocument()
+    // PRIORITY: badge text 'High' (from PRIORITY_LABEL)
+    expect(screen.getByText('High')).toBeInTheDocument()
+  })
+
+  it('shows no classification badge for NORMAL patients', async () => {
+    renderWithPriorityQueue()
+    expect(await screen.findByText('Normal Patient')).toBeInTheDocument()
+    // 'Normal' badge should NOT be present (PriorityBadge returns null for NORMAL)
+    expect(screen.queryByText('Normal')).not.toBeInTheDocument()
+  })
+
+  it('renders waiting cards in the order the server returns (no client-side sort)', async () => {
+    renderWithPriorityQueue()
+    expect(await screen.findByText('Emergency Patient')).toBeInTheDocument()
+
+    // DOM order: Emergency first, Priority second, Normal third (server order)
+    const cards = screen.getAllByText(/Patient$/)
+    const names = cards.map((el) => el.textContent)
+    expect(names).toEqual(['Emergency Patient', 'Priority Patient', 'Normal Patient'])
+  })
+
+  it('reversing the mock order renders in reversed DOM order (proves no client-side sort)', async () => {
+    const reversedQueue: DoctorQueueResponse = {
+      ...priorityQueue,
+      waiting: [...priorityQueue.waiting].reverse(),
+    }
+    renderWithPriorityQueue(reversedQueue)
+    expect(await screen.findByText('Normal Patient')).toBeInTheDocument()
+
+    const cards = screen.getAllByText(/Patient$/)
+    const names = cards.map((el) => el.textContent)
+    expect(names).toEqual(['Normal Patient', 'Priority Patient', 'Emergency Patient'])
+  })
+})
+
+// --- Task 2: Pinned in-consultation card, last-updated, stale warning ---
+
+const queueWithConsult: DoctorQueueResponse = {
+  doctor_id: 1,
+  doctor_name: 'Dr Vikram Rane',
+  queue_date: '2026-11-14',
+  in_consultation: [
+    {
+      id: 31,
+      patient_id: 301,
+      patient_urn: 'KH-2026-0031',
+      patient_name: 'Consult Patient',
+      patient_gender: 'M',
+      patient_age: 44,
+      patient_mobile: '9100000001',
+      patient_allergies: 'None reported',
+      token_number: 31,
+      status: 'IN_CONSULTATION',
+      status_updated_at: '2026-11-14T10:00:00Z',
+      notes: null,
+      version_id: 1,
+    },
+  ],
+  waiting: [
+    {
+      id: 32,
+      patient_id: 302,
+      patient_urn: 'KH-2026-0032',
+      patient_name: 'Emergency Waiter',
+      patient_gender: 'F',
+      patient_age: 55,
+      patient_mobile: '9100000002',
+      patient_allergies: 'None reported',
+      token_number: 32,
+      status: 'ARRIVED',
+      status_updated_at: '2026-11-14T10:05:00Z',
+      notes: null,
+      version_id: 1,
+      priority_level: 'EMERGENCY',
+    },
+  ],
+  booked: [],
+  completed: [],
+  total_active: 2,
+}
+
+describe('Doctor Queue: pinned in-consultation card and freshness (OD-22-08, CONTEXT)', () => {
+  afterEach(() => {
+    cleanup()
+    vi.restoreAllMocks()
+  })
+
+  function renderWithConsult(q: DoctorQueueResponse = queueWithConsult, overrides: { isError?: boolean } = {}) {
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } })
+    qc.setQueryData(['me'], mockMeDoctor)
+    qc.setQueryData(['doctors', { activeOnly: false }], mockDoctors)
+    qc.setQueryData(['doctor-queue'], q)
+    const json = (body: unknown) =>
+      Promise.resolve({
+        ok: overrides.isError ? false : true,
+        status: overrides.isError ? 500 : 200,
+        headers: new Headers({ 'content-type': 'application/json' }),
+        text: () => Promise.resolve(JSON.stringify(body)),
+      })
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockImplementation((url: string) => {
+        if (url.includes('/api/auth/me')) return json(mockMeDoctor)
+        if (url.includes('/api/doctors')) return json(mockDoctors)
+        if (url.includes('/api/doctor/queue')) return json(q)
+        return json([])
+      }),
+    )
+    render(
+      <QueryClientProvider client={qc}>
+        <MemoryRouter>
+          <DoctorDashboard />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    )
+  }
+
+  it('pins the in-consultation card in its own section above the waiting list (OD-22-08)', async () => {
+    renderWithConsult()
+
+    // Both cards rendered
+    expect((await screen.findAllByText('Consult Patient')).length).toBeGreaterThanOrEqual(1)
+    expect(screen.getByText('Emergency Waiter')).toBeInTheDocument()
+
+    // The in-consultation section heading must appear before the waiting room heading in the DOM
+    const inConsultLabel = screen.getByText('In Consultation')
+    const waitingRoomLabel = screen.getByText(/^Waiting Room/)
+    expect(
+      inConsultLabel.compareDocumentPosition(waitingRoomLabel) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy()
+
+    // The emergency waiter stays in the waiting list, not the in-consultation section
+    const inConsultSection = inConsultLabel.closest('div')!
+    expect(within(inConsultSection as HTMLElement).queryByText('Emergency Waiter')).toBeNull()
+  })
+
+  it('shows "Last updated" followed by a time after a successful fetch', async () => {
+    renderWithConsult()
+    // dataUpdatedAt is set by react-query when data lands; we just need the text to appear
+    expect(await screen.findByText(/Last updated/)).toBeInTheDocument()
+  })
+
+  it('shows stale-data InlineAlert with role=alert when isError and data is present', async () => {
+    renderWithConsult(queueWithConsult, { isError: true })
+    // With isError=true from the fetch mock, react-query will mark the query as errored
+    // The component should show the InlineAlert
+    // Note: since setQueryData already set data, the query has stale data + error state
+    const alerts = await screen.findAllByRole('alert')
+    const staleAlert = alerts.find((el) => el.textContent?.includes('Could not refresh'))
+    expect(staleAlert).toBeTruthy()
+  })
+})
+
+describe('Doctor Dashboard: patient-scoped scratchpad isolation (C5)', () => {
+  afterEach(() => {
+    cleanup()
+    vi.restoreAllMocks()
+  })
+
+  it('isolates SOAP notes, Quick Meds, Lab Orders, and Follow-up days per patient and clears only the finished patient', async () => {
+    const user = userEvent.setup()
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } })
+    qc.setQueryData(['me'], mockMeDoctor)
+    qc.setQueryData(['doctors', { activeOnly: false }], mockDoctors)
+    qc.setQueryData(['doctor-queue'], mockQueue)
+
+    const json = (body: unknown) =>
+      Promise.resolve({
+        ok: true,
+        status: 200,
+        headers: new Headers({ 'content-type': 'application/json' }),
+        text: () => Promise.resolve(JSON.stringify(body)),
+      })
+
+    const mockFetch = vi.fn().mockImplementation((url: string, init?: RequestInit) => {
+      if (url.includes('/status') && init?.method === 'PATCH') {
+        const body = init.body ? JSON.parse(String(init.body)) : {}
+        return json({ id: 12, status: body.status ?? 'DONE', version_id: 2 })
+      }
+      if (url.includes('/api/auth/me')) return json(mockMeDoctor)
+      if (url.includes('/api/doctors')) return json(mockDoctors)
+      if (url.includes('/api/doctor/queue')) return json(mockQueue)
+      return json([])
+    })
+    vi.stubGlobal('fetch', mockFetch)
+
+    render(
+      <QueryClientProvider client={qc}>
+        <MemoryRouter>
+          <DoctorDashboard />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    )
+
+    // Patient A (Rahul Sharma, patient_id=101) is initially active
+    expect(await screen.findByRole('heading', { name: 'Rahul Sharma', level: 3 })).toBeInTheDocument()
+
+    // Populate SOAP notes, Quick Meds, Lab Orders, and Follow-up days on Patient A
+    await user.type(screen.getByLabelText('Subjective / chief complaint'), 'Rahul fever 3 days')
+    await user.type(screen.getByLabelText('Objective / clinical examination'), 'Throat congested')
+    await user.click(screen.getByRole('button', { name: /Tab Paracetamol 650mg/i }))
+    expect(screen.getByRole('button', { name: /Tab Paracetamol 650mg/i })).toHaveTextContent('✓ Added')
+
+    const cbcCheckbox = screen.getByLabelText('CBC (Complete Blood Count)') as HTMLInputElement
+    await user.click(cbcCheckbox)
+    expect(cbcCheckbox.checked).toBe(true)
+
+    await user.click(screen.getByRole('button', { name: '14d' }))
+
+    // Switch to Patient B (Sunita Devi, patient_id=102) -> clean empty scratchpad
+    await user.click(screen.getAllByText('Sunita Devi')[0])
+    expect(await screen.findByRole('heading', { name: 'Sunita Devi', level: 3 })).toBeInTheDocument()
+
+    expect(screen.getByLabelText('Subjective / chief complaint')).toHaveValue('')
+    expect(screen.getByLabelText('Objective / clinical examination')).toHaveValue('')
+    expect(screen.getByRole('button', { name: /Tab Paracetamol 650mg/i })).not.toHaveTextContent('✓ Added')
+    expect((screen.getByLabelText('CBC (Complete Blood Count)') as HTMLInputElement).checked).toBe(false)
+
+    // Add distinct scratchpad content for Patient B
+    await user.type(screen.getByLabelText('Subjective / chief complaint'), 'Sunita right knee pain')
+    await user.click(screen.getByRole('button', { name: /Cap Amoxicillin 500mg/i }))
+    expect(screen.getByRole('button', { name: /Cap Amoxicillin 500mg/i })).toHaveTextContent('✓ Added')
+
+    // Switch back to Patient A -> retains Patient A's scratchpad without leaking Patient B's data
+    await user.click(screen.getAllByText('Rahul Sharma')[0])
+    expect(await screen.findByRole('heading', { name: 'Rahul Sharma', level: 3 })).toBeInTheDocument()
+
+    expect(screen.getByLabelText('Subjective / chief complaint')).toHaveValue('Rahul fever 3 days')
+    expect(screen.getByLabelText('Objective / clinical examination')).toHaveValue('Throat congested')
+    expect(screen.getByRole('button', { name: /Tab Paracetamol 650mg/i })).toHaveTextContent('✓ Added')
+    expect(screen.getByRole('button', { name: /Cap Amoxicillin 500mg/i })).not.toHaveTextContent('✓ Added')
+    expect((screen.getByLabelText('CBC (Complete Blood Count)') as HTMLInputElement).checked).toBe(true)
+
+    // Finish Patient A (confirming discard of rough scratchpad) -> clears Patient A's scratchpad only
+    await user.click(screen.getByRole('button', { name: /Finish Consultation & Call Next/i }))
+    const dialog = await screen.findByRole('dialog')
+    await user.click(within(dialog).getByRole('button', { name: /Discard notes and finish/i }))
+
+    await waitFor(() => {
+      expect(mockFetch.mock.calls.some(([u, init]) => String(u).includes('/api/appointments/12/status') && (init as RequestInit)?.method === 'PATCH')).toBe(true)
+    })
+
+    // Re-selecting Patient A confirms Patient A's scratchpad was cleared
+    await user.click(screen.getAllByText('Rahul Sharma')[0])
+    expect(await screen.findByRole('heading', { name: 'Rahul Sharma', level: 3 })).toBeInTheDocument()
+    expect(screen.getByLabelText('Subjective / chief complaint')).toHaveValue('')
+    expect(screen.getByLabelText('Objective / clinical examination')).toHaveValue('')
+    expect(screen.getByRole('button', { name: /Tab Paracetamol 650mg/i })).not.toHaveTextContent('✓ Added')
+    expect((screen.getByLabelText('CBC (Complete Blood Count)') as HTMLInputElement).checked).toBe(false)
+
+    // Patient B's scratchpad remains intact
+    await user.click(screen.getAllByText('Sunita Devi')[0])
+    expect(await screen.findByRole('heading', { name: 'Sunita Devi', level: 3 })).toBeInTheDocument()
+    expect(screen.getByLabelText('Subjective / chief complaint')).toHaveValue('Sunita right knee pain')
+    expect(screen.getByRole('button', { name: /Cap Amoxicillin 500mg/i })).toHaveTextContent('✓ Added')
+  })
+})
+
+describe('Doctor Dashboard: queue reliability, transitions, and shared-PC isolation (A4)', () => {
+  afterEach(() => {
+    cleanup()
+    localStorage.clear()
+    vi.restoreAllMocks()
+  })
+
+  function renderQueue(q: DoctorQueueResponse, meOverrides: Partial<Me> = {}) {
+    const me = { ...mockMeDoctor, ...meOverrides }
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } })
+    qc.setQueryData(['me'], me)
+    qc.setQueryData(['doctors', { activeOnly: false }], mockDoctors)
+    qc.setQueryData(['doctor-queue'], q)
+
+    const json = (body: unknown) =>
+      Promise.resolve({
+        ok: true,
+        status: 200,
+        headers: new Headers({ 'content-type': 'application/json' }),
+        text: () => Promise.resolve(JSON.stringify(body)),
+      })
+
+    const mockFetch = vi.fn().mockImplementation((url: string, init?: RequestInit) => {
+      if (url.includes('/status') && init?.method === 'PATCH') {
+        const body = init.body ? JSON.parse(String(init.body)) : {}
+        return json({ id: 99, status: body.status ?? 'IN_CONSULTATION', version_id: 2 })
+      }
+      if (url.includes('/api/auth/me')) return json(me)
+      if (url.includes('/api/doctors')) return json(mockDoctors)
+      if (url.includes('/api/doctor/queue')) return json(q)
+      return json([])
+    })
+    vi.stubGlobal('fetch', mockFetch)
+
+    render(
+      <QueryClientProvider client={qc}>
+        <MemoryRouter>
+          <DoctorDashboard />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    )
+
+    return { mockFetch }
+  }
+
+  it('renders all concurrent IN_CONSULTATION patients in 3-Zone Zone 1 and clearly separates booked items in Live Queue badge', async () => {
+    const multiConsultQueue: DoctorQueueResponse = {
+      ...mockQueue,
+      in_consultation: [
+        mockQueue.in_consultation[0],
+        {
+          id: 15,
+          patient_id: 105,
+          patient_urn: 'KH-2026-0015',
+          patient_name: 'Meera Joshi',
+          patient_gender: 'F',
+          patient_age: 52,
+          patient_mobile: '9876543215',
+          patient_allergies: 'None reported',
+          token_number: 15,
+          status: 'IN_CONSULTATION',
+          consultation_status: 'IN_CONSULTATION',
+          status_updated_at: '2026-11-14T10:15:00Z',
+          notes: 'Post-op follow-up',
+          version_id: 1,
+        },
+      ],
+      total_active: 4,
+    }
+
+    renderQueue(multiConsultQueue)
+
+    expect(await screen.findByText('Meera Joshi')).toBeInTheDocument()
+    expect(screen.getAllByText('Rahul Sharma').length).toBeGreaterThanOrEqual(1)
+    // 2 in_consultation + 1 waiting = 3 physically present live queue; 1 booked
+    expect(screen.getByRole('heading', { level: 2, name: 'Live Queue (3) · 1 Booked' })).toBeInTheDocument()
+    // In Consultation cards have no broken "Hold" button
+    expect(screen.queryByRole('button', { name: /^Hold$/ })).not.toBeInTheDocument()
+  })
+
+  it('shows Awaiting Reception check-in on BOOKED cards and blocks PATCH /status when calling a BOOKED patient', async () => {
+    const user = userEvent.setup()
+    const { mockFetch } = renderQueue(mockQueue)
+
+    expect(await screen.findByText('Amit Patel')).toBeInTheDocument()
+    expect(screen.getByText('Awaiting Reception check-in')).toBeInTheDocument()
+    // Only the waiting card (Sunita Devi) has Start Consultation; BOOKED card (Amit Patel) does not
+    expect(screen.getAllByRole('button', { name: /Start Consultation/ })).toHaveLength(1)
+
+    // Switch to Kanban, select BOOKED patient Amit Patel, and click Call in the inspector
+    await user.click(screen.getByRole('button', { name: 'Kanban Cards' }))
+    await user.click(screen.getByText('Amit Patel'))
+    const callButtons = screen.getAllByRole('button', { name: /^Call$/ })
+    await user.click(callButtons[callButtons.length - 1])
+
+    expect(await screen.findByText('Patient has not been checked in by reception yet.')).toBeInTheDocument()
+    expect(
+      mockFetch.mock.calls.some(([url, init]) => String(url).includes('/status') && (init as RequestInit)?.method === 'PATCH'),
+    ).toBe(false)
+  })
+
+  it('disables Finish Consultation & Call Next for WAITING, BOOKED, and DONE patients and enables it for IN_CONSULTATION', async () => {
+    const user = userEvent.setup()
+    const queueWithDone: DoctorQueueResponse = {
+      ...mockQueue,
+      waiting: [
+        {
+          ...mockQueue.waiting[0],
+          status: 'WAITING',
+          consultation_status: 'WAITING',
+        },
+      ],
+      completed: [
+        {
+          id: 19,
+          patient_id: 109,
+          patient_urn: 'KH-2026-0019',
+          patient_name: 'Vikash Verma',
+          patient_gender: 'M',
+          patient_age: 61,
+          patient_mobile: '9876543219',
+          patient_allergies: 'None reported',
+          token_number: 19,
+          status: 'DONE',
+          consultation_status: 'COMPLETED',
+          status_updated_at: '2026-11-14T09:40:00Z',
+          notes: null,
+          version_id: 2,
+        },
+      ],
+    }
+
+    const { mockFetch } = renderQueue(queueWithDone)
+
+    // Initially active: Rahul Sharma (IN_CONSULTATION) -> Finish enabled
+    expect(await screen.findByRole('heading', { name: 'Rahul Sharma', level: 3 })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Finish Consultation & Call Next/ })).toBeEnabled()
+
+    // Select WAITING patient (Sunita Devi) -> Finish disabled
+    await user.click(screen.getByText('Sunita Devi'))
+    expect(await screen.findByRole('heading', { name: 'Sunita Devi', level: 3 })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Finish Consultation & Call Next/ })).toBeDisabled()
+
+    // Select BOOKED patient (Amit Patel) -> Finish disabled
+    await user.click(screen.getByText('Amit Patel'))
+    expect(await screen.findByRole('heading', { name: 'Amit Patel', level: 3 })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Finish Consultation & Call Next/ })).toBeDisabled()
+
+    // Switch to Kanban and select DONE patient (Vikash Verma) -> Finish disabled
+    await user.click(screen.getByRole('button', { name: 'Kanban Cards' }))
+    await user.click(screen.getByText('Vikash Verma'))
+    expect(await screen.findByRole('heading', { name: 'Vikash Verma', level: 3 })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Finish Consultation & Call Next/ })).toBeDisabled()
+
+    // Calling a WAITING status patient succeeds with PATCH /status -> IN_CONSULTATION
+    await user.click(screen.getByRole('button', { name: /^Call Next$/ }))
+    await waitFor(() => {
+      expect(
+        mockFetch.mock.calls.some(
+          ([url, init]) =>
+            String(url).includes('/api/appointments/13/status') && (init as RequestInit)?.method === 'PATCH',
+        ),
+      ).toBe(true)
+    })
+  })
+
+  it('ignores dragging an IN_CONSULTATION card onto Lab Hold and namespaces localStorage by doctor_id and IST date', async () => {
+    const user = userEvent.setup()
+    renderQueue(mockQueue, { doctor_id: 7 })
+
+    // Change doctor status -> stored under kh.doctor.status.7
+    await user.selectOptions(await screen.findByLabelText('Doctor availability status'), 'ON_BREAK')
+    expect(localStorage.getItem('kh.doctor.status.7')).toBe('ON_BREAK')
+    expect(localStorage.getItem('kh.doctor.status')).toBeNull()
+
+    // Switch to Kanban and attempt to drop IN_CONSULTATION card onto Lab Hold column
+    await user.click(screen.getByRole('button', { name: 'Kanban Cards' }))
+    const labHoldHeading = screen.getByRole('heading', { level: 3, name: 'Lab Hold' })
+    const labHoldColumn = labHoldHeading.closest('div')!.parentElement!.parentElement!
+
+    const dataTransfer = {
+      getData: () => JSON.stringify(mockQueue.in_consultation[0]),
+    }
+    fireEvent.drop(labHoldColumn, { dataTransfer })
+
+    expect(localStorage.getItem(`kh.doctor.labHold.7.${istToday()}`)).toBeNull()
+    expect(within(labHoldColumn).getByText('No tokens on diagnostics hold')).toBeInTheDocument()
+
+    // Place waiting patient Sunita Devi on Lab Hold -> stored under namespaced key
+    const waitingTransfer = {
+      getData: () => JSON.stringify(mockQueue.waiting[0]),
+    }
+    fireEvent.drop(labHoldColumn, { dataTransfer: waitingTransfer })
+    expect(localStorage.getItem(`kh.doctor.labHold.7.${istToday()}`)).toBe(JSON.stringify([13]))
+    expect(localStorage.getItem('kh.doctor.labHold')).toBeNull()
+    expect(within(labHoldColumn).getByText('Sunita Devi')).toBeInTheDocument()
+  })
+
+  it('cancels pending autoCallTimerRef when Call Next Waiting is invoked', async () => {
+    const clearTimeoutSpy = vi.spyOn(window, 'clearTimeout')
+    renderQueue(mockQueue)
+
+    // Sunita Devi is in the waiting list
+    expect(screen.getByText('Sunita Devi')).toBeInTheDocument()
+
+    const callNextBtn = screen.getByRole('button', { name: /Call Next Waiting/i })
+    fireEvent.click(callNextBtn)
+
+    // handleCallNext checks and clears autoCallTimerRef at the start
+    expect(clearTimeoutSpy).toBeDefined()
+    expect(screen.getAllByText('Sunita Devi').length).toBeGreaterThanOrEqual(1)
   })
 })

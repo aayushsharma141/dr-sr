@@ -304,7 +304,7 @@ export function PatientPhotoModal({
                 onClick={() => setMode('capture')}
                 className="group relative flex flex-col items-center justify-between rounded-2xl border-2 border-[#5D0B26] bg-[#5D0B26]/5 p-5 text-center transition-all hover:bg-[#5D0B26]/10 hover:shadow-md focus-visible:outline-2 focus-visible:outline-[#5D0B26] cursor-pointer min-h-[160px]"
               >
-                <span className="absolute top-3 right-3 rounded-full bg-[#5D0B26] px-2 py-0.5 text-xs font-bold uppercase tracking-wide text-white">
+                <span className="absolute top-3 right-3 rounded-full bg-[#5D0B26] px-2 py-0.5 text-xs font-bold text-white">
                   Primary
                 </span>
                 <div className="flex flex-col items-center">
