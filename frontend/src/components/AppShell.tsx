@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { sendHeartbeat } from '../api/admin-data-ops'
 import { useClinicBranding } from '../api/branding'
 import { useMyDepartments, type SpecialtyCode } from '../api/specialty'
-import { useMyUnfinishedConsultations } from '../api/consultations'
+import { useMyUnfinishedConsultations, useMyWaitingQueueCount } from '../api/consultations'
 import { Link, useLocation, useNavigate } from 'react-router'
 import { useLatestIntegrityRun } from '../api/integrity'
 import { useLogout } from '../api/queries'
@@ -97,6 +97,8 @@ interface AppShellProps {
 
 type NavigationIcon =
   | 'dashboard'
+  | 'home'
+  | 'queue'
   | 'user-plus'
   | 'ticket'
   | 'folder'
@@ -166,11 +168,18 @@ const RECEPTION_NAVIGATION: NavigationItem[] = [
 
 const DOCTOR_NAVIGATION: NavigationItem[] = [
   {
+    key: 'dashboard',
+    label: 'Dashboard',
+    description: "Operational overview, daily workload, and treatment plans",
+    path: '/doctor',
+    icon: 'home',
+  },
+  {
     key: 'my-queue',
     label: 'My Queue',
     description: 'Your patients for today: call the next one and start the consultation',
-    path: '/doctor',
-    icon: 'dashboard',
+    path: '/doctor/queue',
+    icon: 'queue',
   },
   {
     // Shown only while a consultation is open or one is left unfinished; see visibleItems.
@@ -265,6 +274,22 @@ function NavIcon({ name, active = false }: { name: NavigationIcon; active?: bool
   }
 
   switch (name) {
+    case 'home':
+      return (
+        <svg {...shared}>
+          <path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+          <polyline points="9 22 9 12 15 12 15 22" />
+        </svg>
+      )
+    case 'queue':
+      return (
+        <svg {...shared}>
+          <circle cx="7" cy="7" r="2.5" />
+          <circle cx="17" cy="7" r="2.5" />
+          <circle cx="7" cy="17" r="2.5" />
+          <circle cx="17" cy="17" r="2.5" />
+        </svg>
+      )
     case 'dashboard':
       return (
         <svg {...shared}>
@@ -386,7 +411,7 @@ type Crumb = { label: string; href?: string }
  * The last crumb also names the browser tab, so every page is told apart in the tab bar.
  */
 function breadcrumbsFor(pathname: string, search: string, role: Role): Crumb[] {
-  const crumbs: Crumb[] = [{ label: role === 'DOCTOR' ? 'My Queue' : 'Dashboard', href: dashboardPath(role) }]
+  const crumbs: Crumb[] = [{ label: 'Dashboard', href: dashboardPath(role) }]
 
   if (pathname === '/reception/patients/new') {
     crumbs.push({ label: 'Patient Registration' })
@@ -420,6 +445,8 @@ function breadcrumbsFor(pathname: string, search: string, role: Role): Crumb[] {
   } else if (pathname === '/reception/reports') {
     crumbs.push({ label: 'Billing & Checkout', href: '/reception/billing' })
     crumbs.push({ label: 'Daily Report' })
+  } else if (pathname === '/doctor/queue') {
+    crumbs.push({ label: 'My Queue' })
   } else if (pathname === '/doctor/treatment-plans' || /^\/doctor\/treatment-plans\/\d+$/.test(pathname)) {
     crumbs.push({ label: 'Physiotherapy Treatment' })
   } else if (pathname === '/doctor/encounters/new') {
@@ -556,6 +583,7 @@ export function AppShell({ name, role, children }: AppShellProps) {
 
   // A doctor's open consultation, or the newest one left unfinished, gets its own sidebar link.
   const unfinishedConsultations = useMyUnfinishedConsultations(role === 'DOCTOR')
+  const waitingCount = useMyWaitingQueueCount(role === 'DOCTOR')
   const onConsultationPage = location.pathname.startsWith('/doctor/encounters/')
 
   const visibleItems = useMemo(() => {
@@ -672,7 +700,7 @@ export function AppShell({ name, role, children }: AppShellProps) {
     }
     return (
       <aside
-        aria-label="Primary navigation"
+        aria-label="Administrative navigation"
         className={`flex h-full flex-col bg-brand-900 border-r border-brand-900 text-white transition-all duration-200 ${cls.width}`}
       >
         {/* Sidebar Brand Header */}
@@ -880,6 +908,7 @@ export function AppShell({ name, role, children }: AppShellProps) {
                   ? 'Clinical workflow'
                   : null
             const draftCount = item.key === 'consultation' ? unfinishedConsultations.length : 0
+            const queueCount = item.key === 'my-queue' ? waitingCount : 0
             const iconOnly = !isDrawer && sidebarCollapsed
 
             return (
@@ -905,6 +934,15 @@ export function AppShell({ name, role, children }: AppShellProps) {
                   <span className={`truncate ${cls.inline}`}>
                     {item.label}
                   </span>
+                  {queueCount > 0 && (
+                    <span
+                      title={`${queueCount} patients waiting in queue`}
+                      className={`inline-flex min-w-[20px] shrink-0 items-center justify-center rounded-full bg-amber-100 ring-1 ring-amber-300/80 px-1.5 py-0.5 text-xs font-bold leading-none tabular-nums text-amber-950 ${iconOnly ? 'absolute right-0.5 top-0.5' : `ml-auto ${cls.inline}`}`}
+                    >
+                      <span aria-hidden="true">{queueCount}</span>
+                      <span className="sr-only">, {queueCount} waiting</span>
+                    </span>
+                  )}
                   {draftCount > 1 && (
                     <span
                       title={`${draftCount} unfinished consultations; this opens the newest. All of them are listed on My Queue.`}

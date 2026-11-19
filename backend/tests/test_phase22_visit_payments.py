@@ -731,11 +731,19 @@ def test_concurrent_visit_payments_exact_single_winner(
             assert tot.due_paise == 40000
     finally:
         with owner_engine.connect() as conn:
+            conn.execute(text("ALTER TABLE ledger_entries DISABLE TRIGGER USER"))
             conn.execute(text("ALTER TABLE payments DISABLE TRIGGER USER"))
+            conn.execute(
+                text(
+                    "DELETE FROM ledger_entries WHERE visit_id = :vid OR patient_id = :pid"
+                ),
+                {"vid": visit_id, "pid": patient_id},
+            )
             conn.execute(text("DELETE FROM payments WHERE visit_id = :vid"), {"vid": visit_id})
             conn.execute(text("DELETE FROM bill_items WHERE visit_id = :vid"), {"vid": visit_id})
             conn.execute(text("DELETE FROM appointments WHERE visit_id = :vid"), {"vid": visit_id})
             conn.execute(text("DELETE FROM visits WHERE id = :vid"), {"vid": visit_id})
             conn.execute(text("DELETE FROM patients WHERE id = :pid"), {"pid": patient_id})
             conn.execute(text("ALTER TABLE payments ENABLE TRIGGER USER"))
+            conn.execute(text("ALTER TABLE ledger_entries ENABLE TRIGGER USER"))
             conn.commit()

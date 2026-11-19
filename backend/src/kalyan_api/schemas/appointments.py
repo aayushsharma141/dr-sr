@@ -84,17 +84,24 @@ class AppointmentCreate(BaseModel):
         default=PriorityLevel.NORMAL, description="Initial priority for a tokenized arrival"
     )
     priority_reason: str | None = Field(
-        default=None, max_length=500, description="Required when initial priority is High or Emergency"
+        default=None,
+        max_length=500,
+        description="Required when initial priority is High or Emergency",
     )
 
     @model_validator(mode="after")
     def _check_priority_reason(self) -> "AppointmentCreate":
         if self.priority_level != PriorityLevel.NORMAL and not self.issue_token:
             raise ValueError("Priority can be set when a doctor-queue token is created.")
-        if self.priority_level != PriorityLevel.NORMAL and len((self.priority_reason or "").strip()) < 3:
+        if (
+            self.priority_level != PriorityLevel.NORMAL
+            and len((self.priority_reason or "").strip()) < 3
+        ):
             raise ValueError("Enter a reason for marking the patient Priority or Emergency.")
         if self.priority_level == PriorityLevel.NORMAL and (self.priority_reason or "").strip():
-            raise ValueError("A priority reason can only be supplied for High or Emergency priority.")
+            raise ValueError(
+                "A priority reason can only be supplied for High or Emergency priority."
+            )
         return self
 
 
@@ -116,6 +123,11 @@ class CheckInRequest(CheckInDetailsIn):
     """Payload to check a booked patient in on arrival (RF-12)."""
 
     version_id: int = Field(..., gt=0, description="Optimistic locking version ID")
+    patient_id: int | None = Field(
+        default=None,
+        gt=0,
+        description="Optional patient ID verified against the appointment on check-in",
+    )
 
 
 class NewPatientCheckIn(CheckInDetailsIn):
@@ -250,11 +262,26 @@ class AppointmentRead(BaseModel):
     updated_at: datetime
 
 
+class AppointmentBucketCounts(BaseModel):
+    """Server-computed counts across canonical operational status buckets."""
+
+    active: int = 0
+    to_arrive: int = 0
+    checked_in: int = 0
+    completed: int = 0
+    no_show: int = 0
+    cancelled: int = 0
+    all: int = 0
+
+
 class AppointmentListResponse(BaseModel):
     """Paginated or filtered appointment list response."""
 
     total: int
     appointments: list[AppointmentRead]
+    limit: int | None = None
+    offset: int = 0
+    bucket_counts: AppointmentBucketCounts | None = None
 
 
 class DoctorQueueItem(BaseModel):

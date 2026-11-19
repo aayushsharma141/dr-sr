@@ -18,7 +18,7 @@ export function AdminPageHeader({ title, description, eyebrow, icon, actions, cl
   return (
     <div className={`flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between ${className}`.trim()}>
       <div className="min-w-0">
-        {eyebrow && <p className="text-xs font-semibold uppercase tracking-wider text-red-900">{eyebrow}</p>}
+        {eyebrow && <p className="text-xs font-semibold uppercase tracking-wider text-brand-700">{eyebrow}</p>}
         <div className="flex items-center gap-2.5">
           {icon}
           <h1 className="text-xl font-bold tracking-tight text-slate-900">{title}</h1>

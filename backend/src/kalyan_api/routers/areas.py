@@ -15,7 +15,8 @@ from sqlalchemy.orm import Session
 
 from kalyan_api import clock
 from kalyan_api.config import Settings, get_settings
-from kalyan_api.core.permissions import Permission
+from kalyan_api.core.errors import ApiError
+from kalyan_api.core.permissions import Permission, Role
 from kalyan_api.core.policy import require
 from kalyan_api.core.principal import Principal, current_principal
 from kalyan_api.db.session import SessionDep
@@ -23,6 +24,7 @@ from kalyan_api.models import (
     Appointment,
     AppointmentStatus,
     AuditLog,
+    ClinicalEncounter,
     ConsultationStatus,
     Department,
     Doctor,
@@ -523,6 +525,33 @@ class DoctorOverviewResponse(BaseModel):
     doctor_name_en: str
 
 
+class DoctorDashboardTodayGlance(BaseModel):
+    """Reconciled operational glance metrics for the doctor's day."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    total: int = 0
+    completed: int = 0
+    in_progress: int = 0
+    pending: int = 0
+
+
+class DoctorDashboardSummary(BaseModel):
+    """Doctor dashboard summary metrics and workload counts."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    doctor_id: int
+    doctor_name_en: str
+    specialty_name: str
+    waiting_count: int = 0
+    in_consultation_count: int = 0
+    scheduled_count: int = 0
+    completed_count: int = 0
+    pending_drafts_count: int = 0
+    today_glance: DoctorDashboardTodayGlance
+
+
 @router.get(
     "/admin/overview",
     response_model=AdminOverviewResponse,
@@ -1021,4 +1050,115 @@ def get_doctor_overview(
         role=principal.role.value if hasattr(principal.role, "value") else str(principal.role),
         doctor_id=doctor_id,
         doctor_name_en=doctor_name,
+    )
+
+
+@router.get(
+    "/doctor/dashboard/summary",
+    response_model=DoctorDashboardSummary,
+    dependencies=[Depends(require(Permission.DASHBOARD_DOCTOR))],
+)
+def get_doctor_dashboard_summary(
+    session: SessionDep,
+    principal: Principal = Depends(current_principal),
+) -> DoctorDashboardSummary:
+    """Return doctor workspace dashboard summary metrics and workload counts."""
+    if principal.role != Role.DOCTOR or principal.doctor_id is None:
+        raise ApiError(status_code=403, code="doctor_only", message="Doctor access required.")
+
+    doctor = session.get(Doctor, principal.doctor_id)
+    if not doctor:
+        raise ApiError(status_code=404, code="doctor_not_found", message="Doctor not found.")
+
+    dept_stmt = (
+        select(Department.name_en)
+        .join(doctor_departments, doctor_departments.c.department_id == Department.id)
+        .where(
+            doctor_departments.c.doctor_id == doctor.id,
+            Department.is_active.is_(True),
+        )
+        .order_by(Department.name_en.asc(), Department.id.asc())
+    )
+    specialty_name = session.scalar(dept_stmt) or doctor.qualification or "General Medicine"
+
+    today = clock.ist_today()
+
+    appt_stmt = select(
+        Appointment.id,
+        Appointment.status,
+        Appointment.consultation_status,
+    ).where(
+        Appointment.doctor_id == principal.doctor_id,
+        Appointment.appointment_date == today,
+    )
+    appointments = session.execute(appt_stmt).all()
+
+    waiting_count = 0
+    in_consultation_count = 0
+    scheduled_count = 0
+    completed_count = 0
+    in_consultation_appt_ids: list[int] = []
+
+    for appt_id, status, consultation_status in appointments:
+        status_val = status.value if hasattr(status, "value") else str(status) if status else ""
+        c_status_val = (
+            consultation_status.value
+            if hasattr(consultation_status, "value")
+            else str(consultation_status)
+            if consultation_status
+            else ""
+        )
+        if status_val == AppointmentStatus.RESCHEDULED.value:
+            continue
+        if c_status_val == ConsultationStatus.IN_CONSULTATION.value:
+            in_consultation_count += 1
+            in_consultation_appt_ids.append(appt_id)
+        elif c_status_val == ConsultationStatus.WAITING.value or status_val in (
+            AppointmentStatus.ARRIVED.value,
+            AppointmentStatus.CHECKED_IN.value,
+            AppointmentStatus.WAITING.value,
+        ):
+            waiting_count += 1
+        elif status_val in (
+            AppointmentStatus.BOOKED.value,
+            AppointmentStatus.TO_ARRIVE.value,
+            AppointmentStatus.REGISTERED.value,
+        ):
+            scheduled_count += 1
+        elif (
+            status_val in (AppointmentStatus.DONE.value, AppointmentStatus.COMPLETED.value)
+            or c_status_val == ConsultationStatus.COMPLETED.value
+        ):
+            completed_count += 1
+
+    draft_stmt = select(func.count(ClinicalEncounter.id)).where(
+        ClinicalEncounter.doctor_id == principal.doctor_id,
+        ClinicalEncounter.is_finalised.is_(False),
+    )
+    if in_consultation_appt_ids:
+        draft_stmt = draft_stmt.where(
+            or_(
+                ClinicalEncounter.appointment_id.is_(None),
+                ClinicalEncounter.appointment_id.not_in(in_consultation_appt_ids),
+            )
+        )
+    pending_drafts_count = int(session.scalar(draft_stmt) or 0)
+
+    total_glance = completed_count + in_consultation_count + pending_drafts_count
+
+    return DoctorDashboardSummary(
+        doctor_id=doctor.id,
+        doctor_name_en=doctor.name_en,
+        specialty_name=specialty_name,
+        waiting_count=waiting_count,
+        in_consultation_count=in_consultation_count,
+        scheduled_count=scheduled_count,
+        completed_count=completed_count,
+        pending_drafts_count=pending_drafts_count,
+        today_glance=DoctorDashboardTodayGlance(
+            total=total_glance,
+            completed=completed_count,
+            in_progress=in_consultation_count,
+            pending=pending_drafts_count,
+        ),
     )

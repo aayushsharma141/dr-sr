@@ -1,4 +1,4 @@
-import { act, cleanup, render, screen, within } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { MemoryRouter, useLocation } from 'react-router'
@@ -29,6 +29,7 @@ const state: {
   doctorDepartmentsOverride: ((doctorId: number | null) => DoctorDepartmentsResult) | null
   doctorDepartmentsRefetch: ReturnType<typeof vi.fn>
   reassignMutate: ReturnType<typeof vi.fn>
+  reassignIsPending: boolean
   cancelMutate: ReturnType<typeof vi.fn>
 } = {
   appointments: [],
@@ -38,6 +39,7 @@ const state: {
   doctorDepartmentsOverride: null,
   doctorDepartmentsRefetch: vi.fn(),
   reassignMutate: vi.fn(),
+  reassignIsPending: false,
   cancelMutate: vi.fn(),
 }
 
@@ -65,7 +67,7 @@ vi.mock('../../api/queries', () => ({
     }
     return { data: [{ id: 10, name_en: 'General OPD' }], isSuccess: true, isPending: false, isError: false, refetch: state.doctorDepartmentsRefetch }
   },
-  useReassignAppointment: () => ({ mutate: state.reassignMutate, isPending: false }),
+  useReassignAppointment: () => ({ mutate: state.reassignMutate, isPending: state.reassignIsPending }),
   useUpdateAppointmentStatus: () => ({ mutate: state.cancelMutate, isPending: false }),
 }))
 
@@ -133,6 +135,7 @@ describe('WaitingRoom', () => {
     state.doctorsQuery = { data: DEFAULT_DOCTORS }
     state.visitsQuery = { data: { total: 1, visits: [{ id: 500 }] }, isSuccess: true }
     state.doctorDepartmentsOverride = null
+    state.reassignIsPending = false
   })
 
   it('orders waiting patients: emergency by classification time, then priority, then normal', () => {
@@ -676,5 +679,60 @@ describe('WaitingRoom', () => {
     const waitingRegion = screen.getByRole('region', { name: 'Waiting' })
     expect(waitingRegion).toHaveClass('lg:max-h-[70vh]')
     expect(waitingRegion).not.toHaveClass('max-h-[70vh]')
+  })
+
+  it('blocks synchronous double-submit in ReassignModal via inFlightRef until settled', async () => {
+    state.appointments = [appt({ id: 1, token_number: 1, department_id: 10, doctor_id: 1, version_id: 5 })]
+    renderPage()
+
+    await userEvent.click(screen.getByRole('button', { name: 'Reassign' }))
+    const dialog = screen.getByRole('dialog', { hidden: true })
+    await userEvent.selectOptions(within(dialog).getByLabelText('Move to doctor'), '2')
+    await userEvent.selectOptions(within(dialog).getByLabelText('Department for this consultation'), '20')
+    await userEvent.type(within(dialog).getByLabelText('Reason'), 'Specialist opinion')
+
+    // Trigger two back-to-back form submits before React re-renders isPending=true.
+    const form = dialog.querySelector('form')!
+    fireEvent.submit(form)
+    fireEvent.submit(form)
+    expect(state.reassignMutate).toHaveBeenCalledTimes(1)
+
+    // Once onSettled releases inFlightRef, a retry submit is permitted again.
+    const onSettled = state.reassignMutate.mock.calls[0][1]?.onSettled as (() => void) | undefined
+    expect(onSettled).toBeTypeOf('function')
+    act(() => {
+      onSettled?.()
+    })
+    fireEvent.submit(form)
+    expect(state.reassignMutate).toHaveBeenCalledTimes(2)
+  })
+
+  it('disables Keep with current doctor, submit button, and inputs while ReassignModal mutation is pending', async () => {
+    state.appointments = [appt({ id: 1, token_number: 1, department_id: 10, doctor_id: 1, version_id: 5 })]
+    const { rerender } = renderPage()
+
+    await userEvent.click(screen.getByRole('button', { name: 'Reassign' }))
+    const dialog = screen.getByRole('dialog', { hidden: true })
+    await userEvent.selectOptions(within(dialog).getByLabelText('Move to doctor'), '2')
+
+    expect(within(dialog).getByRole('button', { name: 'Keep with current doctor' })).toBeEnabled()
+    expect(within(dialog).getByRole('button', { name: 'Reassign & issue new token' })).toBeEnabled()
+
+    state.reassignIsPending = true
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    rerender(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter initialEntries={['/reception/waiting']}>
+          <SearchSpy />
+          <WaitingRoom />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    )
+
+    expect(within(dialog).getByRole('button', { name: 'Keep with current doctor' })).toBeDisabled()
+    expect(within(dialog).getByRole('button', { name: 'Reassigning…' })).toBeDisabled()
+    expect(within(dialog).getByLabelText('Move to doctor')).toBeDisabled()
+    expect(within(dialog).getByLabelText('Department for this consultation')).toBeDisabled()
+    expect(within(dialog).getByLabelText('Reason')).toBeDisabled()
   })
 })

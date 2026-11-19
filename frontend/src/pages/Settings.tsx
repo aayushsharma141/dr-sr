@@ -5,6 +5,7 @@ import { AppShell } from '../components/AppShell'
 import { ConflictBanner } from '../components/ConflictBanner'
 import { InlineAlert } from '../components/InlineAlert'
 import { Modal } from '../components/Modal'
+import { toast } from '../components/ToastHost'
 import { UnsavedChangesGuard } from '../components/UnsavedChangesGuard'
 import { HospitalAssetManager } from '../components/admin/HospitalAssetManager'
 import { AdminPageHeader } from '../components/admin/AdminPageHeader'
@@ -233,7 +234,6 @@ export function Settings() {
 
   const [isConflict, setIsConflict] = useState(false)
   const [isReloading, setIsReloading] = useState(false)
-  const [saveSuccess, setSaveSuccess] = useState(false)
   const [errorMessages, setErrorMessages] = useState<string[]>([])
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({})
 
@@ -257,14 +257,12 @@ export function Settings() {
   }
 
   const clearMessages = () => {
-    setSaveSuccess(false)
     setErrorMessages([])
     setFieldErrors({})
   }
 
   const setField = <K extends FieldName>(key: K, value: SettingsForm[K]) => {
     setForm((prev) => (prev ? { ...prev, [key]: value } : prev))
-    setSaveSuccess(false)
     if (fieldErrors[key]) {
       setFieldErrors((prev) => {
         const next = { ...prev }
@@ -318,7 +316,7 @@ export function Settings() {
     const updated = await updateMutation.mutateAsync(payload)
     applyServer(updated)
     setIsConflict(false)
-    setSaveSuccess(true)
+    toast.success('Hospital settings saved successfully.')
   }
 
   const handleSubmit = async (e: FormEvent) => {
@@ -644,12 +642,6 @@ export function Settings() {
         <AdminPageHeader title="Hospital Settings" />
 
         {isConflict && <ConflictBanner onReload={handleReload} isReloading={isReloading} />}
-
-        {saveSuccess && (
-          <InlineAlert tone="success" onDismiss={() => setSaveSuccess(false)}>
-            Hospital settings saved successfully.
-          </InlineAlert>
-        )}
 
         {errorMessages.length > 0 && (
           <InlineAlert tone="error" onDismiss={() => setErrorMessages([])}>

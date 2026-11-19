@@ -10,9 +10,12 @@ Guarantees:
 - VAS score strictly bounded between 0 and 10.
 """
 
+from datetime import timedelta
+
 from sqlalchemy import select
 
-from kalyan_api.models import AuditLog, Patient, TreatmentPlan
+from kalyan_api import clock
+from kalyan_api.models import AuditLog, Patient, TreatmentPlan, TreatmentSession
 
 
 def _create_patient_and_plan(
@@ -262,3 +265,100 @@ def test_treatment_sessions_role_and_silo_permissions(
         ).status_code
         == 404
     )
+
+
+def test_log_treatment_session_rejects_future_date_invariant_11(
+    login_client, doctor_a_user, db_session
+):
+    """Invariant #11: Sessions cannot be logged for a future date."""
+    _patient, plan = _create_patient_and_plan(
+        db_session, doctor_a_user.doctor_id, total_sessions=3, suffix="05"
+    )
+    doc_a_client = login_client(doctor_a_user)
+
+    future_date = (clock.ist_today() + timedelta(days=1)).isoformat()
+    future_resp = doc_a_client.post(
+        f"/api/treatment-plans/{plan.id}/sessions",
+        json={
+            "session_date": future_date,
+            "vas_score": 4,
+            "modalities": ["IFT"],
+            "clinical_notes": "Attempt to pre-log tomorrow's session.",
+        },
+    )
+    assert future_resp.status_code == 422, future_resp.text
+    assert future_resp.json()["code"] == "future_session_date_not_allowed"
+
+    # No session created and completed_sessions untouched
+    db_session.refresh(plan)
+    assert plan.completed_sessions == 0
+    sessions_count = len(
+        db_session.execute(
+            select(TreatmentSession).where(TreatmentSession.treatment_plan_id == plan.id)
+        )
+        .scalars()
+        .all()
+    )
+    assert sessions_count == 0
+
+    # Today's date is accepted
+    today_resp = doc_a_client.post(
+        f"/api/treatment-plans/{plan.id}/sessions",
+        json={
+            "session_date": clock.ist_today().isoformat(),
+            "vas_score": 4,
+            "modalities": ["IFT"],
+            "clinical_notes": "Today's completed session.",
+        },
+    )
+    assert today_resp.status_code == 201, today_resp.text
+    db_session.refresh(plan)
+    assert plan.completed_sessions == 1
+
+
+def test_ophthalmology_doctor_cannot_log_physiotherapy_treatment_session(
+    login_client, test_settings, db_session
+):
+    """Non-Physiotherapy doctors receive 403 specialty_required when logging rehab sessions."""
+    from kalyan_api.core.security import build_hasher, hash_password
+    from kalyan_api.models import Department, Doctor, User
+    from tests.conftest import TEST_PASSWORD
+
+    ophth_dept = db_session.scalar(select(Department).where(Department.code == "OPHTHALMOLOGY"))
+    if ophth_dept is None:
+        ophth_dept = Department(name_en="Ophthalmology", code="OPHTHALMOLOGY", is_active=True)
+        db_session.add(ophth_dept)
+        db_session.flush()
+
+    ophth_doc = Doctor(name_en="Dr. Eye Session Specialist", is_active=True)
+    ophth_doc.departments.append(ophth_dept)
+    db_session.add(ophth_doc)
+    db_session.flush()
+
+    ophth_user = User(
+        username="fixture_ophth_session_doc",
+        full_name="Dr. Eye Session Specialist",
+        role="DOCTOR",
+        doctor_id=ophth_doc.id,
+        password_hash=hash_password(build_hasher(test_settings), TEST_PASSWORD),
+        must_change_password=False,
+        is_active=True,
+    )
+    db_session.add(ophth_user)
+    db_session.flush()
+
+    _patient, plan = _create_patient_and_plan(
+        db_session, ophth_doc.id, total_sessions=3, suffix="09"
+    )
+
+    ophth_client = login_client(ophth_user)
+    resp = ophth_client.post(
+        f"/api/treatment-plans/{plan.id}/sessions",
+        json={
+            "vas_score": 4,
+            "modalities": ["IFT"],
+            "clinical_notes": "Ophthalmology doctor attempting physio session",
+        },
+    )
+    assert resp.status_code == 403, resp.text
+    assert resp.json()["code"] == "specialty_required"

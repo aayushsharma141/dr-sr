@@ -1,8 +1,9 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { cleanup, render, screen, waitFor } from '@testing-library/react'
+import { cleanup, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { MemoryRouter, Route, Routes } from 'react-router'
+import { MemoryRouter, Route, Routes, useLocation } from 'react-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import '../../test/dialog-shim'
 import { TreatmentPlanWorkspace } from '../TreatmentPlanWorkspace'
 import type {
   Me,
@@ -313,14 +314,42 @@ describe('Treatment Plan Workspace & Session Logger UI', () => {
     expect(capturedBody.vas_score).toBe(5)
   })
 
-  it('renders physiotherapy & rehabilitation center directory when no patient is specified', async () => {
+  it('renders Active Treatment Packages Roster on launchpad from GET /api/treatment-plans?status=ACTIVE with Open Plan link', async () => {
+    const requestedUrls: string[] = []
+    const completedPlan: TreatmentPlanOut = {
+      ...mockActivePlan,
+      id: 202,
+      plan_name: 'Cervical Traction 5-Session Rehab',
+      condition_diagnosis: 'Cervical Spondylosis',
+      completed_sessions: 5,
+      total_sessions: 5,
+      status: 'COMPLETED',
+    }
+
     const mockFetch = vi.fn().mockImplementation((url: string) => {
+      requestedUrls.push(String(url))
       if (url.includes('/api/auth/me')) {
         return Promise.resolve({
           ok: true,
           status: 200,
           headers: new Headers({ 'content-type': 'application/json' }),
           text: () => Promise.resolve(JSON.stringify(mockMeDoctor)),
+        })
+      }
+      if (url.includes('/api/treatment-plans?status=ACTIVE')) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          headers: new Headers({ 'content-type': 'application/json' }),
+          text: () => Promise.resolve(JSON.stringify([mockActivePlan])),
+        })
+      }
+      if (url.includes('/api/treatment-plans?status=COMPLETED')) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          headers: new Headers({ 'content-type': 'application/json' }),
+          text: () => Promise.resolve(JSON.stringify([completedPlan])),
         })
       }
       if (url.includes('/api/patients')) {
@@ -349,6 +378,313 @@ describe('Treatment Plan Workspace & Session Logger UI', () => {
       expect(screen.getByRole('heading', { level: 1, name: /Physiotherapy Treatment/ })).toBeInTheDocument()
     })
     expect(screen.getByPlaceholderText(/Type URN/i)).toBeInTheDocument()
-    expect(screen.getByText(/Spine Rehabilitation \(Lumbar \/ Cervical\)/i)).toBeInTheDocument()
+
+    const roster = await screen.findByTestId('active-treatment-plans-roster')
+    expect(await within(roster).findByText(/Lumbar Spondylosis 5-Session Rehab/i)).toBeInTheDocument()
+    expect(within(roster).getByText('Sunita Sharma')).toBeInTheDocument()
+    expect(within(roster).getByText('KH-2026-0002')).toBeInTheDocument()
+    expect(within(roster).getByText(/2 \/ 5/i)).toBeInTheDocument()
+
+    const openLink = within(roster).getByRole('link', { name: /Open Plan/i })
+    expect(openLink).toHaveAttribute('href', '/doctor/treatment-plans/201')
+    expect(requestedUrls.some((u) => u.includes('/api/treatment-plans?status=ACTIVE'))).toBe(true)
+
+    // Static protocol cards are no longer rendered
+    expect(screen.queryByText(/Spine Rehabilitation \(Lumbar \/ Cervical\)/i)).not.toBeInTheDocument()
+
+    // Status filter switches to Completed
+    await userEvent.click(within(roster).getByRole('button', { name: 'Completed' }))
+    expect(await within(roster).findByText(/Cervical Traction 5-Session Rehab/i)).toBeInTheDocument()
+  })
+
+  it('links encounter_id when creating a package, resets form, and navigates to the created plan', async () => {
+    let capturedCreateBody: any = null
+    const patient101: PatientOut = {
+      ...mockPatient,
+      id: 101,
+      urn: 'KH-2026-0001',
+      full_name: 'Aarav Kumar',
+    }
+    const createdPlan: TreatmentPlanOut = {
+      ...mockActivePlan,
+      id: 305,
+      patient_id: 101,
+      patient_urn: 'KH-2026-0001',
+      patient_name: 'Aarav Kumar',
+      encounter_id: 10,
+      plan_name: 'Post-Op ACL Rehab',
+      condition_diagnosis: 'Right ACL tear recovery',
+      total_sessions: 10,
+      completed_sessions: 0,
+      agreed_price_paise: 500000,
+    }
+
+    function LocationProbe() {
+      const loc = useLocation()
+      return <span data-testid="location-probe">{loc.pathname}{loc.search}</span>
+    }
+
+    const mockFetch = vi.fn().mockImplementation((url: string, opts?: any) => {
+      if (url.includes('/api/auth/me')) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          headers: new Headers({ 'content-type': 'application/json' }),
+          text: () => Promise.resolve(JSON.stringify(mockMeDoctor)),
+        })
+      }
+      if (url.endsWith('/api/treatment-plans') && opts?.method === 'POST') {
+        capturedCreateBody = JSON.parse(opts.body)
+        return Promise.resolve({
+          ok: true,
+          status: 201,
+          headers: new Headers({ 'content-type': 'application/json' }),
+          text: () => Promise.resolve(JSON.stringify(createdPlan)),
+        })
+      }
+      if (url.includes('/api/treatment-plans/305/sessions')) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          headers: new Headers({ 'content-type': 'application/json' }),
+          text: () => Promise.resolve(JSON.stringify([])),
+        })
+      }
+      if (url.includes('/api/treatment-plans/305')) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          headers: new Headers({ 'content-type': 'application/json' }),
+          text: () => Promise.resolve(JSON.stringify(createdPlan)),
+        })
+      }
+      if (url.includes('/api/patients/101/treatment-plans')) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          headers: new Headers({ 'content-type': 'application/json' }),
+          text: () => Promise.resolve(JSON.stringify(capturedCreateBody ? [createdPlan] : [])),
+        })
+      }
+      if (url.includes('/api/patients/101')) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          headers: new Headers({ 'content-type': 'application/json' }),
+          text: () => Promise.resolve(JSON.stringify(patient101)),
+        })
+      }
+      if (url.includes('/api/patients')) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          headers: new Headers({ 'content-type': 'application/json' }),
+          text: () => Promise.resolve(JSON.stringify([patient101])),
+        })
+      }
+      return Promise.reject(new Error(`Unhandled: ${url}`))
+    })
+    vi.stubGlobal('fetch', mockFetch)
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter initialEntries={['/doctor/treatment-plans?patient_id=101&encounter_id=10']}>
+          <LocationProbe />
+          <Routes>
+            <Route path="/doctor/treatment-plans" element={<TreatmentPlanWorkspace />} />
+            <Route path="/doctor/treatment-plans/:id" element={<TreatmentPlanWorkspace />} />
+          </Routes>
+        </MemoryRouter>
+      </QueryClientProvider>,
+    )
+
+    await waitFor(() => {
+      expect(screen.getByText(/Aarav Kumar/i)).toBeInTheDocument()
+    })
+
+    await userEvent.click(screen.getByRole('button', { name: /\+ New Package/i }))
+
+    // Badge shows Linked to Consultation #10
+    expect(screen.getByTestId('linked-encounter-badge')).toHaveTextContent('Linked to Consultation #10')
+
+    // Validation blocks <2 char diagnosis before hitting server
+    const planNameInput = screen.getByLabelText(/Package Name/i)
+    const diagInput = screen.getByLabelText(/Condition \/ Diagnosis/i)
+    await userEvent.clear(planNameInput)
+    await userEvent.type(planNameInput, 'Post-Op ACL Rehab')
+    await userEvent.type(diagInput, 'X')
+    await userEvent.click(screen.getByRole('button', { name: 'Create Package' }))
+    expect(capturedCreateBody).toBeNull()
+
+    // Valid diagnosis submits encounter_id: 10
+    await userEvent.clear(diagInput)
+    await userEvent.type(diagInput, 'Right ACL tear recovery')
+    await userEvent.click(screen.getByRole('button', { name: 'Create Package' }))
+
+    await waitFor(() => {
+      expect(capturedCreateBody).not.toBeNull()
+    })
+    expect(capturedCreateBody).toMatchObject({
+      patient_id: 101,
+      encounter_id: 10,
+      plan_name: 'Post-Op ACL Rehab',
+      condition_diagnosis: 'Right ACL tear recovery',
+    })
+
+    // Navigated immediately to the newly created plan route
+    await waitFor(() => {
+      expect(screen.getByTestId('location-probe')).toHaveTextContent('/doctor/treatment-plans/305')
+    })
+    expect(await screen.findByText('Post-Op ACL Rehab')).toBeInTheDocument()
+
+    // Re-opening New Package modal confirms inputs were reset
+    await userEvent.click(screen.getByRole('button', { name: /\+ New Package/i }))
+    expect(screen.getByLabelText(/Package Name/i)).toHaveValue('Physiotherapy Rehabilitation Package')
+    expect(screen.getByLabelText(/Condition \/ Diagnosis/i)).toHaveValue('')
+  })
+
+  it('shows read-only banner and hides write actions for another doctor plan, and filters activePlan out of Other Packages', async () => {
+    const otherDoctorPlan: TreatmentPlanOut = {
+      ...mockActivePlan,
+      id: 210,
+      doctor_id: 99,
+      doctor_name: 'Dr. Kavita Verma',
+      plan_name: 'Shoulder Frozen Joint Rehab',
+    }
+    const secondPlan: TreatmentPlanOut = {
+      ...mockActivePlan,
+      id: 211,
+      doctor_id: 1,
+      plan_name: 'Older Knee Rehab',
+      status: 'COMPLETED',
+      completed_sessions: 5,
+      total_sessions: 5,
+    }
+
+    const mockFetch = vi.fn().mockImplementation((url: string) => {
+      if (url.includes('/api/auth/me')) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          headers: new Headers({ 'content-type': 'application/json' }),
+          text: () => Promise.resolve(JSON.stringify(mockMeDoctor)),
+        })
+      }
+      if (url.includes('/api/treatment-plans/210/sessions')) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          headers: new Headers({ 'content-type': 'application/json' }),
+          text: () => Promise.resolve(JSON.stringify(mockSessions)),
+        })
+      }
+      if (url.includes('/api/treatment-plans/210')) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          headers: new Headers({ 'content-type': 'application/json' }),
+          text: () => Promise.resolve(JSON.stringify(otherDoctorPlan)),
+        })
+      }
+      if (url.includes('/api/patients/102/treatment-plans')) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          headers: new Headers({ 'content-type': 'application/json' }),
+          text: () => Promise.resolve(JSON.stringify([otherDoctorPlan, secondPlan])),
+        })
+      }
+      if (url.includes('/api/patients/102')) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          headers: new Headers({ 'content-type': 'application/json' }),
+          text: () => Promise.resolve(JSON.stringify(mockPatient)),
+        })
+      }
+      return Promise.reject(new Error(`Unhandled: ${url}`))
+    })
+    vi.stubGlobal('fetch', mockFetch)
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter initialEntries={['/doctor/treatment-plans/210']}>
+          <Routes>
+            <Route path="/doctor/treatment-plans/:id" element={<TreatmentPlanWorkspace />} />
+          </Routes>
+        </MemoryRouter>
+      </QueryClientProvider>,
+    )
+
+    expect(await screen.findByText('Shoulder Frozen Joint Rehab')).toBeInTheDocument()
+    const banner = await screen.findByTestId('treatment-plan-readonly-banner')
+    expect(banner).toHaveTextContent(/Dr\. Kavita Verma/i)
+
+    // Write buttons are hidden for cross-doctor plan
+    expect(screen.queryByRole('button', { name: /Log Session/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Cancel Package/i })).not.toBeInTheDocument()
+    await waitFor(() => {
+      expect(screen.getByText(/Session #1/i)).toBeInTheDocument()
+    })
+    expect(screen.queryByRole('button', { name: /\+ Addendum/i })).not.toBeInTheDocument()
+
+    // Other Treatment Packages excludes the currently viewed plan
+    expect(screen.getByText('Other Treatment Packages (1)')).toBeInTheDocument()
+    expect(screen.getByText('Older Knee Rehab')).toBeInTheDocument()
+  })
+
+  it('renders treatment-plan-error alert for 404 or invalid route plan ID instead of silent launchpad', async () => {
+    const mockFetch = vi.fn().mockImplementation((url: string) => {
+      if (url.includes('/api/auth/me')) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          headers: new Headers({ 'content-type': 'application/json' }),
+          text: () => Promise.resolve(JSON.stringify(mockMeDoctor)),
+        })
+      }
+      if (url.includes('/api/treatment-plans/9999')) {
+        return Promise.resolve({
+          ok: false,
+          status: 404,
+          headers: new Headers({ 'content-type': 'application/json' }),
+          text: () => Promise.resolve(JSON.stringify({ code: 'plan_not_found', message: 'Treatment plan not found.' })),
+        })
+      }
+      return Promise.reject(new Error(`Unhandled: ${url}`))
+    })
+    vi.stubGlobal('fetch', mockFetch)
+
+    const { unmount } = render(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter initialEntries={['/doctor/treatment-plans/9999']}>
+          <Routes>
+            <Route path="/doctor/treatment-plans/:id" element={<TreatmentPlanWorkspace />} />
+          </Routes>
+        </MemoryRouter>
+      </QueryClientProvider>,
+    )
+
+    const err404 = await screen.findByTestId('treatment-plan-error')
+    expect(err404).toHaveAttribute('role', 'alert')
+    expect(err404).toHaveTextContent(/Treatment plan not found/i)
+    expect(screen.queryByTestId('active-treatment-plans-roster')).not.toBeInTheDocument()
+    unmount()
+
+    // Non-numeric route plan ID also renders treatment-plan-error
+    render(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter initialEntries={['/doctor/treatment-plans/invalid-id']}>
+          <Routes>
+            <Route path="/doctor/treatment-plans/:id" element={<TreatmentPlanWorkspace />} />
+          </Routes>
+        </MemoryRouter>
+      </QueryClientProvider>,
+    )
+
+    const errInvalid = await screen.findByTestId('treatment-plan-error')
+    expect(errInvalid).toHaveAttribute('role', 'alert')
+    expect(errInvalid).toHaveTextContent(/Invalid treatment plan ID/i)
+    expect(screen.queryByTestId('active-treatment-plans-roster')).not.toBeInTheDocument()
   })
 })

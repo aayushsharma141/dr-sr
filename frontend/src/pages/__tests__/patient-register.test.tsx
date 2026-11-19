@@ -189,6 +189,7 @@ describe('Patient Registration Screen', () => {
         requests.push({ url, method, body: init?.body ? JSON.parse(init.body as string) : undefined })
       }
       if (url.includes('/api/auth/me')) return Promise.resolve(json(200, mockMe))
+      if (url.includes('/api/appointments/501/check-in')) return Promise.resolve(json(200, { ...appointment, status: 'CHECKED_IN' }))
       if (url.includes('/api/opd-arrivals/77/register')) return Promise.resolve(json(201, appointment))
       if (url.includes('/api/opd-arrivals/77')) return Promise.resolve(json(200, arrival))
       if (url.includes('/api/patients/check-duplicate')) return Promise.resolve(json(200, { has_duplicate: false, matching_patient: null }))
@@ -208,7 +209,7 @@ describe('Patient Registration Screen', () => {
         <MemoryRouter initialEntries={['/reception/patients/new?arrival_id=77']}>
           <Routes>
             <Route path="/reception/patients/new" element={<PatientRegister />} />
-            <Route path="/reception/tokens" element={<Destination />} />
+            <Route path="/reception/appointments" element={<Destination />} />
           </Routes>
         </MemoryRouter>
       </QueryClientProvider>,
@@ -221,7 +222,7 @@ describe('Patient Registration Screen', () => {
     await user.type(screen.getByLabelText(/Address \(Village/i), 'Station Road, Ara')
     await user.click(screen.getByRole('button', { name: /register patient/i }))
 
-    expect(await screen.findByText(/Patient registered and linked to token #4/i)).toBeInTheDocument()
+    expect(await screen.findByText(/Patient registered and checked in \(Token #4\)/i)).toBeInTheDocument()
     expect(requests).toHaveLength(1)
     expect(requests[0].url).toContain('/api/opd-arrivals/77/register')
     expect(requests[0].body).toMatchObject({
@@ -349,10 +350,10 @@ describe('Patient Registration Screen', () => {
     // Registration issues no queue token and touches no visit or appointment.
     expect(screen.queryByText(/Allocated Queue Token/i)).not.toBeInTheDocument()
     expect(requests.some((r) => /\/api\/(appointments|visits|encounters)/.test(r))).toBe(false)
-    // The next step opens Check-in & Token with this patient already chosen.
+    // The next step opens Appointments with this patient already chosen.
     expect(screen.getByRole('link', { name: 'Check In & Issue Token' })).toHaveAttribute(
       'href',
-      expect.stringMatching(/^\/reception\/tokens\?patient_id=\d+$/),
+      expect.stringMatching(/^\/reception\/appointments\?patient_id=\d+$/),
     )
   })
 

@@ -1,7 +1,10 @@
 import type { PrescriptionOut } from '../api/types'
 import { Modal } from './Modal'
-import { useClinicSettings } from '../api/queries'
+import * as queries from '../api/queries'
+import { withDoctorTitle } from '../format'
 import {
+  isHardcodedPhysioDoctor,
+  isPhysiotherapyDepartment,
   LetterheadBanner,
   LetterheadContactLine,
   LetterheadDoctors,
@@ -13,11 +16,45 @@ import {
 
 interface PrescriptionPrintProps {
   prescription: PrescriptionOut
+  departmentName?: string | null
   onClose?: () => void
 }
 
-export function PrescriptionPrint({ prescription, onClose }: PrescriptionPrintProps) {
-  const { data: settings } = useClinicSettings()
+function formatIstDate(value: string): string {
+  const trimmed = value.trim()
+  const parsed = /^\d{4}-\d{2}-\d{2}$/.test(trimmed)
+    ? new Date(`${trimmed}T00:00:00+05:30`)
+    : new Date(trimmed)
+  if (Number.isNaN(parsed.getTime())) return trimmed
+  return parsed.toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata' })
+}
+
+function nonPrintableWatermarkLabel(status?: PrescriptionOut['status']): string {
+  switch (status) {
+    case 'DRAFT':
+      return 'DRAFT — NOT AUTHORISED (प्रिंट हेतु मान्य नहीं)'
+    case 'CANCELLED':
+      return 'CANCELLED — VOID (रद्द प्रिस्क्रिप्शन)'
+    case 'SUPERSEDED':
+      return 'SUPERSEDED — REVISED (संशोधित / अप्रचलित)'
+    default:
+      return 'NOT AUTHORISED — DO NOT DISPENSE'
+  }
+}
+
+function getUseDoctorsHook(): typeof queries.useDoctors | null {
+  // Vitest module mocks throw on missing exports via a Proxy; guard so tests mocking only useClinicSettings still pass.
+  try {
+    return typeof queries.useDoctors === 'function' ? queries.useDoctors : null
+  } catch {
+    return null
+  }
+}
+
+export function PrescriptionPrint({ prescription, departmentName, onClose }: PrescriptionPrintProps) {
+  const { data: settings } = queries.useClinicSettings()
+  const useDoctorsHook = getUseDoctorsHook()
+  const doctors = useDoctorsHook ? useDoctorsHook(false).data : undefined
 
   const clinicNameEn = settings?.name_en || 'Kalyan Hospital'
   const addresses = settings?.address_1
@@ -26,7 +63,27 @@ export function PrescriptionPrint({ prescription, onClose }: PrescriptionPrintPr
         ...(settings.address_2 ? [`क्लिनिक: 2. ${settings.address_2}`] : []),
       ]
     : undefined
-  const issuedOn = new Date(prescription.created_at).toLocaleDateString('en-IN')
+  const issuedOn = formatIstDate(prescription.created_at)
+
+  const isPrintable =
+    prescription.status !== undefined
+      ? prescription.status === 'AUTHORISED' && prescription.is_printable !== false
+      : prescription.is_printable ?? false
+
+  const matchedDoctor = doctors?.find((d) => d.id === prescription.doctor_id)
+  const doctorDisplayName = withDoctorTitle(prescription.doctor_name)
+  const isPhysioDoctor = isHardcodedPhysioDoctor(matchedDoctor?.name_en || prescription.doctor_name)
+  const useAuthoringDoctorHeader =
+    (Boolean(departmentName?.trim()) && !isPhysiotherapyDepartment(departmentName)) ||
+    (!isPhysioDoctor && Boolean(prescription.doctor_name || matchedDoctor))
+
+  const authoringDoctor = useAuthoringDoctorHeader
+    ? {
+        name: withDoctorTitle(matchedDoctor?.name_en || prescription.doctor_name),
+        qualification: matchedDoctor?.qualification ?? null,
+        registrationNumber: matchedDoctor?.registration_number ?? null,
+      }
+    : null
 
   // Shared Modal renders this as a print portal on <body>, so printing hides the rest of the
   // app (print.css and index.css) instead of printing the workspace page behind the slip.
@@ -40,11 +97,24 @@ export function PrescriptionPrint({ prescription, onClose }: PrescriptionPrintPr
       className="max-w-4xl"
     >
       {/* Screen action controls - hidden during printing */}
-      <div className="flex flex-wrap justify-end gap-3 print:hidden">
+      <div className="flex flex-wrap items-center justify-end gap-3 print:hidden">
+        {!isPrintable && (
+          <span className="mr-auto text-xs font-semibold text-red-800">
+            Only authorised prescriptions can be printed.
+          </span>
+        )}
         <button
           type="button"
-          onClick={() => window.print()}
-          className="cursor-pointer rounded-lg bg-red-900 px-5 py-2.5 text-sm font-semibold text-white shadow transition hover:bg-red-800"
+          disabled={!isPrintable}
+          title={
+            !isPrintable
+              ? `Printing is disabled because prescription status is ${prescription.status ?? 'not authorised'}.`
+              : undefined
+          }
+          onClick={() => {
+            if (isPrintable) window.print()
+          }}
+          className="cursor-pointer rounded-lg bg-red-900 px-5 py-2.5 text-sm font-semibold text-white shadow transition hover:bg-red-800 disabled:cursor-not-allowed disabled:bg-slate-500 disabled:opacity-70"
         >
           Print Prescription Slip (प्रिंट करें)
         </button>
@@ -64,9 +134,26 @@ export function PrescriptionPrint({ prescription, onClose }: PrescriptionPrintPr
         className="printable-sheet mx-auto mt-4 w-[198mm] max-w-full bg-white p-3 text-slate-900 print:mt-0 print:w-full print:p-0 print:shadow-none"
         data-testid="prescription-sheet"
       >
-        <LetterheadBanner clinicName={clinicNameEn} clinicNameHi={settings?.name_hi} />
+        {/* Non-print:hidden status watermark so native browser Ctrl+P cannot produce a valid-looking slip */}
+        {!isPrintable && (
+          <div
+            role="alert"
+            data-testid="rx-status-watermark"
+            className="mb-2 rounded border-2 border-dashed border-red-700 bg-red-50 px-3 py-2 text-center text-[13px] font-extrabold uppercase tracking-wider text-red-900"
+          >
+            {nonPrintableWatermarkLabel(prescription.status)}
+          </div>
+        )}
+
+        <LetterheadBanner
+          clinicName={clinicNameEn}
+          clinicNameHi={settings?.name_hi}
+          departmentName={departmentName}
+          authoringDoctor={authoringDoctor}
+          useAuthoringDoctorHeader={useAuthoringDoctorHeader}
+        />
         <LetterheadHeaderNote settings={settings} />
-        <LetterheadDoctors />
+        <LetterheadDoctors authoringDoctor={authoringDoctor} />
         <PatientStrip
           values={{
             name: prescription.patient_name,
@@ -90,7 +177,7 @@ export function PrescriptionPrint({ prescription, onClose }: PrescriptionPrintPr
           )}
           <span>
             <span className="font-bold text-slate-600">Doctor (चिकित्सक):</span>{' '}
-            <span className="font-semibold">{prescription.doctor_name}</span>
+            <span className="font-semibold">{doctorDisplayName}</span>
           </span>
         </div>
 
@@ -117,7 +204,7 @@ export function PrescriptionPrint({ prescription, onClose }: PrescriptionPrintPr
               <tr className="border-b border-slate-300 bg-rose-50" style={{ color: PRINT_INK }}>
                 <th className="w-8 border-r border-slate-300 px-2 py-1.5 text-center">#</th>
                 <th className="border-r border-slate-300 px-2 py-1.5">Medicine Name (दवा का नाम)</th>
-                <th className="w-24 border-r border-slate-300 px-2 py-1.5">Dosage (मात्रा)</th>
+                <th className="w-28 border-r border-slate-300 px-2 py-1.5">Dosage / Route (मात्रा)</th>
                 <th className="w-24 border-r border-slate-300 px-2 py-1.5">Frequency (आवृत्ति)</th>
                 <th className="w-20 border-r border-slate-300 px-2 py-1.5">Days (दिन)</th>
                 <th className="px-2 py-1.5">Instructions (निर्देश)</th>
@@ -130,9 +217,19 @@ export function PrescriptionPrint({ prescription, onClose }: PrescriptionPrintPr
                     {item.item_order}
                   </td>
                   <td className="border-r border-slate-200 px-2 py-1.5 font-semibold">
-                    {item.medicine_name}
+                    <div>{item.medicine_name}</div>
+                    {(item.form || item.strength) && (
+                      <div className="text-[11px] font-normal text-slate-600">
+                        {[item.form, item.strength].filter(Boolean).join(' · ')}
+                      </div>
+                    )}
                   </td>
-                  <td className="border-r border-slate-200 px-2 py-1.5">{item.dosage}</td>
+                  <td className="border-r border-slate-200 px-2 py-1.5">
+                    <div>{item.dosage}</div>
+                    {item.route && (
+                      <div className="text-[11px] font-medium text-slate-600">{item.route}</div>
+                    )}
+                  </td>
                   <td className="border-r border-slate-200 px-2 py-1.5 font-medium">{item.frequency}</td>
                   <td className="border-r border-slate-200 px-2 py-1.5">{item.duration_days} d</td>
                   <td className="px-2 py-1.5 text-[11px] text-slate-600">{item.instructions || '—'}</td>
@@ -171,7 +268,7 @@ export function PrescriptionPrint({ prescription, onClose }: PrescriptionPrintPr
           >
             Next Consultation / Follow-up (पुनः परामर्श दिनांक):{' '}
             <span className="font-bold">
-              {new Date(prescription.follow_up_date).toLocaleDateString('en-IN')}
+              {formatIstDate(prescription.follow_up_date)}
             </span>
           </div>
         )}
@@ -180,7 +277,7 @@ export function PrescriptionPrint({ prescription, onClose }: PrescriptionPrintPr
         <div className="mt-10 flex break-inside-avoid items-end justify-between text-[11px]">
           <p className="text-slate-500">Computer generated prescription slip · Valid with clinician seal</p>
           <div className="w-60 border-t border-black pt-1 text-center">
-            <p className="font-bold">{prescription.doctor_name}</p>
+            <p className="font-bold">{doctorDisplayName}</p>
             <p className="text-slate-600">Authorised Signatory (चिकित्सक हस्ताक्षर)</p>
           </div>
         </div>

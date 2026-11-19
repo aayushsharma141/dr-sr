@@ -11,7 +11,7 @@ Guarantees:
 
 from sqlalchemy import select
 
-from kalyan_api.models import AuditLog, Patient
+from kalyan_api.models import AuditLog, ClinicalEncounter, Patient, TreatmentPlan
 
 
 def _create_test_patient(db_session, suffix="20") -> Patient:
@@ -276,3 +276,359 @@ def test_doctor_silo_cross_isolation_on_plans(
         ).status_code
         == 404
     )
+
+
+def test_list_treatment_plans_roster_scoping_and_status_filters(
+    login_client, admin_user, reception_user, doctor_a_user, doctor_b_user, db_session
+):
+    """GET /api/treatment-plans returns only the logged-in doctor's plans filtered by status."""
+    patient = _create_test_patient(db_session, "05")
+    doc_a_client = login_client(doctor_a_user)
+    doc_b_client = login_client(doctor_b_user)
+
+    # Doctor A: ACTIVE plan
+    active_resp = doc_a_client.post(
+        "/api/treatment-plans",
+        json={
+            "patient_id": patient.id,
+            "plan_name": "Doc A Active Package",
+            "condition_diagnosis": "Lumbar Strain",
+            "total_sessions": 6,
+            "agreed_price_paise": 300000,
+        },
+    )
+    assert active_resp.status_code == 201
+    active_id = active_resp.json()["id"]
+
+    # Doctor A: CANCELLED plan
+    cancel_create = doc_a_client.post(
+        "/api/treatment-plans",
+        json={
+            "patient_id": patient.id,
+            "plan_name": "Doc A Cancelled Package",
+            "condition_diagnosis": "Ankle Sprain",
+            "total_sessions": 4,
+            "agreed_price_paise": 200000,
+        },
+    )
+    assert cancel_create.status_code == 201
+    cancelled_id = cancel_create.json()["id"]
+    cancel_patch = doc_a_client.patch(
+        f"/api/treatment-plans/{cancelled_id}",
+        json={
+            "version_id": 1,
+            "status": "CANCELLED",
+            "cancellation_reason": "Patient discontinued treatment",
+        },
+    )
+    assert cancel_patch.status_code == 200
+
+    # Doctor A: COMPLETED plan (1-session plan completed by logging 1 session)
+    complete_create = doc_a_client.post(
+        "/api/treatment-plans",
+        json={
+            "patient_id": patient.id,
+            "plan_name": "Doc A Completed Package",
+            "condition_diagnosis": "Cervical Spasm",
+            "total_sessions": 1,
+            "agreed_price_paise": 50000,
+        },
+    )
+    assert complete_create.status_code == 201
+    completed_id = complete_create.json()["id"]
+    sess_resp = doc_a_client.post(
+        f"/api/treatment-plans/{completed_id}/sessions",
+        json={
+            "vas_score": 2,
+            "modalities": ["IFT"],
+            "clinical_notes": "Single session completed.",
+        },
+    )
+    assert sess_resp.status_code == 201
+
+    # Doctor B: ACTIVE plan (must NOT appear in Doctor A's roster)
+    doc_b_create = doc_b_client.post(
+        "/api/treatment-plans",
+        json={
+            "patient_id": patient.id,
+            "plan_name": "Doc B Active Package",
+            "condition_diagnosis": "Knee Osteoarthritis",
+            "total_sessions": 8,
+            "agreed_price_paise": 400000,
+        },
+    )
+    assert doc_b_create.status_code == 201
+    doc_b_plan_id = doc_b_create.json()["id"]
+
+    # Default status=ACTIVE for Doctor A returns only Doctor A's active plan
+    default_resp = doc_a_client.get("/api/treatment-plans")
+    assert default_resp.status_code == 200
+    default_ids = [p["id"] for p in default_resp.json()]
+    assert active_id in default_ids
+    assert cancelled_id not in default_ids
+    assert completed_id not in default_ids
+    assert doc_b_plan_id not in default_ids
+
+    # status=COMPLETED
+    comp_resp = doc_a_client.get("/api/treatment-plans", params={"status": "COMPLETED"})
+    assert comp_resp.status_code == 200
+    assert [p["id"] for p in comp_resp.json()] == [completed_id]
+
+    # status=CANCELLED
+    canc_resp = doc_a_client.get("/api/treatment-plans", params={"status": "CANCELLED"})
+    assert canc_resp.status_code == 200
+    assert [p["id"] for p in canc_resp.json()] == [cancelled_id]
+
+    # status=ALL returns all 3 of Doctor A's plans, excluding Doctor B's
+    all_resp = doc_a_client.get("/api/treatment-plans", params={"status": "ALL"})
+    assert all_resp.status_code == 200
+    all_ids = {p["id"] for p in all_resp.json()}
+    assert {active_id, cancelled_id, completed_id}.issubset(all_ids)
+    assert doc_b_plan_id not in all_ids
+
+    # Invalid status -> 422
+    invalid_resp = doc_a_client.get("/api/treatment-plans", params={"status": "INVALID"})
+    assert invalid_resp.status_code == 422
+    assert invalid_resp.json()["code"] == "invalid_plan_status"
+
+    # Doctor B sees only Doctor B's active plan
+    doc_b_roster = doc_b_client.get("/api/treatment-plans")
+    assert doc_b_roster.status_code == 200
+    doc_b_ids = [p["id"] for p in doc_b_roster.json()]
+    assert doc_b_plan_id in doc_b_ids
+    assert active_id not in doc_b_ids
+
+    # Reception and Admin -> 403
+    assert login_client(reception_user).get("/api/treatment-plans").status_code == 403
+    assert login_client(admin_user).get("/api/treatment-plans").status_code == 403
+
+
+def test_create_treatment_plan_with_encounter_id_linkage_and_isolation(
+    login_client, doctor_a_user, doctor_b_user, db_session
+):
+    """POST /api/treatment-plans persists encounter_id and rejects cross-patient/doctor links."""
+    patient_1 = _create_test_patient(db_session, "06")
+    patient_2 = _create_test_patient(db_session, "07")
+
+    enc_doc_a = ClinicalEncounter(
+        patient_id=patient_1.id,
+        doctor_id=doctor_a_user.doctor_id,
+        symptoms="Right shoulder pain",
+        clinical_notes="Limited abduction",
+        diagnosis="Frozen Shoulder",
+        created_by_user_id=doctor_a_user.id,
+    )
+    enc_doc_b = ClinicalEncounter(
+        patient_id=patient_1.id,
+        doctor_id=doctor_b_user.doctor_id,
+        symptoms="Neck stiffness",
+        clinical_notes="Paraspinal tenderness",
+        diagnosis="Cervical Strain",
+        created_by_user_id=doctor_b_user.id,
+    )
+    db_session.add_all([enc_doc_a, enc_doc_b])
+    db_session.flush()
+
+    doc_a_client = login_client(doctor_a_user)
+
+    # Valid linkage to own encounter for same patient -> 201
+    ok_resp = doc_a_client.post(
+        "/api/treatment-plans",
+        json={
+            "patient_id": patient_1.id,
+            "encounter_id": enc_doc_a.id,
+            "plan_name": "Shoulder Rehab Linked",
+            "condition_diagnosis": "Frozen Shoulder",
+            "total_sessions": 8,
+            "agreed_price_paise": 400000,
+        },
+    )
+    assert ok_resp.status_code == 201, ok_resp.text
+    created = ok_resp.json()
+    assert created["encounter_id"] == enc_doc_a.id
+    persisted = db_session.get(TreatmentPlan, created["id"])
+    assert persisted is not None
+    assert persisted.encounter_id == enc_doc_a.id
+
+    # Cross-patient encounter_id -> 404
+    cross_patient_resp = doc_a_client.post(
+        "/api/treatment-plans",
+        json={
+            "patient_id": patient_2.id,
+            "encounter_id": enc_doc_a.id,
+            "plan_name": "Mismatched Patient Plan",
+            "condition_diagnosis": "Frozen Shoulder",
+            "total_sessions": 5,
+            "agreed_price_paise": 250000,
+        },
+    )
+    assert cross_patient_resp.status_code == 404
+    assert cross_patient_resp.json()["code"] == "encounter_not_found"
+
+    # Cross-doctor encounter_id -> 404
+    cross_doctor_resp = doc_a_client.post(
+        "/api/treatment-plans",
+        json={
+            "patient_id": patient_1.id,
+            "encounter_id": enc_doc_b.id,
+            "plan_name": "Mismatched Doctor Plan",
+            "condition_diagnosis": "Cervical Strain",
+            "total_sessions": 5,
+            "agreed_price_paise": 250000,
+        },
+    )
+    assert cross_doctor_resp.status_code == 404
+
+
+def test_create_treatment_plan_succeeds_with_merged_secondary_patient_encounter(
+    login_client, doctor_a_user, db_session
+):
+    """create_treatment_plan succeeds when linking an encounter from a merged secondary patient."""
+    master = _create_test_patient(db_session, "10")
+    secondary = _create_test_patient(db_session, "11")
+
+    # Encounter recorded under secondary patient prior to merge
+    enc = ClinicalEncounter(
+        patient_id=secondary.id,
+        doctor_id=doctor_a_user.doctor_id,
+        symptoms="Knee pain",
+        clinical_notes="Meniscus injury suspected",
+        diagnosis="Left knee strain",
+        created_by_user_id=doctor_a_user.id,
+    )
+    db_session.add(enc)
+    db_session.flush()
+
+    # Merge secondary into master
+    secondary.merged_into_id = master.id
+    secondary.is_active = False
+    db_session.flush()
+
+    doc_a_client = login_client(doctor_a_user)
+
+    # Creating treatment plan under master linking the secondary encounter succeeds
+    resp = doc_a_client.post(
+        "/api/treatment-plans",
+        json={
+            "patient_id": master.id,
+            "encounter_id": enc.id,
+            "plan_name": "Knee Rehab Post-Merge",
+            "condition_diagnosis": "Left Knee Strain",
+            "total_sessions": 6,
+            "agreed_price_paise": 300000,
+        },
+    )
+    assert resp.status_code == 201, resp.text
+    data = resp.json()
+    assert data["encounter_id"] == enc.id
+    assert data["patient_id"] in [master.id, secondary.id]
+
+    # Verify downward alias consolidation on master patient plans list
+    list_resp = doc_a_client.get(f"/api/patients/{master.id}/treatment-plans")
+    assert list_resp.status_code == 200
+    plan_ids = [p["id"] for p in list_resp.json()]
+    assert data["id"] in plan_ids
+
+
+def test_patch_treatment_plan_rejects_premature_completed_invariant_11(
+    login_client, doctor_a_user, db_session
+):
+    """Invariant #11: PATCH COMPLETED is rejected when completed_sessions < total_sessions."""
+    patient = _create_test_patient(db_session, "08")
+    doc_a_client = login_client(doctor_a_user)
+
+    create_resp = doc_a_client.post(
+        "/api/treatment-plans",
+        json={
+            "patient_id": patient.id,
+            "plan_name": "Post-ACL Rehab",
+            "condition_diagnosis": "ACL Reconstruction Rehab",
+            "total_sessions": 5,
+            "agreed_price_paise": 500000,
+        },
+    )
+    assert create_resp.status_code == 201
+    plan_id = create_resp.json()["id"]
+
+    # 0/5 completed -> 422 sessions_incomplete
+    premature_0 = doc_a_client.patch(
+        f"/api/treatment-plans/{plan_id}",
+        json={"version_id": 1, "status": "COMPLETED"},
+    )
+    assert premature_0.status_code == 422
+    assert premature_0.json()["code"] == "sessions_incomplete"
+    assert "0/5" in premature_0.json()["message"]
+
+    # Log 1 session -> 1/5 completed -> still 422 sessions_incomplete
+    sess_resp = doc_a_client.post(
+        f"/api/treatment-plans/{plan_id}/sessions",
+        json={
+            "vas_score": 5,
+            "modalities": ["TENS"],
+            "clinical_notes": "Session 1 done.",
+        },
+    )
+    assert sess_resp.status_code == 201
+
+    plan_after_s1 = doc_a_client.get(f"/api/treatment-plans/{plan_id}").json()
+    assert plan_after_s1["completed_sessions"] == 1
+    assert plan_after_s1["status"] == "ACTIVE"
+
+    premature_1 = doc_a_client.patch(
+        f"/api/treatment-plans/{plan_id}",
+        json={"version_id": plan_after_s1["version_id"], "status": "COMPLETED"},
+    )
+    assert premature_1.status_code == 422
+    assert premature_1.json()["code"] == "sessions_incomplete"
+    assert "1/5" in premature_1.json()["message"]
+
+    # Plan must remain ACTIVE
+    refreshed = doc_a_client.get(f"/api/treatment-plans/{plan_id}").json()
+    assert refreshed["status"] == "ACTIVE"
+
+
+def test_ophthalmology_doctor_cannot_create_physiotherapy_treatment_plan(
+    login_client, test_settings, db_session
+):
+    """Non-Physiotherapy doctors receive 403 specialty_required when creating rehab plans."""
+    from kalyan_api.core.security import build_hasher, hash_password
+    from kalyan_api.models import Department, Doctor, User
+    from tests.conftest import TEST_PASSWORD
+
+    patient = _create_test_patient(db_session, "09")
+    ophth_dept = db_session.scalar(select(Department).where(Department.code == "OPHTHALMOLOGY"))
+    if ophth_dept is None:
+        ophth_dept = Department(name_en="Ophthalmology", code="OPHTHALMOLOGY", is_active=True)
+        db_session.add(ophth_dept)
+        db_session.flush()
+
+    ophth_doc = Doctor(name_en="Dr. Eye Specialist", is_active=True)
+    ophth_doc.departments.append(ophth_dept)
+    db_session.add(ophth_doc)
+    db_session.flush()
+
+    ophth_user = User(
+        username="fixture_ophth_plan_doc",
+        full_name="Dr. Eye Specialist",
+        role="DOCTOR",
+        doctor_id=ophth_doc.id,
+        password_hash=hash_password(build_hasher(test_settings), TEST_PASSWORD),
+        must_change_password=False,
+        is_active=True,
+    )
+    db_session.add(ophth_user)
+    db_session.flush()
+
+    ophth_client = login_client(ophth_user)
+    resp = ophth_client.post(
+        "/api/treatment-plans",
+        json={
+            "patient_id": patient.id,
+            "plan_name": "Unauthorized Physio Plan",
+            "condition_diagnosis": "Cervical Pain",
+            "total_sessions": 5,
+            "agreed_price_paise": 250000,
+        },
+    )
+    assert resp.status_code == 403, resp.text
+    assert resp.json()["code"] == "specialty_required"

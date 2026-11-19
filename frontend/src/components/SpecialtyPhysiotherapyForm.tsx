@@ -37,6 +37,7 @@ export function SpecialtyPhysiotherapyForm({
   const updateField = (key: keyof PhysiotherapyFormData, value: any) => {
     if (readOnly) return
     onChange({
+      ...(data.starting_vas === undefined ? { starting_vas: vas } : {}),
       ...data,
       [key]: value,
     })
@@ -67,7 +68,7 @@ export function SpecialtyPhysiotherapyForm({
       {/* Pain Assessment */}
       <div className="bg-neutral-50 p-4 rounded-lg border border-neutral-200 space-y-4">
         <div className="flex items-center justify-between">
-          <h4 className="text-sm font-semibold text-neutral-800 uppercase tracking-wider">
+          <h4 className="text-sm font-semibold text-neutral-800">
             1. Pain Assessment
           </h4>
           <span
@@ -206,7 +207,7 @@ export function SpecialtyPhysiotherapyForm({
 
       {/* Range of Motion (ROM) */}
       <div className="bg-neutral-50 p-4 rounded-lg border border-neutral-200 space-y-4">
-        <h4 className="text-sm font-semibold text-neutral-800 uppercase tracking-wider">
+        <h4 className="text-sm font-semibold text-neutral-800">
           2. Range of Motion (ROM)
         </h4>
 
@@ -287,7 +288,7 @@ export function SpecialtyPhysiotherapyForm({
 
       {/* Strength & Function */}
       <div className="bg-neutral-50 p-4 rounded-lg border border-neutral-200 space-y-4">
-        <h4 className="text-sm font-semibold text-neutral-800 uppercase tracking-wider">
+        <h4 className="text-sm font-semibold text-neutral-800">
           3. Strength & Function
         </h4>
 
@@ -355,7 +356,7 @@ export function SpecialtyPhysiotherapyForm({
 
       {/* Posture & Gait */}
       <div className="bg-neutral-50 p-4 rounded-lg border border-neutral-200 space-y-4">
-        <h4 className="text-sm font-semibold text-neutral-800 uppercase tracking-wider">
+        <h4 className="text-sm font-semibold text-neutral-800">
           4. Posture & Gait
         </h4>
 

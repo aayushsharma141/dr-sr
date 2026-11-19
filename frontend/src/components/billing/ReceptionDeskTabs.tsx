@@ -28,22 +28,22 @@ export function ReceptionDeskTabs({ activeTab, actions, isAdmin }: ReceptionDesk
           <Link
             to="/reception/billing"
             className={`flex shrink-0 items-center gap-2 border-b-2 px-3 sm:px-4 py-2.5 sm:py-3 text-xs sm:text-sm font-bold transition-all whitespace-nowrap cursor-pointer ${activeTab === 'billing'
-              ? 'border-emerald-800 text-emerald-950 font-black'
-              : 'border-transparent text-slate-500 hover:text-slate-800 hover:border-slate-300'
+              ? 'border-brand-700 text-brand-800 bg-brand-50/70'
+              : 'border-transparent text-slate-600 hover:text-slate-900 hover:bg-slate-50'
               }`}
           >
-            <IconRupee className="h-4 w-4 text-emerald-800" />
+            <IconRupee className="h-4 w-4 text-brand-700" />
             Billing &amp; Checkout
           </Link>
         ) : (
           <Link
             to="/reception/billing?tab=ledger"
             className={`flex shrink-0 items-center gap-2 border-b-2 px-3 sm:px-4 py-2.5 sm:py-3 text-xs sm:text-sm font-bold transition-all whitespace-nowrap cursor-pointer ${activeTab === 'ledger' || activeTab === 'billing'
-              ? 'border-emerald-800 text-emerald-950 font-black'
-              : 'border-transparent text-slate-500 hover:text-slate-800 hover:border-slate-300'
+              ? 'border-brand-700 text-brand-800 bg-brand-50/70'
+              : 'border-transparent text-slate-600 hover:text-slate-900 hover:bg-slate-50'
               }`}
           >
-            <IconReceipt className="h-4 w-4 text-emerald-800" />
+            <IconReceipt className="h-4 w-4 text-brand-700" />
             Receipts Ledger
           </Link>
         )}
@@ -51,22 +51,22 @@ export function ReceptionDeskTabs({ activeTab, actions, isAdmin }: ReceptionDesk
         <Link
           to="/reception/billing?tab=dues"
           className={`flex shrink-0 items-center gap-2 border-b-2 px-3 sm:px-4 py-2.5 sm:py-3 text-xs sm:text-sm font-bold transition-all whitespace-nowrap cursor-pointer ${activeTab === 'dues'
-            ? 'border-emerald-800 text-emerald-950 font-black'
-            : 'border-transparent text-slate-500 hover:text-slate-800 hover:border-slate-300'
+            ? 'border-brand-700 text-brand-800 bg-brand-50/70'
+            : 'border-transparent text-slate-600 hover:text-slate-900 hover:bg-slate-50'
             }`}
         >
-          <IconClock className="h-4 w-4 text-emerald-800" />
+          <IconClock className="h-4 w-4 text-brand-700" />
           Pending Dues
         </Link>
 
         <Link
           to="/reception/receipts"
           className={`flex shrink-0 items-center gap-2 border-b-2 px-3 sm:px-4 py-2.5 sm:py-3 text-xs sm:text-sm font-bold transition-all whitespace-nowrap cursor-pointer ${activeTab === 'receipts'
-            ? 'border-emerald-800 text-emerald-950 font-black'
-            : 'border-transparent text-slate-500 hover:text-slate-800 hover:border-slate-300'
+            ? 'border-brand-700 text-brand-800 bg-brand-50/70'
+            : 'border-transparent text-slate-600 hover:text-slate-900 hover:bg-slate-50'
             }`}
         >
-          <IconReceipt className="h-4 w-4 text-emerald-800" />
+          <IconReceipt className="h-4 w-4 text-brand-700" />
           Receipts Desk
         </Link>
 
@@ -74,11 +74,11 @@ export function ReceptionDeskTabs({ activeTab, actions, isAdmin }: ReceptionDesk
           <Link
             to="/reception/reports"
             className={`flex shrink-0 items-center gap-2 border-b-2 px-3 sm:px-4 py-2.5 sm:py-3 text-xs sm:text-sm font-bold transition-all whitespace-nowrap cursor-pointer ${activeTab === 'reports'
-              ? 'border-emerald-800 text-emerald-950 font-black'
-              : 'border-transparent text-slate-500 hover:text-slate-800 hover:border-slate-300'
+              ? 'border-brand-700 text-brand-800 bg-brand-50/70'
+              : 'border-transparent text-slate-600 hover:text-slate-900 hover:bg-slate-50'
               }`}
           >
-            <IconReportMedical className="h-4 w-4 text-emerald-800" />
+            <IconReportMedical className="h-4 w-4 text-brand-700" />
             Daily Collection Report
           </Link>
         )}

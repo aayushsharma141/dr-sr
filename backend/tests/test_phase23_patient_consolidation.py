@@ -2,13 +2,10 @@
 
 from datetime import date
 from decimal import Decimal
-import pytest
-from sqlalchemy import select
 
 from kalyan_api import clock
 from kalyan_api.models import (
     Appointment,
-    AppointmentSource,
     AppointmentStatus,
     BillItem,
     BillItemCategory,
@@ -220,7 +217,7 @@ def test_patient_detail_merged_urn(login_client, admin_user, db_session):
     assert data["merged_into_urn"] == p1.urn
 
     # Search patients matching mobile must populate merged_into_urn
-    search_resp = client.get(f"/api/patients?q=9811199988")
+    search_resp = client.get("/api/patients?q=9811199988&status=all")
     assert search_resp.status_code == 200, search_resp.text
     s_items = search_resp.json()
     p2_result = next((item for item in s_items if item["id"] == p2.id), None)
@@ -264,7 +261,7 @@ def test_checkin_and_booking_blocked_for_merged_patient(
             "patient_id": p2.id,
             "doctor_id": doctor.id,
             "department_id": dept.id,
-            "appointment_date": str(date.today()),
+            "appointment_date": str(clock.ist_today()),
         },
     )
     assert resp_book.status_code == 400
@@ -362,4 +359,108 @@ def test_previous_dues_consolidation_from_merged_patient(
     assert len(dues_after) == 1
     assert dues_after[0].visit_id == v2.id
     assert dues_after[0].due_paise == 50000
+
+
+def test_merged_patient_clinical_encounters_plans_allergies_and_conditions(
+    login_client, admin_user, doctor_a_user, db_session
+):
+    """Master patient lists merged-child encounters/plans and patches migrated clinical rows."""
+    p1 = _create_test_patient(db_session, "URN-CLN-01", "Meena Devi", mobile="9855544433")
+    p2 = _create_test_patient(db_session, "URN-CLN-02", "Meena Devi", mobile="9855544433")
+
+    enc_p2 = ClinicalEncounter(
+        patient_id=p2.id,
+        doctor_id=doctor_a_user.doctor_id,
+        encounter_date=clock.utcnow(),
+        symptoms="Right knee stiffness",
+        clinical_notes="Mild effusion",
+        diagnosis="Osteoarthritis right knee",
+        is_finalised=False,
+        created_by_user_id=doctor_a_user.id,
+    )
+    db_session.add(enc_p2)
+    db_session.commit()
+
+    doc_client = login_client(doctor_a_user)
+    admin_client = login_client(admin_user)
+
+    # Create treatment plan, allergy, and longitudinal condition on secondary patient p2
+    plan_resp = doc_client.post(
+        "/api/treatment-plans",
+        json={
+            "patient_id": p2.id,
+            "plan_name": "Knee Rehab 6-Session",
+            "condition_diagnosis": "Osteoarthritis right knee",
+            "total_sessions": 6,
+            "agreed_price_paise": 300000,
+        },
+    )
+    assert plan_resp.status_code == 201, plan_resp.text
+    plan_id = plan_resp.json()["id"]
+
+    allergy_resp = doc_client.post(
+        f"/api/patients/{p2.id}/allergies",
+        json={
+            "substance": "Penicillin",
+            "category": "DRUG",
+            "severity": "SEVERE",
+            "reaction": "Urticaria",
+        },
+    )
+    assert allergy_resp.status_code == 201, allergy_resp.text
+    allergy = allergy_resp.json()
+
+    cond_resp = doc_client.post(
+        f"/api/patients/{p2.id}/conditions",
+        json={
+            "condition_name": "Type 2 Diabetes Mellitus",
+            "icd10_code": "E11",
+            "status": "ACTIVE",
+        },
+    )
+    assert cond_resp.status_code == 201, cond_resp.text
+    condition = cond_resp.json()
+
+    # Merge p2 -> p1
+    merge_resp = admin_client.post(
+        "/api/admin/patients/merge",
+        json={
+            "master_patient_id": p1.id,
+            "secondary_patient_id": p2.id,
+            "reason": "Clinical alias consolidation test",
+        },
+    )
+    assert merge_resp.status_code == 200, merge_resp.text
+
+    # Master patient lists merged-child encounters
+    enc_list = doc_client.get(f"/api/patients/{p1.id}/encounters")
+    assert enc_list.status_code == 200, enc_list.text
+    assert any(item["id"] == enc_p2.id for item in enc_list.json())
+
+    # Master patient lists merged-child treatment plans
+    plan_list = doc_client.get(f"/api/patients/{p1.id}/treatment-plans")
+    assert plan_list.status_code == 200, plan_list.text
+    assert any(item["id"] == plan_id for item in plan_list.json())
+
+    # Master patient can PATCH migrated allergy
+    patch_allergy = doc_client.patch(
+        f"/api/patients/{p1.id}/allergies/{allergy['id']}",
+        json={
+            "version_id": allergy["version_id"],
+            "reaction": "Severe rash and swelling",
+        },
+    )
+    assert patch_allergy.status_code == 200, patch_allergy.text
+    assert patch_allergy.json()["reaction"] == "Severe rash and swelling"
+
+    # Master patient can PATCH migrated longitudinal condition
+    patch_cond = doc_client.patch(
+        f"/api/patients/{p1.id}/conditions/{condition['id']}",
+        json={
+            "version_id": condition["version_id"],
+            "status": "RESOLVED",
+        },
+    )
+    assert patch_cond.status_code == 200, patch_cond.text
+    assert patch_cond.json()["status"] == "RESOLVED"
 

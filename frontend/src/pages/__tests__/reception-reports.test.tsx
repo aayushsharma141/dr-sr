@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { cleanup, render, screen } from '@testing-library/react'
+import { cleanup, render, screen, within } from '@testing-library/react'
 import { MemoryRouter } from 'react-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ReceptionReportsPage } from '../ReceptionReportsPage'
@@ -177,5 +177,37 @@ describe('ReceptionReportsPage', () => {
     renderPage([], true)
 
     expect(await screen.findByRole('alert')).toBeInTheDocument()
+  })
+
+  it('renders cashier drawer reconciliation and service breakdown', async () => {
+    renderPage()
+
+    // Top desk tabs
+    const deskNav = await screen.findByRole('navigation', { name: 'Reception Desk Financial Tabs' })
+    expect(within(deskNav).getByRole('link', { name: /Billing & Checkout/i })).toHaveAttribute(
+      'href',
+      '/reception/billing',
+    )
+    expect(within(deskNav).getByRole('link', { name: /Receipts Desk/i })).toHaveAttribute(
+      'href',
+      '/reception/receipts',
+    )
+
+    // Cashier Drawer Reconciliation heading and breakdown
+    expect(await screen.findByText('Cashier Drawer Reconciliation')).toBeInTheDocument()
+    expect(screen.getByText('Physical Cash in Drawer')).toBeInTheDocument()
+    expect(screen.getByText('UPI / QR Collections')).toBeInTheDocument()
+    expect(screen.getByText('Card / POS Terminal')).toBeInTheDocument()
+
+    // Specific mode totals from mockPayments (500 cash, 300 upi)
+    expect(screen.getByText('₹500.00')).toBeInTheDocument()
+    expect(screen.getByText('₹300.00')).toBeInTheDocument()
+
+    // Department & Service Breakdown
+    expect(screen.getByText('Department & Service Breakdown')).toBeInTheDocument()
+    expect(screen.getAllByText(/OPD Consultation/i).length).toBeGreaterThan(0)
+
+    // Print button exists
+    expect(screen.getByRole('button', { name: /Print Closing Sheet/i })).toBeInTheDocument()
   })
 })

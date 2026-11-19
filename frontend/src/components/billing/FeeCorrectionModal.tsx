@@ -5,6 +5,7 @@ import { formatPaise, paiseToRupees, rupeesToPaise } from '../../format'
 import { ConflictBanner } from '../ConflictBanner'
 import { InlineAlert } from '../InlineAlert'
 import { Modal } from '../Modal'
+import { toast } from '../ToastHost'
 
 export interface FeeCorrectionModalProps {
   open: boolean
@@ -99,6 +100,13 @@ export function FeeCorrectionModal({
           reason: trimmedReason,
         },
       })
+      toast.success(
+        kind === 'WAIVER'
+          ? 'Consultation fee waived.'
+          : kind === 'DISCOUNT'
+            ? 'Consultation fee discount applied.'
+            : 'Consultation fee corrected.',
+      )
       onClose()
     } catch (err: unknown) {
       if (err instanceof ApiError && err.status === 409) {
@@ -141,7 +149,7 @@ export function FeeCorrectionModal({
 
         {/* S6 copy: "Original ₹X → Revised ₹Y" */}
         <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-center">
-          <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">Fee Adjustment</p>
+          <p className="text-xs font-bold text-slate-500">Fee Adjustment</p>
           <p className="text-base font-bold font-mono text-slate-900 mt-1">
             Original {formatPaise(currentAmountPaise)} → Revised {newAmountPaise != null ? formatPaise(newAmountPaise) : '—'}
           </p>
@@ -149,7 +157,7 @@ export function FeeCorrectionModal({
 
         {/* Kind selector (segmented options) */}
         <div className="space-y-1.5">
-          <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
+          <label className="block text-xs font-bold text-slate-700">
             Adjustment Type *
           </label>
           <div className="grid grid-cols-3 gap-2">
@@ -176,7 +184,7 @@ export function FeeCorrectionModal({
 
         {/* Amount input */}
         <div className="space-y-1">
-          <label htmlFor="fee-adjust-amount" className="block text-xs font-bold uppercase tracking-wider text-slate-700">
+          <label htmlFor="fee-adjust-amount" className="block text-xs font-bold text-slate-700">
             {kind === 'WAIVER' ? 'New Amount (₹)' : kind === 'DISCOUNT' ? 'Discounted Amount (₹) *' : 'Corrected Amount (₹) *'}
           </label>
           <input
@@ -195,7 +203,7 @@ export function FeeCorrectionModal({
         {/* Reason field (3-500 characters with counter) */}
         <div className="space-y-1">
           <div className="flex items-center justify-between">
-            <label htmlFor="fee-adjust-reason" className="block text-xs font-bold uppercase tracking-wider text-slate-700">
+            <label htmlFor="fee-adjust-reason" className="block text-xs font-bold text-slate-700">
               Reason *
             </label>
             <span

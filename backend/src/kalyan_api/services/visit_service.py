@@ -19,6 +19,7 @@ from sqlalchemy.orm import Session
 from kalyan_api import clock
 from kalyan_api.core.errors import ApiError, require_version
 from kalyan_api.models import Appointment, ConsultationStatus, Patient, Visit, VisitStatus
+from kalyan_api.services.code_sequence_service import allocate_visit_code
 
 ACTIVE_CONSULTATION_STATUSES = (
     ConsultationStatus.WAITING.value,
@@ -79,6 +80,7 @@ def join_or_open_visit(
         return visit, False
 
     visit = Visit(
+        visit_code=allocate_visit_code(session, today),
         patient_id=patient_id,
         visit_date=today,
         status=VisitStatus.OPEN.value,

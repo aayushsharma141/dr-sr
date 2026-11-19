@@ -3,6 +3,8 @@
  * Matches backend schemas and permissions exactly.
  */
 
+import type { BillPaymentOut } from './bill'
+
 export type Role = 'ADMIN' | 'RECEPTION' | 'DOCTOR'
 
 export type ApiErrorCode =
@@ -63,6 +65,7 @@ export interface DoctorTodayOut {
   in_consultation: number
   done: number
   arrived_waiting?: number
+  pending_arrivals?: number
   department?: string
   next_token?: number | null
 }
@@ -215,6 +218,25 @@ export interface DoctorOverview {
   doctor_id: number
   department_id: number | null
   doctor_name_en: string
+}
+
+export interface DoctorDashboardTodayGlance {
+  total: number
+  completed: number
+  in_progress: number
+  pending: number
+}
+
+export interface DoctorDashboardSummary {
+  doctor_id: number
+  doctor_name_en: string
+  specialty_name: string
+  waiting_count: number
+  in_consultation_count: number
+  scheduled_count: number
+  completed_count: number
+  pending_drafts_count: number
+  today_glance: DoctorDashboardTodayGlance
 }
 
 export type AreaOverview = AdminOverview | ReceptionOverview | DoctorOverview
@@ -513,6 +535,7 @@ export interface ClinicSettingsOut {
   print_footer_en: string | null
   print_footer_hi: string | null
   consultation_validity_days: number
+  token_reset_policy?: 'DAILY'
   version_id: number
   created_at: string
   updated_at: string
@@ -534,6 +557,7 @@ export interface ClinicSettingsUpdate {
   print_footer_en?: string | null
   print_footer_hi?: string | null
   consultation_validity_days: number
+  token_reset_policy?: 'DAILY'
   version_id: number
   /** Must be true when the cycle changes after receipts exist in the current cycle. */
   confirm_receipt_cycle_change?: boolean
@@ -692,11 +716,19 @@ export interface PatientOut {
   gender: 'M' | 'F' | 'O'
   dob: string | null
   age_years: number
+  /** Birthday-aware age derived from dob (IST today) with age_years fallback; always returned by backend. */
+  computed_age_years?: number
   mobile: string
   address: string
   district: string
   state: string
   emergency_contact: string | null
+  alternate_mobile?: string | null
+  email?: string | null
+  blood_group?: string | null
+  pin_code?: string | null
+  guardian_relationship?: string | null
+  medical_history_notes?: string | null
   allergies: string
   notes: string | null
   photo_path: string | null
@@ -708,6 +740,9 @@ export interface PatientOut {
   is_archived?: boolean
   archived_at?: string | null
   archive_reason?: string | null
+  visit_count?: number | null
+  last_visit_date?: string | null
+  outstanding_paise?: number | null
   version_id: number
   created_at: string
   updated_at: string
@@ -724,6 +759,12 @@ export interface PatientCreate {
   district: string
   state: string
   emergency_contact?: string | null
+  alternate_mobile?: string | null
+  email?: string | null
+  blood_group?: string | null
+  pin_code?: string | null
+  guardian_relationship?: string | null
+  medical_history_notes?: string | null
   allergies: string
   notes?: string | null
 }
@@ -740,9 +781,145 @@ export interface PatientUpdate {
   district?: string
   state?: string
   emergency_contact?: string | null
+  alternate_mobile?: string | null
+  email?: string | null
+  blood_group?: string | null
+  pin_code?: string | null
+  guardian_relationship?: string | null
+  medical_history_notes?: string | null
   allergies?: string
   notes?: string | null
   is_active?: boolean
+}
+
+// ==============================================================================
+// Patient Workspace & Structured Clinical Allergies (Milestone 1)
+// ==============================================================================
+
+export type AllergyCategory = 'DRUG' | 'FOOD' | 'ENVIRONMENTAL' | 'OTHER'
+export type AllergySeverity = 'MILD' | 'MODERATE' | 'SEVERE' | 'LIFE_THREATENING'
+export type AllergyStatus = 'ACTIVE' | 'INACTIVE' | 'RESOLVED'
+
+/** Safety-alert-only allergy projection (RECEPTION & DOCTOR; strictly null for ADMIN). */
+export interface AllergySafetyAlertOut {
+  has_allergies: boolean
+  count: number
+  highest_severity: AllergySeverity | null
+  alert_labels: string[]
+}
+
+/** Full structured clinical allergy record (DOCTOR only under D-04). */
+export interface PatientAllergyOut {
+  id: number
+  patient_id: number
+  substance: string
+  category: AllergyCategory
+  severity: AllergySeverity
+  reaction: string | null
+  clinical_notes: string | null
+  status: AllergyStatus
+  doctor_id: number | null
+  recorded_by_user_id: number | null
+  recorded_by_username: string | null
+  created_at: string
+  updated_at: string
+  version_id: number
+}
+
+export interface PatientAllergyCreate {
+  substance: string
+  category?: AllergyCategory
+  severity?: AllergySeverity
+  reaction?: string | null
+  clinical_notes?: string | null
+  status?: AllergyStatus
+}
+
+export interface PatientAllergyUpdate {
+  version_id: number
+  substance?: string | null
+  category?: AllergyCategory | null
+  severity?: AllergySeverity | null
+  reaction?: string | null
+  clinical_notes?: string | null
+  status?: AllergyStatus | null
+}
+
+export interface LatestVisitBrief {
+  visit_id: number
+  visit_code: string
+  visit_date: string
+  status: string
+  token_numbers: number[]
+  doctors: string[]
+  departments: string[]
+  consultation_count: number
+  completed_consultations: number
+}
+
+export interface LatestEncounterBrief {
+  encounter_id: number
+  encounter_code: string
+  encounter_date: string
+  doctor_name: string
+  department_name: string | null
+  is_finalised: boolean
+  diagnosis_summary: string | null
+}
+
+/** Role-redacted Patient Workspace KPI summary (GET /api/patients/{id}/summary). */
+export interface PatientSummaryOut {
+  patient_id: number
+  urn: string
+  total_visits: number
+  active_treatment_plans: number
+  latest_visit: LatestVisitBrief | null
+  /** Populated for RECEPTION & DOCTOR; strictly null for ADMIN. */
+  allergy_alert: AllergySafetyAlertOut | null
+  /** Full clinical records strictly for DOCTOR; null for RECEPTION & ADMIN. */
+  active_allergies: PatientAllergyOut[] | null
+  /** Clinical KPIs: DOCTOR only (null for ADMIN & RECEPTION under D-04). */
+  prescriptions_count: number | null
+  active_conditions_count: number | null
+  latest_encounter: LatestEncounterBrief | null
+  /** Financial KPIs: ADMIN & RECEPTION only (null for DOCTOR per AGENTS.md #7). */
+  total_billed_paise: number | null
+  total_paid_paise: number | null
+  total_refunded_paise: number | null
+  outstanding_paise: number | null
+}
+
+export interface EncounterLinkBrief {
+  encounter_id: number
+  encounter_code: string
+  is_finalised: boolean
+  doctor_name: string
+}
+
+export interface PatientVisitHistoryItem {
+  visit_id: number
+  visit_code: string
+  visit_date: string
+  status: string
+  token_numbers: number[]
+  doctors: string[]
+  departments: string[]
+  consultation_count: number
+  completed_consultations: number
+  /** DOCTOR only (null for ADMIN & RECEPTION under D-04). */
+  encounter_links: EncounterLinkBrief[] | null
+  /** ADMIN & RECEPTION only (null for DOCTOR per AGENTS.md #7). */
+  bill_total_paise: number | null
+  paid_paise: number | null
+  due_paise: number | null
+  payment_status: string | null
+}
+
+export interface PatientVisitHistoryResponse {
+  items: PatientVisitHistoryItem[]
+  total: number
+  limit: number
+  offset: number
 }
 
 export interface DuplicateCheckResponse {
@@ -878,11 +1055,19 @@ export interface OpdArrival {
   token_number: number
   priority_level: PriorityLevel
   priority_reason?: string | null
-  status: 'TO_ARRIVE' | 'REGISTERED'
+  cancellation_reason?: string | null
+  status: 'TO_ARRIVE' | 'REGISTERED' | 'CANCELLED'
   version_id: number
   created_at: string
   patient_id?: number | null
   appointment_id?: number | null
+}
+
+export interface OpdArrivalList {
+  total: number
+  arrivals: OpdArrival[]
+  limit?: number | null
+  offset?: number
 }
 
 export interface OpdArrivalCreate {
@@ -917,6 +1102,7 @@ export interface WalkInCreate extends CheckInDetails {
 
 export interface CheckInRequest extends CheckInDetails {
   version_id: number
+  patient_id?: number
 }
 
 /** Register a first-time patient and check them in, in one transaction (OD-22-03). */
@@ -962,9 +1148,23 @@ export interface AppointmentStatusUpdate {
   cancellation_reason?: string | null
 }
 
+export interface AppointmentBucketCounts {
+  active: number
+  to_arrive: number
+  checked_in: number
+  completed: number
+  no_show: number
+  cancelled: number
+  rescheduled?: number
+  all: number
+}
+
 export interface AppointmentListResponse {
   total: number
   appointments: Appointment[]
+  limit?: number | null
+  offset?: number
+  bucket_counts?: AppointmentBucketCounts | null
 }
 
 export interface DoctorQueueItem {
@@ -1004,6 +1204,8 @@ export interface DoctorQueueResponse {
 export interface EncounterCreate {
   patient_id: number
   appointment_id?: number | null
+  /** Optional linked visit ID for walk-in encounters. */
+  visit_id?: number | null
   /** Omit to let the server take it from the appointment or the doctor's only department. */
   department_id?: number | null
   symptoms: string
@@ -1033,6 +1235,7 @@ export interface AddendumRead {
 
 export interface EncounterRead {
   id: number
+  encounter_code?: string
   patient_id: number
   patient_urn: string
   patient_name: string
@@ -1041,6 +1244,7 @@ export interface EncounterRead {
   doctor_id: number
   doctor_name: string
   appointment_id: number | null
+  visit_id?: number | null
   department_id?: number | null
   encounter_date: string
   symptoms: string
@@ -1110,6 +1314,7 @@ export interface PrescriptionItemOut {
 export interface PrescriptionCreate {
   patient_id: number
   encounter_id?: number | null
+  appointment_id?: number | null
   status?: string
   diagnosis?: string | null
   dietary_advice?: string | null
@@ -1127,8 +1332,20 @@ export interface PrescriptionUpdate {
   version_id?: number | null
 }
 
+export type PrescriptionStatus = 'DRAFT' | 'AUTHORISED' | 'SUPERSEDED' | 'CANCELLED'
+
 export interface PrescriptionCancelRequest {
   reason: string
+}
+
+export interface PrescriptionAmendRequest {
+  amendment_reason: string
+  diagnosis?: string | null
+  dietary_advice?: string | null
+  general_advice?: string | null
+  follow_up_date?: string | null
+  items: PrescriptionItemCreate[]
+  authorise_immediately?: boolean
 }
 
 export interface PrescriptionOut {
@@ -1141,7 +1358,10 @@ export interface PrescriptionOut {
   doctor_id: number
   doctor_name: string
   encounter_id: number | null
-  status: string
+  status: PrescriptionStatus
+  revision_number?: number
+  supersedes_prescription_id?: number | null
+  amendment_reason?: string | null
   authorised_at?: string | null
   cancelled_at?: string | null
   cancellation_reason?: string | null
@@ -1165,7 +1385,10 @@ export interface PrescriptionSummary {
   doctor_id: number
   doctor_name: string
   encounter_id: number | null
-  status: string
+  status: PrescriptionStatus
+  revision_number?: number
+  supersedes_prescription_id?: number | null
+  amendment_reason?: string | null
   diagnosis: string
   items_count: number
   follow_up_date: string | null
@@ -1330,7 +1553,8 @@ export interface VisitConsultation {
 
 export interface VisitPayment {
   id: number
-  appointment_id: number
+  visit_id?: number | null
+  appointment_id: number | null
   receipt_number: string
   amount_paise: number
   payment_method: PaymentMethod
@@ -1341,6 +1565,7 @@ export interface VisitPayment {
 
 export interface VisitRead {
   id: number
+  visit_code?: string
   patient_id: number
   patient_urn: string
   patient_name: string
@@ -1603,6 +1828,8 @@ export interface TemplateResponseRead {
   updated_at: string
 }
 
+export type FollowUpStatus = 'PENDING' | 'BOOKED' | 'CLOSED'
+
 export interface FollowUpRecommendationCreate {
   recommended_date: string
   recommended_doctor_id?: number | null
@@ -1616,6 +1843,8 @@ export interface FollowUpCloseRequest {
 export interface FollowUpBookRequest {
   appointment_date?: string | null
   notes?: string | null
+  department_id?: number | null
+  override_reason?: string | null
 }
 
 export interface DoctorFollowUpResponse {
@@ -1650,7 +1879,7 @@ export interface ReceptionFollowUpResponse {
   recommended_doctor_id: number
   recommended_doctor_name: string
   recommended_date: string
-  status: string
+  status: FollowUpStatus
   booked_appointment_id?: number | null
   created_at: string
 }
@@ -1710,6 +1939,443 @@ export interface PatientExportRequest {
   scope: ExportScope
   fields: string[]
 }
+
+// ==============================================================================
+// Milestone 2: Longitudinal Conditions, Encounter Diagnoses & Investigations
+// ==============================================================================
+
+export type ConditionStatus = 'ACTIVE' | 'RESOLVED' | 'INACTIVE'
+
+export interface PatientConditionCreate {
+  condition_name: string
+  icd10_code?: string | null
+  status?: ConditionStatus
+  onset_date?: string | null
+  resolved_date?: string | null
+  notes?: string | null
+}
+
+export interface PatientConditionUpdate {
+  version_id: number
+  condition_name?: string | null
+  icd10_code?: string | null
+  status?: ConditionStatus | null
+  onset_date?: string | null
+  resolved_date?: string | null
+  notes?: string | null
+}
+
+export interface PatientConditionOut {
+  id: number
+  patient_id: number
+  doctor_id: number
+  doctor_name: string | null
+  condition_name: string
+  icd10_code: string | null
+  status: ConditionStatus
+  onset_date: string | null
+  resolved_date: string | null
+  notes: string | null
+  created_at: string
+  updated_at: string
+  version_id: number
+}
+
+export type DiagnosisType = 'PRIMARY' | 'SECONDARY' | 'PROVISIONAL'
+export type DiagnosisStatus = 'ACTIVE' | 'RESOLVED' | 'INACTIVE'
+
+export interface EncounterDiagnosisCreate {
+  diagnosis_name: string
+  icd10_code?: string | null
+  diagnosis_type?: DiagnosisType
+  status?: DiagnosisStatus
+  onset_date?: string | null
+  notes?: string | null
+  patient_condition_id?: number | null
+  promote_to_condition?: boolean
+}
+
+export interface EncounterDiagnosisUpdate {
+  diagnosis_name?: string | null
+  icd10_code?: string | null
+  diagnosis_type?: DiagnosisType | null
+  status?: DiagnosisStatus | null
+  onset_date?: string | null
+  notes?: string | null
+  patient_condition_id?: number | null
+}
+
+export interface EncounterDiagnosisOut {
+  id: number
+  encounter_id: number
+  encounter_code: string | null
+  patient_id: number
+  doctor_id: number
+  doctor_name: string | null
+  diagnosis_name: string
+  icd10_code: string | null
+  diagnosis_type: DiagnosisType
+  status: DiagnosisStatus
+  onset_date: string | null
+  notes: string | null
+  patient_condition_id: number | null
+  created_at: string
+  updated_at: string
+}
+
+export type InvestigationCategory = 'LAB' | 'IMAGING' | 'PATHOLOGY' | 'DIAGNOSTIC' | 'OTHER'
+export type InvestigationPriority = 'ROUTINE' | 'URGENT'
+export type InvestigationStatus = 'ORDERED' | 'SAMPLE_COLLECTED' | 'COMPLETED' | 'CANCELLED'
+
+export interface InvestigationOrderCreate {
+  category: InvestigationCategory
+  test_name: string
+  instructions?: string | null
+  priority?: InvestigationPriority
+}
+
+export interface InvestigationStatusUpdate {
+  status: InvestigationStatus
+  cancelled_reason?: string | null
+  version_id: number
+}
+
+export interface InvestigationResultCreate {
+  summary_text: string
+  result_value?: string | null
+  unit?: string | null
+  reference_range?: string | null
+  is_abnormal?: boolean
+  reported_at?: string | null
+  document_id?: number | null
+}
+
+export interface InvestigationResultOut {
+  id: number
+  order_id: number
+  patient_id: number
+  document_id?: number | null
+  document_title?: string | null
+  summary_text: string
+  result_value: string | null
+  unit: string | null
+  reference_range: string | null
+  is_abnormal: boolean
+  reported_at: string
+  recorded_by_user_id: number
+  recorded_by_username: string | null
+  created_at: string
+}
+
+export interface InvestigationOrderOut {
+  id: number
+  encounter_id: number
+  encounter_code: string
+  patient_id: number
+  doctor_id: number
+  doctor_name: string
+  category: InvestigationCategory
+  test_name: string
+  instructions: string | null
+  priority: InvestigationPriority
+  status: InvestigationStatus
+  cancelled_reason: string | null
+  ordered_at: string
+  updated_at: string
+  version_id: number
+  results: InvestigationResultOut[]
+}
+
+// ==============================================================================
+// Milestone 3: Append-Only Patient Financial Ledger & Admin Refunds
+// ==============================================================================
+
+export type LedgerEntryType =
+  | 'CHARGE'
+  | 'CHARGE_ADJUSTMENT'
+  | 'CHARGE_VOID'
+  | 'PACKAGE_CHARGE'
+  | 'PACKAGE_ADJUSTMENT'
+  | 'LEGACY_CHARGE'
+  | 'PAYMENT'
+  | 'PAYMENT_REVERSAL'
+  | 'REFUND'
+
+export type LedgerDirection = 'DEBIT' | 'CREDIT'
+
+export type LedgerReferenceType =
+  | 'BILL_ITEM'
+  | 'BILL_ITEM_ADJUSTMENT'
+  | 'TREATMENT_PLAN'
+  | 'APPOINTMENT'
+  | 'PAYMENT'
+  | 'REFUND'
+
+export interface RefundCreateRequest {
+  amount_paise: number
+  refund_method: PaymentMethod
+  reason: string
+}
+
+export interface RefundOut {
+  id: number
+  refund_number: string
+  payment_id: number
+  payment_receipt_number: string | null
+  patient_id: number
+  visit_id: number | null
+  amount_paise: number
+  refund_method: string
+  reason: string
+  refunded_by_user_id: number
+  refunded_by_username: string
+  created_at: string
+}
+
+export interface LedgerEntryOut {
+  id: number
+  patient_id: number
+  visit_id: number | null
+  entry_type: LedgerEntryType | string
+  direction: LedgerDirection
+  amount_paise: number
+  signed_amount_paise: number
+  running_balance_paise: number
+  reference_type: LedgerReferenceType | string
+  reference_id: number
+  description: string
+  actor_user_id: number | null
+  actor_username: string | null
+  occurred_at: string
+  created_at: string
+}
+
+export interface LedgerPaymentItemOut extends PaymentOut {
+  refunded_paise: number
+  remaining_refundable_paise: number
+}
+
+export interface LedgerVisitBillOut {
+  visit_id: number
+  visit_code: string
+  visit_date: string
+  status: string
+  bill_total_paise: number
+  paid_paise: number
+  refunded_paise: number
+  due_paise: number
+}
+
+export interface PatientLedgerResponse {
+  patient_id: number
+  patient_urn: string
+  total_billed_paise: number
+  total_paid_paise: number
+  total_refunded_paise: number
+  outstanding_paise: number
+  ledger_balance_paise: number
+  entries: LedgerEntryOut[]
+  total_entries: number
+  limit: number
+  offset: number
+  payments: LedgerPaymentItemOut[]
+  refunds: RefundOut[]
+  visits: LedgerVisitBillOut[]
+}
+
+// ==============================================================================
+// Milestone 4: Patient Documents, Directory Filters & Unified Visit Workspace
+// ==============================================================================
+
+export type DocumentCategory =
+  | 'LAB_REPORT'
+  | 'IMAGING'
+  | 'PRESCRIPTION_SCAN'
+  | 'REFERRAL'
+  | 'ID_PROOF'
+  | 'INSURANCE'
+  | 'DISCHARGE_SUMMARY'
+  | 'OTHER'
+
+export interface PatientDocumentOut {
+  id: number
+  patient_id: number
+  visit_id: number | null
+  visit_code: string | null
+  encounter_id: number | null
+  encounter_code: string | null
+  title: string
+  category: DocumentCategory | string
+  is_clinical: boolean
+  original_filename: string
+  mime_type: string
+  file_size_bytes: number
+  sha256_hex: string
+  notes: string | null
+  uploaded_by_user_id: number
+  uploaded_by_username: string | null
+  doctor_id: number | null
+  is_archived: boolean
+  archived_at: string | null
+  archived_by_user_id: number | null
+  created_at: string
+}
+
+export interface PatientDocumentUploadInput {
+  file: File
+  title: string
+  category: DocumentCategory
+  is_clinical?: boolean
+  visit_id?: number | null
+  encounter_id?: number | null
+  notes?: string | null
+}
+
+export type PatientDirectoryStatus = 'active' | 'archived' | 'all'
+export type PatientDirectorySort = 'recent' | 'name' | 'urn'
+
+export interface PatientDirectoryFilters {
+  status?: PatientDirectoryStatus
+  gender?: 'M' | 'F' | 'O' | '' | null
+  district?: string | null
+  has_due_balance?: boolean | null
+  sort_by?: PatientDirectorySort
+}
+
+export interface VisitWorkspacePatientStrip {
+  patient_id: number
+  urn: string
+  full_name: string
+  computed_age_years: number
+  gender: 'M' | 'F' | 'O' | string
+  mobile: string
+  is_active: boolean
+  is_archived: boolean
+  merged_into_id: number | null
+  merged_into_urn: string | null
+  /** Populated for DOCTOR and RECEPTION; strictly null for ADMIN (D-04). */
+  allergy_alert: AllergySafetyAlertOut | null
+}
+
+export interface VisitWorkspaceVisitMeta {
+  visit_id: number
+  visit_code: string
+  visit_date: string
+  status: VisitStatus | string
+  referral_source: ReferralSource | string | null
+  referrer_name: string | null
+  token_numbers: number[]
+}
+
+export interface WorkspaceTemplateSummaryOut {
+  template_code: string
+  template_name_en: string
+  template_version_id: number
+  version_number: number
+  response_data: Record<string, unknown>
+  updated_at: string
+}
+
+export interface WorkspaceClinicalChargeOut {
+  id: number
+  category: string
+  source: string
+  status: string
+  description: string
+  unit: string | null
+  quantity: string | number
+  rate_paise: number
+  amount_paise: number
+  treatment_plan_id: number | null
+}
+
+export interface VisitWorkspaceConsultationOut {
+  appointment_id: number | null
+  token_number: number | null
+  doctor_id: number
+  doctor_name: string
+  department_name: string | null
+  consultation_status: ConsultationStatus | string | null
+  visit_kind: VisitKind | string | null
+  priority_level: PriorityLevel | string | null
+
+  /** Clinical bundle: DOCTOR only (strictly null for ADMIN and RECEPTION under D-04). */
+  encounter_id: number | null
+  encounter_code: string | null
+  is_finalised: boolean | null
+  vitals: VitalObservationResponse | null
+  symptoms: string | null
+  clinical_notes: string | null
+  diagnosis: string | null
+  template_response_summary: WorkspaceTemplateSummaryOut | null
+  diagnoses: EncounterDiagnosisOut[] | null
+  investigations: InvestigationOrderOut[] | null
+  prescriptions: PrescriptionOut[] | null
+  treatment_plans: TreatmentPlanOut[] | null
+  follow_up: DoctorFollowUpResponse | null
+  addenda: AddendumRead[] | null
+  /** Q13: own consultation fee + own doctor-authored lines only (empty for other doctors' rows). */
+  clinical_charges: WorkspaceClinicalChargeOut[] | null
+}
+
+export interface VisitWorkspaceFinancialSummaryOut {
+  bill_total_paise: number
+  paid_paise: number
+  refunded_paise: number
+  due_paise: number
+  payment_status: string
+  payments: BillPaymentOut[]
+  refunds: RefundOut[]
+}
+
+export interface VisitWorkspaceOut {
+  patient: VisitWorkspacePatientStrip
+  visit: VisitWorkspaceVisitMeta
+  consultations: VisitWorkspaceConsultationOut[]
+  /** ADMIN & RECEPTION only; strictly null for DOCTOR per AGENTS.md #7. */
+  financial_summary: VisitWorkspaceFinancialSummaryOut | null
+}
+
+// ==============================================================================
+// Phase 3: Persistent Clinical Quick Phrases
+// ==============================================================================
+
+export type QuickPhraseScope = 'PERSONAL' | 'HOSPITAL_DEFAULT'
+export type QuickPhraseSection = 'COMPLAINTS' | 'EXAMINATION' | 'DIAGNOSIS' | 'ADVICE'
+
+export interface QuickPhraseCreate {
+  phrase_text: string
+  section?: QuickPhraseSection
+  department_id?: number | null
+  sort_order?: number
+}
+
+export interface QuickPhraseUpdate {
+  phrase_text?: string | null
+  section?: QuickPhraseSection | null
+  sort_order?: number | null
+}
+
+export interface QuickPhraseOut {
+  id: number
+  scope: QuickPhraseScope | string
+  doctor_id: number | null
+  department_id: number | null
+  department_code: string | null
+  section: QuickPhraseSection | string
+  phrase_text: string
+  sort_order: number
+  is_active: boolean
+  created_at: string
+  updated_at: string
+}
+
+export interface QuickPhraseListResponse {
+  defaults: QuickPhraseOut[]
+  personal: QuickPhraseOut[]
+}
+
+
 
 
 

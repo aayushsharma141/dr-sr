@@ -191,7 +191,7 @@ def bulk_archive_patients(
     ctx = build_audit_context(request, principal)
     now = utcnow()
 
-    for pid in payload.patient_ids:
+    for pid in sorted(set(payload.patient_ids)):
         patient = session.scalar(
             select(Patient).where(Patient.id == pid).with_for_update()
         )

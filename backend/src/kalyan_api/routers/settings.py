@@ -46,6 +46,7 @@ _SETTINGS_AUDIT_FIELDS: tuple[str, ...] = (
     "print_footer_en",
     "print_footer_hi",
     "consultation_validity_days",
+    "token_reset_policy",
     "version_id",
 )
 
@@ -121,6 +122,8 @@ def update_clinic_settings(
     settings.print_footer_en = payload.print_footer_en
     settings.print_footer_hi = payload.print_footer_hi
     settings.consultation_validity_days = payload.consultation_validity_days
+    if payload.token_reset_policy is not None:
+        settings.token_reset_policy = payload.token_reset_policy
 
     session.flush()
 

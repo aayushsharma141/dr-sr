@@ -9,17 +9,20 @@ import { usePatientTreatmentPlans } from '../../api/queries'
 import { formatIst, formatPaise } from '../../format'
 import { InlineAlert } from '../InlineAlert'
 import { Modal } from '../Modal'
+import { toast } from '../ToastHost'
 
 export interface DoctorChargesPanelProps {
   appointmentId: number | null | undefined
   patientId?: number | null
   isVisitClosed?: boolean
+  embedded?: boolean
 }
 
 export function DoctorChargesPanel({
   appointmentId,
   patientId,
   isVisitClosed = false,
+  embedded = false,
 }: DoctorChargesPanelProps) {
   const { data, isPending, isError, error } = useDoctorCharges(appointmentId)
 
@@ -55,7 +58,7 @@ export function DoctorChargesPanel({
   }
 
   const consultationLine = data?.consultation_line
-  const doctorLines = data?.doctor_lines ?? []
+  const doctorLines = (data?.doctor_lines ?? []).filter((line) => line.status !== 'VOIDED')
 
   // Check if consultation fee is waived
   const isWaived =
@@ -124,6 +127,7 @@ export function DoctorChargesPanel({
         new_amount_paise: newPaise,
         reason: trimmedReason,
       })
+      toast.success(adjustKind === 'WAIVER' ? 'Consultation fee waived.' : 'Consultation fee adjusted.')
       setIsAdjustOpen(false)
     } catch (err: any) {
       setAdjustError(err.message || 'Failed to adjust fee.')
@@ -161,6 +165,7 @@ export function DoctorChargesPanel({
           rate_paise: ratePaise,
           unit: procUnit.trim() || null,
         })
+        toast.success(`Added charge: ${trimmedDesc}.`)
         setIsAddOpen(false)
       } catch (err: any) {
         setAddError(err.message || 'Failed to add charge.')
@@ -176,6 +181,7 @@ export function DoctorChargesPanel({
           category: 'PACKAGE',
           treatment_plan_id: planId,
         })
+        toast.success('Treatment package linked to consultation.')
         setIsAddOpen(false)
       } catch (err: any) {
         setAddError(err.message || 'Failed to link package.')
@@ -201,7 +207,7 @@ export function DoctorChargesPanel({
   return (
     <div
       data-testid="doctor-charges-panel"
-      className="rounded-xl border border-slate-200 bg-white p-4 shadow-xs"
+      className={embedded ? 'p-4' : 'rounded-xl border border-slate-200 bg-white p-4 shadow-xs'}
     >
       {/* Header */}
       <div className="flex items-center justify-between border-b border-slate-100 pb-3">
@@ -274,7 +280,7 @@ export function DoctorChargesPanel({
 
           {/* Doctor Lines: Procedures & Packages */}
           <div className="border-t border-slate-100 pt-3">
-            <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+            <h3 className="text-xs font-semibold text-slate-500">
               Procedures & Packages
             </h3>
 
@@ -326,7 +332,7 @@ export function DoctorChargesPanel({
 
           {/* Type: Discount or Waive */}
           <div>
-            <label className="block text-xs font-semibold uppercase tracking-wider text-slate-700">
+            <label className="block text-xs font-semibold text-slate-700">
               Adjustment Type
             </label>
             <div className="mt-2 flex gap-4">
@@ -360,7 +366,7 @@ export function DoctorChargesPanel({
             <div>
               <label
                 htmlFor="adjustAmount"
-                className="block text-xs font-semibold uppercase tracking-wider text-slate-700"
+                className="block text-xs font-semibold text-slate-700"
               >
                 Revised fee (₹) *
               </label>
@@ -392,7 +398,7 @@ export function DoctorChargesPanel({
             <div className="flex justify-between">
               <label
                 htmlFor="adjustReason"
-                className="block text-xs font-semibold uppercase tracking-wider text-slate-700"
+                className="block text-xs font-semibold text-slate-700"
               >
                 Reason (3-500 characters) *
               </label>
@@ -449,7 +455,7 @@ export function DoctorChargesPanel({
 
           {/* Category selection */}
           <div>
-            <label className="block text-xs font-semibold uppercase tracking-wider text-slate-700">
+            <label className="block text-xs font-semibold text-slate-700">
               Charge Type
             </label>
             <div className="mt-2 flex gap-4">
@@ -484,7 +490,7 @@ export function DoctorChargesPanel({
               <div>
                 <label
                   htmlFor="procDesc"
-                  className="block text-xs font-semibold uppercase tracking-wider text-slate-700"
+                  className="block text-xs font-semibold text-slate-700"
                 >
                   Description *
                 </label>
@@ -504,7 +510,7 @@ export function DoctorChargesPanel({
                 <div>
                   <label
                     htmlFor="procQty"
-                    className="block text-xs font-semibold uppercase tracking-wider text-slate-700"
+                    className="block text-xs font-semibold text-slate-700"
                   >
                     Quantity *
                   </label>
@@ -521,7 +527,7 @@ export function DoctorChargesPanel({
                 <div>
                   <label
                     htmlFor="procUnit"
-                    className="block text-xs font-semibold uppercase tracking-wider text-slate-700"
+                    className="block text-xs font-semibold text-slate-700"
                   >
                     Unit (optional)
                   </label>
@@ -541,7 +547,7 @@ export function DoctorChargesPanel({
               <div>
                 <label
                   htmlFor="procRate"
-                  className="block text-xs font-semibold uppercase tracking-wider text-slate-700"
+                  className="block text-xs font-semibold text-slate-700"
                 >
                   Rate (₹) *
                 </label>
@@ -575,7 +581,7 @@ export function DoctorChargesPanel({
                 <div className="mt-3">
                   <label
                     htmlFor="packageSelect"
-                    className="block text-xs font-semibold uppercase tracking-wider text-slate-700"
+                    className="block text-xs font-semibold text-slate-700"
                   >
                     Treatment Plan *
                   </label>

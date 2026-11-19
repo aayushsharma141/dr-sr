@@ -2,7 +2,7 @@
 
 from datetime import date, datetime
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 class PrescriptionItemCreate(BaseModel):
@@ -68,6 +68,11 @@ class PrescriptionCreate(BaseModel):
     encounter_id: int | None = Field(
         default=None, gt=0, description="Optional linked clinical encounter ID"
     )
+    appointment_id: int | None = Field(
+        default=None,
+        gt=0,
+        description="Optional linked appointment ID (resolves consultation encounter)",
+    )
     status: str = Field(
         default="AUTHORISED", description="Prescription status: DRAFT or AUTHORISED"
     )
@@ -99,6 +104,42 @@ class PrescriptionUpdate(BaseModel):
     )
 
 
+class PrescriptionAmendRequest(BaseModel):
+    """Schema for creating a versioned amendment of an authorised prescription."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    amendment_reason: str = Field(
+        min_length=5,
+        max_length=1000,
+        description="Clinical reason for amending an authorised prescription",
+    )
+    diagnosis: str | None = Field(
+        default=None,
+        max_length=1000,
+        description="Updated clinical diagnosis (inherits original diagnosis if omitted)",
+    )
+    dietary_advice: str | None = Field(default=None, max_length=1000)
+    general_advice: str | None = Field(default=None, max_length=1000)
+    follow_up_date: date | None = Field(default=None)
+    items: list[PrescriptionItemCreate] = Field(
+        min_length=1,
+        description="Replacement medication items for the amended revision",
+    )
+    authorise_immediately: bool = Field(
+        default=True,
+        description="Authorise the amended revision immediately (default True)",
+    )
+
+    @field_validator("amendment_reason")
+    @classmethod
+    def _validate_amendment_reason(cls, value: str) -> str:
+        stripped = value.strip()
+        if len(stripped) < 5:
+            raise ValueError("Amendment reason must be at least 5 characters.")
+        return stripped
+
+
 class PrescriptionOut(BaseModel):
     """Schema for full prescription reading including items."""
 
@@ -114,6 +155,9 @@ class PrescriptionOut(BaseModel):
     doctor_name: str
     encounter_id: int | None = None
     status: str
+    revision_number: int
+    supersedes_prescription_id: int | None = None
+    amendment_reason: str | None = None
     authorised_at: datetime | None = None
     cancelled_at: datetime | None = None
     cancellation_reason: str | None = None
@@ -142,6 +186,9 @@ class PrescriptionSummary(BaseModel):
     doctor_name: str
     encounter_id: int | None = None
     status: str
+    revision_number: int = 1
+    supersedes_prescription_id: int | None = None
+    amendment_reason: str | None = None
     diagnosis: str
     items_count: int
     follow_up_date: date | None = None

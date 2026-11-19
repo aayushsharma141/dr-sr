@@ -1,7 +1,10 @@
 import type { EncounterRead, PatientOut } from '../api/types'
 import { Modal } from './Modal'
-import { useClinicSettings } from '../api/queries'
+import * as queries from '../api/queries'
+import { formatIst, withDoctorTitle } from '../format'
 import {
+  isHardcodedPhysioDoctor,
+  isPhysiotherapyDepartment,
   LetterheadBanner,
   LetterheadContactLine,
   LetterheadDoctors,
@@ -10,6 +13,15 @@ import {
   PatientStrip,
   PRINT_INK,
 } from './PrintLetterhead'
+
+function formatIstDate(value: string): string {
+  const trimmed = value.trim()
+  const parsed = /^\d{4}-\d{2}-\d{2}$/.test(trimmed)
+    ? new Date(`${trimmed}T00:00:00+05:30`)
+    : new Date(trimmed)
+  if (Number.isNaN(parsed.getTime())) return trimmed
+  return parsed.toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata' })
+}
 
 export function formatReprintTimestamp(d: Date = new Date()): string {
   const dd = String(d.getDate()).padStart(2, '0')
@@ -23,6 +35,7 @@ export function formatReprintTimestamp(d: Date = new Date()): string {
 export interface ConsultationSummaryPrintProps {
   encounter: EncounterRead
   patient?: PatientOut | null
+  departmentName?: string | null
   followUp?: {
     recommended_date?: string | null
     recommended_doctor_id?: number | null
@@ -35,16 +48,28 @@ export interface ConsultationSummaryPrintProps {
   onClose?: () => void
 }
 
+function getUseDoctorsHook(): typeof queries.useDoctors | null {
+  // Vitest module mocks throw on missing exports via a Proxy; guard so tests mocking only useClinicSettings still pass.
+  try {
+    return typeof queries.useDoctors === 'function' ? queries.useDoctors : null
+  } catch {
+    return null
+  }
+}
+
 export function ConsultationSummaryPrint({
   encounter,
   patient,
+  departmentName,
   followUp,
   advice,
   isReprint,
   reprintTimestamp,
   onClose,
 }: ConsultationSummaryPrintProps) {
-  const { data: settings } = useClinicSettings()
+  const { data: settings } = queries.useClinicSettings()
+  const useDoctorsHook = getUseDoctorsHook()
+  const doctors = useDoctorsHook ? useDoctorsHook(false).data : undefined
 
   // Defense-in-depth: Finalisation gate (DWS-09)
   if (!encounter.is_finalised) {
@@ -88,8 +113,8 @@ export function ConsultationSummaryPrint({
     : undefined
 
   const consultationDate = encounter.encounter_date
-    ? new Date(encounter.encounter_date).toLocaleDateString('en-IN')
-    : new Date().toLocaleDateString('en-IN')
+    ? formatIstDate(encounter.encounter_date)
+    : new Date().toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata' })
 
   const patientAge = patient?.age_years !== undefined ? `${patient.age_years} Y` : ''
   const patientGender = patient?.gender ? (patient.gender === 'M' ? 'Male' : patient.gender === 'F' ? 'Female' : patient.gender) : ''
@@ -99,7 +124,34 @@ export function ConsultationSummaryPrint({
   const shouldRenderReprint = Boolean(isReprint || reprintTimestamp)
   const stampText = reprintTimestamp || formatReprintTimestamp(new Date())
 
-  const careAdvice = advice || encounter.clinical_notes || 'Routine clinical precautions and care advice discussed.'
+  // Never fall back to internal encounter.clinical_notes in patient-facing advice.
+  const careAdvice =
+    advice?.trim() || 'Follow prescribed instructions and return for follow-up as advised.'
+
+  const doctorDisplayName = encounter.doctor_name ? withDoctorTitle(encounter.doctor_name) : ''
+  const followUpDoctorDisplayName = followUp?.doctor_name
+    ? withDoctorTitle(followUp.doctor_name)
+    : doctorDisplayName
+
+  const matchedDoctor = doctors?.find((d) => d.id === encounter.doctor_id)
+  const useAuthoringDoctorHeader =
+    (Boolean(departmentName?.trim()) && !isPhysiotherapyDepartment(departmentName)) ||
+    (Boolean(matchedDoctor) && !isHardcodedPhysioDoctor(matchedDoctor?.name_en || encounter.doctor_name))
+
+  const authoringDoctor = useAuthoringDoctorHeader
+    ? {
+        name: withDoctorTitle(matchedDoctor?.name_en || encounter.doctor_name || 'Consulting Doctor'),
+        qualification: matchedDoctor?.qualification ?? null,
+        registrationNumber: matchedDoctor?.registration_number ?? null,
+      }
+    : null
+
+  const sortedAddenda =
+    encounter.addenda && encounter.addenda.length > 0
+      ? [...encounter.addenda].sort(
+          (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime(),
+        )
+      : []
 
   return (
     <Modal
@@ -135,9 +187,13 @@ export function ConsultationSummaryPrint({
         className="printable-sheet mx-auto w-[198mm] max-w-full bg-white p-3 text-slate-900 print:mt-0 print:w-full print:p-0 print:shadow-none"
         data-testid="consultation-summary-sheet"
       >
-        <LetterheadBanner clinicName={clinicNameEn} clinicNameHi={settings?.name_hi} />
+        <LetterheadBanner
+          clinicName={clinicNameEn}
+          clinicNameHi={settings?.name_hi}
+          departmentName={departmentName}
+        />
         <LetterheadHeaderNote settings={settings} />
-        <LetterheadDoctors />
+        <LetterheadDoctors authoringDoctor={authoringDoctor} />
         
         {/* Patient identity strip */}
         <PatientStrip
@@ -166,7 +222,7 @@ export function ConsultationSummaryPrint({
           )}
           <span>
             <span className="font-bold text-slate-600">Consulting Doctor (परामर्शदाता चिकित्सक):</span>{' '}
-            <span className="font-semibold">{encounter.doctor_name}</span>
+            <span className="font-semibold">{doctorDisplayName}</span>
           </span>
         </div>
 
@@ -221,14 +277,14 @@ export function ConsultationSummaryPrint({
                 <span className="text-slate-600 font-medium">Recommended Date: </span>
                 <span className="font-semibold text-slate-900">
                   {followUp?.recommended_date
-                    ? new Date(followUp.recommended_date).toLocaleDateString('en-IN')
+                    ? formatIstDate(followUp.recommended_date)
                     : 'As advised clinically'}
                 </span>
               </div>
               <div>
                 <span className="text-slate-600 font-medium">Consulting Doctor: </span>
                 <span className="font-semibold text-slate-900">
-                  {followUp?.doctor_name || encounter.doctor_name}
+                  {followUpDoctorDisplayName}
                 </span>
               </div>
             </div>
@@ -238,6 +294,33 @@ export function ConsultationSummaryPrint({
               </p>
             )}
           </section>
+
+          {/* Section 5: Chronological Clinical Addenda (when present) */}
+          {sortedAddenda.length > 0 && (
+            <section
+              data-testid="summary-addenda-section"
+              className="break-inside-avoid rounded border border-slate-200 bg-slate-50/50 p-2.5"
+            >
+              <h3 className="font-bold text-xs uppercase tracking-wider text-slate-700 mb-1.5">
+                Clinical Addenda / अतिरिक्त टिप्पणियां
+              </h3>
+              <ol className="space-y-2 text-[12px] text-slate-800">
+                {sortedAddenda.map((ad, idx) => (
+                  <li key={ad.id} className="border-t border-slate-200 pt-1.5 first:border-t-0 first:pt-0">
+                    <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] text-slate-600">
+                      <span className="font-semibold text-slate-800">
+                        Addendum #{idx + 1} · {withDoctorTitle(ad.doctor_name)}
+                      </span>
+                      <span>{formatIst(ad.created_at)}</span>
+                    </div>
+                    <p className="mt-0.5 whitespace-pre-wrap leading-relaxed text-slate-900">
+                      {ad.addendum_text}
+                    </p>
+                  </li>
+                ))}
+              </ol>
+            </section>
+          )}
 
           {/* Guarantee: Strict Medication Exclusion Disclaimer (T-19-12, D-19-29) */}
           <div className="rounded border border-amber-200 bg-amber-50/60 p-2 text-center text-xs text-amber-900">
@@ -263,7 +346,7 @@ export function ConsultationSummaryPrint({
 
           <div className="text-center w-64 border-t border-slate-700 pt-1.5">
             <p className="font-bold text-[13px] text-slate-900">
-              {encounter.doctor_name || 'Consulting Doctor'}
+              {doctorDisplayName || 'Consulting Doctor'}
             </p>
             <p className="text-[11px] text-slate-600 font-serif italic">
               Doctor's Signature / चिकित्सक के हस्ताक्षर

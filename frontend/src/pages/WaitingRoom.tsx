@@ -3,12 +3,13 @@ import type * as React from 'react'
 import { Link, useSearchParams } from 'react-router'
 import { useQueryClient } from '@tanstack/react-query'
 import { AppShell } from '../components/AppShell'
-import { useAppointments, useDepartments, useDoctorDepartments, useDoctors, useMe, useReassignAppointment, useUpdateAppointmentStatus, useVisits } from '../api/queries'
+import { useAppointments, useDepartments, useDoctors, useMe, useUpdateAppointmentStatus, useVisits } from '../api/queries'
 import type { Appointment, PriorityLevel } from '../api/types'
 import { ApiError, isVersionConflict } from '../api/client'
 import { InlineAlert } from '../components/InlineAlert'
-import { Modal } from '../components/Modal'
+import { toast } from '../components/ToastHost'
 import { PriorityBadge } from '../components/checkin/PriorityBadge'
+import { ReassignModal } from '../components/checkin/ReassignModal'
 import { AppointmentStatusBadge, getWaitingElapsedMinutes, useIstToday } from '../components/reception/AppointmentStatusBadge'
 import { formatIst, formatToken } from '../format'
 
@@ -147,15 +148,15 @@ export function WaitingRoom() {
       <section aria-labelledby="waiting-room-title" className="space-y-4">
         <header className="flex flex-wrap items-end justify-between gap-3">
           <div>
-            <h1 id="waiting-room-title" className="text-base font-bold text-neutral-900">Waiting Room</h1>
-            <p className="text-sm text-neutral-600">
+            <h1 id="waiting-room-title" className="text-xl font-semibold tracking-tight text-slate-900">Waiting Room</h1>
+            <p className="text-sm text-slate-600 tabular-nums">
               {updatedAt
                 ? `Last updated ${updatedAt.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Kolkata' })}`
                 : 'Loading today’s queue…'}
             </p>
           </div>
-          <div className="flex flex-col items-start gap-0.5 text-xs text-neutral-600 sm:items-end">
-            <p className="font-semibold text-neutral-800">
+          <div className="flex flex-col items-start gap-0.5 text-xs text-slate-600 sm:items-end">
+            <p className="font-semibold text-slate-800 tabular-nums">
               Waiting: {waiting.length} · In Cabin: {inCabin.length} · Completed: {completed.length}
             </p>
             <p>Doctors start and complete consultations from My Queue</p>
@@ -169,13 +170,13 @@ export function WaitingRoom() {
           </InlineAlert>
         )}
 
-        <div className="flex flex-wrap gap-4">
-          <label className="flex flex-col text-sm font-semibold text-neutral-700">
+        <div className="flex flex-wrap gap-4 rounded-xl border border-slate-200 bg-white p-4 shadow-2xs">
+          <label className="flex flex-col text-xs font-semibold text-slate-700">
             Doctor
             <select
               value={doctorFilter}
               onChange={(e) => setDoctorFilter(e.target.value)}
-              className="mt-1 min-h-[44px] rounded-md border border-neutral-300 bg-white px-3 text-sm"
+              className="mt-1 min-h-[44px] rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-900 focus:border-brand-700 focus:outline-none focus:ring-2 focus:ring-brand-700/20"
             >
               <option value="">All doctors</option>
               {(doctors.data ?? []).map((d) => (
@@ -183,12 +184,12 @@ export function WaitingRoom() {
               ))}
             </select>
           </label>
-          <label className="flex flex-col text-sm font-semibold text-neutral-700">
+          <label className="flex flex-col text-xs font-semibold text-slate-700">
             Department
             <select
               value={departmentFilter}
               onChange={(e) => setDepartmentFilter(e.target.value)}
-              className="mt-1 min-h-[44px] rounded-md border border-neutral-300 bg-white px-3 text-sm"
+              className="mt-1 min-h-[44px] rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-900 focus:border-brand-700 focus:outline-none focus:ring-2 focus:ring-brand-700/20"
             >
               <option value="">All departments</option>
               {(departments.data ?? []).filter((d) => d.is_active).map((d) => (
@@ -196,13 +197,13 @@ export function WaitingRoom() {
               ))}
             </select>
           </label>
-          <label className="flex min-w-[240px] flex-1 flex-col text-sm font-semibold text-neutral-700">
+          <label className="flex min-w-[240px] flex-1 flex-col text-xs font-semibold text-slate-700">
             Search by name, URN or token
             <input
               type="search"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="mt-1 min-h-[44px] rounded-md border border-neutral-300 bg-white px-3 text-sm"
+              className="mt-1 min-h-[44px] rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-900 focus:border-brand-700 focus:outline-none focus:ring-2 focus:ring-brand-700/20"
             />
           </label>
         </div>
@@ -215,7 +216,7 @@ export function WaitingRoom() {
               : 'grid gap-4 lg:grid-cols-3'
           }
         >
-          <Column title="Waiting" count={waiting.length} emptyText="No one is waiting.">
+          <Column title="Waiting" count={waiting.length} tone="waiting" emptyText="No one is waiting.">
             {waiting.map((a, index) => (
               <WaitingCard
                 key={a.id}
@@ -226,7 +227,7 @@ export function WaitingRoom() {
               />
             ))}
           </Column>
-          <Column title="In Cabin" count={inCabin.length} emptyText="No one is in a cabin.">
+          <Column title="In Cabin" count={inCabin.length} tone="in_cabin" emptyText="No one is in a cabin.">
             {inCabin.map((a) => (
               <InCabinCard key={a.id} appt={a} canCancel={canCancel} />
             ))}
@@ -234,13 +235,14 @@ export function WaitingRoom() {
           <Column
             title="Completed"
             count={completed.length}
+            tone="completed"
             emptyText="No consultations completed yet today."
             emptyHint="Completed visits appear here ready for checkout."
             emptyAction={
               canCollect ? (
                 <Link
                   to="/reception/billing"
-                  className="inline-flex min-h-9 items-center rounded-md border border-neutral-300 bg-white px-3 text-xs font-semibold text-brand-700 hover:bg-neutral-100"
+                  className="inline-flex min-h-9 items-center rounded-lg border border-brand-200 bg-brand-50 px-3 text-xs font-semibold text-brand-800 hover:bg-brand-100 transition-colors"
                 >
                   Open Billing &amp; Checkout →
                 </Link>
@@ -264,9 +266,16 @@ export function WaitingRoom() {
   )
 }
 
+const COLUMN_COUNT_CLASSES = {
+  waiting: 'border-amber-200 bg-amber-50 text-amber-900',
+  in_cabin: 'border-blue-200 bg-blue-50 text-blue-800',
+  completed: 'border-emerald-200 bg-emerald-50 text-emerald-800',
+} as const
+
 function Column({
   title,
   count,
+  tone,
   emptyText,
   emptyHint,
   emptyAction,
@@ -274,22 +283,23 @@ function Column({
 }: {
   title: string
   count: number
+  tone: keyof typeof COLUMN_COUNT_CLASSES
   emptyText: string
   emptyHint?: string
   emptyAction?: React.ReactNode
   children: React.ReactNode
 }) {
   return (
-    <section aria-label={title} className="flex lg:max-h-[70vh] flex-col rounded-lg border border-neutral-200 bg-neutral-50">
-      <div className="flex items-center justify-between border-b border-neutral-200 px-3 py-2">
-        <h2 className="text-xs font-bold text-neutral-700">{title}</h2>
-        <span className="font-mono text-xs font-semibold text-neutral-700">{count}</span>
+    <section aria-label={title} className="flex lg:max-h-[70vh] flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-2xs">
+      <div className="flex items-center justify-between border-b border-slate-200 bg-slate-50 px-3.5 py-2.5">
+        <h2 className="text-xs font-bold text-slate-800">{title}</h2>
+        <span className={`rounded-full border px-2 py-0.5 font-mono text-xs font-semibold tabular-nums ${COLUMN_COUNT_CLASSES[tone]}`}>{count}</span>
       </div>
       <div className="space-y-2.5 overflow-y-auto p-3">
         {count === 0 ? (
           <div className="space-y-1.5 py-2">
-            <p className="text-sm font-medium text-neutral-600">{emptyText}</p>
-            {emptyHint && <p className="text-xs text-neutral-600">{emptyHint}</p>}
+            <p className="text-sm font-medium text-slate-700">{emptyText}</p>
+            {emptyHint && <p className="text-xs text-slate-600">{emptyHint}</p>}
             {emptyAction && <div className="pt-1">{emptyAction}</div>}
           </div>
         ) : (
@@ -313,13 +323,13 @@ function CardFrame({
 }) {
   const showPriority = Boolean(appt.priority_level && appt.priority_level !== 'NORMAL')
   return (
-    <article className="rounded-lg border border-neutral-200 bg-white p-3 shadow-2xs">
+    <article className="rounded-xl border border-slate-200 bg-white p-3 shadow-2xs transition-colors hover:border-slate-300">
       <div className="flex items-center justify-between gap-2">
         <div className="flex min-w-0 items-center gap-2">
-          <span className="shrink-0 rounded bg-neutral-100 px-1.5 py-0.5 font-mono text-xs font-bold text-neutral-900">
+          <span className="shrink-0 rounded-md bg-slate-900 px-2 py-0.5 font-mono text-xs font-bold text-white tabular-nums">
             {formatToken(appt.token_number)}
           </span>
-          <p data-testid="card-patient-name" className="truncate text-sm font-bold text-neutral-900" title={appt.patient_name}>
+          <p data-testid="card-patient-name" className="truncate text-sm font-bold text-slate-900" title={appt.patient_name}>
             {appt.patient_name}
           </p>
         </div>
@@ -331,7 +341,7 @@ function CardFrame({
         )}
       </div>
 
-      <p className="mt-1 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-xs text-neutral-600">
+      <p className="mt-1 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-xs text-slate-600">
         <span className="truncate">{appt.doctor_name_en}</span>
         <span aria-hidden="true">·</span>
         <span className="font-mono">{appt.patient_urn}</span>
@@ -344,7 +354,7 @@ function CardFrame({
       </p>
 
       {children && (
-        <div className="mt-2.5 border-t border-neutral-100 pt-2">
+        <div className="mt-2.5 border-t border-slate-100 pt-2">
           {children}
         </div>
       )}
@@ -397,6 +407,7 @@ function CancelConsultationForm({
           setCancelOpen(false)
           setReason('')
           setError(null)
+          toast.success(`Cancelled consultation for ${appt.patient_name}.`)
         },
         onError: (err) => {
           if (isVersionConflict(err) || (err instanceof ApiError && err.status === 409)) {
@@ -431,7 +442,7 @@ function CancelConsultationForm({
                 type="button"
                 aria-expanded={cancelOpen}
                 onClick={toggle}
-                className="min-h-9 rounded-md border border-neutral-300 bg-white px-2.5 text-xs font-semibold text-neutral-800 hover:bg-neutral-50"
+                className="min-h-9 rounded-lg border border-slate-300 bg-white px-2.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors"
               >
                 Cancel consultation
               </button>
@@ -441,19 +452,19 @@ function CancelConsultationForm({
       </div>
 
       {canCancel && cancelOpen && (
-        <form onSubmit={submitCancel} className="mt-2 space-y-2 border-t border-neutral-100 pt-2">
-          <label className="block text-xs font-semibold text-neutral-700">
+        <form onSubmit={submitCancel} className="mt-2 space-y-2 border-t border-slate-100 pt-2">
+          <label className="block text-xs font-semibold text-slate-700">
             Reason for cancelling
             <input
               value={reason}
               onChange={(e) => setReason(e.target.value)}
-              className="mt-1 min-h-9 w-full rounded-md border border-neutral-300 bg-white px-2.5 text-sm text-neutral-900"
+              className="mt-1 min-h-9 w-full rounded-lg border border-slate-300 bg-white px-2.5 text-sm text-slate-900 focus:border-brand-700 focus:outline-none focus:ring-2 focus:ring-brand-700/20"
             />
           </label>
           <button
             type="submit"
             disabled={cancel.isPending}
-            className="min-h-9 rounded-md bg-danger-600 px-3 text-xs font-semibold text-white disabled:opacity-70"
+            className="min-h-9 rounded-lg bg-red-700 px-3 text-xs font-semibold text-white hover:bg-red-800 transition-colors disabled:opacity-70"
           >
             {cancel.isPending ? 'Cancelling…' : 'Cancel consultation'}
           </button>
@@ -489,14 +500,14 @@ function WaitingCard({
       appt={appt}
       badge={
         position === 1 ? (
-          <span className="inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-xs font-semibold text-emerald-800">
+          <span className="inline-flex items-center rounded-full border border-brand-200 bg-brand-50 px-2 py-0.5 text-xs font-semibold text-brand-800">
             Next up
           </span>
         ) : undefined
       }
       meta={
         elapsed !== null ? (
-          <span className={elapsed >= 30 ? 'font-semibold text-amber-800' : undefined}>
+          <span className={elapsed >= 30 ? 'font-semibold text-amber-800 tabular-nums' : 'tabular-nums'}>
             {elapsed} min waiting
           </span>
         ) : undefined
@@ -505,13 +516,13 @@ function WaitingCard({
       <CancelConsultationForm
         appt={appt}
         canCancel={canCancel}
-        leading={<span className="text-xs font-medium text-neutral-600">Position {position}</span>}
+        leading={<span className="text-xs font-medium text-slate-600 tabular-nums">Position {position}</span>}
         extraAction={
           canReassign ? (
             <button
               type="button"
               onClick={() => setReassignOpen(true)}
-              className="min-h-9 rounded-md border border-neutral-300 bg-white px-2.5 text-xs font-semibold text-neutral-800 hover:bg-neutral-50"
+              className="min-h-9 rounded-lg border border-slate-300 bg-white px-2.5 text-xs font-semibold text-slate-700 hover:border-brand-300 hover:bg-brand-50 hover:text-brand-800 transition-colors"
             >
               Reassign
             </button>
@@ -520,7 +531,7 @@ function WaitingCard({
       />
 
       {canReassign && reassignOpen && (
-        <ReassignDialog appt={appt} onClose={() => setReassignOpen(false)} />
+        <ReassignModal appointment={appt} onClose={() => setReassignOpen(false)} />
       )}
     </CardFrame>
   )
@@ -535,7 +546,7 @@ function InCabinCard({ appt, canCancel }: { appt: Appointment; canCancel: boolea
   return (
     <CardFrame
       appt={appt}
-      meta={elapsed !== null ? <span>In cabin · {elapsed} min</span> : undefined}
+      meta={elapsed !== null ? <span className="font-medium text-blue-800 tabular-nums">In cabin · {elapsed} min</span> : undefined}
     >
       <CancelConsultationForm
         appt={appt}
@@ -543,7 +554,7 @@ function InCabinCard({ appt, canCancel }: { appt: Appointment; canCancel: boolea
         leading={
           <>
             <AppointmentStatusBadge status="IN_CABIN" label="Consultation in progress" />
-            <span className="text-xs text-neutral-600">Completed by doctor</span>
+            <span className="text-xs text-slate-600">Completed by doctor</span>
           </>
         }
       />
@@ -576,7 +587,7 @@ function CompletedCard({
             {canCollect && (
               <Link
                 to={billingHref}
-                className="inline-flex min-h-9 items-center rounded-md bg-emerald-700 px-3 text-xs font-semibold text-white hover:bg-emerald-800"
+                className="inline-flex min-h-9 items-center rounded-lg bg-brand-700 px-3 text-xs font-semibold text-white hover:bg-brand-800 transition-colors"
               >
                 Collect payment →
               </Link>
@@ -588,7 +599,7 @@ function CompletedCard({
             {canCollect && (
               <Link
                 to={billingHref}
-                className="inline-flex min-h-9 items-center rounded-md border border-neutral-300 bg-white px-2.5 text-xs font-semibold text-neutral-800 hover:bg-neutral-50"
+                className="inline-flex min-h-9 items-center rounded-lg border border-slate-300 bg-white px-2.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors"
               >
                 Open billing →
               </Link>
@@ -600,7 +611,7 @@ function CompletedCard({
             {canCollect && (
               <Link
                 to={billingHref}
-                className="inline-flex min-h-9 items-center rounded-md border border-neutral-300 bg-white px-2.5 text-xs font-semibold text-neutral-800 hover:bg-neutral-50"
+                className="inline-flex min-h-9 items-center rounded-lg border border-slate-300 bg-white px-2.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors"
               >
                 View bill →
               </Link>
@@ -609,163 +620,5 @@ function CompletedCard({
         )}
       </div>
     </CardFrame>
-  )
-}
-
-function ReassignDialog({ appt, onClose }: { appt: Appointment; onClose: () => void }) {
-  const queryClient = useQueryClient()
-  const doctors = useDoctors(true)
-  const reassign = useReassignAppointment()
-  const [targetDoctorId, setTargetDoctorId] = useState('')
-  const [departmentId, setDepartmentId] = useState('')
-  const [reason, setReason] = useState('')
-  const [error, setError] = useState<string | null>(null)
-
-  const targetId = targetDoctorId ? Number(targetDoctorId) : null
-  const targetDepartments = useDoctorDepartments(targetId)
-  // TanStack Query v5 reports isPending=true while disabled (targetId === null); guard on targetId !== null.
-  const targetDepartmentsUnavailable =
-    targetId !== null && (targetDepartments.isPending || targetDepartments.isError)
-  const sameDepartment =
-    targetDepartments.data?.some((d) => d.id === appt.department_id) ?? false
-  const needsDepartment = targetId !== null && targetDepartments.isSuccess && !sameDepartment
-
-  const candidates = (doctors.data ?? []).filter((d) => d.id !== appt.doctor_id && d.is_active)
-
-  const submit = (e: React.FormEvent) => {
-    e.preventDefault()
-    if (targetId === null) {
-      setError('Choose the doctor to move the patient to.')
-      return
-    }
-    if (targetDepartmentsUnavailable) {
-      return
-    }
-    if (needsDepartment && !departmentId) {
-      setError('Choose one of this doctor’s departments.')
-      return
-    }
-    const text = reason.trim()
-    if (text.length < 3) {
-      setError('Enter a reason of at least 3 characters.')
-      return
-    }
-    setError(null)
-    reassign.mutate(
-      {
-        id: appt.id,
-        body: {
-          version_id: appt.version_id,
-          new_doctor_id: targetId,
-          new_department_id: needsDepartment ? Number(departmentId) : null,
-          reason: text,
-        },
-      },
-      {
-        onSuccess: () => onClose(),
-        onError: (err) => {
-          if (err instanceof ApiError && err.code === 'department_required') {
-            setError('Choose one of this doctor’s departments.')
-          } else if (isVersionConflict(err) || (err instanceof ApiError && err.status === 409)) {
-            void queryClient.invalidateQueries({ queryKey: ['appointments'] })
-            setError('This patient was updated by someone else. The queue has refreshed; check it and try again.')
-          } else {
-            setError('Could not move the patient. The consultation is still waiting. Try again.')
-          }
-        },
-      },
-    )
-  }
-
-  return (
-    <Modal
-      open
-      onClose={onClose}
-      title={`Reassign ${formatToken(appt.token_number)} (${appt.patient_name})?`}
-      description={`The old token stays in history. The patient gets a new token from the new doctor's sequence.`}
-      variant="warning"
-      dismiss="none"
-      busy={reassign.isPending}
-      className="max-w-md"
-    >
-      <form onSubmit={submit} className="space-y-3">
-        <label className="block text-sm font-semibold text-neutral-700">
-          Move to doctor
-          <select
-            value={targetDoctorId}
-            onChange={(e) => {
-              setTargetDoctorId(e.target.value)
-              setDepartmentId('')
-              setError(null)
-            }}
-            className="mt-1 w-full min-h-[44px] rounded-md border border-neutral-300 bg-white px-3 text-sm"
-          >
-            <option value="">Choose a doctor</option>
-            {candidates.map((d) => (
-              <option key={d.id} value={d.id}>{d.name_en}</option>
-            ))}
-          </select>
-        </label>
-
-        {targetId !== null && targetDepartments.isError && (
-          <InlineAlert tone="error">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <span>Could not load departments for the selected doctor.</span>
-              <button
-                type="button"
-                onClick={() => void targetDepartments.refetch()}
-                className="min-h-8 rounded border border-red-300 bg-white px-2.5 text-xs font-semibold text-red-700 hover:bg-red-50"
-              >
-                Retry
-              </button>
-            </div>
-          </InlineAlert>
-        )}
-
-        {needsDepartment && (
-          <label className="block text-sm font-semibold text-neutral-700">
-            Department for this consultation
-            <select
-              value={departmentId}
-              onChange={(e) => setDepartmentId(e.target.value)}
-              className="mt-1 w-full min-h-[44px] rounded-md border border-neutral-300 bg-white px-3 text-sm"
-            >
-              <option value="">Choose a department</option>
-              {(targetDepartments.data ?? []).map((d) => (
-                <option key={d.id} value={d.id}>{d.name_en}</option>
-              ))}
-            </select>
-          </label>
-        )}
-
-        <label className="block text-sm font-semibold text-neutral-700">
-          Reason
-          <input
-            value={reason}
-            onChange={(e) => setReason(e.target.value)}
-            className="mt-1 w-full min-h-[44px] rounded-md border border-neutral-300 px-3 text-sm"
-          />
-        </label>
-
-        {error && <InlineAlert tone="error">{error}</InlineAlert>}
-
-        <div className="flex flex-wrap justify-end gap-2 pt-2">
-          <button
-            type="button"
-            onClick={onClose}
-            className="min-h-[44px] rounded-md border border-neutral-300 bg-white px-4 text-sm font-semibold"
-          >
-            Keep with current doctor
-          </button>
-          <button
-            type="submit"
-            disabled={reassign.isPending || targetDepartmentsUnavailable}
-            className="min-h-[44px] rounded-md bg-danger-600 px-4 text-sm font-semibold text-white disabled:opacity-70"
-          >
-            {reassign.isPending ? 'Reassigning…' : 'Reassign & issue new token'}
-          </button>
-        </div>
-      </form>
-    </Modal>
   )
 }

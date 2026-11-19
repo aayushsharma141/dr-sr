@@ -93,7 +93,7 @@ def test_new_patient_check_in_registers_opens_visit_and_issues_token(
     assert response.status_code == 201, response.text
     body = response.json()
     assert body["patient_urn"].startswith("KH-")
-    assert body["status"] == "CHECKED_IN"
+    assert body["status"] == "ARRIVED"
     assert body["consultation_status"] == "WAITING"
     assert body["token_number"] == 1
     assert body["visit_kind"] == "NEW"
@@ -149,7 +149,7 @@ def test_new_patient_token_to_arrive_and_check_in(
     )
     assert check_in_resp.status_code == 200, check_in_resp.text
     checked_in = check_in_resp.json()
-    assert checked_in["status"] == "CHECKED_IN"
+    assert checked_in["status"] == "ARRIVED"
     assert checked_in["consultation_status"] == "WAITING"
     assert checked_in["token_number"] == data["token_number"]
 

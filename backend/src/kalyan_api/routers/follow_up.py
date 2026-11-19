@@ -12,7 +12,7 @@ Guarantees:
 from datetime import UTC, date, datetime
 
 from fastapi import APIRouter, Depends, Query, Request
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.orm import selectinload
 
 from kalyan_api import clock
@@ -271,6 +271,7 @@ def list_reception_follow_ups(
     date_from: date | None = Query(None, description="Recommended date on or after"),
     date_to: date | None = Query(None, description="Recommended date on or before"),
     overdue: bool | None = Query(None, description="Filter for overdue pending recommendations"),
+    principal: Principal = Depends(current_principal),
 ) -> list[ReceptionFollowUpResponse]:
     """
     Query follow-up recommendations for administrative booking (D-19-19, DWS-08).
@@ -278,6 +279,9 @@ def list_reception_follow_ups(
     CRITICAL PRIVACY INVARIANT:
     clinical_reason is STRICTLY omitted from both query and response.
     """
+    if principal.role == Role.DOCTOR and principal.doctor_id is None:
+        return []
+
     stmt = (
         select(
             FollowUpRecommendation.id,
@@ -299,6 +303,14 @@ def list_reception_follow_ups(
             FollowUpRecommendation.recommended_date.asc(), FollowUpRecommendation.created_at.desc()
         )
     )
+
+    if principal.role == Role.DOCTOR:
+        stmt = stmt.where(
+            or_(
+                FollowUpRecommendation.doctor_id == principal.doctor_id,
+                FollowUpRecommendation.recommended_doctor_id == principal.doctor_id,
+            )
+        )
 
     if status:
         stmt = stmt.where(FollowUpRecommendation.status == status.upper())
@@ -349,6 +361,13 @@ def book_follow_up(
     principal: Principal = Depends(current_principal),
 ) -> ReceptionFollowUpResponse:
     """Convert recommendation to a scheduled appointment (D-19-18). Accessible by Doctor or Reception."""  # noqa: E501 - published as the OpenAPI description; wrapping changes the text
+    if principal.role != Role.RECEPTION:
+        raise ApiError(
+            status_code=403,
+            code="reception_only",
+            message="Only reception can book appointments from follow-up recommendations.",
+        )
+
     stmt = (
         select(FollowUpRecommendation)
         .where(FollowUpRecommendation.id == id)
@@ -518,6 +537,23 @@ def close_follow_up(
             status_code=404,
             code="follow_up_not_found",
             message="Follow-up recommendation not found.",
+        )
+
+    if principal.role == Role.DOCTOR:
+        if principal.doctor_id is None or (
+            rec.doctor_id != principal.doctor_id
+            and rec.recommended_doctor_id != principal.doctor_id
+        ):
+            raise ApiError(
+                status_code=404,
+                code="follow_up_not_found",
+                message="Follow-up recommendation not found.",
+            )
+    elif principal.role != Role.RECEPTION:
+        raise ApiError(
+            status_code=403,
+            code="forbidden",
+            message="You are not permitted to close follow-up recommendations.",
         )
 
     if rec.status != FollowUpStatus.PENDING.value:

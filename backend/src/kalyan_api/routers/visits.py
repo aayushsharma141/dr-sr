@@ -34,6 +34,7 @@ router = APIRouter(prefix="/visits", tags=["visits"])
 def _to_read(visit: Visit, patient: Patient) -> VisitRead:
     return VisitRead(
         id=visit.id,
+        visit_code=visit.visit_code,
         patient_id=visit.patient_id,
         patient_urn=patient.urn,
         patient_name=patient.full_name,
@@ -86,6 +87,7 @@ def _to_detail(session, visit: Visit, patient: Patient) -> VisitDetail:
         payments=[
             VisitPayment(
                 id=p.id,
+                visit_id=p.visit_id,
                 appointment_id=p.appointment_id,
                 receipt_number=p.receipt_number,
                 amount_paise=p.amount_paise,
@@ -95,7 +97,6 @@ def _to_detail(session, visit: Visit, patient: Patient) -> VisitDetail:
                 created_by_username=p.created_by_user.username if p.created_by_user else "",
             )
             for p in payments
-            if p.appointment_id is not None
         ],
         total_paid_paise=totals.paid_paise,
         outstanding_paise=totals.due_paise,

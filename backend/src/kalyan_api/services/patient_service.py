@@ -35,6 +35,18 @@ def create_patient(session: Session, payload: PatientCreate) -> Patient:
         district=payload.district.strip(),
         state=payload.state.strip(),
         emergency_contact=payload.emergency_contact.strip() if payload.emergency_contact else None,
+        alternate_mobile=(
+            clean_mobile(payload.alternate_mobile) if payload.alternate_mobile else None
+        ),
+        email=payload.email.strip() if payload.email else None,
+        blood_group=payload.blood_group,
+        pin_code=payload.pin_code.strip() if payload.pin_code else None,
+        guardian_relationship=(
+            payload.guardian_relationship.strip() if payload.guardian_relationship else None
+        ),
+        medical_history_notes=(
+            payload.medical_history_notes.strip() if payload.medical_history_notes else None
+        ),
         allergies=payload.allergies.strip(),
         notes=payload.notes.strip() if payload.notes else None,
     )
@@ -51,4 +63,10 @@ def registration_audit_after(patient: Patient) -> dict[str, object]:
         "mobile": patient.mobile,
         "gender": patient.gender,
         "age_years": patient.age_years,
+        "alternate_mobile": patient.alternate_mobile,
+        "email": patient.email,
+        "blood_group": patient.blood_group,
+        "pin_code": patient.pin_code,
+        "guardian_relationship": patient.guardian_relationship,
+        "medical_history_notes": patient.medical_history_notes,
     }

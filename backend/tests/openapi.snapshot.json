@@ -3884,6 +3884,88 @@
         "title": "DoctorCreate",
         "type": "object"
       },
+      "DoctorDashboardSummary": {
+        "additionalProperties": false,
+        "description": "Doctor dashboard summary metrics and workload counts.",
+        "properties": {
+          "completed_count": {
+            "default": 0,
+            "title": "Completed Count",
+            "type": "integer"
+          },
+          "doctor_id": {
+            "title": "Doctor Id",
+            "type": "integer"
+          },
+          "doctor_name_en": {
+            "title": "Doctor Name En",
+            "type": "string"
+          },
+          "in_consultation_count": {
+            "default": 0,
+            "title": "In Consultation Count",
+            "type": "integer"
+          },
+          "pending_drafts_count": {
+            "default": 0,
+            "title": "Pending Drafts Count",
+            "type": "integer"
+          },
+          "scheduled_count": {
+            "default": 0,
+            "title": "Scheduled Count",
+            "type": "integer"
+          },
+          "specialty_name": {
+            "title": "Specialty Name",
+            "type": "string"
+          },
+          "today_glance": {
+            "$ref": "#/components/schemas/DoctorDashboardTodayGlance"
+          },
+          "waiting_count": {
+            "default": 0,
+            "title": "Waiting Count",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "doctor_id",
+          "doctor_name_en",
+          "specialty_name",
+          "today_glance"
+        ],
+        "title": "DoctorDashboardSummary",
+        "type": "object"
+      },
+      "DoctorDashboardTodayGlance": {
+        "additionalProperties": false,
+        "description": "Reconciled operational glance metrics for the doctor's day.",
+        "properties": {
+          "completed": {
+            "default": 0,
+            "title": "Completed",
+            "type": "integer"
+          },
+          "in_progress": {
+            "default": 0,
+            "title": "In Progress",
+            "type": "integer"
+          },
+          "pending": {
+            "default": 0,
+            "title": "Pending",
+            "type": "integer"
+          },
+          "total": {
+            "default": 0,
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "title": "DoctorDashboardTodayGlance",
+        "type": "object"
+      },
       "DoctorDepartmentAssignment": {
         "additionalProperties": false,
         "properties": {
@@ -19018,6 +19100,28 @@
         "summary": "List Department Doctors",
         "tags": [
           "departments"
+        ]
+      }
+    },
+    "/api/doctor/dashboard/summary": {
+      "get": {
+        "description": "Return doctor workspace dashboard summary metrics and workload counts.",
+        "operationId": "get_doctor_dashboard_summary_api_doctor_dashboard_summary_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DoctorDashboardSummary"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Get Doctor Dashboard Summary",
+        "tags": [
+          "areas"
         ]
       }
     },

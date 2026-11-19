@@ -22,6 +22,7 @@ import { formatIst, formatPaise, formatToken, istToday, paiseToRupees, rupeesToP
 import { IconArrowLeft, IconCheck, IconPrinter, IconRupee, IconUser } from '../icons'
 import { InlineAlert } from '../InlineAlert'
 import { PAYMENT_RECORDED_EVENT } from '../ReceiptHost'
+import { toast } from '../ToastHost'
 import { BillPanel } from './BillPanel'
 
 const PAYMENT_METHODS: PaymentMethod[] = ['CASH', 'UPI', 'CARD']
@@ -501,7 +502,6 @@ export function VisitCheckout({
 }: VisitCheckoutProps) {
   // undefined = nothing picked yet, so the dashboard's visit is shown; null = cleared after a close or back.
   const [picked, setPicked] = useState<number | null | undefined>(undefined)
-  const [notice, setNotice] = useState<string | null>(null)
   const rawSelectedId = picked === undefined ? initialVisitId : picked
   const validSelectedId =
     typeof rawSelectedId === 'number' && Number.isInteger(rawSelectedId) && rawSelectedId > 0
@@ -565,14 +565,6 @@ export function VisitCheckout({
   )
 
   const showDirectPayment = canCollect && Boolean(onDirectPayment)
-  const noticeBanner = notice ? (
-    <div
-      role="status"
-      className="rounded-xl border border-emerald-300 bg-emerald-50 p-3 text-xs font-semibold text-emerald-900"
-    >
-      {notice}
-    </div>
-  ) : null
   const initialErrorBanner =
     initialVisitError && validSelectedId == null ? (
       <InlineAlert tone="error">{initialVisitError}</InlineAlert>
@@ -582,7 +574,6 @@ export function VisitCheckout({
   if ((resolvingInitialVisit || readyPending) && validSelectedId == null) {
     return (
       <section className="max-w-2xl space-y-3 rounded-2xl border border-slate-200 bg-white p-6 shadow-xs">
-        {noticeBanner}
         {initialErrorBanner}
         <p className="py-4 text-center text-xs text-slate-600">Loading visits...</p>
       </section>
@@ -593,7 +584,6 @@ export function VisitCheckout({
   if (readyError && validSelectedId == null) {
     return (
       <section className="max-w-2xl space-y-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-xs">
-        {noticeBanner}
         {initialErrorBanner}
         <InlineAlert tone="error">
           {errorText(readyErr, 'Could not load visits awaiting checkout. Try refreshing.')}
@@ -614,7 +604,6 @@ export function VisitCheckout({
         data-testid="checkout-empty-state"
         className="max-w-2xl space-y-5 rounded-2xl border border-slate-200 bg-white p-6 shadow-xs"
       >
-        {noticeBanner}
         {initialErrorBanner}
         <div>
           <h2 className="text-base font-bold text-slate-900">No visits awaiting checkout</h2>
@@ -670,7 +659,6 @@ export function VisitCheckout({
         data-testid="checkout-queue-unselected"
         className="max-w-3xl space-y-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-xs"
       >
-        {noticeBanner}
         {initialErrorBanner}
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
@@ -692,10 +680,7 @@ export function VisitCheckout({
               <VisitQueueCard
                 visit={v}
                 selected={false}
-                onSelect={() => {
-                  setNotice(null)
-                  setPicked(v.id)
-                }}
+                onSelect={() => setPicked(v.id)}
               />
             </li>
           ))}
@@ -734,10 +719,7 @@ export function VisitCheckout({
                 <VisitQueueCard
                   visit={v}
                   selected={v.id === validSelectedId}
-                  onSelect={() => {
-                    setNotice(null)
-                    setPicked(v.id)
-                  }}
+                  onSelect={() => setPicked(v.id)}
                 />
               </li>
             ))}
@@ -751,12 +733,10 @@ export function VisitCheckout({
       </section>
 
       <section className="space-y-5 rounded-2xl border border-slate-200 bg-white p-5 shadow-xs lg:col-span-8">
-        {noticeBanner}
         <div>
           <button
             type="button"
             onClick={() => {
-              setNotice(null)
               setPicked(null)
               onClearInitialVisit?.()
             }}
@@ -778,7 +758,7 @@ export function VisitCheckout({
             canClose={canClose}
             onReprint={onReprint}
             onClosed={(closed) => {
-              setNotice(
+              toast.success(
                 closed.outstanding_paise > 0
                   ? `${closed.patient_name}'s visit is closed. ${formatPaise(closed.outstanding_paise)} stays under Pending Dues.`
                   : `${closed.patient_name}'s visit is closed.`,
@@ -797,7 +777,6 @@ export function VisitCheckout({
 export function VisitDuesSection({ canCollect }: { canCollect: boolean }) {
   const { data: dues, isPending, isError, error, refetch } = useVisitDues()
   const [collecting, setCollecting] = useState<VisitDueOut | null>(null)
-  const [notice, setNotice] = useState<string | null>(null)
   const total = (dues ?? []).reduce((acc, d) => acc + d.balance_paise, 0)
 
   return (
@@ -817,19 +796,13 @@ export function VisitDuesSection({ canCollect }: { canCollect: boolean }) {
         </div>
       </div>
 
-      {notice && (
-        <div role="status" className="rounded-xl border border-emerald-300 bg-emerald-50 p-3 text-xs font-semibold text-emerald-900">
-          {notice}
-        </div>
-      )}
-
       {collecting && canCollect && (
         <DueCollectForm
           due={collecting}
           onCancel={() => setCollecting(null)}
           onCollected={(payment) => {
             setCollecting(null)
-            setNotice(`Receipt ${payment.receipt_number} issued for ${payment.patient_name}.`)
+            toast.success(`Receipt ${payment.receipt_number} issued for ${payment.patient_name}.`)
           }}
         />
       )}

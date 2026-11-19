@@ -64,9 +64,9 @@ function ReceiptTable({
         </thead>
         <tbody className="divide-y divide-slate-100 font-medium">
           {rows.map((p) => (
-            <tr key={p.id} className="hover:bg-slate-50/80 transition-colors">
-              <td className="py-3 px-3 font-mono font-bold text-slate-900">{p.receipt_number}</td>
-              <td className="py-3 px-3 text-slate-600">{formatIst(p.created_at)}</td>
+            <tr key={p.id} className="hover:bg-slate-50/80 transition-colors duration-150">
+              <td className="py-3 px-3 font-mono tabular-nums font-bold text-slate-900">{p.receipt_number}</td>
+              <td className="py-3 px-3 tabular-nums text-slate-600">{formatIst(p.created_at)}</td>
               <td className="py-3 px-3">
                 <div className="font-bold text-slate-900">{p.patient_name}</div>
                 <div className="font-mono text-xs text-slate-500">{p.patient_urn}</div>
@@ -74,26 +74,34 @@ function ReceiptTable({
               <td className="py-3 px-3 text-slate-700">
                 {p.treatment_plan_name || p.notes || 'OPD Consultation'}
               </td>
-              <td className="py-3 px-3 text-right font-mono font-bold text-emerald-900">
+              <td
+                className={`py-3 px-3 text-right font-mono tabular-nums font-bold ${
+                  p.is_reversed ? 'text-slate-500 line-through' : 'text-emerald-800'
+                }`}
+              >
                 {formatPaise(p.amount_paise)}
               </td>
               <td className="py-3 px-3 text-center">
-                <span className="rounded bg-slate-100 px-2 py-0.5 text-xs font-bold text-slate-700">
+                <span className="rounded border border-slate-200 bg-slate-50 px-2 py-0.5 text-xs font-semibold text-slate-700">
                   {p.payment_method}
                 </span>
               </td>
               <td className="py-3 px-3 text-center">
                 {p.is_reversed ? (
-                  <span className="rounded bg-red-100 px-2 py-0.5 text-xs font-bold text-red-800">Reversed</span>
+                  <span className="rounded-full border border-red-200 bg-red-50 px-2.5 py-0.5 text-xs font-semibold text-red-800">
+                    Reversed
+                  </span>
                 ) : (
-                  <span className="rounded bg-emerald-100 px-2 py-0.5 text-xs font-bold text-emerald-800">Active</span>
+                  <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-0.5 text-xs font-semibold text-emerald-800">
+                    Active
+                  </span>
                 )}
               </td>
               <td className="py-3 px-3 text-right">
                 <button
                   type="button"
                   onClick={() => onPrint(p)}
-                  className="inline-flex items-center gap-1 rounded-lg border border-slate-300 bg-white px-2.5 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-50 cursor-pointer shadow-2xs"
+                  className="inline-flex items-center gap-1 rounded-lg border border-slate-300 bg-white px-2.5 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-50 hover:border-slate-400 cursor-pointer shadow-2xs transition-colors"
                 >
                   <IconPrinter className="h-3.5 w-3.5 text-slate-500" />
                   Print
@@ -402,7 +410,7 @@ export function ReceptionBillingPage() {
                 <div className="flex items-center justify-between border-b border-slate-200 pb-3">
                   <div>
                     <h2 className="text-base font-bold text-slate-900">Direct Payment (No Visit)</h2>
-                    <p className="text-xs text-slate-500">
+                    <p className="text-xs text-slate-600">
                       Charge fee schedule item, plan or custom payment without a consultation visit.
                     </p>
                   </div>
@@ -412,7 +420,7 @@ export function ReceptionBillingPage() {
                       setCheckoutMode('visit')
                       handleResetCheckout()
                     }}
-                    className="inline-flex min-h-9 cursor-pointer items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3.5 text-xs font-bold text-slate-700 shadow-2xs hover:bg-slate-50 transition-colors"
+                    className="inline-flex min-h-9 cursor-pointer items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3.5 text-xs font-semibold text-slate-700 shadow-2xs hover:bg-slate-50 transition-colors"
                   >
                     <IconArrowLeft className="h-4 w-4 text-slate-600" />
                     Back to Visit Checkout
@@ -423,11 +431,11 @@ export function ReceptionBillingPage() {
                 {recordedPayment ? (
                   <div
                     role="status"
-                    className="space-y-4 rounded-2xl border border-emerald-300 bg-emerald-50/90 p-6 text-emerald-950 shadow-sm"
+                    className="space-y-4 rounded-xl border border-emerald-200 bg-emerald-50 p-6 text-emerald-950 shadow-2xs"
                   >
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                       <div className="flex items-center gap-4">
-                        <div className="flex h-12 w-12 items-center justify-center rounded-full bg-emerald-600 text-white font-bold">
+                        <div className="flex h-12 w-12 items-center justify-center rounded-full bg-emerald-700 text-white font-bold">
                           <IconCheck className="h-6 w-6" />
                         </div>
                         <div>
@@ -435,20 +443,20 @@ export function ReceptionBillingPage() {
                             Payment Recorded &amp; Receipt Issued!
                           </h3>
                           <p className="text-xs text-emerald-800">
-                            Receipt <span className="font-mono font-bold">{recordedPayment.receipt_number}</span> issued for{' '}
+                            Receipt <span className="font-mono tabular-nums font-bold">{recordedPayment.receipt_number}</span> issued for{' '}
                             <span className="font-semibold">{recordedPayment.patient_name}</span> ({recordedPayment.patient_urn}).
                           </p>
                         </div>
                       </div>
 
-                      <div className="rounded-xl border border-emerald-300 bg-white px-5 py-3 text-center shadow-xs">
-                        <span className="text-xs font-bold text-slate-500">
+                      <div className="rounded-xl border border-emerald-200 bg-white px-5 py-3 text-center shadow-2xs">
+                        <span className="text-xs font-semibold text-slate-600">
                           Amount Collected
                         </span>
-                        <div className="font-mono text-2xl font-black text-emerald-800">
+                        <div className="font-mono tabular-nums text-2xl font-bold text-emerald-800">
                           {formatPaise(recordedPayment.amount_paise)}
                         </div>
-                        <span className="text-xs font-bold text-slate-600">
+                        <span className="text-xs font-semibold text-slate-600">
                           {recordedPayment.payment_method}
                         </span>
                       </div>
@@ -458,7 +466,7 @@ export function ReceptionBillingPage() {
                       <button
                         type="button"
                         onClick={() => setReprintPayment(recordedPayment)}
-                        className="inline-flex min-h-11 items-center gap-2 rounded-lg bg-emerald-800 px-5 text-sm font-semibold text-white hover:bg-emerald-900 shadow-xs cursor-pointer"
+                        className="inline-flex min-h-11 items-center gap-2 rounded-lg bg-brand-700 px-5 text-sm font-semibold text-white hover:bg-brand-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-700 shadow-2xs cursor-pointer transition-colors"
                       >
                         <IconPrinter className="h-4 w-4" />
                         Print Receipt Slip (A4 / Thermal)
@@ -466,7 +474,7 @@ export function ReceptionBillingPage() {
                       <button
                         type="button"
                         onClick={handleResetCheckout}
-                        className="inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50 cursor-pointer"
+                        className="inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50 cursor-pointer transition-colors"
                       >
                         Checkout Next Patient
                       </button>
@@ -477,7 +485,7 @@ export function ReceptionBillingPage() {
                     {formError && (
                       <div
                         role="alert"
-                        className="rounded-xl border border-red-300 bg-red-50 p-4 text-sm font-semibold text-red-900 shadow-xs"
+                        className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm font-semibold text-red-900 shadow-2xs"
                       >
                         {formError}
                       </div>
@@ -488,9 +496,9 @@ export function ReceptionBillingPage() {
                   {/* LEFT COLUMN: Patient Selection & Charges (7 cols) */}
                   <div className="space-y-5 lg:col-span-7 xl:col-span-8">
                     {/* Patient Search & Profile Card */}
-                    <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs sm:p-6 space-y-4">
+                    <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-2xs sm:p-6 space-y-4">
                       <div className="flex items-center gap-2 border-b border-slate-100 pb-3">
-                        <IconUser className="h-5 w-5 text-emerald-800" />
+                        <IconUser className="h-5 w-5 text-brand-700" />
                         <h2 className="text-base font-bold text-slate-900">Patient Identification</h2>
                       </div>
 
@@ -505,7 +513,7 @@ export function ReceptionBillingPage() {
                           value={searchQuery}
                           onChange={(e) => setSearchQuery(e.target.value)}
                           placeholder="Search patient by Name, Mobile or Patient ID (URN)..."
-                          className="w-full rounded-xl border border-slate-300 bg-white pl-10 pr-9 py-2.5 text-xs font-medium text-slate-900 placeholder:text-slate-400 shadow-2xs focus:border-emerald-700 focus:outline-none focus:ring-1 focus:ring-emerald-700 min-h-[44px]"
+                          className="w-full rounded-xl border border-slate-300 bg-white pl-10 pr-9 py-2.5 text-xs font-medium text-slate-900 placeholder:text-slate-400 shadow-2xs focus:border-brand-700 focus:outline-none focus:ring-2 focus:ring-brand-700/20 min-h-[44px]"
                         />
                         {searchQuery && (
                           <button
@@ -532,13 +540,13 @@ export function ReceptionBillingPage() {
                                   setSelectedPatient(patient)
                                   setSearchQuery('')
                                 }}
-                                className="w-full p-2.5 text-left text-xs hover:bg-emerald-50/60 cursor-pointer flex items-center justify-between transition-colors"
+                                className="w-full p-2.5 text-left text-xs hover:bg-brand-50/60 cursor-pointer flex items-center justify-between transition-colors"
                               >
                                 <div>
                                   <div className="font-bold text-slate-900">{patient.full_name}</div>
-                                  <div className="font-mono text-xs text-emerald-800">{patient.urn}</div>
+                                  <div className="font-mono text-xs text-brand-800">{patient.urn}</div>
                                 </div>
-                                <div className="text-right text-xs text-slate-500 font-mono">
+                                <div className="text-right text-xs text-slate-500 font-mono tabular-nums">
                                   {patient.mobile}
                                 </div>
                               </button>
@@ -554,7 +562,7 @@ export function ReceptionBillingPage() {
                         <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-4 space-y-2.5 shadow-2xs">
                           <div className="flex items-center justify-between">
                             <div className="flex items-center gap-3">
-                              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-100 text-emerald-800 font-bold">
+                              <div className="flex h-10 w-10 items-center justify-center rounded-full border border-brand-200 bg-brand-50 text-brand-800 font-bold">
                                 <IconUser className="h-5 w-5" />
                               </div>
                               <div>
@@ -570,13 +578,13 @@ export function ReceptionBillingPage() {
                                 setSelectedPatient(null)
                                 clearCheckoutParams()
                               }}
-                              className="text-xs font-semibold text-slate-500 hover:text-red-700 cursor-pointer"
+                              className="text-xs font-semibold text-slate-600 hover:text-red-700 cursor-pointer"
                             >
                               Change
                             </button>
                           </div>
 
-                          <div className="flex items-center justify-between text-xs text-slate-600 border-t border-slate-200/70 pt-2 font-mono">
+                          <div className="flex items-center justify-between text-xs text-slate-600 border-t border-slate-200/70 pt-2 font-mono tabular-nums">
                             <span>
                               {selectedPatient.age_years} Y &bull;{' '}
                               {selectedPatient.gender === 'M' ? 'Male' : selectedPatient.gender === 'F' ? 'Female' : 'Other'}
@@ -592,9 +600,9 @@ export function ReceptionBillingPage() {
                     </section>
 
                     {/* Service & Charge Selection */}
-                    <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs sm:p-6 space-y-4">
+                    <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-2xs sm:p-6 space-y-4">
                       <div className="flex items-center gap-2 border-b border-slate-100 pb-3">
-                        <IconStethoscope className="h-5 w-5 text-emerald-800" />
+                        <IconStethoscope className="h-5 w-5 text-brand-700" />
                         <h2 className="text-base font-bold text-slate-900">Service Charges &amp; Fees</h2>
                       </div>
 
@@ -608,7 +616,7 @@ export function ReceptionBillingPage() {
                             id="billing-service-type"
                             value={serviceType}
                             onChange={(e) => handleServiceChange(e.target.value as ServiceType)}
-                            className="w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-xs font-medium text-slate-900 shadow-2xs focus:border-emerald-700 focus:outline-none min-h-[44px]"
+                            className="w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-xs font-medium text-slate-900 shadow-2xs focus:border-brand-700 focus:outline-none focus:ring-2 focus:ring-brand-700/20 min-h-[44px]"
                           >
                             <option value="opd_consultation">OPD consultation (doctor's fee)</option>
                             {fees?.map((fee) => (
@@ -629,7 +637,7 @@ export function ReceptionBillingPage() {
                             id="billing-doctor"
                             value={selectedDoctorId}
                             onChange={(e) => handleDoctorChange(e.target.value)}
-                            className="w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-xs font-medium text-slate-900 shadow-2xs focus:border-emerald-700 focus:outline-none min-h-[44px]"
+                            className="w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-xs font-medium text-slate-900 shadow-2xs focus:border-brand-700 focus:outline-none focus:ring-2 focus:ring-brand-700/20 min-h-[44px]"
                           >
                             <option value="">-- Clinic General OPD --</option>
                             {doctors?.map((doc) => (
@@ -659,7 +667,7 @@ export function ReceptionBillingPage() {
                               onChange={(e) => setAmountRupees(e.target.value)}
                               placeholder="Enter amount"
                               aria-describedby="billing-amount-hint"
-                              className="w-full rounded-xl border border-slate-300 bg-white pl-8 pr-3.5 py-2.5 text-base font-black text-slate-900 shadow-2xs focus:border-emerald-700 focus:outline-none min-h-[44px]"
+                              className="w-full rounded-xl border border-slate-300 bg-white pl-8 pr-3.5 py-2.5 font-mono tabular-nums text-base font-bold text-slate-900 shadow-2xs focus:border-brand-700 focus:outline-none focus:ring-2 focus:ring-brand-700/20 min-h-[44px]"
                             />
                           </div>
                           <p id="billing-amount-hint" className="mt-1 text-xs text-slate-600">
@@ -674,9 +682,9 @@ export function ReceptionBillingPage() {
 
                   {/* RIGHT COLUMN: Payment Mode & Issue Receipt (5 cols) */}
                   <div className="space-y-5 lg:col-span-5 xl:col-span-4">
-                    <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs sm:p-6 space-y-4">
+                    <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-2xs sm:p-6 space-y-4">
                       <div className="flex items-center gap-2 border-b border-slate-100 pb-3">
-                        <IconRupee className="h-5 w-5 text-emerald-800" />
+                        <IconRupee className="h-5 w-5 text-brand-700" />
                         <h2 className="text-base font-bold text-slate-900">Payment Collection</h2>
                       </div>
 
@@ -691,8 +699,8 @@ export function ReceptionBillingPage() {
                               key={mode}
                               type="button"
                               onClick={() => setPaymentMethod(mode)}
-                              className={`rounded-xl border py-2.5 text-xs font-bold transition-all ${paymentMethod === mode
-                                ? 'border-emerald-600 bg-[#124832] text-white shadow-xs'
+                              className={`rounded-xl border py-2.5 text-xs font-bold transition-colors cursor-pointer ${paymentMethod === mode
+                                ? 'border-brand-700 bg-brand-700 text-white shadow-2xs'
                                 : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50'
                                 }`}
                             >
@@ -713,21 +721,21 @@ export function ReceptionBillingPage() {
                           value={notes}
                           onChange={(e) => setNotes(e.target.value)}
                           placeholder="UPI Ref ID, Cash Counter, or receipt note..."
-                          className="w-full rounded-xl border border-slate-300 bg-white p-3 text-xs font-medium text-slate-900 shadow-2xs focus:border-emerald-700 focus:outline-none"
+                          className="w-full rounded-xl border border-slate-300 bg-white p-3 text-xs font-medium text-slate-900 shadow-2xs focus:border-brand-700 focus:outline-none focus:ring-2 focus:ring-brand-700/20"
                         />
                       </div>
 
                       {/* Final Checkout Summary Box */}
-                      <div className="rounded-xl border border-emerald-200 bg-emerald-50/70 p-4 space-y-2">
-                        <div className="flex items-center justify-between text-xs text-emerald-900">
-                          <span>Total Amount Payable:</span>
-                          <span className="font-mono text-xl font-black text-emerald-950">
+                      <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 space-y-2">
+                        <div className="flex items-center justify-between text-xs text-slate-700">
+                          <span className="font-semibold">Total Amount Payable:</span>
+                          <span className="font-mono tabular-nums text-xl font-bold text-slate-900">
                             ₹{parseFloat(amountRupees || '0').toFixed(2)}
                           </span>
                         </div>
-                        <div className="flex items-center justify-between text-xs text-emerald-800 border-t border-emerald-200/80 pt-1.5 font-medium">
+                        <div className="flex items-center justify-between text-xs text-slate-600 border-t border-slate-200 pt-1.5 font-medium">
                           <span>Receipt Numbering:</span>
-                          <span className="font-bold">Next Sequential (Gap-free)</span>
+                          <span className="font-semibold text-slate-800">Next Sequential (Gap-free)</span>
                         </div>
                       </div>
 
@@ -735,7 +743,7 @@ export function ReceptionBillingPage() {
                       <button
                         type="submit"
                         disabled={recordPaymentMutation.isPending || !selectedPatient}
-                        className="w-full inline-flex min-h-12 items-center justify-center gap-2 rounded-xl bg-[#124832] px-6 text-sm font-bold text-white shadow-xs hover:bg-[#0D3822] disabled:opacity-50 cursor-pointer"
+                        className="w-full inline-flex min-h-12 items-center justify-center gap-2 rounded-xl bg-brand-700 px-6 text-sm font-semibold text-white shadow-2xs transition-colors hover:bg-brand-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-700 disabled:opacity-50 cursor-pointer"
                       >
                         <IconDeviceFloppy className="h-4 w-4" />
                         {recordPaymentMutation.isPending
@@ -756,16 +764,16 @@ export function ReceptionBillingPage() {
         {/* TAB 2: TODAY'S RECEIPTS (reception) / LEDGER (admin)     */}
         {/* ======================================================== */}
         {me && activeTab === 'ledger' && canCheckout && (
-          <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs sm:p-6 space-y-4">
+          <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-2xs sm:p-6 space-y-4">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 pb-4">
               <div>
                 <h2 className="text-base font-bold text-slate-900">Today&apos;s Receipts</h2>
-                <p className="text-xs text-slate-500">Today&apos;s receipts (IST). Earlier days in Admin.</p>
+                <p className="text-xs text-slate-600">Today&apos;s receipts (IST). Earlier days in Admin.</p>
               </div>
               <div className="flex flex-wrap items-center gap-3">
                 <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2">
-                  <span className="block text-xs font-bold text-emerald-800">Collected today</span>
-                  <span className="font-mono text-base font-black text-emerald-950">
+                  <span className="block text-xs font-semibold text-emerald-800">Collected today</span>
+                  <span className="font-mono tabular-nums text-base font-bold text-emerald-950">
                     {todayError ? '—' : formatPaise(todayCollectedPaise)}
                   </span>
                 </div>
@@ -775,7 +783,7 @@ export function ReceptionBillingPage() {
                   value={receiptSearch}
                   onChange={(e) => setReceiptSearch(e.target.value)}
                   placeholder="Filter by receipt #, URN or name..."
-                  className="rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-900 focus:border-emerald-700 focus:outline-none min-h-[38px]"
+                  className="rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-900 placeholder:text-slate-400 focus:border-brand-700 focus:outline-none focus:ring-2 focus:ring-brand-700/20 min-h-[38px]"
                 />
               </div>
             </div>
@@ -795,11 +803,11 @@ export function ReceptionBillingPage() {
         )}
 
         {me && activeTab === 'ledger' && !canCheckout && (
-          <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs sm:p-6 space-y-4">
+          <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-2xs sm:p-6 space-y-4">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 pb-4">
               <div>
                 <h2 className="text-base font-bold text-slate-900">Collections &amp; Receipts Ledger</h2>
-                <p className="text-xs text-slate-500">
+                <p className="text-xs text-slate-600">
                   Audit-backed sequential receipts issued for consultations and packages.
                 </p>
               </div>
@@ -812,13 +820,13 @@ export function ReceptionBillingPage() {
                   value={ledgerSearch}
                   onChange={(e) => setLedgerSearch(e.target.value)}
                   placeholder="Filter by receipt #, URN or name..."
-                  className="rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-900 focus:border-emerald-700 focus:outline-none min-h-[38px]"
+                  className="rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-900 placeholder:text-slate-400 focus:border-brand-700 focus:outline-none focus:ring-2 focus:ring-brand-700/20 min-h-[38px]"
                 />
                 <select
                   aria-label="Filter receipts by payment status"
                   value={ledgerStatus}
                   onChange={(e) => setLedgerStatus(e.target.value as 'all' | 'active' | 'reversed')}
-                  className="rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-900 focus:border-emerald-700 focus:outline-none min-h-[38px]"
+                  className="rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-900 focus:border-brand-700 focus:outline-none focus:ring-2 focus:ring-brand-700/20 min-h-[38px]"
                 >
                   <option value="all">All Receipts</option>
                   <option value="active">Active Only</option>
@@ -848,21 +856,21 @@ export function ReceptionBillingPage() {
           <div className="space-y-5">
             <VisitDuesSection canCollect={canCollect} />
 
-            <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs sm:p-6 space-y-4">
+            <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-2xs sm:p-6 space-y-4">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 pb-4">
                 <div>
                   <h2 className="text-base font-bold text-slate-900">Package Dues</h2>
-                  <p className="text-xs text-slate-500">
+                  <p className="text-xs text-slate-600">
                     Active physiotherapy packages with pending balances computed dynamically.
                   </p>
                 </div>
 
                 <div className="flex flex-wrap items-center gap-4">
                   <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-2">
-                    <span className="text-xs font-bold text-amber-800 block">
+                    <span className="text-xs font-semibold text-amber-900 block">
                       Total Outstanding
                     </span>
-                    <span className="font-mono text-base font-black text-amber-950">
+                    <span className="font-mono tabular-nums text-base font-bold text-amber-950">
                       {duesError ? '—' : formatPaise(totalOutstandingPaise)}
                     </span>
                   </div>
@@ -872,7 +880,7 @@ export function ReceptionBillingPage() {
                     value={duesSearch}
                     onChange={(e) => setDuesSearch(e.target.value)}
                     placeholder="Search by patient, URN, or package..."
-                    className="rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-900 focus:border-emerald-700 focus:outline-none min-h-[38px]"
+                    className="rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-900 placeholder:text-slate-400 focus:border-brand-700 focus:outline-none focus:ring-2 focus:ring-brand-700/20 min-h-[38px]"
                   />
                 </div>
               </div>
@@ -901,7 +909,7 @@ export function ReceptionBillingPage() {
                     </thead>
                     <tbody className="divide-y divide-slate-100 font-medium">
                       {filteredDues.map((due) => (
-                        <tr key={due.treatment_plan_id} className="hover:bg-slate-50/80 transition-colors">
+                        <tr key={due.treatment_plan_id} className="hover:bg-slate-50/80 transition-colors duration-150">
                           <td className="py-3 px-3">
                             <div className="font-bold text-slate-900">{due.patient_name}</div>
                             <div className="font-mono text-xs text-slate-500">{due.patient_urn}</div>
@@ -909,17 +917,25 @@ export function ReceptionBillingPage() {
                           <td className="py-3 px-3">
                             <div className="font-bold text-slate-900">{due.plan_name}</div>
                           </td>
-                          <td className="py-3 px-3 text-right font-mono font-medium text-slate-800">
+                          <td className="py-3 px-3 text-right font-mono tabular-nums font-medium text-slate-800">
                             {formatPaise(due.agreed_price_paise)}
                           </td>
-                          <td className="py-3 px-3 text-right font-mono font-bold text-emerald-800">
+                          <td className="py-3 px-3 text-right font-mono tabular-nums font-semibold text-emerald-800">
                             {formatPaise(due.paid_paise)}
                           </td>
-                          <td className="py-3 px-3 text-right font-mono font-black text-red-700">
-                            {formatPaise(due.balance_paise)}
+                          <td className="py-3 px-3 text-right">
+                            <span
+                              className={`inline-flex items-center rounded-md border px-2 py-0.5 font-mono tabular-nums font-bold ${
+                                due.completed_sessions >= due.total_sessions
+                                  ? 'border-red-200 bg-red-50 text-red-800'
+                                  : 'border-amber-200 bg-amber-50 text-amber-900'
+                              }`}
+                            >
+                              {formatPaise(due.balance_paise)}
+                            </span>
                           </td>
                           <td className="py-3 px-3 text-center">
-                            <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-bold text-slate-700">
+                            <span className="rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 font-mono tabular-nums text-xs font-semibold text-slate-700">
                               {due.completed_sessions} / {due.total_sessions}
                             </span>
                           </td>
@@ -928,7 +944,7 @@ export function ReceptionBillingPage() {
                               <button
                                 type="button"
                                 onClick={() => setDueToCollect(due)}
-                                className="inline-flex items-center gap-1 rounded-lg bg-emerald-800 px-3 py-1.5 text-xs font-bold text-white shadow-xs hover:bg-emerald-900 cursor-pointer"
+                                className="inline-flex items-center gap-1 rounded-lg bg-brand-700 px-3 py-1.5 text-xs font-semibold text-white shadow-2xs transition-colors hover:bg-brand-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-700 cursor-pointer"
                               >
                                 <IconRupee className="h-3.5 w-3.5" />
                                 Collect Payment

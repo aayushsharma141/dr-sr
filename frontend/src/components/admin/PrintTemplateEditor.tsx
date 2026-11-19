@@ -5,6 +5,7 @@ import {
 } from '../../api/queries'
 import type { PrintDocumentType, PrintTemplateOut } from '../../api/types'
 import { ConflictBanner } from '../ConflictBanner'
+import { toast } from '../ToastHost'
 
 interface DocumentTabOption {
   type: PrintDocumentType
@@ -31,8 +32,6 @@ export function PrintTemplateEditor() {
   const [footerEn, setFooterEn] = useState('')
   const [footerHi, setFooterHi] = useState('')
   const [hasConflict, setHasConflict] = useState(false)
-  const [saveSuccess, setSaveSuccess] = useState(false)
-  const [saveError, setSaveError] = useState<string | null>(null)
 
   // Find active template from fetched list
   const activeTemplate: PrintTemplateOut | undefined = templates?.find(
@@ -47,23 +46,17 @@ export function PrintTemplateEditor() {
       setFooterEn(activeTemplate.footer_en || '')
       setFooterHi(activeTemplate.footer_hi || '')
       setHasConflict(false)
-      setSaveError(null)
-      setSaveSuccess(false)
     }
   }, [activeTemplate, activeTab])
 
   const handleTabChange = (newTab: PrintDocumentType) => {
     setActiveTab(newTab)
-    setSaveSuccess(false)
-    setSaveError(null)
   }
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!activeTemplate) return
 
-    setSaveError(null)
-    setSaveSuccess(false)
     setHasConflict(false)
 
     try {
@@ -77,13 +70,12 @@ export function PrintTemplateEditor() {
           version: activeTemplate.version,
         },
       })
-      setSaveSuccess(true)
-      setTimeout(() => setSaveSuccess(false), 4000)
+      toast.success('Print template saved successfully (version incremented).')
     } catch (err: any) {
       if (err?.status === 409 || err?.message?.includes('409') || err?.code === 'version_conflict') {
         setHasConflict(true)
       } else {
-        setSaveError(err?.message || 'Failed to update print template.')
+        toast.error(err?.message || 'Failed to update print template.')
       }
     }
   }
@@ -165,18 +157,6 @@ export function PrintTemplateEditor() {
           {hasConflict && (
             <div className="mt-4">
               <ConflictBanner onReload={handleReload} isReloading={isFetching} />
-            </div>
-          )}
-
-          {saveSuccess && (
-            <div className="mt-4 rounded-md bg-emerald-50 border border-emerald-200 p-3 text-sm text-emerald-800">
-              Print template saved successfully (version incremented).
-            </div>
-          )}
-
-          {saveError && (
-            <div className="mt-4 rounded-md bg-red-50 border border-red-200 p-3 text-sm text-red-800">
-              {saveError}
             </div>
           )}
 

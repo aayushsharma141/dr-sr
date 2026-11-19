@@ -132,8 +132,12 @@ def validate_status_transition(
                 ),
             )
 
-    # Doctor-only transition enforcement: IN_CONSULTATION and DONE must be initiated by DOCTOR
-    if target_status in (AppointmentStatus.IN_CONSULTATION, AppointmentStatus.DONE):
+    # Doctor-only transition enforcement: IN_CONSULTATION and DONE/COMPLETED require DOCTOR.
+    if target_status in (
+        AppointmentStatus.IN_CONSULTATION,
+        AppointmentStatus.DONE,
+        AppointmentStatus.COMPLETED,
+    ):
         if principal.role != Role.DOCTOR:
             raise ApiError(
                 status_code=403,
@@ -384,7 +388,7 @@ def validate_consultation_transition(
 
 # The legacy appointment status that goes with each consultation status.
 MIRRORED_STATUS: dict[ConsultationStatus, AppointmentStatus] = {
-    ConsultationStatus.WAITING: AppointmentStatus.CHECKED_IN,
+    ConsultationStatus.WAITING: AppointmentStatus.ARRIVED,
     ConsultationStatus.IN_CONSULTATION: AppointmentStatus.IN_CONSULTATION,
     ConsultationStatus.COMPLETED: AppointmentStatus.DONE,
     ConsultationStatus.CANCELLED: AppointmentStatus.CANCELLED,
@@ -394,6 +398,7 @@ MIRRORED_STATUS: dict[ConsultationStatus, AppointmentStatus] = {
 _STATUS_TO_CONSULTATION: dict[AppointmentStatus, ConsultationStatus] = {
     AppointmentStatus.IN_CONSULTATION: ConsultationStatus.IN_CONSULTATION,
     AppointmentStatus.DONE: ConsultationStatus.COMPLETED,
+    AppointmentStatus.COMPLETED: ConsultationStatus.COMPLETED,
     AppointmentStatus.CANCELLED: ConsultationStatus.CANCELLED,
 }
 

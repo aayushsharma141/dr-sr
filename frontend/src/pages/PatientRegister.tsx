@@ -10,10 +10,12 @@ import {
   useUpdateAppointmentStatus,
   useOpdArrival,
   useRegisterOpdArrival,
+  useCheckIn,
 } from '../api/queries'
 import { ApiError, apiFetch } from '../api/client'
 import { AppShell } from '../components/AppShell'
 import { ConflictBanner } from '../components/ConflictBanner'
+import { toast } from '../components/ToastHost'
 import { UnsavedChangesGuard } from '../components/UnsavedChangesGuard'
 import { PatientPhotoModal } from '../components/PatientPhotoModal'
 import {
@@ -21,9 +23,11 @@ import {
   IconAlertTriangle,
   IconCamera,
   IconCheck,
+  IconChevronDown,
   IconDeviceFloppy,
   IconHeartRateMonitor,
   IconMapPin,
+  IconNotes,
   IconPhone,
   IconRefresh,
   IconTicket,
@@ -33,11 +37,13 @@ import {
 } from '../components/icons'
 import type { Appointment, PatientCreate, PatientOut, PatientUpdate } from '../api/types'
 
+const BLOOD_GROUP_OPTIONS = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'] as const
+
 /** Shared field styling: one control height, one brand focus treatment, across both columns. */
 const LABEL_CLASS =
-  'mb-1.5 block text-xs font-semibold uppercase tracking-wider text-slate-600'
+  'mb-1.5 block text-xs font-medium text-slate-700'
 const INPUT_CLASS =
-  'min-h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm font-medium text-slate-900 shadow-2xs transition-colors placeholder:text-slate-400 hover:border-slate-400 focus:border-[#8E1C3D] focus:outline-none focus:ring-2 focus:ring-[#8E1C3D]/15'
+  'min-h-[38px] w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-2xs transition-colors duration-150 placeholder:text-slate-400 hover:border-slate-400 focus:border-[#8E1C3D] focus:outline-none focus:ring-2 focus:ring-[#8E1C3D]/15'
 const INPUT_WITH_ICON_CLASS = `${INPUT_CLASS} pl-10`
 
 /** Numbered section heading: the form's only structural accent, in brand maroon and gold. */
@@ -53,16 +59,16 @@ function SectionHeader({
   icon: ReactNode
 }) {
   return (
-    <div className="flex items-center gap-3 border-b border-slate-200 bg-[#FBF5F7] px-5 py-3">
-      <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#5D0B26] text-xs font-bold text-white">
+    <div className="flex items-center gap-3 border-b border-slate-200 bg-[#FBF5F7] px-4 py-3 sm:px-5">
+      <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#5D0B26] text-xs font-semibold text-white tabular-nums">
         {index}
       </span>
       <div className="min-w-0 flex-1">
-        <h2 className="flex items-center gap-2 text-sm font-bold text-[#5D0B26]">
-          <span className="text-[#8E1C3D]">{icon}</span>
+        <h2 className="flex items-center gap-2 text-base font-semibold tracking-tight text-[#5D0B26]">
+          <span className="shrink-0 text-[#8E1C3D]">{icon}</span>
           {title}
         </h2>
-        <p className="text-xs leading-snug text-slate-500">{hint}</p>
+        <p className="text-xs leading-relaxed text-slate-500">{hint}</p>
       </div>
     </div>
   )
@@ -98,6 +104,7 @@ export function PatientRegister() {
   const uploadPhotoMutation = useUploadPatientPhoto()
   const updateAppointmentStatus = useUpdateAppointmentStatus()
   const registerOpdArrival = useRegisterOpdArrival()
+  const checkInMutation = useCheckIn()
 
   // 12 Canonical demographic fields
   const [fullName, setFullName] = useState('')
@@ -112,6 +119,15 @@ export function PatientRegister() {
   const [emergencyContact, setEmergencyContact] = useState('')
   const [allergies, setAllergies] = useState('None reported')
   const [notes, setNotes] = useState('')
+
+  // Additional optional demographic & background fields (Milestone 1)
+  const [alternateMobile, setAlternateMobile] = useState('')
+  const [email, setEmail] = useState('')
+  const [bloodGroup, setBloodGroup] = useState('')
+  const [pinCode, setPinCode] = useState('')
+  const [guardianRelationship, setGuardianRelationship] = useState('')
+  const [medicalHistoryNotes, setMedicalHistoryNotes] = useState('')
+  const [showAdditionalDetails, setShowAdditionalDetails] = useState(false)
 
   // Photo state
   const [photoFile, setPhotoFile] = useState<File | null>(null)
@@ -129,13 +145,11 @@ export function PatientRegister() {
 
   // Feedback states
   const [createdPatient, setCreatedPatient] = useState<PatientOut | null>(null)
-  const [quickSuccessNotice, setQuickSuccessNotice] = useState<string | null>(null)
   const [formError, setFormError] = useState<string | null>(null)
   // Steps after the patient record was saved that did not complete (photo, visit, check-in).
   const [registrationWarnings, setRegistrationWarnings] = useState<string[]>([])
   const [photoFailure, setPhotoFailure] = useState<{ patientId: number; fileName: string; message: string } | null>(null)
   const [photoRetrying, setPhotoRetrying] = useState(false)
-  const [photoSavedNotice, setPhotoSavedNotice] = useState<string | null>(null)
   const arrivalPrefilledRef = useRef<number | null>(null)
   // Edit mode: the record as last loaded (its version_id guards the save), and save state.
   const [baseline, setBaseline] = useState<PatientOut | null>(null)
@@ -165,6 +179,12 @@ export function PatientRegister() {
           district.trim() !== baseline.district ||
           state.trim() !== baseline.state ||
           emergencyContact.trim() !== (baseline.emergency_contact ?? '') ||
+          alternateMobile.trim() !== (baseline.alternate_mobile ?? '') ||
+          email.trim() !== (baseline.email ?? '') ||
+          bloodGroup !== (baseline.blood_group ?? '') ||
+          pinCode.trim() !== (baseline.pin_code ?? '') ||
+          guardianRelationship.trim() !== (baseline.guardian_relationship ?? '') ||
+          medicalHistoryNotes.trim() !== (baseline.medical_history_notes ?? '') ||
           allergies.trim() !== baseline.allergies ||
           notes.trim() !== (baseline.notes ?? ''),
       )
@@ -181,6 +201,12 @@ export function PatientRegister() {
           district.trim() !== 'Bhojpur' ||
           state.trim() !== 'Bihar' ||
           emergencyContact.trim() ||
+          alternateMobile.trim() ||
+          email.trim() ||
+          bloodGroup ||
+          pinCode.trim() ||
+          guardianRelationship.trim() ||
+          medicalHistoryNotes.trim() ||
           allergies.trim() !== 'None reported' ||
           notes.trim() ||
           photoFile,
@@ -199,10 +225,29 @@ export function PatientRegister() {
     district,
     state,
     emergencyContact,
+    alternateMobile,
+    email,
+    bloodGroup,
+    pinCode,
+    guardianRelationship,
+    medicalHistoryNotes,
     allergies,
     notes,
     photoFile,
   ])
+
+  const filledAdditionalCount = useMemo(
+    () =>
+      [
+        alternateMobile.trim(),
+        email.trim(),
+        bloodGroup,
+        pinCode.trim(),
+        guardianRelationship.trim(),
+        medicalHistoryNotes.trim(),
+      ].filter(Boolean).length,
+    [alternateMobile, email, bloodGroup, pinCode, guardianRelationship, medicalHistoryNotes],
+  )
 
   // Debounce duplicate check
   useEffect(() => {
@@ -276,6 +321,22 @@ export function PatientRegister() {
     setDistrict(p.district)
     setState(p.state)
     setEmergencyContact(p.emergency_contact ?? '')
+    setAlternateMobile(p.alternate_mobile ?? '')
+    setEmail(p.email ?? '')
+    setBloodGroup(p.blood_group ?? '')
+    setPinCode(p.pin_code ?? '')
+    setGuardianRelationship(p.guardian_relationship ?? '')
+    setMedicalHistoryNotes(p.medical_history_notes ?? '')
+    if (
+      p.alternate_mobile ||
+      p.email ||
+      p.blood_group ||
+      p.pin_code ||
+      p.guardian_relationship ||
+      p.medical_history_notes
+    ) {
+      setShowAdditionalDetails(true)
+    }
     setAllergies(p.allergies)
     setNotes(p.notes ?? '')
     setBaseline(p)
@@ -332,7 +393,6 @@ export function PatientRegister() {
   const handleClear = () => {
     setRegistrationWarnings([])
     setPhotoFailure(null)
-    setPhotoSavedNotice(null)
     setFullName('')
     setGuardianName('')
     setGender(null)
@@ -343,13 +403,18 @@ export function PatientRegister() {
     setDistrict('Bhojpur')
     setState('Bihar')
     setEmergencyContact('')
+    setAlternateMobile('')
+    setEmail('')
+    setBloodGroup('')
+    setPinCode('')
+    setGuardianRelationship('')
+    setMedicalHistoryNotes('')
     setAllergies('None reported')
     setNotes('')
     setPhotoFile(null)
     showPhotoPreview(null)
     setConfirmDifferentPatient(false)
     setFormError(null)
-    setQuickSuccessNotice(null)
     if (nameInputRef.current) {
       nameInputRef.current.focus()
     }
@@ -358,11 +423,11 @@ export function PatientRegister() {
   const errorText = (err: unknown) =>
     err instanceof Error && err.message ? err.message : 'unknown error'
 
-  /** Editing is done: back to the patient's record or token desk, which shows the notice. */
+  /** Editing is done: back to the patient's record or Appointments, which shows the notice. */
   const finishEdit = (notice: string) => {
     skipUnsavedGuardRef.current = true
     if (appointmentId) {
-      navigate(`/reception/tokens?patient_id=${editId}&appointment_id=${appointmentId}`, { state: { notice } })
+      navigate(`/reception/appointments?patient_id=${editId}&appointment_id=${appointmentId}`, { state: { notice } })
       return
     }
     navigate(recordPath, { state: { notice } })
@@ -371,7 +436,6 @@ export function PatientRegister() {
   const handleRetryPhoto = async () => {
     if (!photoFailure || !photoFile) return
     setPhotoRetrying(true)
-    setPhotoSavedNotice(null)
     try {
       await uploadPhotoMutation.mutateAsync({ id: photoFailure.patientId, file: photoFile })
       setPhotoFailure(null)
@@ -379,7 +443,7 @@ export function PatientRegister() {
         finishEdit('Patient details and photo updated successfully.')
         return
       }
-      setPhotoSavedNotice('Photo uploaded and saved to the patient record.')
+      toast.success('Photo uploaded and saved to the patient record.')
     } catch (retryErr) {
       setPhotoFailure({ ...photoFailure, message: errorText(retryErr) })
     } finally {
@@ -429,6 +493,12 @@ export function PatientRegister() {
       state: state.trim() || 'Bihar',
       // '' clears these on the server; null would leave the old value in place.
       emergency_contact: emergencyContact.trim(),
+      alternate_mobile: alternateMobile.trim() || null,
+      email: email.trim() || null,
+      blood_group: bloodGroup || null,
+      pin_code: pinCode.trim() || null,
+      guardian_relationship: guardianRelationship.trim() || null,
+      medical_history_notes: medicalHistoryNotes.trim() || null,
       allergies: allergies.trim() || 'None reported',
       notes: notes.trim(),
     }
@@ -480,10 +550,8 @@ export function PatientRegister() {
     // A registered patient stays on screen until "Register Another" is used; never create a second one.
     if (submittingRef.current || createdPatient || editSaved) return
     setFormError(null)
-    setQuickSuccessNotice(null)
     setRegistrationWarnings([])
     setPhotoFailure(null)
-    setPhotoSavedNotice(null)
 
     if (ageYears === '' || ageYears < 0) {
       setFormError('Please enter a valid age in years.')
@@ -526,6 +594,12 @@ export function PatientRegister() {
       district: district.trim() || 'Bhojpur',
       state: state.trim() || 'Bihar',
       emergency_contact: emergencyContact.trim() || null,
+      alternate_mobile: alternateMobile.trim() || null,
+      email: email.trim() || null,
+      blood_group: bloodGroup || null,
+      pin_code: pinCode.trim() || null,
+      guardian_relationship: guardianRelationship.trim() || null,
+      medical_history_notes: medicalHistoryNotes.trim() || null,
       allergies: allergies.trim() || 'None reported',
       notes: notes.trim() || null,
     }
@@ -545,9 +619,24 @@ export function PatientRegister() {
             photoWarning = ` Photo upload failed: ${errorText(photoErr)}`
           }
         }
+        let checkedIn = appointment
+        try {
+          checkedIn = await checkInMutation.mutateAsync({
+            id: appointment.id,
+            body: {
+              version_id: appointment.version_id,
+              referral_source: 'SELF',
+              visit_kind: 'NEW',
+              priority_level: arrivalQuery.data.priority_level ?? 'NORMAL',
+              priority_reason: arrivalQuery.data.priority_reason ?? null,
+            },
+          })
+        } catch {
+          // If check-in already done or fails, continue with appointment
+        }
         skipUnsavedGuardRef.current = true
-        navigate(`/reception/tokens?patient_id=${appointment.patient_id}&appointment_id=${appointment.id}`, {
-          state: { notice: `Patient registered and linked to token #${appointment.token_number}.${photoWarning}` },
+        navigate('/reception/appointments', {
+          state: { notice: `Patient registered and checked in (Token #${checkedIn.token_number}).${photoWarning}` },
         })
         return
       }
@@ -572,10 +661,11 @@ export function PatientRegister() {
       }
 
       if (saveAndAddAnother) {
-        setQuickSuccessNotice(`Registered ${patient.full_name} (${patient.urn}). Form reset for next patient.`)
         handleClear()
+        toast.success(`Registered ${patient.full_name} (${patient.urn}). Form reset for next patient.`)
       } else {
         setCreatedPatient(patient)
+        toast.success(`Registered ${patient.full_name} (${patient.urn}).`)
       }
     } catch (err: unknown) {
       if (err instanceof ApiError) {
@@ -623,8 +713,8 @@ export function PatientRegister() {
           {arrivalQuery.isError ? (
             <div role="alert" className="space-y-4 text-sm text-red-800">
               <p>Could not load this To Arrive entry. No patient record has been created.</p>
-              <Link to="/reception/tokens" className="font-semibold text-[#8E1C3D] hover:underline">
-                Return to Check-in &amp; Token
+              <Link to="/reception/appointments" className="font-semibold text-[#8E1C3D] hover:underline">
+                Return to Appointments
               </Link>
             </div>
           ) : (
@@ -645,26 +735,26 @@ export function PatientRegister() {
           <div className="flex items-start gap-3">
             <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-[#E4C8D1] bg-[#FBF5F7] text-[#8E1C3D]">
               {isEditMode ? (
-                <IconUser className="h-6 w-6" stroke={1.8} />
+                <IconUser className="h-6 w-6 shrink-0" stroke={1.8} />
               ) : (
-                <IconUserPlus className="h-6 w-6" stroke={1.8} />
+                <IconUserPlus className="h-6 w-6 shrink-0" stroke={1.8} />
               )}
             </span>
             <div className="min-w-0">
-              <h1 className="text-xl font-bold tracking-tight text-slate-900">
+              <h1 className="text-xl font-semibold tracking-tight leading-tight text-slate-900 sm:text-2xl">
                 {isEditMode ? 'Edit Patient Details' : arrivalId > 0 ? 'Register To Arrive Patient' : 'Patient Registration'}
               </h1>
-              <p className="text-xs text-slate-500">
+              <p className="mt-0.5 max-w-prose text-xs leading-relaxed text-slate-500">
                 {isEditMode ? (
                   <>
                     Update the saved details of{' '}
                     <span className="font-semibold text-slate-700">{baseline?.full_name}</span> · URN{' '}
-                    <span className="font-mono font-semibold text-[#5D0B26]">{baseline?.urn}</span>. The
+                    <span className="font-mono font-semibold text-[#5D0B26] tabular-nums">{baseline?.urn}</span>. The
                     URN does not change.{' '}
                   </>
                 ) : (
                   <>
-                    Register the patient and allocate the Universal Record Number (URN). The queue token is issued at Check-in &amp; Token.{' '}
+                    Register the patient and allocate the Universal Record Number (URN). The queue token is issued at Appointments.{' '}
                   </>
                 )}
                 <span className="font-semibold text-[#8E1C3D]">Fields marked * are required.</span>
@@ -672,29 +762,29 @@ export function PatientRegister() {
             </div>
           </div>
 
-          <div className="flex shrink-0 items-center gap-2.5">
+          <div className="flex shrink-0 flex-wrap items-center gap-2">
             {isEditMode ? (
               <Link
                 to={recordPath}
-                className="inline-flex min-h-10 items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3.5 text-xs font-semibold text-slate-700 shadow-2xs transition-colors hover:border-[#8E1C3D] hover:text-[#5D0B26]"
+                className="inline-flex min-h-[38px] items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3.5 py-2 text-xs font-medium text-slate-700 shadow-2xs transition-colors duration-150 hover:border-[#8E1C3D] hover:text-[#5D0B26]"
               >
-                <IconUser className="h-4 w-4 text-[#8E1C3D]" />
+                <IconUser className="h-4 w-4 shrink-0 text-[#8E1C3D]" />
                 Patient File
               </Link>
             ) : (
               <Link
-                to="/reception/tokens"
-                className="inline-flex min-h-10 items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3.5 text-xs font-semibold text-slate-700 shadow-2xs transition-colors hover:border-[#8E1C3D] hover:text-[#5D0B26]"
+                to="/reception/appointments"
+                className="inline-flex min-h-[38px] items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3.5 py-2 text-xs font-medium text-slate-700 shadow-2xs transition-colors duration-150 hover:border-[#8E1C3D] hover:text-[#5D0B26]"
               >
-                <IconTicket className="h-4 w-4 text-[#8E1C3D]" />
-                Check-in &amp; Token
+                <IconTicket className="h-4 w-4 shrink-0 text-[#8E1C3D]" />
+                Appointments
               </Link>
             )}
             <Link
               to="/reception/patients"
-              className="inline-flex min-h-10 items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3.5 text-xs font-semibold text-slate-700 shadow-2xs transition-colors hover:border-[#8E1C3D] hover:text-[#5D0B26]"
+              className="inline-flex min-h-[38px] items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3.5 py-2 text-xs font-medium text-slate-700 shadow-2xs transition-colors duration-150 hover:border-[#8E1C3D] hover:text-[#5D0B26]"
             >
-              <IconUser className="h-4 w-4 text-[#8E1C3D]" />
+              <IconUser className="h-4 w-4 shrink-0 text-[#8E1C3D]" />
               Patient Records
             </Link>
           </div>
@@ -708,10 +798,10 @@ export function PatientRegister() {
         {registrationWarnings.length > 0 && (
           <div
             role="alert"
-            className="space-y-1 rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-950 shadow-xs"
+            className="space-y-1.5 rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm leading-relaxed text-amber-950 shadow-2xs"
           >
-            <p className="flex items-center gap-2 font-bold">
-              <IconAlertTriangle className="h-4 w-4 text-amber-700" />
+            <p className="flex items-center gap-2 font-semibold">
+              <IconAlertTriangle className="h-4 w-4 shrink-0 text-amber-700" />
               Patient saved, but some steps did not complete:
             </p>
             <ul className="list-disc pl-5">
@@ -725,23 +815,23 @@ export function PatientRegister() {
         {photoFailure && (
           <div
             role="alert"
-            className="space-y-3 rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-950 shadow-xs"
+            className="space-y-3 rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm leading-relaxed text-amber-950 shadow-2xs"
           >
-            <p className="flex items-center gap-2 font-bold">
-              <IconAlertTriangle className="h-4 w-4 text-amber-700" />
+            <p className="flex items-center gap-2 font-semibold">
+              <IconAlertTriangle className="h-4 w-4 shrink-0 text-amber-700" />
               Patient saved, but the photo was not uploaded.
             </p>
             <p>
               {photoFailure.fileName}: {photoFailure.message}
             </p>
-            <div className="flex flex-wrap items-center gap-3">
+            <div className="flex flex-wrap items-center gap-2.5">
               <button
                 type="button"
                 onClick={() => void handleRetryPhoto()}
                 disabled={photoRetrying || !photoFile}
-                className="inline-flex min-h-11 items-center gap-1.5 rounded-lg bg-amber-800 px-4 text-sm font-semibold text-white hover:bg-amber-900 disabled:opacity-50 cursor-pointer"
+                className="inline-flex min-h-[38px] cursor-pointer items-center gap-1.5 rounded-lg bg-amber-800 px-3.5 py-2 text-sm font-medium text-white shadow-2xs transition-colors duration-150 hover:bg-amber-900 disabled:cursor-not-allowed disabled:opacity-50"
               >
-                <IconCamera className="h-4 w-4" />
+                <IconCamera className="h-4 w-4 shrink-0" />
                 {photoRetrying ? 'Uploading…' : 'Retry photo upload'}
               </button>
               <button
@@ -753,7 +843,7 @@ export function PatientRegister() {
                   }
                   setPhotoFailure(null)
                 }}
-                className="inline-flex min-h-11 items-center rounded-lg border border-amber-400 bg-white px-4 text-sm font-semibold text-amber-950 hover:bg-amber-100 cursor-pointer"
+                className="inline-flex min-h-[38px] cursor-pointer items-center rounded-lg border border-amber-400 bg-white px-3.5 py-2 text-sm font-medium text-amber-950 transition-colors duration-150 hover:bg-amber-100"
               >
                 Continue without photo
               </button>
@@ -761,94 +851,54 @@ export function PatientRegister() {
           </div>
         )}
 
-        {photoSavedNotice && (
-          <div
-            role="status"
-            className="flex items-center justify-between rounded-xl border border-emerald-300 bg-emerald-50 p-4 text-sm font-semibold text-emerald-950 shadow-xs"
-          >
-            <span className="flex items-center gap-2">
-              <IconCheck className="h-5 w-5 text-emerald-700" />
-              {photoSavedNotice}
-            </span>
-            <button
-              type="button"
-              onClick={() => setPhotoSavedNotice(null)}
-              className="text-xs font-bold text-emerald-800 hover:text-emerald-950 cursor-pointer"
-            >
-              Dismiss
-            </button>
-          </div>
-        )}
-
-        {/* Quick Success Toast when 'Save and add another' is active */}
-        {quickSuccessNotice && (
-          <div
-            role="status"
-            className="flex items-center justify-between rounded-xl border border-emerald-300 bg-emerald-50 p-4 text-sm font-semibold text-emerald-950 shadow-xs"
-          >
-            <div className="flex items-center gap-2">
-              <IconCheck className="h-5 w-5 text-emerald-700" />
-              <span>{quickSuccessNotice}</span>
-            </div>
-            <button
-              type="button"
-              onClick={() => setQuickSuccessNotice(null)}
-              className="text-xs font-bold text-emerald-800 hover:text-emerald-950 cursor-pointer"
-            >
-              Dismiss
-            </button>
-          </div>
-        )}
-
         {/* Permanent Success Card (when not adding another) */}
         {createdPatient && (
           <div
             role="status"
-            className="space-y-4 rounded-2xl border border-[#E4C8D1] bg-[#FBF5F7] p-6 shadow-sm"
+            className="space-y-4 rounded-xl border border-[#E4C8D1] bg-[#FBF5F7] p-4 shadow-2xs sm:p-5"
           >
             <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <span
-                  className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-bold ${photoFailure ? 'bg-amber-200/70 text-amber-900' : 'bg-emerald-200/70 text-emerald-900'}`}
+                  className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold ${photoFailure ? 'bg-amber-200/70 text-amber-900' : 'bg-emerald-200/70 text-emerald-900'}`}
                 >
-                  <IconCheck className="h-4 w-4 text-emerald-800" />
+                  <IconCheck className="h-4 w-4 shrink-0 text-emerald-800" />
                   {photoFailure ? 'Patient Registered — Photo Pending' : 'Registration Successful!'}
                 </span>
-                <h3 className="mt-2 text-xl font-bold text-slate-900">
+                <h3 className="mt-2 text-xl font-semibold tracking-tight text-slate-900">
                   {createdPatient.full_name}
                 </h3>
-                <p className="text-xs text-slate-600">
+                <p className="text-xs leading-relaxed text-slate-600">
                   Allocated Universal Record Number (URN):
                 </p>
-                <div className="mt-1.5 inline-block rounded-lg border border-[#C39A35] bg-white px-4 py-1.5 font-mono text-xl font-black text-[#5D0B26] shadow-2xs">
+                <div className="mt-1.5 inline-block rounded-lg border border-[#C39A35] bg-white px-4 py-1.5 font-mono text-xl font-bold text-[#5D0B26] tabular-nums shadow-2xs">
                   {createdPatient.urn}
                 </div>
               </div>
-
             </div>
 
-            <div className="flex flex-wrap items-center gap-3 border-t border-[#E4C8D1] pt-3">
+            <div className="flex flex-wrap items-center gap-2.5 border-t border-[#E4C8D1] pt-3.5">
               <button
                 type="button"
                 onClick={() => {
                   skipUnsavedGuardRef.current = true
                   navigate(`/reception/patients/${createdPatient.id}`)
                 }}
-                className="inline-flex min-h-11 items-center justify-center rounded-lg bg-[#8E1C3D] px-5 text-sm font-semibold text-white shadow-xs transition-colors hover:bg-[#5D0B26] cursor-pointer"
+                className="inline-flex min-h-[38px] cursor-pointer items-center justify-center rounded-lg bg-[#8E1C3D] px-4 py-2 text-sm font-medium text-white shadow-2xs transition-colors duration-150 hover:bg-[#5D0B26]"
               >
                 View Patient File &amp; Card
               </button>
               <Link
                 to={appointmentId
-                  ? `/reception/tokens?patient_id=${createdPatient.id}&appointment_id=${appointmentId}`
-                  : `/reception/tokens?patient_id=${createdPatient.id}`}
-                className="inline-flex min-h-11 items-center justify-center rounded-lg border border-[#8E1C3D] bg-white px-4 text-sm font-semibold text-[#5D0B26] transition-colors hover:bg-[#FBF5F7] cursor-pointer"
+                  ? `/reception/appointments?patient_id=${createdPatient.id}&appointment_id=${appointmentId}`
+                  : `/reception/appointments?patient_id=${createdPatient.id}`}
+                className="inline-flex min-h-[38px] cursor-pointer items-center justify-center rounded-lg border border-[#8E1C3D] bg-white px-3.5 py-2 text-sm font-medium text-[#5D0B26] transition-colors duration-150 hover:bg-[#FBF5F7]"
               >
                 {appointmentId ? 'Complete Check-In & Issue Token' : 'Check In & Issue Token'}
               </Link>
               <Link
                 to={`/reception/patients/${createdPatient.id}/print`}
-                className="inline-flex min-h-11 items-center justify-center rounded-lg border border-[#8E1C3D] bg-white px-4 text-sm font-semibold text-[#5D0B26] transition-colors hover:bg-[#FBF5F7] cursor-pointer"
+                className="inline-flex min-h-[38px] cursor-pointer items-center justify-center rounded-lg border border-[#8E1C3D] bg-white px-3.5 py-2 text-sm font-medium text-[#5D0B26] transition-colors duration-150 hover:bg-[#FBF5F7]"
               >
                 Print Registration Card
               </Link>
@@ -858,7 +908,7 @@ export function PatientRegister() {
                   setCreatedPatient(null)
                   handleClear()
                 }}
-                className="inline-flex min-h-11 items-center justify-center rounded-lg border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-50 cursor-pointer"
+                className="inline-flex min-h-[38px] cursor-pointer items-center justify-center rounded-lg border border-slate-300 bg-white px-3.5 py-2 text-sm font-medium text-slate-700 transition-colors duration-150 hover:bg-slate-50"
               >
                 Register Another Patient
               </button>
@@ -870,31 +920,31 @@ export function PatientRegister() {
         {isDuplicateDetected && duplicateData?.matching_patient && (
           <div
             role="alert"
-            className="space-y-3 rounded-xl border border-amber-300 bg-amber-50 p-5 text-amber-950 shadow-xs"
+            className="space-y-3 rounded-xl border border-amber-300 bg-amber-50 p-4 text-amber-950 shadow-2xs sm:p-5"
           >
-            <div className="flex items-center gap-2 text-sm font-bold text-amber-900">
-              <IconAlertTriangle className="h-4 w-4 text-amber-700" />
+            <div className="flex items-center gap-2 text-sm font-semibold text-amber-900">
+              <IconAlertTriangle className="h-4 w-4 shrink-0 text-amber-700" />
               <span>Potential Duplicate Patient Detected</span>
             </div>
-            <p className="text-xs text-amber-900">
+            <p className="text-xs leading-relaxed text-amber-900">
               A patient matching <span className="font-semibold">{duplicateData.matching_patient.full_name}</span> with mobile{' '}
-              <span className="font-semibold">{duplicateData.matching_patient.mobile}</span> is already in the system:
+              <span className="font-mono font-semibold tabular-nums">{duplicateData.matching_patient.mobile}</span> is already in the system:
             </p>
-            <div className="space-y-1 rounded-lg border border-amber-200 bg-white/90 p-3 font-mono text-xs">
+            <div className="space-y-1 rounded-lg border border-amber-200 bg-white/90 p-3 font-mono text-xs tabular-nums">
               <div><strong>URN:</strong> {duplicateData.matching_patient.urn}</div>
               <div><strong>Registered:</strong> {new Date(duplicateData.matching_patient.created_at).toLocaleDateString()}</div>
             </div>
-            <div className="flex items-center gap-2 border-t border-amber-200 pt-2">
+            <div className="flex items-center gap-2 border-t border-amber-200 pt-2.5">
               <input
                 id="confirm-different-checkbox"
                 type="checkbox"
                 checked={confirmDifferentPatient}
                 onChange={(e) => setConfirmDifferentPatient(e.target.checked)}
-                className="h-4 w-4 rounded border-amber-400 accent-[#8E1C3D] focus:ring-[#8E1C3D]"
+                className="h-4 w-4 shrink-0 rounded border-amber-400 accent-[#8E1C3D] focus:ring-[#8E1C3D]"
               />
               <label
                 htmlFor="confirm-different-checkbox"
-                className="text-xs font-semibold text-amber-950 cursor-pointer"
+                className="cursor-pointer text-xs font-medium text-amber-950"
               >
                 Confirm this is a different patient (permit new registration)
               </label>
@@ -906,7 +956,7 @@ export function PatientRegister() {
         {formError && (
           <div
             role="alert"
-            className="flex items-start gap-2 rounded-xl border border-red-300 bg-red-50 p-4 text-sm font-semibold text-red-900 shadow-xs"
+            className="flex items-start gap-2 rounded-xl border border-red-300 bg-red-50 p-4 text-sm font-medium leading-relaxed text-red-900 shadow-2xs"
           >
             <IconAlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-red-700" />
             <span>{formError}</span>
@@ -914,408 +964,544 @@ export function PatientRegister() {
         )}
 
         <form onSubmit={handleSubmit} className="space-y-5">
-          <div className="grid grid-cols-1 items-start gap-5 xl:grid-cols-12">
-            {/* ========================================================= */}
-            {/* LEFT: identity, contact and clinical flags (8 of 12)      */}
-            {/* ========================================================= */}
-            <div className="space-y-5 xl:col-span-12">
-              {/* SECTION 1: Patient identity */}
-              <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xs">
-                <SectionHeader
-                  index="1"
-                  title="Patient Details"
-                  hint="Name, guardian, age and sex as printed on the registration card"
-                  icon={<IconUser className="h-4 w-4" />}
-                />
+          <div className="space-y-5">
+            {/* SECTION 1: Patient identity */}
+            <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-2xs">
+              <SectionHeader
+                index="1"
+                title="Patient Details"
+                hint="Name, guardian, age and sex as printed on the registration card"
+                icon={<IconUser className="h-4 w-4 shrink-0" />}
+              />
 
-                <div className="flex flex-col gap-6 p-5 sm:p-6 md:flex-row md:items-start">
-                  {/* Photo: portrait frame, gold ring once a photo is captured */}
-                  <div className="flex shrink-0 flex-col items-center gap-2">
-                    <input
-                      ref={fileInputRef}
-                      type="file"
-                      accept="image/jpeg,image/png"
-                      aria-label="Patient Photograph"
-                      onChange={handlePhotoSelect}
-                      className="hidden"
-                    />
-                    <div
-                      onClick={() => setIsPhotoModalOpen(true)}
-                      className={`group relative flex h-40 w-32 cursor-pointer flex-col items-center justify-center overflow-hidden rounded-xl border-2 border-dashed p-2 text-center transition-colors ${
-                        photoPreview
-                          ? 'border-[#C39A35] bg-white ring-2 ring-[#C39A35]/25'
-                          : 'border-slate-300 bg-[#FBF5F7]/60 hover:border-[#8E1C3D] hover:bg-[#FBF5F7]'
-                      }`}
-                      role="button"
-                      tabIndex={0}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter' || e.key === ' ') {
-                          setIsPhotoModalOpen(true)
-                        }
-                      }}
-                      title="Click to capture or upload patient photo"
-                    >
-                      {photoPreview ? (
-                        <img
-                          src={photoPreview}
-                          alt="Patient preview"
-                          className="h-full w-full rounded-lg object-cover"
-                          onError={() => {
-                            // The photo on file could not be streamed (file missing): show the empty frame.
-                            if (!photoFile) setPhotoPreview(null)
-                          }}
-                        />
-                      ) : (
+              <div className="flex flex-col gap-5 p-4 sm:p-5 md:flex-row md:items-start">
+                {/* Photo: portrait frame, gold ring once a photo is captured */}
+                <div className="flex shrink-0 flex-col items-center gap-2">
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/jpeg,image/png"
+                    aria-label="Patient Photograph"
+                    onChange={handlePhotoSelect}
+                    className="hidden"
+                  />
+                  <div
+                    onClick={() => setIsPhotoModalOpen(true)}
+                    className={`group relative flex h-40 w-32 cursor-pointer flex-col items-center justify-center overflow-hidden rounded-xl border-2 border-dashed p-2 text-center transition-colors duration-150 ${
+                      photoPreview
+                        ? 'border-[#C39A35] bg-white ring-2 ring-[#C39A35]/25'
+                        : 'border-slate-300 bg-[#FBF5F7]/60 hover:border-[#8E1C3D] hover:bg-[#FBF5F7]'
+                    }`}
+                    role="button"
+                    tabIndex={0}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        setIsPhotoModalOpen(true)
+                      }
+                    }}
+                    title="Click to capture or upload patient photo"
+                  >
+                    {photoPreview ? (
+                      <img
+                        src={photoPreview}
+                        alt="Patient preview"
+                        className="h-full w-full rounded-lg object-cover"
+                        onError={() => {
+                          // The photo on file could not be streamed (file missing): show the empty frame.
+                          if (!photoFile) setPhotoPreview(null)
+                        }}
+                      />
+                    ) : (
+                      <>
+                        <IconCamera className="h-8 w-8 shrink-0 text-[#8E1C3D]" />
+                        <span className="mt-1.5 text-xs font-semibold text-slate-600 group-hover:text-[#5D0B26]">
+                          Add Photo
+                        </span>
+                        <span className="mt-0.5 text-xs font-medium text-slate-500">
+                          Optional
+                        </span>
+                      </>
+                    )}
+                  </div>
+                  {photoPreview && (
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setIsPhotoModalOpen(true)}
+                        className="inline-flex cursor-pointer items-center gap-1 text-xs font-semibold text-[#8E1C3D] hover:underline"
+                      >
+                        Change
+                      </button>
+                      {/* The saved photo cannot be deleted here, only replaced; so while editing
+                          Remove only appears for a photo chosen in this session. */}
+                      {(!isEditMode || photoFile) && (
                         <>
-                          <IconCamera className="h-8 w-8 text-[#8E1C3D]" />
-                          <span className="mt-1.5 text-xs font-semibold text-slate-600 group-hover:text-[#5D0B26]">
-                            Add Photo
-                          </span>
-                          <span className="mt-0.5 text-xs font-medium uppercase tracking-wider text-slate-500">
-                            Optional
-                          </span>
+                          <span className="text-slate-500" aria-hidden="true">•</span>
+                          <button
+                            type="button"
+                            onClick={handleRemovePhoto}
+                            className="inline-flex cursor-pointer items-center gap-1 text-xs font-semibold text-red-600 hover:underline"
+                          >
+                            <IconTrash className="h-3 w-3 shrink-0" />
+                            {isEditMode ? 'Discard new photo' : 'Remove'}
+                          </button>
                         </>
                       )}
                     </div>
-                    {photoPreview && (
-                      <div className="flex items-center gap-2">
-                        <button
-                          type="button"
-                          onClick={() => setIsPhotoModalOpen(true)}
-                          className="inline-flex items-center gap-1 text-xs font-semibold text-[#8E1C3D] hover:underline cursor-pointer"
-                        >
-                          Change
-                        </button>
-                        {/* The saved photo cannot be deleted here, only replaced; so while editing
-                            Remove only appears for a photo chosen in this session. */}
-                        {(!isEditMode || photoFile) && (
-                          <>
-                            <span className="text-slate-500">•</span>
-                            <button
-                              type="button"
-                              onClick={handleRemovePhoto}
-                              className="inline-flex items-center gap-1 text-xs font-semibold text-red-600 hover:underline cursor-pointer"
-                            >
-                              <IconTrash className="h-3 w-3" />
-                              {isEditMode ? 'Discard new photo' : 'Remove'}
-                            </button>
-                          </>
-                        )}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Identity fields */}
-                  <div className="flex-1 space-y-4">
-                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-12">
-                      <div className="sm:col-span-12">
-                        <label htmlFor="patient-full-name" className={LABEL_CLASS}>
-                          Patient Name *
-                        </label>
-                        <input
-                          ref={nameInputRef}
-                          id="patient-full-name"
-                          aria-label="Full Name *"
-                          type="text"
-                          required
-                          value={fullName}
-                          onChange={(e) => setFullName(e.target.value)}
-                          readOnly={arrivalId > 0}
-                          placeholder="Enter full name"
-                          className={INPUT_CLASS}
-                        />
-                      </div>
-
-                      <div className="sm:col-span-6">
-                        <label htmlFor="patient-guardian-name" className={LABEL_CLASS}>
-                          Father / Guardian / Spouse *
-                        </label>
-                        <input
-                          id="patient-guardian-name"
-                          aria-label="Father / Guardian / Spouse Name *"
-                          type="text"
-                          value={guardianName}
-                          required
-                          onChange={(e) => setGuardianName(e.target.value)}
-                          placeholder="Guardian name"
-                          className={INPUT_CLASS}
-                        />
-                      </div>
-
-                      <div className="sm:col-span-6">
-                        <label htmlFor="patient-mobile" className={LABEL_CLASS}>
-                          Mobile Number *
-                        </label>
-                        <div className="relative">
-                          <span className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-slate-500">
-                            <IconPhone className="h-4 w-4" />
-                          </span>
-                          <input
-                            id="patient-mobile"
-                            aria-label="Mobile Number *"
-                            type="tel"
-                            required
-                            value={mobile}
-                            onChange={(e) => setMobile(e.target.value)}
-                            readOnly={arrivalId > 0}
-                            placeholder="Enter mobile number"
-                            className={INPUT_WITH_ICON_CLASS}
-                          />
-                          {duplicateChecking && (
-                            <span className="absolute right-3 top-3.5 text-xs font-bold uppercase tracking-wider text-[#8E1C3D]">
-                              Checking…
-                            </span>
-                          )}
-                        </div>
-                      </div>
-
-                      <div className="sm:col-span-4">
-                        <label htmlFor="patient-dob" className={LABEL_CLASS}>
-                          Date of Birth
-                        </label>
-                        <input
-                          id="patient-dob"
-                          aria-label="Date of Birth (Optional)"
-                          type="date"
-                          value={dob}
-                          onChange={(e) => handleDobChange(e.target.value)}
-                          className={INPUT_CLASS}
-                        />
-                      </div>
-
-                      <div className="sm:col-span-3">
-                        <label htmlFor="patient-age" className={LABEL_CLASS}>
-                          Age (Years) *
-                        </label>
-                        <input
-                          id="patient-age"
-                          aria-label="Age (Years) *"
-                          type="number"
-                          min={0}
-                          max={150}
-                          required
-                          value={ageYears}
-                          onChange={(e) => setAgeYears(e.target.value === '' ? '' : Number(e.target.value))}
-                          readOnly={arrivalId > 0}
-                          placeholder="0"
-                          className={INPUT_CLASS}
-                        />
-                      </div>
-
-                      <div className="sm:col-span-5">
-                        <span className={LABEL_CLASS}>Sex *</span>
-                        {/* Segmented, so Male / Female / Other stay on one line in a narrow column. */}
-                        <div className="flex gap-1 rounded-lg border border-slate-300 bg-slate-100/70 p-1">
-                          <label
-                            className={`flex min-h-9 flex-1 cursor-pointer items-center justify-center gap-1.5 rounded-md text-xs font-bold transition-colors ${
-                              gender === 'M'
-                                ? 'border border-[#C39A35] bg-white text-[#5D0B26] shadow-2xs'
-                                : 'border border-transparent text-slate-600 hover:text-[#5D0B26]'
-                            }`}
-                          >
-                            <input
-                              type="radio"
-                              name="gender"
-                              aria-label="Gender *"
-                              value="M"
-                              checked={gender === 'M'}
-                              onChange={() => setGender('M')}
-                              required
-                              className="h-4 w-4 shrink-0 accent-[#8E1C3D] focus:ring-[#8E1C3D]"
-                            />
-                            Male
-                          </label>
-                          <label
-                            className={`flex min-h-9 flex-1 cursor-pointer items-center justify-center gap-1.5 rounded-md text-xs font-bold transition-colors ${
-                              gender === 'F'
-                                ? 'border border-[#C39A35] bg-white text-[#5D0B26] shadow-2xs'
-                                : 'border border-transparent text-slate-600 hover:text-[#5D0B26]'
-                            }`}
-                          >
-                            <input
-                              type="radio"
-                              name="gender"
-                              value="F"
-                              checked={gender === 'F'}
-                              onChange={() => setGender('F')}
-                              className="h-4 w-4 shrink-0 accent-[#8E1C3D] focus:ring-[#8E1C3D]"
-                            />
-                            Female
-                          </label>
-                          <label
-                            className={`flex min-h-9 flex-1 cursor-pointer items-center justify-center gap-1.5 rounded-md text-xs font-bold transition-colors ${
-                              gender === 'O'
-                                ? 'border border-[#C39A35] bg-white text-[#5D0B26] shadow-2xs'
-                                : 'border border-transparent text-slate-600 hover:text-[#5D0B26]'
-                            }`}
-                          >
-                            <input
-                              type="radio"
-                              name="gender"
-                              value="O"
-                              checked={gender === 'O'}
-                              onChange={() => setGender('O')}
-                              className="h-4 w-4 shrink-0 accent-[#8E1C3D] focus:ring-[#8E1C3D]"
-                            />
-                            Other
-                          </label>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
+                  )}
                 </div>
-              </section>
 
-              {/* SECTION 2: Address & contact */}
-              <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xs">
-                <SectionHeader
-                  index="2"
-                  title="Address & Contact"
-                  hint="Where the patient lives and who to call in an emergency"
-                  icon={<IconMapPin className="h-4 w-4" />}
-                />
-
-                <div className="grid grid-cols-1 gap-4 p-5 sm:grid-cols-12 sm:p-6">
-                  <div className="sm:col-span-12">
-                    <label htmlFor="patient-address" className={LABEL_CLASS}>
-                      Address (Village / Mohalla / Ward) *
-                    </label>
-                    <div className="relative">
-                      <span className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-slate-500">
-                        <IconMapPin className="h-4 w-4" />
-                      </span>
+                {/* Identity fields */}
+                <div className="flex-1 space-y-4">
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-12">
+                    <div className="sm:col-span-12">
+                      <label htmlFor="patient-full-name" className={LABEL_CLASS}>
+                        Patient Name *
+                      </label>
                       <input
-                        id="patient-address"
-                        aria-label="Address (Village / Mohalla / Ward) *"
+                        ref={nameInputRef}
+                        id="patient-full-name"
+                        aria-label="Full Name *"
                         type="text"
                         required
-                        value={address}
-                        onChange={(e) => setAddress(e.target.value)}
-                        placeholder="House, street, village or mohalla"
-                        className={INPUT_WITH_ICON_CLASS}
+                        value={fullName}
+                        onChange={(e) => setFullName(e.target.value)}
+                        readOnly={arrivalId > 0}
+                        placeholder="Enter full name"
+                        className={INPUT_CLASS}
                       />
                     </div>
-                  </div>
 
-                  <div className="sm:col-span-4">
-                    <label htmlFor="patient-district" className={LABEL_CLASS}>
-                      District *
-                    </label>
+                    <div className="sm:col-span-6">
+                      <label htmlFor="patient-guardian-name" className={LABEL_CLASS}>
+                        Father / Guardian / Spouse *
+                      </label>
+                      <input
+                        id="patient-guardian-name"
+                        aria-label="Father / Guardian / Spouse Name *"
+                        type="text"
+                        value={guardianName}
+                        required
+                        onChange={(e) => setGuardianName(e.target.value)}
+                        placeholder="Guardian name"
+                        className={INPUT_CLASS}
+                      />
+                    </div>
+
+                    <div className="sm:col-span-6">
+                      <label htmlFor="patient-mobile" className={LABEL_CLASS}>
+                        Mobile Number *
+                      </label>
+                      <div className="relative">
+                        <span className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-slate-500">
+                          <IconPhone className="h-4 w-4 shrink-0" />
+                        </span>
+                        <input
+                          id="patient-mobile"
+                          aria-label="Mobile Number *"
+                          type="tel"
+                          required
+                          value={mobile}
+                          onChange={(e) => setMobile(e.target.value)}
+                          readOnly={arrivalId > 0}
+                          placeholder="Enter mobile number"
+                          className={`${INPUT_WITH_ICON_CLASS} tabular-nums`}
+                        />
+                        {duplicateChecking && (
+                          <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-semibold text-[#8E1C3D]">
+                            Checking…
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="sm:col-span-4">
+                      <label htmlFor="patient-dob" className={LABEL_CLASS}>
+                        Date of Birth
+                      </label>
+                      <input
+                        id="patient-dob"
+                        aria-label="Date of Birth (Optional)"
+                        type="date"
+                        value={dob}
+                        onChange={(e) => handleDobChange(e.target.value)}
+                        className={`${INPUT_CLASS} tabular-nums`}
+                      />
+                    </div>
+
+                    <div className="sm:col-span-3">
+                      <label htmlFor="patient-age" className={LABEL_CLASS}>
+                        Age (Years) *
+                      </label>
+                      <input
+                        id="patient-age"
+                        aria-label="Age (Years) *"
+                        type="number"
+                        min={0}
+                        max={150}
+                        required
+                        value={ageYears}
+                        onChange={(e) => setAgeYears(e.target.value === '' ? '' : Number(e.target.value))}
+                        readOnly={arrivalId > 0}
+                        placeholder="0"
+                        className={`${INPUT_CLASS} tabular-nums`}
+                      />
+                    </div>
+
+                    <div className="sm:col-span-5">
+                      <span className={LABEL_CLASS}>Sex *</span>
+                      {/* Segmented, so Male / Female / Other stay on one line in a narrow column. */}
+                      <div className="flex min-h-[38px] gap-1 rounded-lg border border-slate-300 bg-slate-100/70 p-1">
+                        <label
+                          className={`flex min-h-[28px] flex-1 cursor-pointer items-center justify-center gap-1.5 rounded-md text-xs font-semibold transition-colors duration-150 ${
+                            gender === 'M'
+                              ? 'border border-[#C39A35] bg-white text-[#5D0B26] shadow-2xs'
+                              : 'border border-transparent text-slate-600 hover:text-[#5D0B26]'
+                          }`}
+                        >
+                          <input
+                            type="radio"
+                            name="gender"
+                            aria-label="Gender *"
+                            value="M"
+                            checked={gender === 'M'}
+                            onChange={() => setGender('M')}
+                            required
+                            className="h-4 w-4 shrink-0 accent-[#8E1C3D] focus:ring-[#8E1C3D]"
+                          />
+                          Male
+                        </label>
+                        <label
+                          className={`flex min-h-[28px] flex-1 cursor-pointer items-center justify-center gap-1.5 rounded-md text-xs font-semibold transition-colors duration-150 ${
+                            gender === 'F'
+                              ? 'border border-[#C39A35] bg-white text-[#5D0B26] shadow-2xs'
+                              : 'border border-transparent text-slate-600 hover:text-[#5D0B26]'
+                          }`}
+                        >
+                          <input
+                            type="radio"
+                            name="gender"
+                            value="F"
+                            checked={gender === 'F'}
+                            onChange={() => setGender('F')}
+                            className="h-4 w-4 shrink-0 accent-[#8E1C3D] focus:ring-[#8E1C3D]"
+                          />
+                          Female
+                        </label>
+                        <label
+                          className={`flex min-h-[28px] flex-1 cursor-pointer items-center justify-center gap-1.5 rounded-md text-xs font-semibold transition-colors duration-150 ${
+                            gender === 'O'
+                              ? 'border border-[#C39A35] bg-white text-[#5D0B26] shadow-2xs'
+                              : 'border border-transparent text-slate-600 hover:text-[#5D0B26]'
+                          }`}
+                        >
+                          <input
+                            type="radio"
+                            name="gender"
+                            value="O"
+                            checked={gender === 'O'}
+                            onChange={() => setGender('O')}
+                            className="h-4 w-4 shrink-0 accent-[#8E1C3D] focus:ring-[#8E1C3D]"
+                          />
+                          Other
+                        </label>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            {/* SECTION 2: Address & contact */}
+            <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-2xs">
+              <SectionHeader
+                index="2"
+                title="Address & Contact"
+                hint="Where the patient lives and who to call in an emergency"
+                icon={<IconMapPin className="h-4 w-4 shrink-0" />}
+              />
+
+              <div className="grid grid-cols-1 gap-4 p-4 sm:grid-cols-12 sm:p-5">
+                <div className="sm:col-span-12">
+                  <label htmlFor="patient-address" className={LABEL_CLASS}>
+                    Address (Village / Mohalla / Ward) *
+                  </label>
+                  <div className="relative">
+                    <span className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-slate-500">
+                      <IconMapPin className="h-4 w-4 shrink-0" />
+                    </span>
                     <input
-                      id="patient-district"
-                      aria-label="District *"
+                      id="patient-address"
+                      aria-label="Address (Village / Mohalla / Ward) *"
                       type="text"
                       required
-                      value={district}
-                      onChange={(e) => setDistrict(e.target.value)}
-                      className={INPUT_CLASS}
-                    />
-                  </div>
-
-                  <div className="sm:col-span-4">
-                    <label htmlFor="patient-state" className={LABEL_CLASS}>
-                      State *
-                    </label>
-                    <input
-                      id="patient-state"
-                      aria-label="State *"
-                      type="text"
-                      required
-                      value={state}
-                      onChange={(e) => setState(e.target.value)}
-                      className={INPUT_CLASS}
-                    />
-                  </div>
-
-                  <div className="sm:col-span-4">
-                    <label htmlFor="patient-emergency" className={LABEL_CLASS}>
-                      Emergency Contact
-                    </label>
-                    <input
-                      id="patient-emergency"
-                      aria-label="Emergency Contact (Optional)"
-                      type="text"
-                      value={emergencyContact}
-                      onChange={(e) => setEmergencyContact(e.target.value)}
-                      placeholder="Relationship & phone"
-                      className={INPUT_CLASS}
+                      value={address}
+                      onChange={(e) => setAddress(e.target.value)}
+                      placeholder="House, street, village or mohalla"
+                      className={INPUT_WITH_ICON_CLASS}
                     />
                   </div>
                 </div>
-              </section>
 
-              {/* SECTION 3: Alerts & notes */}
-              <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xs">
-                <SectionHeader
-                  index="3"
-                  title="Medical Alerts & Notes"
-                  hint="Known allergies and any administrative remark for the doctor"
-                  icon={<IconHeartRateMonitor className="h-4 w-4" />}
+                <div className="sm:col-span-4">
+                  <label htmlFor="patient-district" className={LABEL_CLASS}>
+                    District *
+                  </label>
+                  <input
+                    id="patient-district"
+                    aria-label="District *"
+                    type="text"
+                    required
+                    value={district}
+                    onChange={(e) => setDistrict(e.target.value)}
+                    className={INPUT_CLASS}
+                  />
+                </div>
+
+                <div className="sm:col-span-4">
+                  <label htmlFor="patient-state" className={LABEL_CLASS}>
+                    State *
+                  </label>
+                  <input
+                    id="patient-state"
+                    aria-label="State *"
+                    type="text"
+                    required
+                    value={state}
+                    onChange={(e) => setState(e.target.value)}
+                    className={INPUT_CLASS}
+                  />
+                </div>
+
+                <div className="sm:col-span-4">
+                  <label htmlFor="patient-emergency" className={LABEL_CLASS}>
+                    Emergency Contact
+                  </label>
+                  <input
+                    id="patient-emergency"
+                    aria-label="Emergency Contact (Optional)"
+                    type="text"
+                    value={emergencyContact}
+                    onChange={(e) => setEmergencyContact(e.target.value)}
+                    placeholder="Relationship & phone"
+                    className={`${INPUT_CLASS} tabular-nums`}
+                  />
+                </div>
+              </div>
+            </section>
+
+            {/* SECTION 3: Alerts & notes */}
+            <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-2xs">
+              <SectionHeader
+                index="3"
+                title="Medical Alerts & Notes"
+                hint="Known allergies and any administrative remark for the doctor"
+                icon={<IconHeartRateMonitor className="h-4 w-4 shrink-0" />}
+              />
+
+              <div className="grid grid-cols-1 gap-4 p-4 sm:grid-cols-12 sm:p-5">
+                <div className="sm:col-span-5">
+                  <label htmlFor="patient-allergies" className={LABEL_CLASS}>
+                    Allergies *
+                  </label>
+                  <input
+                    id="patient-allergies"
+                    aria-label="Allergies *"
+                    type="text"
+                    required
+                    value={allergies}
+                    onChange={(e) => setAllergies(e.target.value)}
+                    className={`${INPUT_CLASS} border-amber-300 focus:border-[#8E1C3D]`}
+                  />
+                  <p className="mt-1.5 text-xs leading-relaxed text-slate-500">
+                    Write “None reported” when the patient reports no allergy.
+                  </p>
+                </div>
+
+                <div className="sm:col-span-7">
+                  <label htmlFor="patient-notes" className={LABEL_CLASS}>
+                    Clinical / Administrative Notes
+                  </label>
+                  <textarea
+                    id="patient-notes"
+                    aria-label="Clinical / Administrative Notes (Optional)"
+                    rows={3}
+                    value={notes}
+                    onChange={(e) => setNotes(e.target.value)}
+                    placeholder="Special remarks, past history, or reference"
+                    className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm leading-relaxed text-slate-900 shadow-2xs transition-colors duration-150 placeholder:text-slate-400 hover:border-slate-400 focus:border-[#8E1C3D] focus:outline-none focus:ring-2 focus:ring-[#8E1C3D]/15"
+                  />
+                </div>
+              </div>
+            </section>
+
+            {/* SECTION 4: Additional Details (Optional, collapsible) */}
+            <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-2xs">
+              <button
+                type="button"
+                aria-expanded={showAdditionalDetails}
+                aria-controls="additional-patient-details"
+                onClick={() => setShowAdditionalDetails((prev) => !prev)}
+                className={`flex min-h-11 w-full cursor-pointer items-center gap-3 bg-[#FBF5F7] px-4 py-3 text-left transition-colors duration-150 hover:bg-[#F5E8EC] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-[#8E1C3D] sm:px-5 ${
+                  showAdditionalDetails ? 'border-b border-slate-200' : ''
+                }`}
+              >
+                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#5D0B26] text-xs font-semibold text-white tabular-nums">
+                  4
+                </span>
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="flex items-center gap-2 text-base font-semibold tracking-tight text-[#5D0B26]">
+                      <span className="shrink-0 text-[#8E1C3D]">
+                        <IconNotes className="h-4 w-4 shrink-0" />
+                      </span>
+                      Additional Details (Optional)
+                    </span>
+                    {filledAdditionalCount > 0 && (
+                      <span className="rounded-full border border-[#E4C8D1] bg-white px-2 py-0.5 text-xs font-medium text-[#5D0B26] tabular-nums">
+                        {filledAdditionalCount} filled
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-xs leading-relaxed text-slate-500">
+                    Alternate phone, email, blood group, PIN code, guardian relationship and background history
+                  </p>
+                </div>
+                <IconChevronDown
+                  className={`h-5 w-5 shrink-0 text-[#5D0B26] transition-transform duration-150 ${
+                    showAdditionalDetails ? 'rotate-180' : ''
+                  }`}
                 />
+              </button>
 
-                <div className="grid grid-cols-1 gap-4 p-5 sm:grid-cols-12 sm:p-6">
-                  <div className="sm:col-span-5">
-                    <label htmlFor="patient-allergies" className={LABEL_CLASS}>
-                      Allergies *
+              {showAdditionalDetails && (
+                <div
+                  id="additional-patient-details"
+                  className="grid grid-cols-1 gap-4 p-4 sm:grid-cols-12 sm:p-5"
+                >
+                  <div className="sm:col-span-4">
+                    <label htmlFor="patient-alternate-mobile" className={LABEL_CLASS}>
+                      Alternate Mobile
                     </label>
                     <input
-                      id="patient-allergies"
-                      aria-label="Allergies *"
-                      type="text"
-                      required
-                      value={allergies}
-                      onChange={(e) => setAllergies(e.target.value)}
-                      className={`${INPUT_CLASS} border-amber-300 focus:border-[#8E1C3D]`}
+                      id="patient-alternate-mobile"
+                      type="tel"
+                      maxLength={15}
+                      value={alternateMobile}
+                      onChange={(e) => setAlternateMobile(e.target.value)}
+                      placeholder="Optional second phone"
+                      className={`${INPUT_CLASS} tabular-nums`}
                     />
-                    <p className="mt-1 text-xs text-slate-500">
-                      Write “None reported” when the patient reports no allergy.
-                    </p>
                   </div>
 
-                  <div className="sm:col-span-7">
-                    <label htmlFor="patient-notes" className={LABEL_CLASS}>
-                      Clinical / Administrative Notes
+                  <div className="sm:col-span-4">
+                    <label htmlFor="patient-email" className={LABEL_CLASS}>
+                      Email Address
+                    </label>
+                    <input
+                      id="patient-email"
+                      type="email"
+                      maxLength={120}
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      placeholder="patient@example.com"
+                      className={INPUT_CLASS}
+                    />
+                  </div>
+
+                  <div className="sm:col-span-4">
+                    <label htmlFor="patient-blood-group" className={LABEL_CLASS}>
+                      Blood Group
+                    </label>
+                    <select
+                      id="patient-blood-group"
+                      value={bloodGroup}
+                      onChange={(e) => setBloodGroup(e.target.value)}
+                      className={INPUT_CLASS}
+                    >
+                      <option value="">Not specified</option>
+                      {BLOOD_GROUP_OPTIONS.map((group) => (
+                        <option key={group} value={group}>
+                          {group}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="sm:col-span-4">
+                    <label htmlFor="patient-pin-code" className={LABEL_CLASS}>
+                      PIN Code
+                    </label>
+                    <input
+                      id="patient-pin-code"
+                      type="text"
+                      inputMode="numeric"
+                      maxLength={10}
+                      value={pinCode}
+                      onChange={(e) => setPinCode(e.target.value)}
+                      placeholder="e.g. 802301"
+                      className={`${INPUT_CLASS} tabular-nums`}
+                    />
+                  </div>
+
+                  <div className="sm:col-span-8">
+                    <label htmlFor="patient-guardian-relationship" className={LABEL_CLASS}>
+                      Guardian Relationship
+                    </label>
+                    <input
+                      id="patient-guardian-relationship"
+                      type="text"
+                      maxLength={40}
+                      value={guardianRelationship}
+                      onChange={(e) => setGuardianRelationship(e.target.value)}
+                      placeholder="e.g. Father, Husband, Mother, Son"
+                      className={INPUT_CLASS}
+                    />
+                  </div>
+
+                  <div className="sm:col-span-12">
+                    <label htmlFor="patient-medical-history-notes" className={LABEL_CLASS}>
+                      Medical History Notes
                     </label>
                     <textarea
-                      id="patient-notes"
-                      aria-label="Clinical / Administrative Notes (Optional)"
+                      id="patient-medical-history-notes"
                       rows={3}
-                      value={notes}
-                      onChange={(e) => setNotes(e.target.value)}
-                      placeholder="Special remarks, past history, or reference"
-                      className="w-full rounded-lg border border-slate-300 bg-white p-3 text-sm font-medium text-slate-900 shadow-2xs transition-colors placeholder:text-slate-400 hover:border-slate-400 focus:border-[#8E1C3D] focus:outline-none focus:ring-2 focus:ring-[#8E1C3D]/15"
+                      maxLength={4000}
+                      value={medicalHistoryNotes}
+                      onChange={(e) => setMedicalHistoryNotes(e.target.value)}
+                      placeholder="Past illnesses, surgeries, ongoing medications or family history"
+                      className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm leading-relaxed text-slate-900 shadow-2xs transition-colors duration-150 placeholder:text-slate-400 hover:border-slate-400 focus:border-[#8E1C3D] focus:outline-none focus:ring-2 focus:ring-[#8E1C3D]/15"
                     />
                   </div>
                 </div>
-              </section>
-            </div>
-
+              )}
+            </section>
           </div>
 
           {/* Bottom action bar */}
-          <div className="flex flex-col justify-between gap-3 rounded-2xl border border-slate-200 border-l-4 border-l-[#C39A35] bg-white p-4 shadow-xs sm:flex-row sm:items-center sm:gap-4">
+          <div className="flex flex-col justify-between gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-2xs sm:flex-row sm:items-center sm:gap-4 sm:px-5">
             {isEditMode ? (
-              <p className="text-xs text-slate-600">
+              <p className="text-xs leading-relaxed text-slate-600">
                 Changes are saved to the patient record and shown on the registration card.
               </p>
             ) : (
-              <label className="flex cursor-pointer select-none items-center gap-2.5 text-sm font-semibold text-slate-800">
+              <label className="flex cursor-pointer select-none items-center gap-2.5 text-sm font-medium text-slate-800">
                 <input
                   type="checkbox"
                   checked={saveAndAddAnother}
                   onChange={(e) => setSaveAndAddAnother(e.target.checked)}
-                  className="h-4 w-4 rounded border-slate-300 accent-[#8E1C3D] focus:ring-[#8E1C3D]"
+                  className="h-4 w-4 shrink-0 rounded border-slate-300 accent-[#8E1C3D] focus:ring-[#8E1C3D]"
                 />
                 Save and add another
               </label>
             )}
 
-            <div className="flex w-full items-center gap-3 sm:w-auto">
+            <div className="flex w-full items-center gap-2.5 sm:w-auto">
               {isEditMode ? (
                 <button
                   type="button"
                   onClick={() => navigate(recordPath)}
-                  className="inline-flex min-h-11 items-center gap-1.5 rounded-xl border border-slate-300 bg-white px-4 text-sm font-bold text-slate-700 transition-colors hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#8E1C3D] cursor-pointer"
+                  className="inline-flex min-h-[38px] cursor-pointer items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3.5 py-2 text-sm font-medium text-slate-700 transition-colors duration-150 hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#8E1C3D]"
                 >
                   Cancel
                 </button>
@@ -1323,9 +1509,9 @@ export function PatientRegister() {
                 <button
                   type="button"
                   onClick={handleClear}
-                  className="inline-flex min-h-11 items-center gap-1.5 rounded-xl border border-slate-300 bg-white px-4 text-sm font-bold text-slate-700 transition-colors hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#8E1C3D] cursor-pointer"
+                  className="inline-flex min-h-[38px] cursor-pointer items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3.5 py-2 text-sm font-medium text-slate-700 transition-colors duration-150 hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#8E1C3D]"
                 >
-                  <IconRefresh className="h-4 w-4 text-slate-500" />
+                  <IconRefresh className="h-4 w-4 shrink-0 text-slate-500" />
                   Clear
                 </button>
               )}
@@ -1340,9 +1526,9 @@ export function PatientRegister() {
                       !!createdPatient ||
                       (isDuplicateDetected && !confirmDifferentPatient)
                 }
-                className="inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-xl bg-[#8E1C3D] px-6 text-sm font-bold text-white shadow-xs transition-colors hover:bg-[#5D0B26] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#5D0B26] disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer sm:flex-none"
+                className="inline-flex min-h-[38px] flex-1 cursor-pointer items-center justify-center gap-2 rounded-lg bg-[#8E1C3D] px-5 py-2 text-sm font-medium text-white shadow-2xs transition-colors duration-150 hover:bg-[#5D0B26] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#5D0B26] disabled:cursor-not-allowed disabled:opacity-50 sm:flex-none"
               >
-                <IconDeviceFloppy className="h-4 w-4" />
+                <IconDeviceFloppy className="h-4 w-4 shrink-0" />
                 {isEditMode
                   ? updateMutation.isPending
                     ? 'Saving...'

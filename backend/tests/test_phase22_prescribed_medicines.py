@@ -141,13 +141,9 @@ def _prescription_with_items(
         doctor_id=doctor_user.doctor_id,
         encounter_id=encounter.id,
         diagnosis=encounter.diagnosis or "Infection",
-        status=status,
+        status=PrescriptionStatus.DRAFT.value,
         dietary_advice="Warm fluids and rest",
         general_advice="Steam inhalation twice daily",
-        authorised_at=utcnow() if status == PrescriptionStatus.AUTHORISED.value else None,
-        cancelled_at=utcnow() if status == PrescriptionStatus.CANCELLED.value else None,
-        cancelled_by_user_id=doctor_user.id if status == PrescriptionStatus.CANCELLED.value else None,
-        cancellation_reason="Cancelled for re-evaluation" if status == PrescriptionStatus.CANCELLED.value else None,
     )
     db_session.add(rx)
     db_session.flush()
@@ -178,6 +174,18 @@ def _prescription_with_items(
     )
     db_session.add_all([item1, item2])
     db_session.flush()
+
+    if status == PrescriptionStatus.AUTHORISED.value:
+        rx.status = PrescriptionStatus.AUTHORISED.value
+        rx.authorised_at = utcnow()
+        db_session.flush()
+    elif status == PrescriptionStatus.CANCELLED.value:
+        rx.status = PrescriptionStatus.CANCELLED.value
+        rx.cancelled_at = utcnow()
+        rx.cancelled_by_user_id = doctor_user.id
+        rx.cancellation_reason = "Cancelled for re-evaluation"
+        db_session.flush()
+
     return rx, [item1, item2]
 
 

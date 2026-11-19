@@ -490,7 +490,7 @@ describe('ReceptionDashboard Component', () => {
     expect(duesCta).toHaveAttribute('href', '/reception/billing?tab=dues')
 
     const checkInCta = within(attention).getByRole('link', { name: 'Check in' })
-    expect(checkInCta).toHaveAttribute('href', '/reception/tokens')
+    expect(checkInCta).toHaveAttribute('href', '/reception/appointments')
 
     expect(within(attention).getAllByRole('link')).toHaveLength(3)
   })
@@ -628,6 +628,17 @@ describe('ReceptionDashboard Component', () => {
     expect(within(workload).queryByText('Physiotherapy')).not.toBeInTheDocument()
   })
 
+  it('shows a centered toast when manual refresh succeeds', async () => {
+    const user = userEvent.setup()
+    renderDashboard()
+
+    await waitFor(() => expect(screen.getByText('₹2,505.55')).toBeInTheDocument())
+    await user.click(screen.getByRole('button', { name: /refresh queue and summary/i }))
+
+    const toastHost = await screen.findByTestId('toast-host')
+    expect(within(toastHost).getByRole('status')).toHaveTextContent('Queue and summary refreshed.')
+  })
+
   it('announces manual refresh errors while keeping the last successful overview', async () => {
     const user = userEvent.setup()
     renderDashboard()
@@ -636,12 +647,13 @@ describe('ReceptionDashboard Component', () => {
     mockApiState.failReceptionOverview = true
     await user.click(screen.getByRole('button', { name: /refresh queue and summary/i }))
 
-    expect(await screen.findByRole('alert')).toHaveTextContent(/summary refresh failed/i)
-    expect(screen.getByRole('alert')).toHaveTextContent(/last successful values are still shown/i)
+    const toastHost = await screen.findByTestId('toast-host')
+    expect(within(toastHost).getByRole('alert')).toHaveTextContent(/summary refresh failed/i)
+    expect(within(toastHost).getByRole('alert')).toHaveTextContent(/last successful values are still shown/i)
     expect(screen.getByText('₹2,505.55')).toBeInTheDocument()
   })
 
-  it('surfaces pending TO_ARRIVE /opd-arrivals in Needs Attention and links to /reception/tokens', async () => {
+  it('surfaces pending TO_ARRIVE /opd-arrivals in Needs Attention and links to /reception/appointments', async () => {
     mockApiState.arrivalsOverride = [
       {
         id: 1,
@@ -720,7 +732,7 @@ describe('ReceptionDashboard Component', () => {
     ).toBeInTheDocument()
 
     const registerLink = within(attention).getByRole('link', { name: /register/i })
-    expect(registerLink).toHaveAttribute('href', '/reception/tokens')
+    expect(registerLink).toHaveAttribute('href', '/reception/appointments')
     expect(within(attention).getAllByRole('link')).toHaveLength(4)
   })
 

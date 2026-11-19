@@ -29,10 +29,10 @@ from kalyan_api.models import (
     Appointment,
     ClinicSettings,
     ConsultationStatus,
-    Doctor,
     Patient,
     Payment,
     PaymentMethod,
+    Refund,
     TreatmentPlan,
 )
 from kalyan_api.schemas.billing import (
@@ -43,13 +43,14 @@ from kalyan_api.schemas.billing import (
     PendingDueOut,
     VisitDueOut,
 )
-from kalyan_api.services import audit_service, billing_service
+from kalyan_api.services import audit_service, billing_service, ledger_service
 from kalyan_api.services.audit_service import AuditAction
 from kalyan_api.services.billing_service import (
     consultation_fee_paise,
     lock_visit,
     visit_totals,
 )
+from kalyan_api.services.code_sequence_service import effective_patient_ids
 from kalyan_api.services.receipt_service import (
     allocate_next_receipt_number,
     current_cycle_key,
@@ -114,7 +115,10 @@ def record_payment(
             raise ApiError(
                 status_code=422,
                 code="payment_target_conflict",
-                message="A payment cannot target both a visit and a consultation or treatment package.",
+                message=(
+                    "A payment cannot target both a visit and a consultation "
+                    "or treatment package."
+                ),
             )
         visit = lock_visit(session, payload.visit_id)
         if not visit or visit.patient_id != payload.patient_id:
@@ -168,12 +172,8 @@ def record_payment(
                 message="Cannot record payment for cancelled treatment package.",
             )
 
-        # Calculate current sum of non-reversed payments
-        paid_stmt = select(func.coalesce(func.sum(Payment.amount_paise), 0)).where(
-            Payment.treatment_plan_id == plan.id,
-            Payment.is_reversed.is_(False),
-        )
-        already_paid: int = session.scalar(paid_stmt) or 0
+        # Calculate net paid (non-reversed payments minus active refunds)
+        already_paid = billing_service.package_net_paid_paise(session, plan.id)
         remaining_balance = plan.agreed_price_paise - already_paid
 
         if payload.amount_paise > remaining_balance:
@@ -248,11 +248,27 @@ def record_payment(
                 message="This consultation has no consultation bill line.",
             )
         if fee_paise > 0:
-            paid_stmt = select(func.coalesce(func.sum(Payment.amount_paise), 0)).where(
-                Payment.appointment_id == appt.id,
-                Payment.is_reversed.is_(False),
+            gross_paid = int(
+                session.scalar(
+                    select(func.coalesce(func.sum(Payment.amount_paise), 0)).where(
+                        Payment.appointment_id == appt.id,
+                        Payment.is_reversed.is_(False),
+                    )
+                )
+                or 0
             )
-            already_paid: int = session.scalar(paid_stmt) or 0
+            refunded_paid = int(
+                session.scalar(
+                    select(func.coalesce(func.sum(Refund.amount_paise), 0))
+                    .join(Payment, Payment.id == Refund.payment_id)
+                    .where(
+                        Payment.appointment_id == appt.id,
+                        Payment.is_reversed.is_(False),
+                    )
+                )
+                or 0
+            )
+            already_paid = max(0, gross_paid - refunded_paid)
             remaining_balance = fee_paise - already_paid
             if payload.amount_paise > remaining_balance:
                 max_rupees = max(0, remaining_balance) / 100
@@ -304,6 +320,7 @@ def record_payment(
     )
     session.add(payment)
     session.flush()
+    ledger_service.record_payment(session, payment, actor_user_id=principal.user_id)
 
     # 7. Audit Trail
     ctx = build_audit_context(request, principal)
@@ -396,7 +413,7 @@ def get_payment(id: int, session: SessionDep) -> PaymentOut:
     dependencies=[Depends(require(Permission.PAYMENT_READ))],
 )
 def list_patient_payments(patient_id: int, session: SessionDep) -> list[PaymentOut]:
-    """Retrieve full payment history for a patient (BIL-01)."""
+    """Retrieve full payment history for a patient, consolidating merged aliases (BIL-01)."""
     patient = session.get(Patient, patient_id)
     if not patient:
         raise ApiError(
@@ -405,16 +422,17 @@ def list_patient_payments(patient_id: int, session: SessionDep) -> list[PaymentO
             message="Patient not found.",
         )
 
+    patient_ids = effective_patient_ids(session, patient_id)
     stmt = (
         select(Payment)
-        .where(Payment.patient_id == patient_id)
+        .where(Payment.patient_id.in_(patient_ids))
         .options(
             selectinload(Payment.patient),
             selectinload(Payment.treatment_plan),
             selectinload(Payment.created_by_user),
             selectinload(Payment.reversed_by_user),
         )
-        .order_by(Payment.created_at.desc())
+        .order_by(Payment.created_at.desc(), Payment.id.desc())
     )
     payments = session.execute(stmt).scalars().all()
     return [_to_payment_out(p) for p in payments]
@@ -568,6 +586,19 @@ def reverse_payment(
             message="Payment transaction has already been reversed.",
         )
 
+    has_refunds = session.scalar(
+        select(Refund.id).where(Refund.payment_id == payment.id).limit(1)
+    )
+    if has_refunds is not None:
+        raise ApiError(
+            status_code=422,
+            code="payment_already_refunded",
+            message=(
+                "Cannot reverse a payment that already has refunds. "
+                "Issue an additional refund for any remaining amount instead."
+            ),
+        )
+
     before_state = {
         "is_reversed": payment.is_reversed,
         "amount_paise": payment.amount_paise,
@@ -580,6 +611,7 @@ def reverse_payment(
     payment.reversed_by_user_id = principal.user_id
     payment.reversed_at = clock.utcnow()
     session.flush()
+    ledger_service.record_payment_reversal(session, payment, actor_user_id=principal.user_id)
     session.expire(payment, ["reversed_by_user"])
 
     # Re-query with loaded relationships for response

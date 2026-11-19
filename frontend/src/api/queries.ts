@@ -117,6 +117,7 @@ import type {
   DepartmentUpdate,
   DepartmentDoctorOut,
   DoctorDepartmentAssignment,
+  DoctorDashboardSummary,
   DoctorMeSettingsUpdate,
   DoctorUpdate,
   FeeCreate,
@@ -125,6 +126,7 @@ import type {
 } from './types'
 import {
   QueryClient,
+  keepPreviousData,
   useMutation,
   useQueries,
   useQuery,
@@ -1402,11 +1404,22 @@ export function useUpdateAppointmentStatus() {
   })
 }
 
-export function useDoctorQueue() {
+export function useDoctorQueue(options?: { enabled?: boolean }) {
   return useQuery({
     queryKey: ['doctor-queue'],
     queryFn: () => apiFetch<DoctorQueueResponse>('/doctor/queue'),
     refetchInterval: 10000, // Poll every 10s for real-time queue refresh
+    enabled: options?.enabled ?? true,
+  })
+}
+
+export function useDoctorDashboardSummary() {
+  return useQuery({
+    queryKey: ['doctor-dashboard-summary'],
+    queryFn: () => apiFetch<DoctorDashboardSummary>('/doctor/dashboard/summary'),
+    placeholderData: keepPreviousData,
+    refetchInterval: 10000,
+    retry: 1,
   })
 }
 

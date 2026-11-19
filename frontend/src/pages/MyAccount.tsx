@@ -2,6 +2,7 @@ import { useState, type FormEvent } from 'react'
 import { useNavigate } from 'react-router'
 import { AppShell } from '../components/AppShell'
 import { Modal } from '../components/Modal'
+import { toast } from '../components/ToastHost'
 import {
   useActiveSessions,
   useChangePassword,
@@ -13,6 +14,7 @@ import {
 import { ApiError } from '../api/client'
 import { useClinicBranding } from '../api/branding'
 import { withDoctorTitle } from '../format'
+import { DoctorSettings } from './DoctorSettings'
 
 export function MyAccount() {
   const navigate = useNavigate()
@@ -40,8 +42,6 @@ export function MyAccount() {
   const [currentPassword, setCurrentPassword] = useState('')
   const [newPassword, setNewPassword] = useState('')
   const [repeatPassword, setRepeatPassword] = useState('')
-  const [passwordNotice, setPasswordNotice] = useState<{ tone: 'ok' | 'error'; message: string } | null>(null)
-  const [sessionNotice, setSessionNotice] = useState<{ tone: 'ok' | 'error'; message: string } | null>(null)
   const [confirmSignOutOpen, setConfirmSignOutOpen] = useState(false)
 
   const handleSignOut = async () => {
@@ -54,15 +54,14 @@ export function MyAccount() {
 
   const handlePasswordSubmit = async (e: FormEvent) => {
     e.preventDefault()
-    setPasswordNotice(null)
 
     if (newPassword !== repeatPassword) {
-      setPasswordNotice({ tone: 'error', message: 'New passwords do not match.' })
+      toast.error('New passwords do not match.')
       return
     }
 
     if (newPassword.length < 12) {
-      setPasswordNotice({ tone: 'error', message: 'Password must be at least 12 characters long.' })
+      toast.error('Password must be at least 12 characters long.')
       return
     }
 
@@ -71,41 +70,38 @@ export function MyAccount() {
         current_password: currentPassword,
         new_password: newPassword,
       })
-      setPasswordNotice({
-        tone: 'ok',
-        message: 'Password changed successfully. Every other signed-in computer has been signed out.',
-      })
+      toast.success('Password changed successfully. Every other signed-in computer has been signed out.')
       setCurrentPassword('')
       setNewPassword('')
       setRepeatPassword('')
       await refetchMe()
-      await refetchSessions()
+      if (canSeeSessions) {
+        await refetchSessions()
+      }
     } catch (err: unknown) {
       if (err instanceof ApiError) {
-        setPasswordNotice({ tone: 'error', message: err.message })
+        toast.error(err.message)
       } else {
-        setPasswordNotice({ tone: 'error', message: 'Failed to change password. Please check LAN connection.' })
+        toast.error('Failed to change password. Please check LAN connection.')
       }
     }
   }
 
   const handleSignOutOthers = async () => {
     if (!me?.id) return
-    setSessionNotice(null)
     try {
       await revokeSessionsMutation.mutateAsync({
         id: me.id,
         payload: { reason: 'User requested sign-out of all other computers via My Account.' },
       })
       setConfirmSignOutOpen(false)
-      setSessionNotice({ tone: 'ok', message: 'All other computers signed out successfully.' })
-      await refetchSessions()
+      toast.success('All other computers signed out successfully.')
+      if (canSeeSessions) {
+        await refetchSessions()
+      }
     } catch (err: unknown) {
       setConfirmSignOutOpen(false)
-      setSessionNotice({
-        tone: 'error',
-        message: err instanceof ApiError ? err.message : 'Failed to sign out other sessions.',
-      })
+      toast.error(err instanceof ApiError ? err.message : 'Failed to sign out other sessions.')
     }
   }
 
@@ -151,7 +147,9 @@ export function MyAccount() {
           </button>
         </div>
 
-        {/* 2-Column Responsive Layout */}
+        {me?.role === 'DOCTOR' && <DoctorSettings embedded />}
+
+        {/* Account and security sections */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
           {/* Left Column: Change Password & Signed-in computers */}
           <div className="lg:col-span-7 space-y-6">
@@ -160,18 +158,6 @@ export function MyAccount() {
               <h2 className="text-base font-bold text-slate-900 mb-4">
                 Change password
               </h2>
-
-              {passwordNotice && (
-                <div
-                  className={`p-3 rounded-lg text-xs font-medium mb-4 ${
-                    passwordNotice.tone === 'ok'
-                      ? 'bg-emerald-50 text-emerald-800 border border-emerald-200'
-                      : 'bg-rose-50 text-rose-800 border border-rose-200'
-                  }`}
-                >
-                  {passwordNotice.message}
-                </div>
-              )}
 
               <form onSubmit={handlePasswordSubmit} className="space-y-4">
                 <div>
@@ -183,7 +169,9 @@ export function MyAccount() {
                   </label>
                   <input
                     id="account-current-pw"
+                    name="current_password"
                     type="password"
+                    autoComplete="current-password"
                     required
                     value={currentPassword}
                     onChange={(e) => setCurrentPassword(e.target.value)}
@@ -202,7 +190,9 @@ export function MyAccount() {
                     </label>
                     <input
                       id="account-new-pw"
+                      name="new_password"
                       type="password"
+                      autoComplete="new-password"
                       required
                       value={newPassword}
                       onChange={(e) => setNewPassword(e.target.value)}
@@ -219,7 +209,9 @@ export function MyAccount() {
                     </label>
                     <input
                       id="account-repeat-pw"
+                      name="repeat_new_password"
                       type="password"
+                      autoComplete="new-password"
                       required
                       value={repeatPassword}
                       onChange={(e) => setRepeatPassword(e.target.value)}
@@ -271,18 +263,6 @@ export function MyAccount() {
                 )}
               </div>
 
-              {sessionNotice && (
-                <div
-                  className={`p-3 rounded-lg text-xs font-medium mb-4 ${
-                    sessionNotice.tone === 'ok'
-                      ? 'bg-emerald-50 text-emerald-800 border border-emerald-200'
-                      : 'bg-rose-50 text-rose-800 border border-rose-200'
-                  }`}
-                >
-                  {sessionNotice.message}
-                </div>
-              )}
-
               {!canSeeSessions ? (
                 <p className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">
                   Only an administrator can see or sign out the computers signed in as you. If you think
@@ -296,7 +276,7 @@ export function MyAccount() {
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-xs">
                   <thead>
-                    <tr className="border-b border-slate-200 text-xs uppercase tracking-wider text-slate-500">
+                    <tr className="border-b border-slate-200 text-xs text-slate-500">
                       <th className="pb-2 font-semibold">Computer</th>
                       <th className="pb-2 font-semibold">Signed in</th>
                       <th className="pb-2 font-semibold">Last seen</th>

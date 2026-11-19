@@ -127,6 +127,7 @@ def _prescription(session: Session, patient: Patient, doctor_id: int) -> Prescri
         patient_id=patient.id,
         doctor_id=doctor_id,
         diagnosis="Hypertension",
+        status="DRAFT",
     )
     session.add(rx)
     session.flush()
@@ -143,6 +144,8 @@ def _prescription_item(session: Session, prescription: Prescription) -> Prescrip
         duration_days=30,
     )
     session.add(item)
+    session.flush()
+    prescription.status = "AUTHORISED"
     session.flush()
     return item
 

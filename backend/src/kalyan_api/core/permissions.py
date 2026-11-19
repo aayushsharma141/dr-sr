@@ -67,6 +67,7 @@ class Permission(StrEnum):
     PAYMENT_CREATE = "payment:create"
     RECEIPT_REPRINT = "receipt:reprint"
     PAYMENT_REVERSE = "payment:reverse"  # D-06: Admin only
+    PAYMENT_REFUND = "payment:refund"  # D-06: Admin only
     TIMELINE_READ = "timeline:read"
 
     # Phase 16: Audit Viewer, Backup/Restore & Integrity (Reserved)
@@ -92,9 +93,10 @@ class Permission(StrEnum):
     VISIT_READ = "visit:read"
     VISIT_WRITE = "visit:write"
 
-    # Phase 22 Wave 3: consultation fee adjustment (OD-A). A doctor adjusts only own consultations; the
-    # admin may also correct a fee. Reception is not granted bill:adjust by default (design §6, OD-A).
-    # Reception holds bill:write for bill line items (plan 22-08); Admin holds report:referral (plan 22-17).
+    # Phase 22 Wave 3: consultation fee adjustment (OD-A). A doctor adjusts only own
+    # consultations; the admin may also correct a fee. Reception is not granted bill:adjust
+    # by default (design §6, OD-A). Reception holds bill:write for bill line items (plan 22-08);
+    # Admin holds report:referral (plan 22-17).
     BILL_CLINICAL = "bill:clinical"
     BILL_ADJUST = "bill:adjust"
     BILL_WRITE = "bill:write"
@@ -104,6 +106,13 @@ class Permission(StrEnum):
     PATIENT_MERGE = "patient:merge"
     PATIENT_ARCHIVE = "patient:archive"
     WORKSTATION_READ = "workstation:read"
+
+    # Patient Records Overhaul (M1): structured clinical allergies (DOCTOR only, D-04)
+    ALLERGY_WRITE = "allergy:write"
+
+    # Patient Records Overhaul (M4): patient documents (D-04 clinical guard enforced per route)
+    DOCUMENT_READ = "document:read"
+    DOCUMENT_WRITE = "document:write"
 
 
 # Authoritative role-to-permissions catalog
@@ -125,10 +134,12 @@ ROLE_PERMISSIONS: dict[Role, frozenset[Permission]] = {
             Permission.FEE_READ,
             Permission.FEE_MANAGE,
             Permission.PATIENT_READ,
+            Permission.PHOTO_READ,
             Permission.APPOINTMENT_READ,
             Permission.PAYMENT_READ,
             Permission.RECEIPT_REPRINT,
             Permission.PAYMENT_REVERSE,
+            Permission.PAYMENT_REFUND,
             Permission.BILL_ADJUST,
             Permission.TIMELINE_READ,
             Permission.AUDIT_READ,
@@ -149,6 +160,7 @@ ROLE_PERMISSIONS: dict[Role, frozenset[Permission]] = {
             Permission.PATIENT_MERGE,
             Permission.PATIENT_ARCHIVE,
             Permission.WORKSTATION_READ,
+            Permission.DOCUMENT_READ,
         }
     ),
     Role.RECEPTION: frozenset(
@@ -171,6 +183,8 @@ ROLE_PERMISSIONS: dict[Role, frozenset[Permission]] = {
             Permission.VISIT_READ,
             Permission.VISIT_WRITE,
             Permission.BILL_WRITE,
+            Permission.DOCUMENT_READ,
+            Permission.DOCUMENT_WRITE,
         }
     ),
     Role.DOCTOR: frozenset(
@@ -182,6 +196,8 @@ ROLE_PERMISSIONS: dict[Role, frozenset[Permission]] = {
             Permission.DOCTOR_SETTINGS_WRITE,
             Permission.FEE_READ,
             Permission.PATIENT_READ,
+            Permission.PHOTO_READ,
+            Permission.ALLERGY_WRITE,
             Permission.APPOINTMENT_READ,
             Permission.APPOINTMENT_WRITE,
             Permission.ENCOUNTER_READ,
@@ -193,6 +209,8 @@ ROLE_PERMISSIONS: dict[Role, frozenset[Permission]] = {
             Permission.SESSION_LOG_READ,
             Permission.SESSION_LOG_WRITE,
             Permission.TIMELINE_READ,
+            Permission.DOCUMENT_READ,
+            Permission.DOCUMENT_WRITE,
         }
     ),
 }

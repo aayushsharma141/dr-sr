@@ -91,14 +91,14 @@ export const QueueTicketPreview: React.FC<QueueTicketPreviewProps> = ({
           <h4 className="text-base font-bold tracking-tight text-slate-900">
             Kalyan Hospital
           </h4>
-          <p className="text-xs font-semibold uppercase tracking-wider text-[#8E1C3D]">
+          <p className="text-xs font-semibold text-[#8E1C3D]">
             {departmentName}
           </p>
         </div>
 
         {/* Big Monotonic Token Badge */}
         <div className="py-5 text-center">
-          <span className="block text-xs font-bold uppercase tracking-widest text-slate-500">
+          <span className="block text-xs font-semibold text-slate-500">
             Token No.
           </span>
           {hasToken ? (
@@ -111,7 +111,7 @@ export const QueueTicketPreview: React.FC<QueueTicketPreviewProps> = ({
           ) : (
             <span
               data-testid="token-preview-number"
-              className="mt-2 inline-flex items-center gap-2 rounded-lg border border-dashed border-[#C39A35] bg-[#FBF5F7] px-3.5 py-2 text-xs font-bold uppercase tracking-widest text-[#8E1C3D]"
+              className="mt-2 inline-flex items-center gap-2 rounded-lg border border-dashed border-[#C39A35] bg-[#FBF5F7] px-3.5 py-2 text-xs font-semibold text-[#8E1C3D]"
             >
               <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-[#C39A35]" />
               {emptyLabel}

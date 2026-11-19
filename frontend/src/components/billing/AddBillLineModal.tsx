@@ -3,6 +3,7 @@ import { useAddBillLine, usePrescribedMedicines } from '../../api/bill'
 import { formatPaise, rupeesToPaise } from '../../format'
 import { InlineAlert } from '../InlineAlert'
 import { Modal } from '../Modal'
+import { toast } from '../ToastHost'
 
 export interface AddBillLineModalProps {
   open: boolean
@@ -82,6 +83,11 @@ export function AddBillLineModal({ open, onClose, visitId, mode }: AddBillLineMo
         rate_paise: parsedRatePaise,
         prescription_item_id: mode === 'medicine' ? prescriptionItemId : null,
       })
+      toast.success(
+        mode === 'medicine'
+          ? `Added medicine: ${description.trim()}.`
+          : `Added bill item: ${description.trim()}.`,
+      )
       onClose()
     } catch (err: unknown) {
       // Keeps typed values in inputs on error so user can retry by hand (CONTEXT adviser rule)
@@ -114,7 +120,7 @@ export function AddBillLineModal({ open, onClose, visitId, mode }: AddBillLineMo
         {/* Prescribed reference list for medicine mode (OD-B, B2) */}
         {mode === 'medicine' && prescribedMeds && prescribedMeds.length > 0 && (
           <div className="space-y-1.5 rounded-xl border border-slate-200 bg-slate-50 p-3">
-            <label className="text-xs font-bold uppercase tracking-wider text-slate-700">
+            <label className="text-xs font-bold text-slate-700">
               Prescribed medicines (reference)
             </label>
             <div className="flex flex-wrap gap-1.5 pt-1">
@@ -146,7 +152,7 @@ export function AddBillLineModal({ open, onClose, visitId, mode }: AddBillLineMo
 
         {/* Description field */}
         <div className="space-y-1">
-          <label htmlFor="bill-line-desc" className="block text-xs font-bold uppercase tracking-wider text-slate-700">
+          <label htmlFor="bill-line-desc" className="block text-xs font-bold text-slate-700">
             {mode === 'medicine' ? 'Medicine name *' : 'Particular name *'}
           </label>
           <input
@@ -168,7 +174,7 @@ export function AddBillLineModal({ open, onClose, visitId, mode }: AddBillLineMo
         {/* Unit field (medicine mode only) */}
         {mode === 'medicine' && (
           <div className="space-y-1">
-            <label htmlFor="bill-line-unit" className="block text-xs font-bold uppercase tracking-wider text-slate-700">
+            <label htmlFor="bill-line-unit" className="block text-xs font-bold text-slate-700">
               Unit (optional)
             </label>
             <input
@@ -185,7 +191,7 @@ export function AddBillLineModal({ open, onClose, visitId, mode }: AddBillLineMo
         {/* Quantity and Rate row */}
         <div className="grid grid-cols-2 gap-3">
           <div className="space-y-1">
-            <label htmlFor="bill-line-qty" className="block text-xs font-bold uppercase tracking-wider text-slate-700">
+            <label htmlFor="bill-line-qty" className="block text-xs font-bold text-slate-700">
               Quantity *
             </label>
             <input
@@ -200,7 +206,7 @@ export function AddBillLineModal({ open, onClose, visitId, mode }: AddBillLineMo
           </div>
 
           <div className="space-y-1">
-            <label htmlFor="bill-line-rate" className="block text-xs font-bold uppercase tracking-wider text-slate-700">
+            <label htmlFor="bill-line-rate" className="block text-xs font-bold text-slate-700">
               Rate (₹) *
             </label>
             <input

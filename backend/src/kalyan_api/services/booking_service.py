@@ -37,7 +37,7 @@ from kalyan_api.models import (
     Visit,
     VisitStatus,
 )
-from kalyan_api.services import token_service, visit_service
+from kalyan_api.services import ledger_service, token_service, visit_service
 from kalyan_api.services.appointment_service import validate_booking_transition
 
 # Statuses that count as an existing booking for the duplicate rule (BR-006).
@@ -408,6 +408,8 @@ def ensure_consultation_line(session: Session, appt: Appointment, principal: Pri
     )
     session.add(line)
     session.flush()
+    if line.amount_paise > 0:
+        ledger_service.record_charge(session, line, actor_user_id=principal.user_id)
     return line
 
 
@@ -510,7 +512,12 @@ def reassign_waiting(
     consultation.
     """
     if (
-        appt.status not in (AppointmentStatus.ARRIVED.value, AppointmentStatus.CHECKED_IN.value)
+        appt.status
+        not in (
+            AppointmentStatus.ARRIVED.value,
+            AppointmentStatus.CHECKED_IN.value,
+            AppointmentStatus.WAITING.value,
+        )
         or appt.consultation_status != ConsultationStatus.WAITING.value
     ):
         raise ApiError(
@@ -538,6 +545,9 @@ def reassign_waiting(
             code="visit_not_open",
             message="The visit is no longer open.",
         )
+    # Lock Patient before Doctor so lock order matches create_booking/check_in
+    # (Appointment -> Patient -> Doctor -> Department -> DailyTokenSequence).
+    session.get(Patient, appt.patient_id, with_for_update=True)
     new_doctor = lock_doctor_for_booking(session, new_doctor_id)
     if new_doctor is None or not new_doctor.is_active:
         raise ApiError(
@@ -572,7 +582,7 @@ def reassign_waiting(
         department_id=department_id,
         appointment_date=appt.appointment_date,
         token_number=token,
-        status=AppointmentStatus.CHECKED_IN.value,
+        status=AppointmentStatus.ARRIVED.value,
         status_updated_at=now,
         check_in_at=appt.check_in_at or now,
         visit_id=appt.visit_id,
@@ -605,6 +615,13 @@ def reassign_waiting(
     appt.cancellation_reason = reason_text
     appt.version_id += 1
     session.flush()
+    ledger_service.void_appointment_charges(
+        session,
+        appt,
+        reason=reason_text,
+        actor_user_id=principal.user_id,
+        occurred_at=now,
+    )
     return successor
 
 
@@ -613,18 +630,32 @@ def check_in(
     appt: Appointment,
     principal: Principal,
     details: CheckInDetails | None = None,
+    *,
+    expected_patient_id: int | None = None,
 ) -> CheckInResult:
-    """Check a booked patient in: CHECKED_IN, visit opened or joined, token issued, WAITING.
+    """Check a booked patient in: ARRIVED, visit opened or joined, token issued, WAITING.
 
     Reception only, and only on the appointment date. A late arrival marked NO_SHOW checks in
     the same way. No money is taken here; payment is collected at checkout. details carries
     the visit type, classification and referral from the check-in desk (phase 22); the older
     status-change path sends none.
     """
-    validate_booking_transition(appt, AppointmentStatus.CHECKED_IN, principal)
+    validate_booking_transition(appt, AppointmentStatus.ARRIVED, principal)
 
-    patient = session.get(Patient, appt.patient_id)
-    if not patient or not patient.is_active or patient.merged_into_id is not None or patient.is_archived:
+    if expected_patient_id is not None and appt.patient_id != expected_patient_id:
+        raise ApiError(
+            status_code=422,
+            code="patient_appointment_mismatch",
+            message="Appointment does not belong to the selected patient.",
+        )
+
+    patient = session.get(Patient, appt.patient_id, with_for_update=True)
+    if (
+        not patient
+        or not patient.is_active
+        or patient.merged_into_id is not None
+        or patient.is_archived
+    ):
         raise ApiError(
             status_code=400,
             code="patient_inactive_or_merged",
@@ -677,7 +708,7 @@ def check_in(
         )
 
     now = clock.utcnow()
-    appt.status = AppointmentStatus.CHECKED_IN.value
+    appt.status = AppointmentStatus.ARRIVED.value
     appt.status_updated_at = now
     if appt.check_in_at is None:
         appt.check_in_at = now

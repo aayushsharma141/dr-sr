@@ -5,6 +5,14 @@ import { MemoryRouter } from 'react-router'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { AppShell } from '../AppShell'
 
+const mockMyDepartments = vi.fn(
+  () => [] as Array<{ id: number; code: string; name_en: string; is_active: boolean }>,
+)
+
+vi.mock('../../api/specialty', () => ({
+  useMyDepartments: () => mockMyDepartments(),
+}))
+
 vi.mock('../../api/queries', () => ({
   useLogout: () => ({
     mutateAsync: vi.fn().mockResolvedValue(undefined),
@@ -63,54 +71,64 @@ describe('AppShell clinical navigation hierarchy', () => {
   afterEach(() => {
     cleanup()
     window.localStorage.clear()
+    mockMyDepartments.mockReturnValue([])
   })
 
   it('lists reception tabs once each, Dashboard first, named like their pages', () => {
     renderShell('RECEPTION', '/reception/appointments')
 
+    const aside = screen.getByRole('complementary', { name: 'Hospital workspace navigation' })
     const primaryNav = screen.getByRole('navigation', { name: 'Primary navigation' })
     const links = within(primaryNav).getAllByRole('link')
     expect(links.map((l) => l.textContent)).toEqual([
       'Dashboard',
-      'Check-in & Token',
-      'Patient Records',
       'Appointments',
       'Waiting Room',
       'Billing & Checkout',
-      'Receipts',
-      'Reports',
+      'Patient Records',
     ])
     expect(links.map((l) => l.getAttribute('href'))).toEqual([
       '/reception',
-      '/reception/tokens',
-      '/reception/patients',
       '/reception/appointments',
       '/reception/waiting',
       // Opens Checkout, not the Dues tab.
       '/reception/billing',
-      '/reception/receipts',
-      '/reception/reports',
+      '/reception/patients',
     ])
-    expect(within(primaryNav).getByText('RECEPTION DESK')).toBeInTheDocument()
+    expect(within(aside).getByText('Reception Desk')).toBeInTheDocument()
+    expect(within(aside).queryByText('Workspace')).not.toBeInTheDocument()
+    expect(within(aside).queryByText('Reception & Registration')).not.toBeInTheDocument()
+    expect(within(primaryNav).queryByText(/Reception desk/i)).not.toBeInTheDocument()
     expect(within(primaryNav).getByRole('link', { name: 'Appointments' })).toHaveAttribute('aria-current', 'page')
     expect(document.title).toBe('Appointments – Kalyan Hospital')
 
+    expect(within(primaryNav).queryByRole('link', { name: 'Check-in & Token' })).not.toBeInTheDocument()
     expect(within(primaryNav).queryByRole('link', { name: 'Billing & Payments' })).not.toBeInTheDocument()
     expect(within(primaryNav).queryByRole('link', { name: 'Physiotherapy Treatment' })).not.toBeInTheDocument()
     expect(within(primaryNav).queryByRole('link', { name: 'Follow-ups' })).not.toBeInTheDocument()
   })
 
-  it('keeps Check-in & Token and Billing & Checkout highlighted on their own pages', () => {
-    renderShell('RECEPTION', '/reception/tokens?patient_id=4&appointment_id=104')
+  it('keeps Appointments and Billing & Checkout highlighted on their own pages', () => {
+    renderShell('RECEPTION', '/reception/appointments?patient_id=4&appointment_id=104')
     let primaryNav = screen.getByRole('navigation', { name: 'Primary navigation' })
-    expect(within(primaryNav).getByRole('link', { name: 'Check-in & Token' })).toHaveAttribute('aria-current', 'page')
-    expect(document.title).toBe('Check-in & Token – Kalyan Hospital')
+    expect(within(primaryNav).getByRole('link', { name: 'Appointments' })).toHaveAttribute('aria-current', 'page')
+    expect(document.title).toBe('Appointments – Kalyan Hospital')
     cleanup()
 
     renderShell('RECEPTION', '/reception/billing?tab=dues')
     primaryNav = screen.getByRole('navigation', { name: 'Primary navigation' })
     expect(within(primaryNav).getByRole('link', { name: 'Billing & Checkout' })).toHaveAttribute('aria-current', 'page')
     expect(within(primaryNav).queryByRole('link', { name: 'Billing & Payments' })).not.toBeInTheDocument()
+    cleanup()
+
+    renderShell('RECEPTION', '/reception/receipts')
+    primaryNav = screen.getByRole('navigation', { name: 'Primary navigation' })
+    expect(within(primaryNav).getByRole('link', { name: 'Billing & Checkout' })).toHaveAttribute('aria-current', 'page')
+    cleanup()
+
+    renderShell('RECEPTION', '/reception/reports')
+    primaryNav = screen.getByRole('navigation', { name: 'Primary navigation' })
+    expect(within(primaryNav).getByRole('link', { name: 'Billing & Checkout' })).toHaveAttribute('aria-current', 'page')
   })
 
   it('keeps Patient Records active and names the page Edit Patient while a patient is edited', () => {
@@ -129,18 +147,23 @@ describe('AppShell clinical navigation hierarchy', () => {
   })
 
   it('gives a doctor one queue tab and activates Follow-ups on its page', () => {
+    mockMyDepartments.mockReturnValue([
+      { id: 1, code: 'PHYSIOTHERAPY', name_en: 'Physiotherapy', is_active: true },
+    ])
     renderShell('DOCTOR', '/reception/appointments?tab=followup')
 
     const primaryNav = screen.getByRole('navigation', { name: 'Primary navigation' })
     // No consultation is open and none is unfinished, so there is nothing to continue.
     expect(within(primaryNav).getAllByRole('link').map((l) => l.textContent)).toEqual([
+      'Dashboard',
       'My Queue',
       'Follow-ups',
       'Physiotherapy Treatment',
       'Patient Records',
       'My Settings',
     ])
-    expect(within(primaryNav).getByRole('link', { name: 'My Queue' })).toHaveAttribute('href', '/doctor')
+    expect(within(primaryNav).getByRole('link', { name: 'Dashboard' })).toHaveAttribute('href', '/doctor')
+    expect(within(primaryNav).getByRole('link', { name: 'My Queue' })).toHaveAttribute('href', '/doctor/queue')
     expect(within(primaryNav).getByRole('link', { name: 'Physiotherapy Treatment' })).toHaveAttribute('href', '/doctor/treatment-plans')
     expect(within(primaryNav).getByRole('link', { name: 'Follow-ups' })).toHaveAttribute('href', '/reception/appointments?tab=followup')
     expect(within(primaryNav).getByRole('link', { name: 'Follow-ups' })).toHaveAttribute('aria-current', 'page')
@@ -152,10 +175,44 @@ describe('AppShell clinical navigation hierarchy', () => {
   })
 
   it('names the physiotherapy page like its tab', () => {
+    mockMyDepartments.mockReturnValue([
+      { id: 1, code: 'PHYSIOTHERAPY', name_en: 'Physiotherapy', is_active: true },
+    ])
     renderShell('DOCTOR', '/doctor/treatment-plans/7')
     const primaryNav = screen.getByRole('navigation', { name: 'Primary navigation' })
     expect(within(primaryNav).getByRole('link', { name: 'Physiotherapy Treatment' })).toHaveAttribute('aria-current', 'page')
     expect(document.title).toBe('Physiotherapy Treatment – Kalyan Hospital')
+  })
+
+  it('fails closed and omits Physiotherapy Treatment when doctor departments are empty or Ophthalmology-only', () => {
+    // 1. Empty / loading departments must not leak Physiotherapy nav
+    mockMyDepartments.mockReturnValue([])
+    renderShell('DOCTOR', '/doctor')
+    let primaryNav = screen.getByRole('navigation', { name: 'Primary navigation' })
+    expect(within(primaryNav).queryByRole('link', { name: 'Physiotherapy Treatment' })).not.toBeInTheDocument()
+    expect(within(primaryNav).getAllByRole('link').map((l) => l.textContent)).toEqual([
+      'Dashboard',
+      'My Queue',
+      'Follow-ups',
+      'Patient Records',
+      'My Settings',
+    ])
+    cleanup()
+
+    // 2. Ophthalmology-only doctor must not see Physiotherapy nav
+    mockMyDepartments.mockReturnValue([
+      { id: 2, code: 'OPHTHALMOLOGY', name_en: 'Ophthalmology', is_active: true },
+    ])
+    renderShell('DOCTOR', '/doctor')
+    primaryNav = screen.getByRole('navigation', { name: 'Primary navigation' })
+    expect(within(primaryNav).queryByRole('link', { name: 'Physiotherapy Treatment' })).not.toBeInTheDocument()
+    expect(within(primaryNav).getAllByRole('link').map((l) => l.textContent)).toEqual([
+      'Dashboard',
+      'My Queue',
+      'Follow-ups',
+      'Patient Records',
+      'My Settings',
+    ])
   })
 
   it('shows Continue Consultation while a consultation is open', () => {
@@ -166,6 +223,7 @@ describe('AppShell clinical navigation hierarchy', () => {
     expect(consultation).toHaveAttribute('href', '/doctor/encounters/42')
     expect(consultation).toHaveAttribute('aria-current', 'page')
     expect(within(primaryNav).getByRole('link', { name: 'My Queue' })).not.toHaveAttribute('aria-current')
+    expect(within(primaryNav).getByRole('link', { name: 'Dashboard' })).not.toHaveAttribute('aria-current')
   })
 
   it('links Continue Consultation to the newest unfinished draft from anywhere', async () => {
@@ -187,7 +245,8 @@ describe('AppShell clinical navigation hierarchy', () => {
       const consultation = await within(primaryNav).findByRole('link', { name: /Continue Consultation/ })
       expect(consultation).toHaveAttribute('href', '/doctor/encounters/9')
       expect(consultation).toHaveTextContent('2')
-      expect(within(primaryNav).getByRole('link', { name: 'My Queue' })).toHaveAttribute('aria-current', 'page')
+      expect(within(primaryNav).getByRole('link', { name: 'Dashboard' })).toHaveAttribute('aria-current', 'page')
+      expect(within(primaryNav).getByRole('link', { name: 'My Queue' })).not.toHaveAttribute('aria-current')
     } finally {
       vi.unstubAllGlobals()
     }
@@ -306,7 +365,7 @@ describe('AppShell clinical navigation hierarchy', () => {
     const user = userEvent.setup()
     renderShell('ADMIN', '/admin')
 
-    const aside = screen.getByRole('complementary', { name: 'Primary navigation' })
+    const aside = screen.getByRole('complementary', { name: 'Administrative navigation' })
     expect(aside.className).toContain('lg:w-64')
     // Nothing is written to browser storage until staff choose a layout.
     expect(window.localStorage.length).toBe(0)

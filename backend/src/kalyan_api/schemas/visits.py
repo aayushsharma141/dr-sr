@@ -29,10 +29,11 @@ class VisitConsultation(BaseModel):
 
 
 class VisitPayment(BaseModel):
-    """A payment recorded against a consultation in the visit."""
+    """A payment recorded against the visit or one of its consultations."""
 
     id: int
-    appointment_id: int
+    visit_id: int | None = None
+    appointment_id: int | None = None
     receipt_number: str
     amount_paise: int
     payment_method: str
@@ -45,6 +46,7 @@ class VisitRead(BaseModel):
     """A visit as listed to reception and admin."""
 
     id: int
+    visit_code: str
     patient_id: int
     patient_urn: str
     patient_name: str

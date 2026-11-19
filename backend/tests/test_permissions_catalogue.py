@@ -9,6 +9,7 @@ from kalyan_api.main import create_app
 
 CLINICAL_PERMISSIONS = frozenset(
     {
+        Permission.ALLERGY_WRITE,
         Permission.ENCOUNTER_READ,
         Permission.ENCOUNTER_WRITE,
         Permission.PRESCRIPTION_READ,
@@ -44,6 +45,15 @@ def test_payment_reverse_restricted_exclusively_to_admin() -> None:
             assert Permission.PAYMENT_REVERSE in perms
         else:
             assert Permission.PAYMENT_REVERSE not in perms, f"{role} must NOT have payment:reverse"
+
+
+def test_payment_refund_restricted_exclusively_to_admin() -> None:
+    """D-06 Decision: Payment refunds are restricted exclusively to ADMIN."""
+    for role, perms in ROLE_PERMISSIONS.items():
+        if role == Role.ADMIN:
+            assert Permission.PAYMENT_REFUND in perms
+        else:
+            assert Permission.PAYMENT_REFUND not in perms, f"{role} must NOT have payment:refund"
 
 
 def test_clinical_permissions_restricted_exclusively_to_doctor() -> None:
@@ -103,10 +113,13 @@ def test_golden_role_permissions_snapshot() -> None:
                 Permission.FEE_READ,
                 Permission.FEE_MANAGE,
                 Permission.PATIENT_READ,
+                Permission.PHOTO_READ,
+                Permission.DOCUMENT_READ,
                 Permission.APPOINTMENT_READ,
                 Permission.PAYMENT_READ,
                 Permission.RECEIPT_REPRINT,
                 Permission.PAYMENT_REVERSE,
+                Permission.PAYMENT_REFUND,
                 Permission.BILL_ADJUST,  # Phase 22 Wave 3, OD-22-11 (design §6)
                 Permission.TIMELINE_READ,
                 Permission.AUDIT_READ,
@@ -140,6 +153,8 @@ def test_golden_role_permissions_snapshot() -> None:
                 Permission.PATIENT_UPDATE,
                 Permission.PHOTO_READ,
                 Permission.PHOTO_WRITE,
+                Permission.DOCUMENT_READ,
+                Permission.DOCUMENT_WRITE,
                 Permission.APPOINTMENT_READ,
                 Permission.APPOINTMENT_WRITE,
                 Permission.PAYMENT_READ,
@@ -160,6 +175,10 @@ def test_golden_role_permissions_snapshot() -> None:
                 Permission.DOCTOR_SETTINGS_WRITE,
                 Permission.FEE_READ,
                 Permission.PATIENT_READ,
+                Permission.PHOTO_READ,
+                Permission.DOCUMENT_READ,
+                Permission.DOCUMENT_WRITE,
+                Permission.ALLERGY_WRITE,
                 Permission.APPOINTMENT_READ,
                 Permission.APPOINTMENT_WRITE,
                 Permission.ENCOUNTER_READ,
@@ -219,7 +238,7 @@ def test_bill_adjust_restricted_exclusively_to_admin() -> None:
 
 
 def test_bill_clinical_restricted_exclusively_to_doctor() -> None:
-    """Phase 22 / OD-22-11: Doctor consultation fee adjustment is restricted exclusively to DOCTOR."""
+    """Phase 22 / OD-22-11: Doctor consultation fee adjustment is DOCTOR-only."""
     for role, perms in ROLE_PERMISSIONS.items():
         if role == Role.DOCTOR:
             assert Permission.BILL_CLINICAL in perms

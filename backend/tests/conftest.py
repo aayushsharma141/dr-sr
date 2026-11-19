@@ -38,6 +38,7 @@ def test_settings(tmp_path_factory: pytest.TempPathFactory) -> Settings:
     storage_root = tmp_path_factory.mktemp("kalyan_storage")
     os.environ["KALYAN_PHOTOS_DIR"] = str(storage_root / "photos")
     os.environ["KALYAN_ASSETS_DIR"] = str(storage_root / "assets")
+    os.environ["KALYAN_DOCUMENTS_DIR"] = str(storage_root / "documents")
     os.environ["KALYAN_BACKUP_DIR"] = str(storage_root / "backups")
     os.environ["KALYAN_SETUP_CODE_PATH"] = str(storage_root / "setup-code.txt")
 
@@ -64,6 +65,26 @@ def configure_test_environment(test_settings: Settings) -> None:
     from kalyan_api.config import get_settings
 
     get_settings.cache_clear()
+
+
+@pytest.fixture(autouse=True)
+def isolate_documents_dir(
+    tmp_path: Path,
+    test_settings: Settings,
+    monkeypatch: pytest.MonkeyPatch,
+) -> Generator[Path, None, None]:
+    """Give each test an isolated documents_dir so uploads never leak across tests or into var/."""
+    from kalyan_api.config import get_settings
+
+    docs_dir = tmp_path / "documents"
+    docs_dir.mkdir(parents=True, exist_ok=True)
+    monkeypatch.setenv("KALYAN_DOCUMENTS_DIR", str(docs_dir))
+    monkeypatch.setattr(test_settings, "documents_dir", docs_dir)
+    get_settings.cache_clear()
+    try:
+        yield docs_dir
+    finally:
+        get_settings.cache_clear()
 
 
 @pytest.fixture(scope="session")

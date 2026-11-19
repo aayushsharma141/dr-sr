@@ -265,3 +265,182 @@ def test_arrival_requires_priority_reason_and_existing_permissions(
     )
     assert denied.status_code == 403
 
+
+def test_cancel_arrival_cancels_with_reason_and_audit(
+    login_client, reception_user, doctor_a_user, db_session
+):
+    reception = login_client(reception_user)
+    created = reception.post("/api/opd-arrivals", json=_draft_payload(doctor_a_user))
+    assert created.status_code == 201
+    draft = created.json()
+
+    # Cancel requires at least 3 character reason
+    bad_reason = reception.post(
+        f"/api/opd-arrivals/{draft['id']}/cancel",
+        json={"version_id": draft["version_id"], "reason": "ab"},
+    )
+    assert bad_reason.status_code == 422
+
+    # Valid cancel
+    resp = reception.post(
+        f"/api/opd-arrivals/{draft['id']}/cancel",
+        json={"version_id": draft["version_id"], "reason": "Patient decided to leave"},
+    )
+    assert resp.status_code == 200, resp.text
+    cancelled = resp.json()
+    assert cancelled["status"] == "CANCELLED"
+    assert cancelled["cancellation_reason"] == "Patient decided to leave"
+    assert cancelled["priority_reason"] == "Needs preferential attention"
+
+    # Listed in arrivals as CANCELLED with cancellation_reason exposed and priority_reason preserved
+    today = app_clock.ist_today().isoformat()
+    listed = reception.get(f"/api/opd-arrivals?arrival_date={today}")
+    assert listed.status_code == 200
+    assert any(
+        a["id"] == draft["id"]
+        and a["status"] == "CANCELLED"
+        and a["cancellation_reason"] == "Patient decided to leave"
+        and a["priority_reason"] == "Needs preferential attention"
+        for a in listed.json()["arrivals"]
+    )
+
+
+def test_list_opd_arrivals_supports_doctor_filter_and_pagination(
+    clock, login_client, reception_user, doctor_a_user, doctor_b_user
+):
+    reception = login_client(reception_user)
+    a1 = reception.post(
+        "/api/opd-arrivals",
+        json=_draft_payload(doctor_a_user, full_name="Asha Devi", mobile="9876501001"),
+    )
+    a2 = reception.post(
+        "/api/opd-arrivals",
+        json=_draft_payload(doctor_a_user, full_name="Bina Kumari", mobile="9876501002"),
+    )
+    b1 = reception.post(
+        "/api/opd-arrivals",
+        json=_draft_payload(doctor_b_user, full_name="Chitra Devi", mobile="9876501003"),
+    )
+    assert a1.status_code == 201 and a2.status_code == 201 and b1.status_code == 201
+
+    today = app_clock.ist_today().isoformat()
+    filtered = reception.get(
+        f"/api/opd-arrivals?arrival_date={today}&doctor_id={doctor_a_user.doctor_id}&limit=1&offset=1"
+    )
+    assert filtered.status_code == 200, filtered.text
+    body = filtered.json()
+    assert body["total"] == 2
+    assert body["limit"] == 1
+    assert body["offset"] == 1
+    assert len(body["arrivals"]) == 1
+    assert body["arrivals"][0]["id"] == a2.json()["id"]
+    assert body["arrivals"][0]["doctor_id"] == doctor_a_user.doctor_id
+
+
+def test_create_opd_arrival_idempotency_replay_and_mismatch(
+    clock, login_client, reception_user, doctor_a_user, db_session
+):
+    reception = login_client(reception_user)
+    payload = _draft_payload(doctor_a_user, full_name="Meera Singh", mobile="9876502001")
+    idem_key = "opd-arrival-idem-key-0001"
+
+    first = reception.post(
+        "/api/opd-arrivals",
+        json=payload,
+        headers={"Idempotency-Key": idem_key},
+    )
+    assert first.status_code == 201, first.text
+
+    replay = reception.post(
+        "/api/opd-arrivals",
+        json=payload,
+        headers={"Idempotency-Key": idem_key},
+    )
+    assert replay.status_code == 201, replay.text
+    assert replay.json() == first.json()
+    assert (
+        db_session.scalar(
+            select(func.count())
+            .select_from(PendingOpdArrival)
+            .where(PendingOpdArrival.mobile == "9876502001")
+        )
+        == 1
+    )
+
+    mismatch = reception.post(
+        "/api/opd-arrivals",
+        json={**payload, "full_name": "Different Patient"},
+        headers={"Idempotency-Key": idem_key},
+    )
+    assert mismatch.status_code == 422
+    assert mismatch.json()["code"] == "idempotency_key_payload_mismatch"
+
+    bad_key = reception.post(
+        "/api/opd-arrivals",
+        json=_draft_payload(doctor_a_user, full_name="Other Patient", mobile="9876502002"),
+        headers={"Idempotency-Key": "short"},
+    )
+    assert bad_key.status_code == 422
+    assert bad_key.json()["code"] == "invalid_idempotency_key"
+
+
+def test_doctor_opd_arrivals_scoped_and_mutations_reception_only(
+    clock, login_client, reception_user, doctor_a_user, doctor_b_user
+):
+    reception = login_client(reception_user)
+    a_resp = reception.post(
+        "/api/opd-arrivals",
+        json=_draft_payload(doctor_a_user, full_name="Doc A Arrival", mobile="9876503001"),
+    )
+    b_resp = reception.post(
+        "/api/opd-arrivals",
+        json=_draft_payload(doctor_b_user, full_name="Doc B Arrival", mobile="9876503002"),
+    )
+    assert a_resp.status_code == 201 and b_resp.status_code == 201
+    a_draft = a_resp.json()
+    b_draft = b_resp.json()
+
+    today = app_clock.ist_today().isoformat()
+    doc_a = login_client(doctor_a_user)
+    doc_b = login_client(doctor_b_user)
+
+    # Doctor list is strictly scoped to own arrivals
+    own_list = doc_a.get(f"/api/opd-arrivals?arrival_date={today}")
+    assert own_list.status_code == 200, own_list.text
+    listed_ids = [item["id"] for item in own_list.json()["arrivals"]]
+    assert a_draft["id"] in listed_ids
+    assert b_draft["id"] not in listed_ids
+
+    # Doctor requesting another doctor's arrivals via query param is forbidden
+    cross_filter = doc_a.get(
+        f"/api/opd-arrivals?arrival_date={today}&doctor_id={doctor_b_user.doctor_id}"
+    )
+    assert cross_filter.status_code == 403
+    assert cross_filter.json()["code"] == "scope_forbidden"
+
+    # Detail read: own arrival succeeds, another doctor's arrival is 403 scope_forbidden
+    assert doc_a.get(f"/api/opd-arrivals/{a_draft['id']}").status_code == 200
+    cross_read = doc_b.get(f"/api/opd-arrivals/{a_draft['id']}")
+    assert cross_read.status_code == 403
+    assert cross_read.json()["code"] == "scope_forbidden"
+
+    # Priority & cancel mutations are strictly Reception-only (403 for any doctor)
+    for client_actor in (doc_a, doc_b):
+        prio = client_actor.patch(
+            f"/api/opd-arrivals/{a_draft['id']}/priority",
+            json={
+                "version_id": a_draft["version_id"],
+                "priority_level": "EMERGENCY",
+                "reason": "Doctor attempt to reprioritize",
+            },
+        )
+        assert prio.status_code == 403
+
+        cancel = client_actor.post(
+            f"/api/opd-arrivals/{a_draft['id']}/cancel",
+            json={
+                "version_id": a_draft["version_id"],
+                "reason": "Doctor attempt to cancel",
+            },
+        )
+        assert cancel.status_code == 403

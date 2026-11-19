@@ -130,7 +130,7 @@ export function AppointmentBookingModal({
                 {expectedTime ? ` · expected ${expectedTime}` : ''}
               </p>
               <p className="text-xs text-neutral-600 mt-3">
-                The queue token is issued when the patient arrives and is checked in at Check-in &amp; Token.
+                The queue token is issued when the patient arrives and is checked in at Appointments.
               </p>
             </div>
             <button

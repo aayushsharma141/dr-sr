@@ -2,7 +2,7 @@
 
 from datetime import date
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from kalyan_api import clock
@@ -18,6 +18,7 @@ from kalyan_api.models import (
     VisitKind,
 )
 from kalyan_api.schemas.opd_arrivals import (
+    OpdArrivalCancel,
     OpdArrivalCreate,
     OpdArrivalPriorityUpdate,
     OpdArrivalRegister,
@@ -157,17 +158,112 @@ def get_arrival(session: Session, arrival_id: int) -> PendingOpdArrival:
     return arrival
 
 
-def list_arrivals(session: Session, arrival_date: date) -> list[PendingOpdArrival]:
+def _arrivals_where(arrival_date: date, doctor_id: int | None):
+    clauses = [
+        PendingOpdArrival.appointment_date == arrival_date,
+        PendingOpdArrival.status.in_(["TO_ARRIVE", "CANCELLED"]),
+    ]
+    if doctor_id is not None:
+        clauses.append(PendingOpdArrival.doctor_id == doctor_id)
+    return clauses
+
+
+def list_arrivals(
+    session: Session,
+    arrival_date: date,
+    *,
+    doctor_id: int | None = None,
+) -> list[PendingOpdArrival]:
     return list(
         session.scalars(
             select(PendingOpdArrival)
-            .where(
-                PendingOpdArrival.appointment_date == arrival_date,
-                PendingOpdArrival.status == "TO_ARRIVE",
-            )
+            .where(*_arrivals_where(arrival_date, doctor_id))
             .order_by(PendingOpdArrival.token_number, PendingOpdArrival.id)
         )
     )
+
+
+def list_arrivals_page(
+    session: Session,
+    arrival_date: date,
+    *,
+    doctor_id: int | None = None,
+    limit: int = 500,
+    offset: int = 0,
+) -> tuple[list[PendingOpdArrival], int]:
+    clauses = _arrivals_where(arrival_date, doctor_id)
+    total = int(
+        session.scalar(select(func.count()).select_from(PendingOpdArrival).where(*clauses)) or 0
+    )
+    rows = list(
+        session.scalars(
+            select(PendingOpdArrival)
+            .where(*clauses)
+            .order_by(PendingOpdArrival.token_number, PendingOpdArrival.id)
+            .offset(offset)
+            .limit(limit)
+        )
+    )
+    return rows, total
+
+
+def cancel_arrival(
+    session: Session,
+    principal: Principal,
+    arrival_id: int,
+    payload: OpdArrivalCancel,
+    audit_context: AuditContext,
+) -> PendingOpdArrival:
+    arrival = session.scalar(
+        select(PendingOpdArrival)
+        .where(PendingOpdArrival.id == arrival_id)
+        .with_for_update(of=PendingOpdArrival)
+    )
+    if arrival is None or (
+        principal.doctor_id is not None and principal.doctor_id != arrival.doctor_id
+    ):
+        raise ApiError(
+            status_code=404, code="opd_arrival_not_found", message="OPD arrival not found."
+        )
+    require_version(arrival, payload.version_id, label="OPD arrival")
+    if arrival.status != "TO_ARRIVE":
+        raise ApiError(
+            status_code=409,
+            code="opd_arrival_not_active",
+            message="Only an active To Arrive entry can be cancelled.",
+        )
+    reason = payload.reason.strip()
+    if len(reason) < 3:
+        raise ApiError(
+            status_code=422,
+            code="cancellation_reason_required",
+            message="Enter a cancellation reason of at least 3 characters.",
+        )
+
+    previous_cancellation_reason = arrival.cancellation_reason
+    arrival.status = "CANCELLED"
+    arrival.cancellation_reason = reason
+    arrival.status_updated_at = clock.utcnow()
+    session.flush()
+    audit_service.record(
+        session,
+        audit_context,
+        AuditAction.OPD_ARRIVAL_CANCELLED,
+        "pending_opd_arrival",
+        arrival.id,
+        before={
+            "status": "TO_ARRIVE",
+            "cancellation_reason": previous_cancellation_reason,
+            "priority_reason": arrival.priority_reason,
+        },
+        after={
+            "status": "CANCELLED",
+            "cancellation_reason": arrival.cancellation_reason,
+            "priority_reason": arrival.priority_reason,
+        },
+        reason=reason,
+    )
+    return arrival
 
 
 def update_arrival_priority(
@@ -196,6 +292,7 @@ def update_arrival_priority(
             message="Priority can only be changed for an active To Arrive entry.",
         )
     old_level = arrival.priority_level
+    old_reason = arrival.priority_reason
     new_level = payload.priority_level.value
     reason = payload.reason.strip()
     if old_level == new_level:
@@ -220,8 +317,8 @@ def update_arrival_priority(
         AuditAction.OPD_ARRIVAL_PRIORITY_CHANGED,
         "pending_opd_arrival",
         arrival.id,
-        before={"priority_level": old_level},
-        after={"priority_level": new_level},
+        before={"priority_level": old_level, "priority_reason": old_reason},
+        after={"priority_level": new_level, "priority_reason": arrival.priority_reason},
         reason=reason,
     )
     return arrival

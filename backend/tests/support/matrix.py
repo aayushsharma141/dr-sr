@@ -203,6 +203,25 @@ def _patch_patient_payload(target: Any = None) -> dict[str, Any]:
     }
 
 
+def _create_allergy_payload(_target: Any = None) -> dict[str, Any]:
+    return {
+        "substance": "Penicillin",
+        "category": "DRUG",
+        "severity": "SEVERE",
+        "reaction": "Urticaria",
+        "clinical_notes": "Matrix allergy test",
+    }
+
+
+def _patch_allergy_payload(target: Any = None) -> dict[str, Any]:
+    ver = target.version_id if target and hasattr(target, "version_id") else 1
+    return {
+        "version_id": ver,
+        "severity": "MODERATE",
+        "status": "INACTIVE",
+    }
+
+
 def _create_department_payload(target: Any = None) -> dict[str, Any]:
     return {
         "name_en": f"New Dept {uuid.uuid4().hex[:6]}",
@@ -455,6 +474,14 @@ def _reverse_payment_payload(_target: Any = None) -> dict[str, Any]:
     }
 
 
+def _refund_payment_payload(_target: Any = None) -> dict[str, Any]:
+    return {
+        "amount_paise": 10000,
+        "refund_method": "CASH",
+        "reason": "Matrix admin partial refund test",
+    }
+
+
 def _create_backup_payload(_target: Any = None) -> dict[str, Any]:
     return {"label": "matrix_test"}
 
@@ -554,6 +581,86 @@ def _cancel_prescription_payload(_target: Any = None) -> dict[str, Any]:
     }
 
 
+def _amend_prescription_payload(_target: Any = None) -> dict[str, Any]:
+    return {
+        "amendment_reason": "Dose adjustment after clinical review",
+        "diagnosis": "Matrix Amended Diagnosis",
+        "items": [
+            {
+                "item_order": 1,
+                "medicine_name": "Paracetamol 650mg",
+                "dosage": "1 tablet",
+                "frequency": "BD",
+                "duration_days": 5,
+            }
+        ],
+        "authorise_immediately": True,
+    }
+
+
+def _create_condition_payload(_target: Any = None) -> dict[str, Any]:
+    return {
+        "condition_name": "Essential Hypertension",
+        "icd10_code": "I10",
+        "status": "ACTIVE",
+        "notes": "Matrix condition test",
+    }
+
+
+def _patch_condition_payload(target: Any = None) -> dict[str, Any]:
+    ver = target.version_id if target and hasattr(target, "version_id") else 1
+    return {
+        "version_id": ver,
+        "status": "RESOLVED",
+        "notes": "Matrix condition resolved",
+    }
+
+
+def _create_diagnosis_payload(_target: Any = None) -> dict[str, Any]:
+    return {
+        "diagnosis_name": "Lumbar Strain",
+        "icd10_code": "S39.012",
+        "diagnosis_type": "PRIMARY",
+        "status": "ACTIVE",
+        "notes": "Matrix diagnosis test",
+    }
+
+
+def _patch_diagnosis_payload(_target: Any = None) -> dict[str, Any]:
+    return {
+        "diagnosis_type": "SECONDARY",
+        "status": "RESOLVED",
+        "notes": "Matrix diagnosis updated",
+    }
+
+
+def _create_investigation_order_payload(_target: Any = None) -> dict[str, Any]:
+    return {
+        "category": "LAB",
+        "test_name": "Complete Blood Count",
+        "priority": "ROUTINE",
+        "instructions": "Fasting not required",
+    }
+
+
+def _patch_investigation_status_payload(target: Any = None) -> dict[str, Any]:
+    ver = target.version_id if target and hasattr(target, "version_id") else 1
+    return {
+        "status": "SAMPLE_COLLECTED",
+        "version_id": ver,
+    }
+
+
+def _create_investigation_result_payload(_target: Any = None) -> dict[str, Any]:
+    return {
+        "summary_text": "Hemoglobin within normal limits",
+        "result_value": "13.8",
+        "unit": "g/dL",
+        "reference_range": "13.0-17.0",
+        "is_abnormal": False,
+    }
+
+
 def _merge_patients_payload(target: Any = None) -> dict[str, Any]:
     master_id = getattr(target, "master_id", 1)
     secondary_id = getattr(target, "secondary_id", 2)
@@ -636,6 +743,19 @@ def _register_opd_arrival_payload(target: Any = None) -> dict[str, Any]:
             "district": "Bhojpur",
             "state": "Bihar",
         },
+    }
+
+
+def _create_quick_phrase_payload(_target: Any = None) -> dict[str, Any]:
+    return {
+        "phrase_text": f"Matrix quick phrase {uuid.uuid4().hex[:6]}",
+        "section": "COMPLAINTS",
+    }
+
+
+def _patch_quick_phrase_payload(_target: Any = None) -> dict[str, Any]:
+    return {
+        "phrase_text": f"Updated matrix phrase {uuid.uuid4().hex[:6]}",
     }
 
 
@@ -812,6 +932,43 @@ MATRIX: list[MatrixRow] = [
             "doctor_b": 403,
         },
     ),
+    # Patient Records Overhaul (M3): Append-Only Financial Ledger & Admin Refunds
+    MatrixRow(
+        method="GET",
+        path="/api/patients/{patient_id}/ledger",
+        body_factory=None,
+        expected={
+            "anonymous": 401,
+            "admin": 200,
+            "reception": 200,
+            "doctor_a": 403,
+            "doctor_b": 403,
+        },
+    ),
+    MatrixRow(
+        method="GET",
+        path="/api/patients/{patient_id}/refunds",
+        body_factory=None,
+        expected={
+            "anonymous": 401,
+            "admin": 200,
+            "reception": 200,
+            "doctor_a": 403,
+            "doctor_b": 403,
+        },
+    ),
+    MatrixRow(
+        method="POST",
+        path="/api/payments/{payment_id}/refunds",
+        body_factory=_refund_payment_payload,
+        expected={
+            "anonymous": 401,
+            "admin": 201,
+            "reception": 403,
+            "doctor_a": 403,
+            "doctor_b": 403,
+        },
+    ),
     MatrixRow(
         method="GET",
         path="/api/patients/{patient_id}/timeline",
@@ -887,6 +1044,18 @@ MATRIX: list[MatrixRow] = [
     MatrixRow(
         method="GET",
         path="/api/doctor/overview",
+        body_factory=None,
+        expected={
+            "anonymous": 401,
+            "admin": 403,
+            "reception": 403,
+            "doctor_a": 200,
+            "doctor_b": 200,
+        },
+    ),
+    MatrixRow(
+        method="GET",
+        path="/api/doctor/dashboard/summary",
         body_factory=None,
         expected={
             "anonymous": 401,
@@ -1238,10 +1407,71 @@ MATRIX: list[MatrixRow] = [
         body_factory=None,
         expected={
             "anonymous": 401,
-            "admin": 403,
+            "admin": 200,
             "reception": 200,
-            "doctor_a": 403,
-            "doctor_b": 403,
+            "doctor_a": 200,
+            "doctor_b": 200,
+        },
+    ),
+    # Patient Records Overhaul (M1): Workspace Summary, Visits & Clinical Allergies
+    MatrixRow(
+        method="GET",
+        path="/api/patients/{patient_id}/summary",
+        body_factory=None,
+        expected={
+            "anonymous": 401,
+            "admin": 200,
+            "reception": 200,
+            "doctor_a": 200,
+            "doctor_b": 200,
+        },
+    ),
+    MatrixRow(
+        method="GET",
+        path="/api/patients/{patient_id}/visits",
+        body_factory=None,
+        expected={
+            "anonymous": 401,
+            "admin": 200,
+            "reception": 200,
+            "doctor_a": 200,
+            "doctor_b": 200,
+        },
+    ),
+    MatrixRow(
+        method="GET",
+        path="/api/patients/{patient_id}/allergies",
+        body_factory=None,
+        expected={
+            "anonymous": 401,
+            "admin": 403,
+            "reception": 403,
+            "doctor_a": 200,
+            "doctor_b": 200,
+        },
+    ),
+    MatrixRow(
+        method="POST",
+        path="/api/patients/{patient_id}/allergies",
+        body_factory=_create_allergy_payload,
+        expected={
+            "anonymous": 401,
+            "admin": 403,
+            "reception": 403,
+            "doctor_a": 201,
+            "doctor_b": 201,
+        },
+    ),
+    MatrixRow(
+        method="PATCH",
+        path="/api/patients/{patient_id}/allergies/{allergy_id}",
+        body_factory=_patch_allergy_payload,
+        expected={
+            "anonymous": 401,
+            "admin": 403,
+            "reception": 403,
+            "doctor_a": 200,
+            "doctor_b": 200,
         },
     ),
     MatrixRow(
@@ -1796,8 +2026,8 @@ MATRIX: list[MatrixRow] = [
             "anonymous": 401,
             "admin": 403,
             "reception": 200,
-            "doctor_a": 200,
-            "doctor_b": 200,
+            "doctor_a": 403,
+            "doctor_b": 403,
         },
     ),
     MatrixRow(
@@ -1809,7 +2039,7 @@ MATRIX: list[MatrixRow] = [
             "admin": 403,
             "reception": 200,
             "doctor_a": 200,
-            "doctor_b": 200,
+            "doctor_b": 404,
         },
     ),
     MatrixRow(
@@ -1827,6 +2057,18 @@ MATRIX: list[MatrixRow] = [
     MatrixRow(
         method="GET",
         path="/api/prescriptions/follow-ups",
+        body_factory=None,
+        expected={
+            "anonymous": 401,
+            "admin": 403,
+            "reception": 403,
+            "doctor_a": 200,
+            "doctor_b": 200,
+        },
+    ),
+    MatrixRow(
+        method="GET",
+        path="/api/encounters/{encounter_id}/prescription",
         body_factory=None,
         expected={
             "anonymous": 401,
@@ -1887,6 +2129,18 @@ MATRIX: list[MatrixRow] = [
     MatrixRow(
         method="GET",
         path="/api/patients/{patient_id}/prescriptions",
+        body_factory=None,
+        expected={
+            "anonymous": 401,
+            "admin": 403,
+            "reception": 403,
+            "doctor_a": 200,
+            "doctor_b": 200,
+        },
+    ),
+    MatrixRow(
+        method="GET",
+        path="/api/treatment-plans",
         body_factory=None,
         expected={
             "anonymous": 401,
@@ -2617,7 +2871,7 @@ MATRIX: list[MatrixRow] = [
             "admin": 200,
             "reception": 200,
             "doctor_a": 200,
-            "doctor_b": 200,
+            "doctor_b": 403,
         },
     ),
     MatrixRow(
@@ -2628,8 +2882,8 @@ MATRIX: list[MatrixRow] = [
             "anonymous": 401,
             "admin": 403,
             "reception": 200,
-            "doctor_a": 200,
-            "doctor_b": 404,
+            "doctor_a": 403,
+            "doctor_b": 403,
         },
     ),
     MatrixRow(
@@ -2640,8 +2894,8 @@ MATRIX: list[MatrixRow] = [
             "anonymous": 401,
             "admin": 403,
             "reception": 200,
-            "doctor_a": 200,
-            "doctor_b": 404,
+            "doctor_a": 403,
+            "doctor_b": 403,
         },
     ),
     MatrixRow(
@@ -2683,7 +2937,7 @@ MATRIX: list[MatrixRow] = [
     ),
     MatrixRow(
         method="GET",
-        path="/api/system/workstations",
+        path="/api/admin/workstations",
         body_factory=None,
         expected={
             "anonymous": 401,
@@ -2693,16 +2947,271 @@ MATRIX: list[MatrixRow] = [
             "doctor_b": 403,
         },
     ),
+    # Patient Records Overhaul (M2): Diagnoses, Longitudinal Conditions, Investigations & Rx Amend
     MatrixRow(
         method="GET",
-        path="/api/admin/workstations",
+        path="/api/patients/{patient_id}/conditions",
+        body_factory=None,
+        expected={
+            "anonymous": 401,
+            "admin": 403,
+            "reception": 403,
+            "doctor_a": 200,
+            "doctor_b": 200,
+        },
+    ),
+    MatrixRow(
+        method="POST",
+        path="/api/patients/{patient_id}/conditions",
+        body_factory=_create_condition_payload,
+        expected={
+            "anonymous": 401,
+            "admin": 403,
+            "reception": 403,
+            "doctor_a": 201,
+            "doctor_b": 201,
+        },
+    ),
+    MatrixRow(
+        method="PATCH",
+        path="/api/patients/{patient_id}/conditions/{condition_id}",
+        body_factory=_patch_condition_payload,
+        expected={
+            "anonymous": 401,
+            "admin": 403,
+            "reception": 403,
+            "doctor_a": 200,
+            "doctor_b": 404,
+        },
+    ),
+    MatrixRow(
+        method="GET",
+        path="/api/encounters/{encounter_id}/diagnoses",
+        body_factory=None,
+        expected={
+            "anonymous": 401,
+            "admin": 403,
+            "reception": 403,
+            "doctor_a": 200,
+            "doctor_b": 200,
+        },
+    ),
+    MatrixRow(
+        method="POST",
+        path="/api/encounters/{encounter_id}/diagnoses",
+        body_factory=_create_diagnosis_payload,
+        expected={
+            "anonymous": 401,
+            "admin": 403,
+            "reception": 403,
+            "doctor_a": 201,
+            "doctor_b": 404,
+        },
+    ),
+    MatrixRow(
+        method="PATCH",
+        path="/api/encounters/{encounter_id}/diagnoses/{diagnosis_id}",
+        body_factory=_patch_diagnosis_payload,
+        expected={
+            "anonymous": 401,
+            "admin": 403,
+            "reception": 403,
+            "doctor_a": 200,
+            "doctor_b": 404,
+        },
+    ),
+    MatrixRow(
+        method="DELETE",
+        path="/api/encounters/{encounter_id}/diagnoses/{diagnosis_id}",
+        body_factory=None,
+        expected={
+            "anonymous": 401,
+            "admin": 403,
+            "reception": 403,
+            "doctor_a": 204,
+            "doctor_b": 404,
+        },
+    ),
+    MatrixRow(
+        method="POST",
+        path="/api/encounters/{encounter_id}/investigations",
+        body_factory=_create_investigation_order_payload,
+        expected={
+            "anonymous": 401,
+            "admin": 403,
+            "reception": 403,
+            "doctor_a": 201,
+            "doctor_b": 404,
+        },
+    ),
+    MatrixRow(
+        method="GET",
+        path="/api/encounters/{encounter_id}/investigations",
+        body_factory=None,
+        expected={
+            "anonymous": 401,
+            "admin": 403,
+            "reception": 403,
+            "doctor_a": 200,
+            "doctor_b": 200,
+        },
+    ),
+    MatrixRow(
+        method="GET",
+        path="/api/patients/{patient_id}/investigations",
+        body_factory=None,
+        expected={
+            "anonymous": 401,
+            "admin": 403,
+            "reception": 403,
+            "doctor_a": 200,
+            "doctor_b": 200,
+        },
+    ),
+    MatrixRow(
+        method="PATCH",
+        path="/api/investigations/{order_id}/status",
+        body_factory=_patch_investigation_status_payload,
+        expected={
+            "anonymous": 401,
+            "admin": 403,
+            "reception": 403,
+            "doctor_a": 200,
+            "doctor_b": 404,
+        },
+    ),
+    MatrixRow(
+        method="POST",
+        path="/api/investigations/{order_id}/results",
+        body_factory=_create_investigation_result_payload,
+        expected={
+            "anonymous": 401,
+            "admin": 403,
+            "reception": 403,
+            "doctor_a": 201,
+            "doctor_b": 404,
+        },
+    ),
+    MatrixRow(
+        method="POST",
+        path="/api/prescriptions/{id}/amend",
+        body_factory=_amend_prescription_payload,
+        expected={
+            "anonymous": 401,
+            "admin": 403,
+            "reception": 403,
+            "doctor_a": 201,
+            "doctor_b": 404,
+        },
+    ),
+    # Milestone 4: Patient Documents & Unified Visit Workspace
+    MatrixRow(
+        method="POST",
+        path="/api/patients/{patient_id}/documents",
+        body_factory=None,
+        expected={
+            "anonymous": 401,
+            "admin": 403,
+            "reception": 201,
+            "doctor_a": 201,
+            "doctor_b": 201,
+        },
+    ),
+    MatrixRow(
+        method="GET",
+        path="/api/patients/{patient_id}/documents",
         body_factory=None,
         expected={
             "anonymous": 401,
             "admin": 200,
+            "reception": 200,
+            "doctor_a": 200,
+            "doctor_b": 200,
+        },
+    ),
+    MatrixRow(
+        method="GET",
+        path="/api/documents/{document_id}/download",
+        body_factory=None,
+        expected={
+            "anonymous": 401,
+            "admin": 200,
+            "reception": 200,
+            "doctor_a": 200,
+            "doctor_b": 200,
+        },
+    ),
+    MatrixRow(
+        method="POST",
+        path="/api/documents/{document_id}/archive",
+        body_factory=None,
+        expected={
+            "anonymous": 401,
+            "admin": 403,
+            "reception": 200,
+            "doctor_a": 200,
+            "doctor_b": 200,
+        },
+    ),
+    MatrixRow(
+        method="GET",
+        path="/api/patients/{patient_id}/visits/{visit_id}/workspace",
+        body_factory=None,
+        expected={
+            "anonymous": 401,
+            "admin": 200,
+            "reception": 200,
+            "doctor_a": 200,
+            "doctor_b": 200,
+        },
+    ),
+    # Doctor Workspace Phase 3: Persistent Clinical Quick Phrases
+    MatrixRow(
+        method="GET",
+        path="/api/quick-phrases",
+        body_factory=None,
+        expected={
+            "anonymous": 401,
+            "admin": 403,
             "reception": 403,
-            "doctor_a": 403,
-            "doctor_b": 403,
+            "doctor_a": 200,
+            "doctor_b": 200,
+        },
+    ),
+    MatrixRow(
+        method="POST",
+        path="/api/quick-phrases",
+        body_factory=_create_quick_phrase_payload,
+        expected={
+            "anonymous": 401,
+            "admin": 403,
+            "reception": 403,
+            "doctor_a": 201,
+            "doctor_b": 201,
+        },
+    ),
+    MatrixRow(
+        method="PATCH",
+        path="/api/quick-phrases/{id}",
+        body_factory=_patch_quick_phrase_payload,
+        expected={
+            "anonymous": 401,
+            "admin": 403,
+            "reception": 403,
+            "doctor_a": 200,
+            "doctor_b": 404,
+        },
+    ),
+    MatrixRow(
+        method="DELETE",
+        path="/api/quick-phrases/{id}",
+        body_factory=None,
+        expected={
+            "anonymous": 401,
+            "admin": 403,
+            "reception": 403,
+            "doctor_a": 204,
+            "doctor_b": 404,
         },
     ),
 ]

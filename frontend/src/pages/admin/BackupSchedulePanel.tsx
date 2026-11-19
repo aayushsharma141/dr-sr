@@ -5,6 +5,7 @@ import type { BackupRunOut, BackupSettingsOut } from '../../api/types'
 import { ConflictBanner } from '../../components/ConflictBanner'
 import { TableSkeleton } from '../../components/AdminSkeleton'
 import { InlineAlert } from '../../components/InlineAlert'
+import { toast } from '../../components/ToastHost'
 
 // Admin module 11. The Windows scheduled task reads these settings every 15 minutes. Backups stay
 // off until the schedule is enabled, and retention only ever removes scheduled archives.
@@ -50,22 +51,17 @@ function ScheduleForm({ settings, onReload, isReloading }: { settings: BackupSet
   const update = useUpdateBackupSettings()
   const [form, setForm] = useState<FormState>(() => toForm(settings))
   const [reason, setReason] = useState('')
-  const [error, setError] = useState<string | null>(null)
-  const [saved, setSaved] = useState(false)
   const [conflict, setConflict] = useState(false)
 
   const retentionValue = form.retention === '' ? null : Number(form.retention)
   const retentionOk = retentionValue === null || (Number.isInteger(retentionValue) && retentionValue >= 1)
   const canSave = reason.trim().length >= REASON_MIN_LENGTH && retentionOk && !update.isPending
   const set = <K extends keyof FormState>(key: K, value: FormState[K]) => {
-    setSaved(false)
     setForm((f) => ({ ...f, [key]: value }))
   }
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault()
-    setError(null)
-    setSaved(false)
     try {
       const updated = await update.mutateAsync({
         version_id: settings.version_id,
@@ -79,12 +75,12 @@ function ScheduleForm({ settings, onReload, isReloading }: { settings: BackupSet
       })
       setForm(toForm(updated))
       setReason('')
-      setSaved(true)
+      toast.success('Backup schedule saved.')
     } catch (err) {
       if (err instanceof ApiError && err.status === 409) {
         setConflict(true)
       } else {
-        setError(err instanceof Error ? err.message : 'Could not save the backup schedule.')
+        toast.error(err instanceof Error ? err.message : 'Could not save the backup schedule.')
       }
     }
   }
@@ -92,16 +88,6 @@ function ScheduleForm({ settings, onReload, isReloading }: { settings: BackupSet
   return (
     <form onSubmit={(e) => void handleSubmit(e)} className="mt-4 space-y-4">
       {conflict && <ConflictBanner onReload={onReload} isReloading={isReloading} />}
-      {error && (
-        <InlineAlert tone="error" onDismiss={() => setError(null)}>
-          {error}
-        </InlineAlert>
-      )}
-      {saved && (
-        <InlineAlert tone="success" onDismiss={() => setSaved(false)}>
-          Backup schedule saved.
-        </InlineAlert>
-      )}
       <label className="flex min-h-11 items-center gap-2 text-sm font-semibold text-slate-900">
         <input type="checkbox" checked={form.enabled} onChange={(e) => set('enabled', e.target.checked)} className="h-5 w-5" />
         Run scheduled backups

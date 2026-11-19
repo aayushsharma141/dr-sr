@@ -2,6 +2,7 @@
 
 import re
 from datetime import datetime
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
@@ -33,6 +34,7 @@ class ClinicSettingsOut(BaseModel):
     print_footer_en: str | None = None
     print_footer_hi: str | None = None
     consultation_validity_days: int
+    token_reset_policy: Literal["DAILY"] = "DAILY"  # noqa: S105
     version_id: int
     created_at: datetime
     updated_at: datetime
@@ -64,6 +66,7 @@ class ClinicSettingsUpdate(BaseModel):
     print_footer_en: str | None = Field(default=None, max_length=1000)
     print_footer_hi: str | None = Field(default=None, max_length=1000)
     consultation_validity_days: int = Field(ge=1, le=365)
+    token_reset_policy: Literal["DAILY"] | None = None
     version_id: int = Field(ge=1)
     confirm_receipt_cycle_change: bool = False
     change_reason: str | None = Field(default=None, max_length=500)

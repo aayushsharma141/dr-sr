@@ -21,9 +21,9 @@ export interface ModalProps {
 }
 
 const VARIANT_STYLE: Record<ModalVariant, { label: string; bar: string; text: string }> = {
-  info: { label: 'Information', bar: 'bg-blue-700', text: 'text-blue-900' },
+  info: { label: 'Information', bar: 'bg-brand-700', text: 'text-brand-900' },
   success: { label: 'Success', bar: 'bg-emerald-700', text: 'text-emerald-900' },
-  warning: { label: 'Warning', bar: 'bg-amber-600', text: 'text-amber-900' },
+  warning: { label: 'Warning', bar: 'bg-amber-700', text: 'text-amber-900' },
   error: { label: 'Error', bar: 'bg-red-700', text: 'text-red-900' },
   destructive: { label: 'Confirm action', bar: 'bg-red-800', text: 'text-red-900' },
 }
@@ -112,28 +112,28 @@ export function Modal({
       onClick={handleClick}
       // m-auto: preflight margin:0 would un-centre it. pointer-events-auto: usable over an open Radix Sheet.
       // max-h + overflow: long English or Hindi content scrolls inside the dialog, never off screen.
-      className={`pointer-events-auto m-auto flex max-h-[calc(100dvh-2rem)] w-full flex-col rounded-xl bg-white p-0 text-neutral-900 shadow-2xl backdrop:bg-black/50 ${print ? 'print-portal ' : ''}${className}`}
+      className={`pointer-events-auto m-auto flex max-h-[calc(100dvh-2rem)] w-full flex-col rounded-xl border border-slate-200 bg-white p-0 text-neutral-900 shadow-lg backdrop:bg-slate-900/40 backdrop:backdrop-blur-[3px] ${print ? 'print-portal ' : ''}${className}`}
     >
       {open && (
         <div className="flex min-h-0 flex-col print:block">
           <div className={`h-1.5 shrink-0 rounded-t-xl ${style.bar} print:hidden`} aria-hidden="true" />
-          <div className="flex items-start justify-between gap-4 border-b border-neutral-200 px-6 pb-3 pt-4 print:hidden">
-            <div className="min-w-0 break-words">
-              <p className={`text-xs font-semibold uppercase tracking-wide ${style.text}`}>{style.label}</p>
-              <h2 id={titleId} className="text-lg font-bold">{title}</h2>
-              {description && <p id={descId} className="text-sm text-neutral-600">{description}</p>}
+          <div className="flex items-start justify-between gap-4 border-b border-neutral-200 px-6 pb-4 pt-5 print:hidden">
+            <div className="min-w-0 space-y-1 break-words">
+              <p className={`text-xs font-semibold uppercase tracking-wider leading-none ${style.text}`}>{style.label}</p>
+              <h2 id={titleId} className="text-lg font-bold leading-snug tracking-tight">{title}</h2>
+              {description && <p id={descId} className="text-sm leading-relaxed text-neutral-600">{description}</p>}
             </div>
             <button
               type="button"
               aria-label="Close"
               disabled={busy}
               onClick={() => onClose()}
-              className="shrink-0 rounded p-2 text-neutral-700 hover:bg-neutral-100 disabled:opacity-50 cursor-pointer"
+              className="-mr-1.5 -mt-1 inline-flex min-h-[36px] min-w-[36px] shrink-0 items-center justify-center rounded-lg text-sm leading-none text-neutral-700 transition-colors hover:bg-neutral-100 disabled:opacity-50 cursor-pointer"
             >
               {'✕'}
             </button>
           </div>
-          <div className="min-h-0 overflow-y-auto break-words px-6 pb-6 pt-4 print:overflow-visible print:p-0">{children}</div>
+          <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain break-words px-6 py-5 print:overflow-visible print:p-0">{children}</div>
         </div>
       )}
     </dialog>

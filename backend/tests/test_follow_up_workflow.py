@@ -388,3 +388,195 @@ def test_follow_up_booking_prefers_the_encounter_department(
     assert resp.status_code == 200, resp.text
     appt = db_session.get(Appointment, resp.json()["booked_appointment_id"])
     assert appt.department_id == eye.id
+
+
+# ---------------------------------------------------------------------------
+# Phase 4 RBAC & workflow hardening (C7 + T4.2 finalise-then-follow-up order)
+# ---------------------------------------------------------------------------
+
+
+def test_doctor_cannot_book_follow_up_recommendation(
+    login_client, doctor_a_user, doctor_b_user, db_session
+):
+    """Only reception may book appointments from follow-up recommendations (403 reception_only)."""
+    patient, _encounter, rec_id = _pending_recommendation(
+        login_client, doctor_a_user, db_session, "21"
+    )
+
+    doc_a_resp = login_client(doctor_a_user).post(f"/api/follow-ups/{rec_id}/book", json={})
+    assert doc_a_resp.status_code == 403, doc_a_resp.text
+    assert doc_a_resp.json()["code"] == "reception_only"
+
+    doc_b_resp = login_client(doctor_b_user).post(f"/api/follow-ups/{rec_id}/book", json={})
+    assert doc_b_resp.status_code == 403, doc_b_resp.text
+    assert doc_b_resp.json()["code"] == "reception_only"
+
+    _assert_not_booked(db_session, rec_id, patient.id)
+
+
+def test_reception_follow_ups_scoping_for_doctors_reception_and_admin(
+    login_client, admin_user, reception_user, doctor_a_user, doctor_b_user, db_session
+):
+    """Doctors only see recommendations where they are authoring or recommended doctor;
+    Reception and Admin see all recommendations with clinical_reason strictly omitted."""
+    pat_a = _create_test_patient(db_session, "22")
+    pat_b = _create_test_patient(db_session, "23")
+    pat_ref = _create_test_patient(db_session, "24")
+
+    enc_a = _create_test_encounter(db_session, pat_a.id, doctor_a_user.doctor_id, doctor_a_user.id)
+    enc_b = _create_test_encounter(db_session, pat_b.id, doctor_b_user.doctor_id, doctor_b_user.id)
+    enc_ref = _create_test_encounter(
+        db_session, pat_ref.id, doctor_a_user.doctor_id, doctor_a_user.id
+    )
+
+    doc_a = login_client(doctor_a_user)
+    doc_b = login_client(doctor_b_user)
+    rec_client = login_client(reception_user)
+    admin_client = login_client(admin_user)
+
+    target_date = (ist_today() + timedelta(days=7)).isoformat()
+    secret_a = "PRIVATE-A: Reassess rotator cuff tear MRI"
+    secret_b = "PRIVATE-B: Reassess optic disc cupping"
+
+    rec_a_id = doc_a.post(
+        f"/api/encounters/{enc_a.id}/follow-up",
+        json={"recommended_date": target_date, "clinical_reason": secret_a},
+    ).json()["id"]
+    rec_b_id = doc_b.post(
+        f"/api/encounters/{enc_b.id}/follow-up",
+        json={"recommended_date": target_date, "clinical_reason": secret_b},
+    ).json()["id"]
+    rec_ref_id = doc_a.post(
+        f"/api/encounters/{enc_ref.id}/follow-up",
+        json={
+            "recommended_date": target_date,
+            "recommended_doctor_id": doctor_b_user.doctor_id,
+            "clinical_reason": "Cross-specialty referral to Doctor B",
+        },
+    ).json()["id"]
+
+    # Doctor A sees own recommendation and cross-referral authored by A, NOT Doctor B's own
+    doc_a_resp = doc_a.get("/api/reception/follow-ups")
+    assert doc_a_resp.status_code == 200, doc_a_resp.text
+    doc_a_ids = {row["id"] for row in doc_a_resp.json()}
+    assert rec_a_id in doc_a_ids
+    assert rec_ref_id in doc_a_ids
+    assert rec_b_id not in doc_a_ids
+    assert all("clinical_reason" not in row for row in doc_a_resp.json())
+
+    # Doctor B sees own recommendation and cross-referral addressed to B, NOT Doctor A's own
+    doc_b_resp = doc_b.get("/api/reception/follow-ups")
+    assert doc_b_resp.status_code == 200, doc_b_resp.text
+    doc_b_ids = {row["id"] for row in doc_b_resp.json()}
+    assert rec_b_id in doc_b_ids
+    assert rec_ref_id in doc_b_ids
+    assert rec_a_id not in doc_b_ids
+    assert all("clinical_reason" not in row for row in doc_b_resp.json())
+
+    # Reception sees all recommendations with clinical_reason strictly omitted
+    rec_resp = rec_client.get("/api/reception/follow-ups")
+    assert rec_resp.status_code == 200, rec_resp.text
+    rec_ids = {row["id"] for row in rec_resp.json()}
+    assert {rec_a_id, rec_b_id, rec_ref_id}.issubset(rec_ids)
+    assert all("clinical_reason" not in row for row in rec_resp.json())
+    assert secret_a not in rec_resp.text
+    assert secret_b not in rec_resp.text
+
+    # Admin also sees all recommendations with clinical_reason strictly omitted
+    adm_resp = admin_client.get("/api/reception/follow-ups")
+    assert adm_resp.status_code == 200, adm_resp.text
+    adm_ids = {row["id"] for row in adm_resp.json()}
+    assert {rec_a_id, rec_b_id, rec_ref_id}.issubset(adm_ids)
+    assert all("clinical_reason" not in row for row in adm_resp.json())
+    assert secret_a not in adm_resp.text
+    assert secret_b not in adm_resp.text
+
+
+def test_doctor_close_follow_up_scoping_and_cross_doctor_404(
+    login_client, doctor_a_user, doctor_b_user, db_session
+):
+    """Doctors can close own/recommended PENDING follow-ups; cross-doctor close returns 404."""
+    _pat_a, _enc_a, rec_a_id = _pending_recommendation(
+        login_client, doctor_a_user, db_session, "25"
+    )
+
+    doc_a = login_client(doctor_a_user)
+    doc_b = login_client(doctor_b_user)
+
+    # Doctor B cannot close Doctor A's recommendation -> 404 anti-enumeration
+    cross_close = doc_b.post(
+        f"/api/follow-ups/{rec_a_id}/close",
+        json={"reason": "Attempted cross-doctor closure"},
+    )
+    assert cross_close.status_code == 404, cross_close.text
+    assert cross_close.json()["code"] == "follow_up_not_found"
+
+    db_session.expire_all()
+    assert db_session.get(FollowUpRecommendation, rec_a_id).status == "PENDING"
+
+    # Doctor A can close own PENDING recommendation -> 200 CLOSED
+    own_close = doc_a.post(
+        f"/api/follow-ups/{rec_a_id}/close",
+        json={"reason": "Symptoms resolved during phone review"},
+    )
+    assert own_close.status_code == 200, own_close.text
+    assert own_close.json()["status"] == "CLOSED"
+
+    # Recommended doctor (Doctor B) can also close a referral addressed to them -> 200 CLOSED
+    pat_ref = _create_test_patient(db_session, "26")
+    enc_ref = _create_test_encounter(
+        db_session, pat_ref.id, doctor_a_user.doctor_id, doctor_a_user.id
+    )
+    ref_create = doc_a.post(
+        f"/api/encounters/{enc_ref.id}/follow-up",
+        json={
+            "recommended_date": (ist_today() + timedelta(days=5)).isoformat(),
+            "recommended_doctor_id": doctor_b_user.doctor_id,
+            "clinical_reason": "Ophthalmology evaluation",
+        },
+    )
+    assert ref_create.status_code == 201, ref_create.text
+    ref_id = ref_create.json()["id"]
+
+    rec_doc_close = doc_b.post(
+        f"/api/follow-ups/{ref_id}/close",
+        json={"reason": "Patient already evaluated in separate clinic visit"},
+    )
+    assert rec_doc_close.status_code == 200, rec_doc_close.text
+    assert rec_doc_close.json()["status"] == "CLOSED"
+
+
+def test_create_follow_up_on_finalised_encounter_succeeds(
+    login_client, doctor_a_user, db_session
+):
+    """Creating a follow-up recommendation after encounter finalisation succeeds (201)."""
+    patient = _create_test_patient(db_session, "27")
+    encounter = _create_test_encounter(
+        db_session, patient.id, doctor_a_user.doctor_id, doctor_a_user.id
+    )
+    doc_a = login_client(doctor_a_user)
+
+    finalise_resp = doc_a.post(
+        f"/api/encounters/{encounter.id}/finalise",
+        json={
+            "version_id": encounter.version_id,
+            "symptoms": "Bilateral knee pain, crepitus",
+            "diagnosis": "Knee Osteoarthritis Grade 2",
+        },
+    )
+    assert finalise_resp.status_code == 200, finalise_resp.text
+    assert finalise_resp.json()["is_finalised"] is True
+
+    target_date = (ist_today() + timedelta(days=14)).isoformat()
+    fu_resp = doc_a.post(
+        f"/api/encounters/{encounter.id}/follow-up",
+        json={
+            "recommended_date": target_date,
+            "clinical_reason": "Post-finalisation physiotherapy reassessment",
+        },
+    )
+    assert fu_resp.status_code == 201, fu_resp.text
+    fu_data = fu_resp.json()
+    assert fu_data["encounter_id"] == encounter.id
+    assert fu_data["status"] == "PENDING"
+    assert fu_data["recommended_date"] == target_date

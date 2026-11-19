@@ -5,6 +5,7 @@ import type { SecurityPolicyField, SecurityPolicyOut } from '../../api/types'
 import { ConflictBanner } from '../../components/ConflictBanner'
 import { InlineAlert } from '../../components/InlineAlert'
 import { Modal } from '../../components/Modal'
+import { toast } from '../../components/ToastHost'
 
 // Admin module 09. The server only accepts tighter values than its installed baseline, so the
 // form shows the allowed range for each field and the server re-checks every value.
@@ -74,6 +75,7 @@ export function SecurityPolicyEditor({ policy, onClose }: { policy: SecurityPoli
         password_min_length: Number(values.password_min_length),
         reason: reason.trim(),
       })
+      toast.success('Security policy updated.')
       onClose()
     } catch (err) {
       if (err instanceof ApiError && err.status === 409) {

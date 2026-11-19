@@ -11,6 +11,7 @@ import { formatPaise, paiseToRupees, rupeesToPaise } from '../../format'
 import { ConflictBanner } from '../ConflictBanner'
 import { InlineAlert } from '../InlineAlert'
 import { Modal } from '../Modal'
+import { toast } from '../ToastHost'
 
 export interface BillLineActionModalProps {
   open: boolean
@@ -103,6 +104,7 @@ export function BillLineActionModal({
           await correctMutation.mutateAsync({ lineId: line.id, payload })
         }
       }
+      toast.success(mode === 'void' ? 'Bill item voided.' : 'Bill item corrected.')
       onClose()
     } catch (err: unknown) {
       if (err instanceof ApiError && err.status === 409) {
@@ -160,7 +162,7 @@ export function BillLineActionModal({
         {mode === 'correct' && (
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1">
-              <label htmlFor="action-line-qty" className="block text-xs font-bold uppercase tracking-wider text-slate-700">
+              <label htmlFor="action-line-qty" className="block text-xs font-bold text-slate-700">
                 New Quantity *
               </label>
               <input
@@ -175,7 +177,7 @@ export function BillLineActionModal({
             </div>
 
             <div className="space-y-1">
-              <label htmlFor="action-line-rate" className="block text-xs font-bold uppercase tracking-wider text-slate-700">
+              <label htmlFor="action-line-rate" className="block text-xs font-bold text-slate-700">
                 Rate (₹) *
               </label>
               <input
@@ -199,7 +201,7 @@ export function BillLineActionModal({
         {/* Reason field (required, 3-500 characters) */}
         <div className="space-y-1">
           <div className="flex items-center justify-between">
-            <label htmlFor="action-line-reason" className="block text-xs font-bold uppercase tracking-wider text-slate-700">
+            <label htmlFor="action-line-reason" className="block text-xs font-bold text-slate-700">
               Reason *
             </label>
             <span

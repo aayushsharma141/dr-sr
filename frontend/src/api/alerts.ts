@@ -13,19 +13,19 @@ export function isOpenEmergency(item: DoctorQueueItem): boolean {
 
 /**
  * Open emergency alerts on the signed-in doctor's own active consultations, oldest first.
- * Polls every 5 seconds (design section 9). The server returns only this doctor's consultations.
+ * Polls every 5 seconds (design section 9) and shares the ['doctor-queue'] cache with
+ * useDoctorQueue() so polling and invalidations are deduplicated into a single request.
  */
 export function useDoctorAlerts(enabled: boolean) {
   return useQuery({
-    queryKey: ['doctor-alerts'],
-    queryFn: async () => {
-      const queue = await apiFetch<DoctorQueueResponse>('/doctor/queue')
-      return [...queue.in_consultation, ...queue.waiting]
+    queryKey: ['doctor-queue'],
+    queryFn: () => apiFetch<DoctorQueueResponse>('/doctor/queue'),
+    select: (queue) =>
+      [...queue.in_consultation, ...queue.waiting]
         .filter(isOpenEmergency)
         .sort((a, b) =>
           (a.emergency_alerted_at ?? '').localeCompare(b.emergency_alerted_at ?? ''),
-        )
-    },
+        ),
     enabled,
     refetchInterval: 5000,
   })

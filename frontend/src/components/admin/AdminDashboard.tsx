@@ -57,12 +57,13 @@ function rupees(paise: number): string {
   return `${sign}₹${Math.floor(Math.abs(paise) / 100).toLocaleString('en-IN')}`
 }
 
-/** Short axis and donut labels: ₹950, ₹12.5k, ₹3.4L. */
+/** Short axis and donut labels: ₹950, ₹12.5k, ₹3.4L, -₹5k. */
 function shortRupees(paise: number): string {
-  const r = Math.round(paise / 100)
-  if (r >= 100000) return `₹${(r / 100000).toFixed(r >= 1000000 ? 0 : 1)}L`
-  if (r >= 1000) return `₹${(r / 1000).toFixed(r >= 10000 ? 0 : 1)}k`
-  return `₹${r}`
+  const sign = paise < 0 ? '-' : ''
+  const r = Math.round(Math.abs(paise) / 100)
+  if (r >= 100000) return `${sign}₹${(r / 100000).toFixed(r >= 1000000 ? 0 : 1)}L`
+  if (r >= 1000) return `${sign}₹${(r / 1000).toFixed(r >= 10000 ? 0 : 1)}k`
+  return `${sign}₹${r}`
 }
 
 function count(n: number | undefined): string {

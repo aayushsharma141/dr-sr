@@ -9,7 +9,7 @@ Guarantees:
 
 from fastapi import APIRouter, Depends, Request, Response
 from sqlalchemy import select
-from sqlalchemy.orm import object_session
+from sqlalchemy.orm import object_session, selectinload
 
 from kalyan_api import clock
 from kalyan_api.core.errors import ApiError, require_version
@@ -37,6 +37,7 @@ from kalyan_api.models import (
     ConsultationStatus,
     Doctor,
     Patient,
+    Visit,
 )
 from kalyan_api.schemas.encounters import (
     AddendumCreate,
@@ -51,6 +52,10 @@ from kalyan_api.schemas.encounters import (
 from kalyan_api.schemas.templates import TemplateResponseInput, TemplateResponseRead
 from kalyan_api.services import appointment_service, audit_service
 from kalyan_api.services.audit_service import AuditAction
+from kalyan_api.services.code_sequence_service import (
+    allocate_encounter_code,
+    effective_patient_ids,
+)
 
 router = APIRouter(tags=["encounters"])
 
@@ -92,6 +97,7 @@ def _to_read_schema(enc: ClinicalEncounter) -> EncounterRead:
 
     return EncounterRead(
         id=enc.id,
+        encounter_code=enc.encounter_code,
         patient_id=enc.patient_id,
         patient_urn=enc.patient_urn or (enc.patient.urn if enc.patient else ""),
         patient_name=enc.patient_name or (enc.patient.full_name if enc.patient else ""),
@@ -100,6 +106,7 @@ def _to_read_schema(enc: ClinicalEncounter) -> EncounterRead:
         doctor_id=enc.doctor_id,
         doctor_name=enc.doctor.name_en if enc.doctor else "",
         appointment_id=enc.appointment_id,
+        visit_id=enc.visit_id,
         department_id=enc.department_id or _department_from_saved_form(enc),
         encounter_date=enc.encounter_date,
         symptoms=enc.symptoms,
@@ -179,6 +186,32 @@ def create_encounter(
             )
         appointment_service.start_consultation(session, appt, principal)
 
+    # Derive visit_id automatically from linked appointment, or validate explicit walk-in visit_id.
+    visit_id: int | None = None
+    if appt is not None:
+        if payload.visit_id is not None and payload.visit_id != appt.visit_id:
+            raise ApiError(
+                status_code=422,
+                code="visit_mismatch",
+                message="Provided visit_id does not match the appointment's visit.",
+            )
+        visit_id = appt.visit_id
+    elif payload.visit_id is not None:
+        visit = session.get(Visit, payload.visit_id)
+        if visit is None:
+            raise ApiError(
+                status_code=404,
+                code="visit_not_found",
+                message="Visit not found.",
+            )
+        if visit.patient_id != payload.patient_id:
+            raise ApiError(
+                status_code=422,
+                code="visit_patient_mismatch",
+                message="Visit does not belong to this patient.",
+            )
+        visit_id = visit.id
+
     # D-19-03: the department (specialty) comes from the appointment. Without an appointment,
     # fall back to the doctor's department when they belong to exactly one.
     department_id = payload.department_id
@@ -191,6 +224,8 @@ def create_encounter(
 
     response.status_code = 201
     enc = ClinicalEncounter(
+        encounter_code=allocate_encounter_code(session, clock.ist_today()),
+        visit_id=visit_id,
         appointment_id=payload.appointment_id,
         department_id=department_id,
         patient_id=payload.patient_id,
@@ -215,6 +250,8 @@ def create_encounter(
         entity_type="clinical_encounter",
         entity_id=enc.id,
         after={
+            "encounter_code": enc.encounter_code,
+            "visit_id": enc.visit_id,
             "patient_id": enc.patient_id,
             "patient_urn": patient.urn,
             "doctor_id": enc.doctor_id,
@@ -242,6 +279,10 @@ def list_unfinished_encounters(
 
     stmt = (
         select(ClinicalEncounter)
+        .options(
+            selectinload(ClinicalEncounter.patient),
+            selectinload(ClinicalEncounter.department),
+        )
         .where(
             ClinicalEncounter.doctor_id == principal.doctor_id,
             ClinicalEncounter.is_finalised.is_(False),
@@ -309,10 +350,15 @@ def list_patient_encounters(
     if principal.role != Role.DOCTOR or principal.doctor_id is None:
         raise ApiError(status_code=403, code="doctor_only", message="Doctor access required.")
 
+    patient_ids = effective_patient_ids(session, patient_id)
     stmt = (
         select(ClinicalEncounter)
+        .options(
+            selectinload(ClinicalEncounter.doctor),
+            selectinload(ClinicalEncounter.addenda),
+        )
         .where(
-            ClinicalEncounter.patient_id == patient_id,
+            ClinicalEncounter.patient_id.in_(patient_ids),
             row_scope(principal, ScopeFamily.CLINICAL_READ, ClinicalEncounter.doctor_id),
         )
         .order_by(ClinicalEncounter.encounter_date.desc())

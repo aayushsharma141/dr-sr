@@ -91,12 +91,16 @@ def test_patient_edit_optimistic_concurrency_and_audit(
 
 def test_patient_photo_upload_and_streaming(
     login_client: Any,
+    admin_user: User,
+    doctor_a_user: User,
     reception_user: User,
     db_session: Session,
     client: TestClient,
 ) -> None:
-    """Photo upload enforces validation, magic bytes, storage, and authenticated streaming."""
+    """Photo upload is RECEPTION-only; streaming works for RECEPTION, DOCTOR, and ADMIN."""
     rec_c = login_client(reception_user)
+    admin_c = login_client(admin_user)
+    doc_c = login_client(doctor_a_user)
 
     patient = Patient(
         urn="KH-2026-0601",
@@ -124,8 +128,23 @@ def test_patient_photo_upload_and_streaming(
     )
     assert resp_invalid.status_code == 422
 
-    # 4. Upload valid JPEG magic bytes
+    # 4. Upload valid JPEG magic bytes (ADMIN and DOCTOR remain strictly forbidden -> 403)
     valid_jpeg = b"\xff\xd8\xff\xe0\x00\x10JFIF" + b"\x00" * 100
+    assert (
+        admin_c.post(
+            f"/api/patients/{patient.id}/photo",
+            files={"file": ("patient.jpg", BytesIO(valid_jpeg), "image/jpeg")},
+        ).status_code
+        == 403
+    )
+    assert (
+        doc_c.post(
+            f"/api/patients/{patient.id}/photo",
+            files={"file": ("patient.jpg", BytesIO(valid_jpeg), "image/jpeg")},
+        ).status_code
+        == 403
+    )
+
     valid_file = BytesIO(valid_jpeg)
     resp_valid = rec_c.post(
         f"/api/patients/{patient.id}/photo",
@@ -147,12 +166,13 @@ def test_patient_photo_upload_and_streaming(
     assert audit is not None
     assert audit.after_data["photo_path"] == data["photo_path"]
 
-    # 6. Stream photo as authenticated caller -> 200 with Cache-Control: private
-    stream_resp = rec_c.get(f"/api/patients/{patient.id}/photo")
-    assert stream_resp.status_code == 200
-    assert "image/jpeg" in stream_resp.headers.get("content-type", "")
-    assert "private" in stream_resp.headers.get("cache-control", "")
-    assert stream_resp.content == valid_jpeg
+    # 6. Stream photo as RECEPTION, DOCTOR, and ADMIN -> 200 with Cache-Control: private
+    for role_client in (rec_c, doc_c, admin_c):
+        stream_resp = role_client.get(f"/api/patients/{patient.id}/photo")
+        assert stream_resp.status_code == 200
+        assert "image/jpeg" in stream_resp.headers.get("content-type", "")
+        assert "private" in stream_resp.headers.get("cache-control", "")
+        assert stream_resp.content == valid_jpeg
 
 
 def test_patient_edit_empty_string_clears_optional_fields_and_null_leaves_them(

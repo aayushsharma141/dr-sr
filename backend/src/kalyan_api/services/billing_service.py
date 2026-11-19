@@ -1,10 +1,10 @@
 """Billing ledger computations shared by billing and dashboard routers.
 
 Guarantees:
-- Visit balances are derived dynamically at visit-level from ACTIVE bill lines and payments (design §4).
+- Visit balances are derived dynamically from ACTIVE bill lines and payments (design §4).
 - Pending dues are derived dynamically from the payment ledger (BIL-03); no stored balances.
 - Monetary values are integer paise only (BIL-02); reversed payments never count as paid.
-- No database trigger guards overpayments on visits; application-level locking and checks enforce limits (P6).
+- No DB trigger guards overpayments on visits; app-level locking and checks enforce limits (P6).
 """
 
 from collections.abc import Iterable
@@ -22,6 +22,7 @@ from kalyan_api.models import (
     Doctor,
     Patient,
     Payment,
+    Refund,
     TreatmentPlan,
     Visit,
     VisitStatus,
@@ -57,6 +58,51 @@ class VisitTotals:
     due_paise: int
     has_completed: bool
     has_active: bool
+    total_refunded_paise: int = 0
+
+
+def net_paid_by_treatment_plans(session: Session, plan_ids: Iterable[int]) -> dict[int, int]:
+    """Return net paid paise (non-reversed payments minus active refunds) per treatment plan."""
+    ids = list(plan_ids)
+    if not ids:
+        return {}
+
+    paid_rows = session.execute(
+        select(
+            Payment.treatment_plan_id,
+            func.coalesce(func.sum(Payment.amount_paise), 0),
+        )
+        .where(
+            Payment.treatment_plan_id.in_(ids),
+            Payment.is_reversed.is_(False),
+        )
+        .group_by(Payment.treatment_plan_id)
+    ).all()
+    gross_by_plan = {int(pid): int(amt) for pid, amt in paid_rows if pid is not None}
+
+    refund_rows = session.execute(
+        select(
+            Payment.treatment_plan_id,
+            func.coalesce(func.sum(Refund.amount_paise), 0),
+        )
+        .join(Payment, Payment.id == Refund.payment_id)
+        .where(
+            Payment.treatment_plan_id.in_(ids),
+            Payment.is_reversed.is_(False),
+        )
+        .group_by(Payment.treatment_plan_id)
+    ).all()
+    refunded_by_plan = {int(pid): int(amt) for pid, amt in refund_rows if pid is not None}
+
+    return {
+        pid: max(0, gross_by_plan.get(pid, 0) - refunded_by_plan.get(pid, 0))
+        for pid in ids
+    }
+
+
+def package_net_paid_paise(session: Session, treatment_plan_id: int) -> int:
+    """Return net paid paise (non-reversed payments minus active refunds) for one package."""
+    return net_paid_by_treatment_plans(session, [treatment_plan_id]).get(treatment_plan_id, 0)
 
 
 def counts_toward_total(
@@ -78,12 +124,10 @@ def counts_toward_total(
     """
     if isinstance(status_or_line, str):
         status = status_or_line
-        category = category_or_consultation_status or ""
         appt_id = appointment_id
         c_status = consultation_status
     else:
         status = getattr(status_or_line, "status", "ACTIVE")
-        category = getattr(status_or_line, "category", "")
         appt_id = getattr(status_or_line, "appointment_id", None)
         c_status = category_or_consultation_status
 
@@ -107,7 +151,8 @@ def visit_totals(
     - exclude lines of CANCELLED appointments (P4).
     - fail closed (W4, K-63): a COMPLETED consultation with no CONSULTATION line fails closed
       with ApiError(422, 'consultation_missing_bill_line').
-    - paid = single OR query over non-reversed payments with visit_id = visit OR appointment_id in visit (counted once).
+    - paid = non-reversed payments (visit_id or appointment_id in visit, counted once)
+      minus active refunds.
     - due = max(0, total - paid).
     """
     ids = list(visit_ids)
@@ -195,10 +240,31 @@ def visit_totals(
 
     paid_by_visit: dict[int, int] = {row[0]: int(row[1]) for row in paid_rows}
 
+    refund_visit_col = func.coalesce(Refund.visit_id, Payment.visit_id, Appointment.visit_id)
+    refund_rows = session.execute(
+        select(
+            refund_visit_col.label("v_id"),
+            func.coalesce(func.sum(Refund.amount_paise), 0),
+        )
+        .join(Payment, Payment.id == Refund.payment_id)
+        .outerjoin(Appointment, Appointment.id == Payment.appointment_id)
+        .where(
+            Payment.is_reversed.is_(False),
+            or_(
+                Refund.visit_id.in_(ids),
+                Payment.visit_id.in_(ids),
+                Appointment.visit_id.in_(ids),
+            ),
+        )
+        .group_by(refund_visit_col)
+    ).all()
+    refunded_by_visit: dict[int, int] = {row[0]: int(row[1]) for row in refund_rows}
+
     totals: dict[int, VisitTotals] = {}
     for v_id in ids:
         tot = total_by_visit.get(v_id, 0)
-        pd = paid_by_visit.get(v_id, 0)
+        refunded = refunded_by_visit.get(v_id, 0)
+        pd = max(0, paid_by_visit.get(v_id, 0) - refunded)
         totals[v_id] = VisitTotals(
             visit_id=v_id,
             bill_total_paise=tot,
@@ -206,6 +272,7 @@ def visit_totals(
             due_paise=max(0, tot - pd),
             has_completed=has_completed_map.get(v_id, False),
             has_active=has_active_map.get(v_id, False),
+            total_refunded_paise=refunded,
         )
     return totals
 
@@ -257,6 +324,7 @@ def visit_charge_lines(
             )
         }
     paid_by_appointment: dict[int, int] = {}
+    refunded_by_appointment: dict[int, int] = {}
     if appointment_ids:
         paid_by_appointment = {
             appointment_id: int(total)
@@ -269,17 +337,37 @@ def visit_charge_lines(
                 .group_by(Payment.appointment_id)
             )
         }
+        refunded_by_appointment = {
+            appointment_id: int(total)
+            for appointment_id, total in session.execute(
+                select(Payment.appointment_id, func.coalesce(func.sum(Refund.amount_paise), 0))
+                .join(Payment, Payment.id == Refund.payment_id)
+                .where(
+                    Payment.appointment_id.in_(appointment_ids),
+                    Payment.is_reversed.is_(False),
+                )
+                .group_by(Payment.appointment_id)
+            )
+        }
 
     for appointment_id, visit_id, doctor_id, doctor_name, status, doctor_default_fee in rows:
         completed = status == ConsultationStatus.COMPLETED.value
-        if completed and appointment_id not in line_fee_by_appointment and (doctor_default_fee or 0) > 0:
+        if (
+            completed
+            and appointment_id not in line_fee_by_appointment
+            and (doctor_default_fee or 0) > 0
+        ):
             raise ApiError(
                 status_code=422,
                 code="consultation_missing_bill_line",
                 message="A completed consultation is missing its consultation bill line.",
             )
         fee_paise = line_fee_by_appointment.get(appointment_id, 0)
-        paid_paise = paid_by_appointment.get(appointment_id, 0)
+        paid_paise = max(
+            0,
+            paid_by_appointment.get(appointment_id, 0)
+            - refunded_by_appointment.get(appointment_id, 0),
+        )
         lines[visit_id].append(
             VisitChargeLine(
                 appointment_id=appointment_id,
@@ -307,7 +395,7 @@ def consultation_fee_paise(session: Session, appointment_id: int) -> int | None:
 
 
 def visit_payments(session: Session, visit_id: int) -> list[Payment]:
-    """Every payment recorded against the visit or its consultations, newest first (reversed too)."""
+    """Every payment on the visit or its consultations, newest first (reversed included)."""
     return list(
         session.scalars(
             select(Payment)
@@ -339,7 +427,7 @@ def visit_outstanding_paise(session: Session, visit_id: int) -> int:
 
 
 def compute_visit_dues(session: Session) -> list[VisitDueOut]:
-    """Consultation fees and charges still owed on visits that were closed with a balance, newest first.
+    """Charges still owed on visits that were closed with a balance, newest first.
 
     A visit closed with money due keeps its balance (owner decision 8). Only CLOSED visits are
     listed: an open one is still at checkout. Paying one of these does not reopen the visit.
@@ -402,14 +490,15 @@ def compute_pending_dues(session: Session) -> list[PendingDueOut]:
         .order_by(TreatmentPlan.created_at.desc())
     )
     plans = session.execute(stmt).scalars().all()
+    if not plans:
+        return []
+
+    plan_ids = [plan.id for plan in plans]
+    paid_by_plan = net_paid_by_treatment_plans(session, plan_ids)
 
     dues: list[PendingDueOut] = []
     for plan in plans:
-        paid_stmt = select(func.coalesce(func.sum(Payment.amount_paise), 0)).where(
-            Payment.treatment_plan_id == plan.id,
-            Payment.is_reversed.is_(False),
-        )
-        paid_paise: int = session.scalar(paid_stmt) or 0
+        paid_paise: int = paid_by_plan.get(plan.id, 0)
         balance_paise = plan.agreed_price_paise - paid_paise
 
         if balance_paise > 0:
@@ -509,15 +598,7 @@ def patient_package_summaries(session: Session, patient_id: int) -> list[Package
         return []
 
     plan_ids = [plan.id for plan in plans]
-    paid_stmt = (
-        select(Payment.treatment_plan_id, func.coalesce(func.sum(Payment.amount_paise), 0))
-        .where(
-            Payment.treatment_plan_id.in_(plan_ids),
-            Payment.is_reversed.is_(False),
-        )
-        .group_by(Payment.treatment_plan_id)
-    )
-    paid_map = dict(session.execute(paid_stmt).all())
+    paid_map = net_paid_by_treatment_plans(session, plan_ids)
 
     summaries: list[PackageInfoOut] = []
     for plan in plans:

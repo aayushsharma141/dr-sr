@@ -25,6 +25,7 @@ Ordering notes:
 - [x] **Phase 20: Admin Data Governance & Asset Management** - Patient demographic correction with audit; CSV/XLSX import centre (8-stage staging pipeline: upload → inspect → map → validate → resolve → preview → commit → reconcile); controlled patient export (permission-checked, field-selective, audited); hospital identity and logo/asset CRUD with version history; bilingual print template management per document type (prescription, receipt, registration card); five-section Admin navigation reorganization (Hospital Configuration, Patient & Data Management, Users/Security/Governance, System & Maintenance). Uses existing RBAC; no new permission system. All existing admin pages preserved and reorganized, not removed. (completed 2026-11-08)
 - [x] **Phase 22: Integrated OPD Workflow** - Check-in with Referred By and classification, emergency acknowledgement, same-visit reassignment, fee-snapshot bill lines, checkout and receipts. (completed 2026-11-16)
 - [x] **Phase 23: Advanced Data Operations** (deferred; formerly numbered 22) - Duplicate patient detection and merge workflow (high-risk FK cascade; dedicated transaction design); bulk archive and bulk delete for eligible records; extended data-edit permission controls; LAN workstation status monitoring. Depends on Phase 20 stable data foundation.
+- [x] **Phase 25: Codebase Audit & System Hardening** - Resolve 20 audit findings across backup restore permissions, RBAC matrix completeness, appointment check-in state machine alignment, workstation heartbeat isolation, and lean clutter removal. (completed 2026-11-17)
 
 ## Phase Details
 
@@ -372,3 +373,38 @@ Plans:
 - [x] 23-03-PLAN.md — Consolidated Patient Aggregations (Timeline, Visits, Dues) & Merged URN Routing (Wave 2)
 - [x] 23-04-PLAN.md — Filtered Bulk Archival, Hard Financial Dues Guard & Workstation Monitoring Backend (Wave 3)
 - [x] 23-05-PLAN.md — Frontend Admin UI (/admin/duplicates, /admin/patients/archive, /admin/workstations) & Verification Gate (Wave 4)
+
+---
+
+### Phase 24: OPD Reception Dashboard Reliability & Efficiency
+
+**Status:** In progress — technical verification pending; receptionist acceptance not run.
+
+**Goal:** Make reception queue and overview data visibly fresh and accurate, and make common queue actions faster to use without changing clinical, queue, payment, or authorization policy.
+
+**Depends on:** Phase 22 integrated OPD workflow; reconcile the current uncommitted OPD worktree before implementation.
+
+**Plan:** `.planning/phases/24-reception-dashboard-reliability/24-01-PLAN.md`
+
+**Design:** `.planning/phases/24-reception-dashboard-reliability/24-DESIGN.md`
+
+**Work areas:** Dashboard freshness/error states; backend-defined payment and reversal activity; authoritative department labels; delayed-queue navigation and accessible controls; synthetic-data regression and receptionist acceptance.
+
+**Acceptance gate:** Follow `AGENTS.md` Definition of Done. Receptionist satisfaction remains unmeasured until an on-site or representative staff walkthrough is recorded.
+
+---
+
+### Phase 25: Codebase Audit & System Hardening
+
+**Goal**: Resolve 20 audit findings across backup restore permissions, RBAC matrix completeness, appointment check-in state machine backwards compatibility, workstation heartbeat isolation, and lean workspace cleanup.
+
+**Depends on**: Audit findings baseline
+
+**Plans:** 4 plans (Waves 1-4)
+
+Plans:
+
+- [x] 25-01-PLAN.md — Backend Security, Permissions & State Machine Alignment (Wave 1) (completed 2026-11-17)
+- [x] 25-02-PLAN.md — Workstation Heartbeat & Frontend Mock Isolation (Wave 2) (completed 2026-11-17)
+- [x] 25-03-PLAN.md — Data Safety, Integrity & Efficiency (Wave 3) (completed 2026-11-17)
+- [x] 25-04-PLAN.md — Lean Cleanup & Documentation Synchronization (Wave 4) (completed 2026-11-17)

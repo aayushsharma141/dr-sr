@@ -48,6 +48,13 @@ class OpdArrivalPriorityUpdate(BaseModel):
     reason: str = Field(min_length=3, max_length=500)
 
 
+class OpdArrivalCancel(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    version_id: int = Field(ge=1)
+    reason: str = Field(min_length=3, max_length=500)
+
+
 class OpdArrivalRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -64,6 +71,7 @@ class OpdArrivalRead(BaseModel):
     priority_level: str
     priority_reason: str | None = None
     status: str
+    cancellation_reason: str | None = None
     version_id: int
     created_at: datetime
     patient_id: int | None = None
@@ -73,3 +81,5 @@ class OpdArrivalRead(BaseModel):
 class OpdArrivalList(BaseModel):
     total: int
     arrivals: list[OpdArrivalRead]
+    limit: int | None = None
+    offset: int = 0

@@ -8,7 +8,7 @@ export const PRIORITY_LABEL: Record<PriorityLevel, string> = {
 }
 
 /**
- * Burgundy for Emergency, gold for High, neutral for Normal.
+ * Clinical triage semantics: Emergency → red, High/Priority → amber, Normal → slate.
  */
 export function PriorityBadge({
   level,
@@ -39,8 +39,8 @@ export function PriorityBadge({
       title={reason ?? undefined}
       className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-semibold ${
         emergency
-          ? 'border border-[#8E1C3D]/25 bg-[#FBF5F7] text-[#5D0B26]'
-          : 'border border-[#C39A35]/40 bg-[#C39A35]/10 text-[#73540B]'
+          ? 'border border-red-200 bg-red-50 text-red-800'
+          : 'border border-amber-200 bg-amber-50 text-amber-900'
       }`}
     >
       {emergency && <IconAlertTriangle className="h-3 w-3" />}

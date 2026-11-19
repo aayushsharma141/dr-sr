@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { cleanup, render, screen } from '@testing-library/react'
+import { cleanup, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -237,5 +237,45 @@ describe('ReceiptsPage', () => {
     expect(screen.getByText('REC-2026-0011')).toBeInTheDocument()
     expect(screen.queryByText('REC-2026-0010')).not.toBeInTheDocument()
     expect(screen.queryByText('REC-2026-0012')).not.toBeInTheDocument()
+  })
+
+  it('renders top financial desk tabs linking to billing and reports', async () => {
+    renderPage()
+
+    const deskNav = await screen.findByRole('navigation', { name: 'Reception Desk Financial Tabs' })
+    const billingTab = within(deskNav).getByRole('link', { name: /Billing & Checkout/i })
+    expect(billingTab).toHaveAttribute('href', '/reception/billing')
+
+    const reportsTab = within(deskNav).getByRole('link', { name: /Daily Collection Report/i })
+    expect(reportsTab).toHaveAttribute('href', '/reception/reports')
+  })
+
+  it('filters receipts by payment method chips', async () => {
+    const user = userEvent.setup()
+    renderPage()
+
+    expect(await screen.findByText('REC-2026-0010')).toBeInTheDocument() // CASH
+    expect(screen.getByText('REC-2026-0011')).toBeInTheDocument() // UPI
+    expect(screen.getByText('REC-2026-0012')).toBeInTheDocument() // CARD (Reversed)
+
+    // Click Cash Drawer filter chip
+    const cashChip = screen.getByRole('button', { name: /Cash Drawer/i })
+    await user.click(cashChip)
+    expect(screen.getByText('REC-2026-0010')).toBeInTheDocument()
+    expect(screen.queryByText('REC-2026-0011')).not.toBeInTheDocument()
+    expect(screen.queryByText('REC-2026-0012')).not.toBeInTheDocument()
+
+    // Click UPI filter chip
+    const upiChip = screen.getByRole('button', { name: /UPI \/ QR/i })
+    await user.click(upiChip)
+    expect(screen.getByText('REC-2026-0011')).toBeInTheDocument()
+    expect(screen.queryByText('REC-2026-0010')).not.toBeInTheDocument()
+
+    // Click Reversals filter chip
+    const reversalsChip = screen.getByRole('button', { name: /Reversals/i })
+    await user.click(reversalsChip)
+    expect(screen.getByText('REC-2026-0012')).toBeInTheDocument()
+    expect(screen.queryByText('REC-2026-0010')).not.toBeInTheDocument()
+    expect(screen.queryByText('REC-2026-0011')).not.toBeInTheDocument()
   })
 })

@@ -47,6 +47,7 @@ describe('DoctorSettings Page (K-60)', () => {
 
   afterEach(() => {
     cleanup()
+    window.localStorage.clear()
     vi.restoreAllMocks()
   })
 
@@ -66,6 +67,14 @@ describe('DoctorSettings Page (K-60)', () => {
           status: 200,
           headers: new Headers({ 'content-type': 'application/json' }),
           text: () => Promise.resolve(JSON.stringify([mockDoctorProfile])),
+        })
+      }
+      if (url.includes('/api/clinic/branding')) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          headers: new Headers({ 'content-type': 'application/json' }),
+          text: () => Promise.resolve(JSON.stringify({ hospitalName: 'Kalyan Hospital' })),
         })
       }
       return Promise.reject(new Error(`Unhandled: ${url}`))
@@ -125,6 +134,14 @@ describe('DoctorSettings Page (K-60)', () => {
           text: () => Promise.resolve(JSON.stringify([mockDoctorProfile])),
         })
       }
+      if (url.includes('/api/clinic/branding')) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          headers: new Headers({ 'content-type': 'application/json' }),
+          text: () => Promise.resolve(JSON.stringify({ hospitalName: 'Kalyan Hospital' })),
+        })
+      }
       return Promise.reject(new Error(`Unhandled: ${url}`))
     })
     vi.stubGlobal('fetch', mockFetch)
@@ -151,6 +168,8 @@ describe('DoctorSettings Page (K-60)', () => {
       default_fee_paise: 60000,
       version_id: 1,
     })
+    expect(window.localStorage.getItem('kh_doctor_consult_pace')).toBeNull()
+    expect(window.localStorage.getItem('kh_doctor_followup_validity')).toBeNull()
   })
 
   it('shows conflict banner on 409 and reloads latest fee', async () => {
@@ -236,7 +255,32 @@ describe('DoctorSettings Page (K-60)', () => {
     })
   })
 
-  it('renders official prescription letterhead preview and consultation pace selector', async () => {
+  it('renders official prescription letterhead preview from live clinic settings without unused localStorage controls', async () => {
+    const liveClinicSettings = {
+      id: 1,
+      name_en: 'Kalyan Hospital',
+      name_hi: 'कल्याण हॉस्पिटल',
+      trust_name_en: 'Sri Vashishtha Kalyan Trust',
+      trust_name_hi: 'श्री वशिष्ठ कल्याण ट्रस्ट',
+      location_line: 'Ara, Bhojpur, Bihar',
+      address_1: 'Station Road, Nawada Thana Lane, Ara, Bihar - 802301',
+      address_2: 'Opp. Railway Junction',
+      phone: '06182-222111',
+      email: null,
+      receipt_sequence_cycle: 'FINANCIAL_YEAR',
+      print_header_en: null,
+      print_header_hi: null,
+      print_footer_en: null,
+      print_footer_hi: null,
+      consultation_validity_days: 7,
+      version_id: 1,
+      created_at: '2026-01-01T00:00:00Z',
+      updated_at: '2026-01-01T00:00:00Z',
+    }
+    const doctorWithoutPrefix: DoctorOut = {
+      ...mockDoctorProfile,
+      name_en: 'Anil Kumar',
+    }
     const mockFetch = vi.fn().mockImplementation((url: string) => {
       if (url.includes('/api/auth/me')) {
         return Promise.resolve({
@@ -251,7 +295,15 @@ describe('DoctorSettings Page (K-60)', () => {
           ok: true,
           status: 200,
           headers: new Headers({ 'content-type': 'application/json' }),
-          text: () => Promise.resolve(JSON.stringify([mockDoctorProfile])),
+          text: () => Promise.resolve(JSON.stringify([doctorWithoutPrefix])),
+        })
+      }
+      if (url.includes('/api/settings')) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          headers: new Headers({ 'content-type': 'application/json' }),
+          text: () => Promise.resolve(JSON.stringify(liveClinicSettings)),
         })
       }
       return Promise.reject(new Error(`Unhandled: ${url}`))
@@ -268,10 +320,17 @@ describe('DoctorSettings Page (K-60)', () => {
 
     await waitFor(() => {
       expect(screen.getByText(/Official Prescription Letterhead & Seal Preview/i)).toBeInTheDocument()
+      expect(
+        screen.getByText(/Station Road, Nawada Thana Lane, Ara, Bihar - 802301, Opp\. Railway Junction/),
+      ).toBeInTheDocument()
     })
-    expect(screen.getByText(/Target Consultation Pace/i)).toBeInTheDocument()
-    expect(screen.getByText(/Prescription Follow-Up Grace Validity/i)).toBeInTheDocument()
+    expect(screen.getByText(/Ara, Bhojpur, Bihar · 06182-222111/)).toBeInTheDocument()
+    expect(screen.getByText('7-day OPD validity')).toBeInTheDocument()
+    expect(screen.getAllByText('Dr. Anil Kumar').length).toBeGreaterThanOrEqual(1)
     expect(screen.getByText(/SEAL PREVIEW \(NOT A SIGNATURE\)/)).toBeInTheDocument()
     expect(screen.queryByText(/DIGITALLY SIGNED/i)).not.toBeInTheDocument()
+    expect(screen.queryByText(/Rahimatpur|Satara/i)).not.toBeInTheDocument()
+    expect(screen.queryByText(/Target Consultation Pace/i)).not.toBeInTheDocument()
+    expect(screen.queryByText(/Prescription Follow-Up Grace Validity/i)).not.toBeInTheDocument()
   })
 })
